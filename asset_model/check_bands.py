@@ -45,9 +45,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
 #: Units a bound is stated in. A rule mixing ROWS and PERCENT is compared at
@@ -233,7 +233,7 @@ class Catalogue:
     def single_tier_readers(self, dataset_id: str) -> dict[str, list[str]]:
         """{column: [check_id, ...]} - every single-tier check reading each
         column of this dataset's table, by its own column or reads_columns."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         table = hierarchy.dataset(dataset_id).table
         out: dict[str, set[str]] = {}
@@ -402,8 +402,8 @@ def evidently_bounds(check_ids=None) -> dict[str, tuple]:
     file (REQ-QAC-241): its method, and its warn and fail bands, each
     tripping on a strict `>`. A check whose method is neither psi nor
     row_drop is refused rather than given some band."""
-    from qa_tools import collections
-    from qa_tools.common import check_lifecycle
+    from asset_model import collections
+    from asset_model import check_lifecycle
 
     entries = {}
     for rel in collections.check_files("evidently"):
@@ -426,7 +426,7 @@ def file_bounds(metadata, doc=None) -> dict[str, tuple]:
     """A file check fails (severity failure) or only warns (warning) on any
     problem with the file - it has no band of its own. One file-checks.yaml
     does not name, or names with another severity, is refused."""
-    from qa_tools import collections
+    from asset_model import collections
 
     if doc is None:
         doc = config_yaml.parse((ROOT / collections.file_checks()).read_text()) or {}
@@ -474,11 +474,11 @@ def soda_reference_reads(path: Path) -> dict[str, tuple[str, str]]:
 def catalogue() -> Catalogue:
     """Every check in force, with its bands and what it reads (criteria 1, 2,
     5). Joined to check_lifecycle's own metadata, so a check is catalogued
-    exactly when the lifecycle gate sees it."""
-    from qa_tools import collections
-    from qa_tools.common import validate_check_lifecycle as vcl
+    exactly when the lifecycle gate sees it - through the working-tree read
+    the gate itself uses (check_sources, REQ-PIPE-380 criterion 12)."""
+    from asset_model import check_sources, collections
 
-    metadata = [m for m in vcl.collect_checks(None) if not m.retired_as_of]
+    metadata = [m for m in check_sources.working_tree_checks() if not m.retired_as_of]
     bounds: dict[str, tuple] = {}
     references: dict[str, tuple[str, str]] = {}
     # Every collection's sources, from the registry (REQ-QAC-241).

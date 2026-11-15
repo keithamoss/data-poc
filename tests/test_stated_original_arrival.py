@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from qa_tools.common import delivery, delivery_log, hand_filing, supply_db
+from asset_model import delivery as delivery_tree
 
 PERTH = timezone(timedelta(hours=8))
 NOW = datetime(2026, 9, 25, 9, 0, tzinfo=PERTH)
@@ -75,7 +76,7 @@ def tree(tmp_path, private_supply_dsn):
 
 
 def _csv(tmp_path):
-    from qa_tools.common import schedule as schedule_mod
+    from asset_model import schedule as schedule_mod
 
     day = schedule_mod.calendar("daily").current.effective_from + timedelta(days=3)
     path = tmp_path / f"birth_registrations_{day.isoformat()}.csv"
@@ -94,7 +95,7 @@ class TestWhatAKeptSupplyRecords:
             stated_original={"*": "2026-09-20T10:00:00+08:00"}, route="file",
             filed_by="analyst@example.org",
             deliveries_dir=deliveries, receipts_dir=receipts)
-        d = delivery.read_delivery(filed.delivery_name, deliveries, receipts)
+        d = delivery_tree.read_delivery(filed.delivery_name, deliveries, receipts)
         (name,) = d.files
         assert d.received_at == NOW, "the receipt is the command's own instant"
         assert d.stated_original == {name: "2026-09-20T10:00:00+08:00"}
@@ -112,7 +113,7 @@ class TestWhatAKeptSupplyRecords:
             stated_original={"*": delivery.NOT_KNOWN}, route="file",
             filed_by="analyst@example.org",
             deliveries_dir=deliveries, receipts_dir=receipts)
-        d = delivery.read_delivery(filed.delivery_name, deliveries, receipts)
+        d = delivery_tree.read_delivery(filed.delivery_name, deliveries, receipts)
         assert d.filed_by == {"kind": "person", "route": "file", "who": "analyst@example.org"}
         with supply_db.connect(label="test-stated") as conn:
             (record,) = [r for r in delivery_log.records(conn)
@@ -154,8 +155,8 @@ class TestWhatAKeptSupplyRecords:
         first = {"kind": "person", "route": "folder", "who": "analyst@example.org"}
         (receipts / "a.csv.json").write_text(json.dumps({"filed_by": first}))
         (receipts / "b.csv.json").write_text(json.dumps({"filed_by": second} if second else {}))
-        with pytest.raises(delivery.DeliveryFormatError, match="disagree"):
-            delivery._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="disagree"):
+            delivery_tree._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
 
     def test_receipts_that_agree_are_read(self, tmp_path):
         import json
@@ -165,7 +166,7 @@ class TestWhatAKeptSupplyRecords:
         who = {"kind": "person", "route": "folder", "who": "analyst@example.org"}
         for name in ("a.csv", "b.csv"):
             (receipts / f"{name}.json").write_text(json.dumps({"filed_by": who}))
-        _, filed_by = delivery._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
+        _, filed_by = delivery_tree._receipt_extras("d", tmp_path / "receipts", ["a.csv", "b.csv"])
         assert filed_by == who
 
     def test_an_automated_delivery_records_no_person_and_never_asked(self, tmp_path, tree):
@@ -173,12 +174,12 @@ class TestWhatAKeptSupplyRecords:
         deliveries, receipts = tree
         delivery.write_delivery("auto", {"x.csv": "a\n1\n"}, received_at=NOW,
                                 deliveries_dir=deliveries, receipts_dir=receipts)
-        d = delivery.read_delivery("auto", deliveries, receipts)
+        d = delivery_tree.read_delivery("auto", deliveries, receipts)
         assert d.filed_by == {"kind": "automated"} and d.stated_original == {}
 
     def test_a_route_outside_the_four_is_refused(self, tmp_path, tree):
         deliveries, receipts = tree
-        with pytest.raises(delivery.DeliveryFormatError):
+        with pytest.raises(delivery_tree.DeliveryFormatError):
             hand_filing.file_supply([_csv(tmp_path)], "civil-registration", "run_",
                                     received_at=NOW, stated_original={"*": "not-known"},
                                     route="email", filed_by="a@b.c",
@@ -236,8 +237,8 @@ class TestTheCommandLine:
         from qa_tools.common import git_identity
 
         monkeypatch.setattr(git_identity, "get_run_by", lambda: "a@b.c")
-        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
-        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(tmp_path / "receipts"))
+        monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(tmp_path / "receipts"))
         with pytest.raises(click.ClickException) as caught:
             common.file_or_trial([str(_csv(tmp_path))], "civil-registration", "run_",
                                  keep=True, route="file")
@@ -253,7 +254,7 @@ class TestTheCommandLine:
         def _none():
             raise git_identity.MissingGitIdentityError("no user.email")
         monkeypatch.setattr(git_identity, "get_run_by", _none)
-        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
         with pytest.raises(click.ClickException) as caught:
             common.file_or_trial([str(_csv(tmp_path))], "civil-registration", "run_",
                                  keep=True, route="file", originally="not-known")
@@ -280,7 +281,8 @@ class TestItIsShownBesideTheReceipt:
             [_csv(tmp_path)], "civil-registration", "run_", received_at=NOW,
             stated_original={"*": "2026-09-20T10:00:00+08:00"}, route="file",
             filed_by="keith@example.org", deliveries_dir=deliveries, receipts_dir=receipts)
-        from qa_tools.common import arrivals, filing
+        from asset_model import arrivals
+        from qa_tools.common import filing
         found = [a for a in arrivals.arrivals_for("civil-registration", "run_",
                                                   deliveries, receipts)
                  if a.delivery_name == filed.delivery_name]
@@ -317,8 +319,8 @@ class TestItIsShownBesideTheReceipt:
 
         filed, _ = self._kept(tmp_path, tree)
         deliveries, receipts = tree
-        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
-        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
+        monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(deliveries))
+        monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
         out = CliRunner().invoke(supply_group, ["deliveries", "--name", filed.delivery_name],
                                  terminal_width=200).output
         flat = " ".join(out.split())
@@ -332,8 +334,8 @@ class TestItIsShownBesideTheReceipt:
         deliveries, receipts = tree
         delivery.write_delivery("auto", {"x.csv": "a\n1\n"}, received_at=NOW,
                                 deliveries_dir=deliveries, receipts_dir=receipts)
-        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
-        monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
+        monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(deliveries))
+        monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
         out = CliRunner().invoke(supply_group, ["deliveries"], terminal_width=200).output
         assert "automatically" in out
 

@@ -28,7 +28,7 @@ def sc(private_supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
 
 
 def _pinned() -> str:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return asset_time.PINNED_NOW_VARIABLE
 

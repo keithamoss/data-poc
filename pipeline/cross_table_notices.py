@@ -26,7 +26,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from qa_tools.common import asset_time, decision_log, hierarchy, period_schema
+from asset_model import asset_time, hierarchy
+from qa_tools.common import decision_log, period_schema
 
 #: A line's form - REQ-DASH-204 criterion 2's one wording and the cases it
 #: names, and criterion 7's two.

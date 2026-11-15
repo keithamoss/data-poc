@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from qa_tools.common import check_id, file_checks as fc
+from asset_model import check_id, file_check_definitions
+from qa_tools.common import file_checks as fc
 
 COLUMNS = ["id", "name", "born"]
 
@@ -24,66 +25,66 @@ class TestEachFaultIsNamed:
 
     def test_a_clean_file_passes_everything(self, tmp_path):
         found = fc.evaluate(_write(tmp_path, b"id,name,born\n1,Ann,2020\n2,Bo,2021\n"), COLUMNS)
-        assert [f.check for f in found] == list(fc.NAMES)
+        assert [f.check for f in found] == list(file_check_definitions.NAMES)
         assert {f.status for f in found} == {fc.PASS}
         assert fc.refusal(found) is None
 
     def test_not_utf8(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,born\n1,Ren\xe9e,2020\n"), COLUMNS))
-        assert f[fc.ENCODING].status == fc.FAIL
-        assert "line 2" in f[fc.ENCODING].words and "Ren" not in f[fc.ENCODING].words
+        assert f[file_check_definitions.ENCODING].status == fc.FAIL
+        assert "line 2" in f[file_check_definitions.ENCODING].words and "Ren" not in f[file_check_definitions.ENCODING].words
 
     def test_wrong_delimiter(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id;name;born\n1;Ann;2020\n"), COLUMNS))
-        assert f[fc.DELIMITER].status == fc.FAIL
+        assert f[file_check_definitions.DELIMITER].status == fc.FAIL
         # A header that does not split has no names to compare - never a pass.
-        assert {f[c].status for c in (fc.HEADER_ROW, fc.HEADER_NAMES_UNIQUE,
-                                       fc.FIELDS_PER_ROW, fc.COLUMN_ORDER)} == {fc.NODATA}
+        assert {f[c].status for c in (file_check_definitions.HEADER_ROW, file_check_definitions.HEADER_NAMES_UNIQUE,
+                                       file_check_definitions.FIELDS_PER_ROW, file_check_definitions.COLUMN_ORDER)} == {fc.NODATA}
 
     def test_no_header_row(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"1,Ann,2020\n2,Bo,2021\n"), COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.FAIL
-        assert "Ann" not in f[fc.HEADER_ROW].words
+        assert f[file_check_definitions.HEADER_ROW].status == fc.FAIL
+        assert "Ann" not in f[file_check_definitions.HEADER_ROW].words
 
     def test_an_empty_file(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b""), COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.FAIL
+        assert f[file_check_definitions.HEADER_ROW].status == fc.FAIL
 
     def test_a_repeated_header_name(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,name\n1,Ann,Ann\n"), COLUMNS))
-        assert f[fc.HEADER_NAMES_UNIQUE].status == fc.FAIL
-        assert "name" in f[fc.HEADER_NAMES_UNIQUE].words
+        assert f[file_check_definitions.HEADER_NAMES_UNIQUE].status == fc.FAIL
+        assert "name" in f[file_check_definitions.HEADER_NAMES_UNIQUE].words
 
     @pytest.mark.parametrize("row", [b"1,Ann\n", b"1,Ann,2020,extra\n"])
     def test_short_and_long_rows_alike(self, tmp_path, row):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,born\n2,Bo,2021\n" + row), COLUMNS))
-        assert f[fc.FIELDS_PER_ROW].status == fc.FAIL
-        assert "line 3" in f[fc.FIELDS_PER_ROW].words
-        assert "Ann" not in f[fc.FIELDS_PER_ROW].words
+        assert f[file_check_definitions.FIELDS_PER_ROW].status == fc.FAIL
+        assert "line 3" in f[file_check_definitions.FIELDS_PER_ROW].words
+        assert "Ann" not in f[file_check_definitions.FIELDS_PER_ROW].words
 
     def test_every_row_one_field_too_many(self, tmp_path):
         """The uniform case the loader takes without error (decision: a
         fourth loader behaviour)."""
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,born\n1,Ann,2020,x\n2,Bo,2021,y\n"),
                                   COLUMNS))
-        assert f[fc.FIELDS_PER_ROW].status == fc.FAIL
-        assert f[fc.FIELDS_PER_ROW].words.startswith("2 rows")
+        assert f[file_check_definitions.FIELDS_PER_ROW].status == fc.FAIL
+        assert f[file_check_definitions.FIELDS_PER_ROW].words.startswith("2 rows")
 
     def test_column_order_only_warns(self, tmp_path):
         found = fc.evaluate(_write(tmp_path, b"name,id,born\nAnn,1,2020\n"), COLUMNS)
         f = _by_check(found)
-        assert f[fc.COLUMN_ORDER].status == fc.WARN
+        assert f[file_check_definitions.COLUMN_ORDER].status == fc.WARN
         assert fc.refusal(found) is None
 
     def test_a_quoted_comma_and_line_break_are_one_field(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b'id,name,born\n1,"Ann, Jr\nII",2020\n'),
                                   COLUMNS))
-        assert f[fc.FIELDS_PER_ROW].status == fc.PASS
+        assert f[file_check_definitions.FIELDS_PER_ROW].status == fc.PASS
 
     def test_a_byte_order_mark_is_not_a_fault(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"\xef\xbb\xbfid,name,born\n1,Ann,2020\n"),
                                   COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.PASS and f[fc.COLUMN_ORDER].status == fc.PASS
+        assert f[file_check_definitions.HEADER_ROW].status == fc.PASS and f[file_check_definitions.COLUMN_ORDER].status == fc.PASS
 
 
 class TestTheEvaluatorsOwnBug:
@@ -92,7 +93,7 @@ class TestTheEvaluatorsOwnBug:
     def test_it_raises_naming_the_check(self, tmp_path, monkeypatch):
         def broken(p, expected):
             raise ZeroDivisionError("ours")
-        monkeypatch.setitem(fc._EVALUATORS, fc.FIELDS_PER_ROW, broken)
+        monkeypatch.setitem(fc._EVALUATORS, file_check_definitions.FIELDS_PER_ROW, broken)
         with pytest.raises(fc.FileCheckCrashed, match="fields_per_row"):
             fc.evaluate(_write(tmp_path, b"id,name,born\n"), COLUMNS)
 
@@ -101,11 +102,11 @@ class TestIdentity:
     """Criterion 4."""
 
     def test_ids_are_derived_and_valid(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         for ds in hierarchy.all_datasets():
-            for d in fc.active():
-                parsed = check_id.parse(fc.check_id_for(ds, d.check))
+            for d in file_check_definitions.active():
+                parsed = check_id.parse(file_check_definitions.check_id_for(ds, d.check))
                 assert (parsed.dataset, parsed.tool) == (ds.dataset_id, "file")
 
     def test_it_is_not_a_data_check_tool(self):
@@ -158,12 +159,12 @@ def _stage(path, received=_RECEIPT, run="run_001"):
 
 @pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
 @pytest.mark.parametrize("fault, data", [
-    (fc.ENCODING, f"{_HEADER}\nBR1,Ren\xe9e\n".encode("latin-1")),
-    (fc.DELIMITER, b"registration_number;child_family_name\nBR1;SMITH\n"),
-    (fc.HEADER_ROW, b"BR1,SMITH\nBR2,JONES\n"),
-    (fc.HEADER_NAMES_UNIQUE, b"registration_number,registration_number\nBR1,BR1\n"),
+    (file_check_definitions.ENCODING, f"{_HEADER}\nBR1,Ren\xe9e\n".encode("latin-1")),
+    (file_check_definitions.DELIMITER, b"registration_number;child_family_name\nBR1;SMITH\n"),
+    (file_check_definitions.HEADER_ROW, b"BR1,SMITH\nBR2,JONES\n"),
+    (file_check_definitions.HEADER_NAMES_UNIQUE, b"registration_number,registration_number\nBR1,BR1\n"),
     # Criterion 17's own named case: short rows load today as empty values.
-    (fc.FIELDS_PER_ROW, f"{_HEADER}\nBR1,SMITH\nBR2\n".encode()),
+    (file_check_definitions.FIELDS_PER_ROW, f"{_HEADER}\nBR1,SMITH\nBR2\n".encode()),
 ])
 def test_each_failure_refuses_the_file_and_is_recorded(staging, fault, data):
     path = staging / "supply.csv"
@@ -175,7 +176,7 @@ def test_each_failure_refuses_the_file_and_is_recorded(staging, fault, data):
     assert failed and failed[0][0].endswith(f".{fault}_file")
     assert {r[2] for r in rows} == {qa_store.FILE_SCOPE} and {r[3] for r in rows} == {"file"}
     (record,) = load_log.failures()
-    name = {d.check: d.name for d in fc.definitions()}[fault]
+    name = {d.check: d.name for d in file_check_definitions.definitions()}[fault]
     assert f"file check {name}:" in record.reason and "supply.csv" in record.reason
     # Against the delivery, the file and the attempt (criteria 7, 8).
     assert {(r[5], r[6]) for r in rows} == {("drop-1", "supply.csv")}
@@ -201,7 +202,7 @@ def test_a_clean_file_records_six_passes_against_its_load(staging):
     path.write_text(f"{_HEADER}\nBR1,SMITH\n")
     assert _stage(path) is not None
     rows = _results()
-    assert len(rows) == len(fc.NAMES) and {r[1] for r in rows} == {fc.PASS}
+    assert len(rows) == len(file_check_definitions.NAMES) and {r[1] for r in rows} == {fc.PASS}
     (loaded,) = [r for r in load_log.records() if r.loaded]
     assert loaded.loaded
 
@@ -217,7 +218,7 @@ def test_a_reprocessed_file_keeps_both_attempts(staging):
     assert _stage(path) is not None
     rows = _results()
     attempts = sorted({r[4] for r in rows})
-    assert len(attempts) == 2 and len(rows) == 2 * len(fc.NAMES)
+    assert len(attempts) == 2 and len(rows) == 2 * len(file_check_definitions.NAMES)
     first = [r for r in rows if r[4] == attempts[0]]
     assert any(r[1] == fc.FAIL for r in first)
 
@@ -230,7 +231,7 @@ def test_re_staging_an_unchanged_file_records_nothing_new(staging):
     path.write_text(f"{_HEADER}\nBR1,SMITH\n")
     _stage(path)
     _stage(path)
-    assert len(_results()) == len(fc.NAMES)
+    assert len(_results()) == len(file_check_definitions.NAMES)
 
 
 @pytest.mark.asset("daily")  # stages a Birth Registrations file (_stage)
@@ -239,7 +240,7 @@ def test_an_evaluator_bug_fails_the_load_and_records_nothing(staging, monkeypatc
     absorbed by the loader's own catch-all."""
     def broken(p, expected):
         raise ZeroDivisionError("ours")
-    monkeypatch.setitem(fc._EVALUATORS, fc.ENCODING, broken)
+    monkeypatch.setitem(fc._EVALUATORS, file_check_definitions.ENCODING, broken)
     path = staging / "supply.csv"
     path.write_text(f"{_HEADER}\nBR1,SMITH\n")
     with pytest.raises(fc.FileCheckCrashed):
@@ -306,32 +307,32 @@ class TestCriticFindings118:
 
     def test_a_header_with_one_renamed_column_is_still_a_header(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,full_name,born\n1,Ann,2020\n"), COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.PASS
+        assert f[file_check_definitions.HEADER_ROW].status == fc.PASS
 
     def test_a_repeated_name_outside_the_contract_is_never_quoted(self, tmp_path):
         """D-E's privacy half: a repeated 'header' name the contract does not
         know may be a row value, so it is counted, never quoted."""
         f = _by_check(fc.evaluate(
             _write(tmp_path, b"id,name,born,Citizen,Citizen\n1,Ann,2020,x,y\n"), COLUMNS))
-        assert f[fc.HEADER_NAMES_UNIQUE].status == fc.FAIL
-        assert "Citizen" not in f[fc.HEADER_NAMES_UNIQUE].words
-        assert "1 column name the contract does not list" in f[fc.HEADER_NAMES_UNIQUE].words
+        assert f[file_check_definitions.HEADER_NAMES_UNIQUE].status == fc.FAIL
+        assert "Citizen" not in f[file_check_definitions.HEADER_NAMES_UNIQUE].words
+        assert "1 column name the contract does not list" in f[file_check_definitions.HEADER_NAMES_UNIQUE].words
 
     def test_a_long_legitimate_field_does_not_refuse_the_file(self, tmp_path):
         """D-F: Python's csv field limit (128 KiB) refused what the loader loads."""
         big = b"x" * 200_000
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name,born\n1," + big + b",2020\n"),
                                   COLUMNS))
-        assert f[fc.FIELDS_PER_ROW].status == fc.PASS
+        assert f[file_check_definitions.FIELDS_PER_ROW].status == fc.PASS
 
     def test_an_unsplittable_line_is_named(self, tmp_path):
         """The csv.Error branch had no test at all."""
         f = _by_check(fc.evaluate(_write(tmp_path, b'id,name,born\n1,"Ann,2020\n'), COLUMNS))
-        assert f[fc.FIELDS_PER_ROW].status == fc.FAIL
+        assert f[file_check_definitions.FIELDS_PER_ROW].status == fc.FAIL
 
     def test_the_refusal_names_the_check_as_the_page_does(self):
         """D-G: the reason said 'fields_per_row', the page 'Fields per row'."""
-        finding = fc.Finding(fc.FIELDS_PER_ROW, fc.FAILURE, fc.FAIL, "line 3 is short")
+        finding = fc.Finding(file_check_definitions.FIELDS_PER_ROW, file_check_definitions.FAILURE, fc.FAIL, "line 3 is short")
         assert fc.reason_for(finding, "cp_clients.csv") == \
             "cp_clients.csv failed the file check Fields per row: line 3 is short."
 
@@ -347,17 +348,17 @@ class TestAHeaderIsNotValueShaped:
                                        b"id,name,true", b"id,name,03/04/2021"])
     def test_a_data_row_holding_a_column_name_is_not_a_header(self, tmp_path, first):
         f = _by_check(fc.evaluate(_write(tmp_path, first + b"\n1,Ann,2020\n"), COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.FAIL
-        assert "value" in f[fc.HEADER_ROW].words
+        assert f[file_check_definitions.HEADER_ROW].status == fc.FAIL
+        assert "value" in f[file_check_definitions.HEADER_ROW].words
 
     def test_missing_columns_are_still_the_data_checks_job(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"id,name\n1,Ann\n"), COLUMNS))
-        assert f[fc.HEADER_ROW].status == fc.PASS
+        assert f[file_check_definitions.HEADER_ROW].status == fc.PASS
 
     def test_the_refusal_never_quotes_the_value(self, tmp_path):
         f = _by_check(fc.evaluate(_write(tmp_path, b"7,name,1987-02-03\n1,Ann,2020\n"),
                                   COLUMNS))
-        assert "1987-02-03" not in f[fc.HEADER_ROW].words
+        assert "1987-02-03" not in f[file_check_definitions.HEADER_ROW].words
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

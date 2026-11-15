@@ -32,7 +32,7 @@ import os
 
 import rich_click as click
 
-from qa_tools.common import assets
+from asset_model import assets
 from rich.console import Console
 
 console = Console()
@@ -356,9 +356,9 @@ def _cached(collection_id: str) -> CollectionCLI:
     found = COMMANDS.get(collection_id)
     if found is not None:
         return found
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     if len(coll.datasets) == 1:
         from cli.one_table import OneTableCLI
 
@@ -373,9 +373,9 @@ def _cached(collection_id: str) -> CollectionCLI:
 def of(value: str) -> CollectionCLI:
     """The collection's command object, by id, short or run prefix - one per
     collection for the life of the process."""
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    return _cached(collections.resolve(value).id)
+    return _cached(declared_collections.resolve(value).id)
 
 
 def refuse_a_broken_adapter(coll) -> None:

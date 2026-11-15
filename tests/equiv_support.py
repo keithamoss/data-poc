@@ -27,14 +27,15 @@ def apply_redirects(root: Path) -> dict:
     Returns {(module, attribute): original} so a caller in the test
     process can restore them; a spawned child simply exits.
     """
+    from asset_model import delivery as delivery_tree
     from qa_tools.common import (delivery, in_flight_log, scenario_map, scripted_decisions,
                                  supply_db)
     from qa_tools.tools import results_history
 
     root = Path(root)
     targets = {
-        (delivery, "default_deliveries_dir"): fixed(root / "deliveries"),
-        (delivery, "default_receipts_dir"): fixed(root / "receipts"),
+        (delivery_tree, "default_deliveries_dir"): fixed(root / "deliveries"),
+        (delivery_tree, "default_receipts_dir"): fixed(root / "receipts"),
         (delivery, "bookkeeping_path"): fixed(root / "generator_bookkeeping.json"),
         (scenario_map, "placements_path"): fixed(root / "scenario_placements.json"),
         (in_flight_log, "OBSERVATIONS_DIR"): root / "observations" / "in_flight",

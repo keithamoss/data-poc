@@ -12,7 +12,7 @@
 # whole `attributes:`-bearing block from bdm-birth-registrations-soda-
 # checks.yml (the file qa_tools/tools/run_soda.py actually loads) and moving it
 # here instead - this file is never passed to `scan.add_sodacl_yaml_
-# file()`, only ever read by qa_tools/common/check_lifecycle.py (which
+# file()`, only ever read by asset_model/check_lifecycle.py (which
 # reuses parse_soda_check_metadata() unchanged, just pointed at this
 # second path).
 #

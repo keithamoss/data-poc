@@ -37,6 +37,7 @@ import hashlib
 from datetime import datetime, time, timedelta
 
 from generator.collections.base import Job, Plan, Provider, Stream
+from asset_model.statuses import VERDICT_ORDER
 
 COLLECTION_ID = "linkage-products"
 DATASET_ID = "linkage-keys"
@@ -52,10 +53,10 @@ def columns() -> list[str]:
     arrive in; blank ordinarily."""
     import re
 
-    from qa_tools.common import hierarchy, linked_datasets
+    from asset_model import hierarchy, linked_datasets
 
     ds = hierarchy.dataset(DATASET_ID)
-    ids = [c for c in linked_datasets._columns(linked_datasets.REPO, ds.contract, ds.table)
+    ids = [c for c in linked_datasets.table_columns(linked_datasets.REPO, ds.contract, ds.table)
            if re.fullmatch(r"id_\d+", c or "")]
     return ["linkage_key", "dataset", *sorted(ids, key=lambda c: int(c[3:]))]
 
@@ -193,7 +194,7 @@ class CannotGenerate(ValueError):
 
 def linked() -> tuple:
     """(dataset id, code, id columns) for every dataset linkage-keys links."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(DATASET_ID).linked
 
@@ -202,7 +203,7 @@ def geocoded() -> list[tuple[str, str, tuple[str, ...]]]:
     """(dataset id, the one source it geocodes, the source's identifier
     columns) for every code-less linked dataset of this collection, in
     hierarchy order (REQ-QAC-294 criterion 2)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return [(d.dataset_id, d.linked[0][0], d.linked[0][2])
             for d in hierarchy.datasets_in_collection(COLLECTION_ID)
@@ -248,9 +249,9 @@ def area_codes(dataset_id: str, record: str, year) -> tuple[str, str]:
 def member_setting_of(dataset_id: str) -> tuple[str, str]:
     """(the member column, the list setting) the dataset's set-member checks
     name - which years a record is written for is that setting's in force."""
-    from qa_tools.common import list_setting_members
+    from asset_model import set_member_checks
 
-    found = {(c.column, c.member_setting) for c in list_setting_members.declared()
+    found = {(c.column, c.member_setting) for c in set_member_checks.declared()
              if c.dataset_id == dataset_id and c.column and c.member_setting}
     if len(found) != 1:
         raise CannotGenerate(f"{dataset_id}'s set-member checks name {sorted(found) or 'no'} "
@@ -262,7 +263,7 @@ def member_setting_of(dataset_id: str) -> tuple[str, str]:
 def members_in_force(dataset_id: str, period) -> tuple:
     """The members in force for the period, on its ROUND DATE (REQ-QAC-300
     criterion 4) - refused where no version covers it."""
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     _column, setting = member_setting_of(dataset_id)
     r = amber_setting.resolve_on_date(dataset_id, period.round_date,
@@ -275,10 +276,10 @@ def members_in_force(dataset_id: str, period) -> tuple:
 
 def geo_columns(dataset_id: str) -> list[str]:
     """The geocoding table's columns, in its contract's order."""
-    from qa_tools.common import hierarchy, linked_datasets
+    from asset_model import hierarchy, linked_datasets
 
     ds = hierarchy.dataset(dataset_id)
-    return linked_datasets._columns(linked_datasets.REPO, ds.contract, ds.table)
+    return linked_datasets.table_columns(linked_datasets.REPO, ds.contract, ds.table)
 
 
 def geocode_rows(dataset_id: str, source_rows, id_columns, years, failure_rate: float):
@@ -342,21 +343,19 @@ def planned_verdict(dataset_id: str, rows, catalogue) -> str:
     return "green"
 
 
-_RANK = {"green": 0, "amber": 1, "red": 2}
-
-
 def worst(*verdicts: str) -> str:
     """The worst of several planned verdicts."""
-    return max(verdicts, key=lambda v: _RANK[v]) if verdicts else "green"
+    return max(verdicts, key=lambda v: VERDICT_ORDER[v]) if verdicts else "green"
 
 
 def known_values(dataset_id: str, column: str) -> list:
     """The values the collection's recorded stats count `column` by for the
     dataset's table (its adapter's stats spec), in declared order."""
     from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from asset_model import collections as declared_collections
+    from asset_model import hierarchy
 
-    spec = collections.adapter(collections.by_id(COLLECTION_ID)).stats
+    spec = collections.adapter(declared_collections.by_id(COLLECTION_ID)).stats
     return list(spec.value_counts.get((hierarchy.dataset(dataset_id).table, column)) or [])
 
 
@@ -364,21 +363,21 @@ def value_counts(rows, column: str, dataset_id: str) -> list[list]:
     """A column's `[[value, count], ...]` exactly as dataset_stats records it
     and the real drift check rebuilds its reference from: every known value,
     zeros included, anything else folded into '(invalid code)'
-    (evidently_common.fold_value_counts, shared)."""
-    from qa_tools.common import evidently_common
+    (drift.fold_value_counts, shared)."""
+    from asset_model import drift
 
     pairs = ([] if rows is None or not len(rows) or column not in rows.columns
              else [[v, int(n)] for v, n in rows[column].astype(str).value_counts().items()])
-    return evidently_common.fold_value_counts(pairs, known_values(dataset_id, column))
+    return drift.fold_value_counts(pairs, known_values(dataset_id, column))
 
 
 def _drift_entry(dataset_id: str) -> dict | None:
     """The geocoding dataset's drift check, as its Evidently check file
     declares it - its column, excluded values and thresholds - or None where
     it declares none."""
-    from qa_tools.common import evidently_common
+    from asset_model import drift
 
-    found = [m for i, m in evidently_common.collection_checks(COLLECTION_ID).checks.items()
+    found = [m for i, m in drift.collection_checks(COLLECTION_ID).checks.items()
              if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
     if len(found) > 1:
         raise CannotGenerate(f"{dataset_id} declares {len(found)} drift checks - one is needed "
@@ -391,15 +390,15 @@ def drift_verdict(dataset_id: str, rows, reference_rows) -> str:
     (REQ-GEN-295 criterion 7 as AMENDED 2026-11-02, Keith, morning report
     A2): computed from the inputs the real check reads - the file's value
     counts and its reference's - by the check's own PSI, exclusions and
-    thresholds (evidently_common.psi_of_counts), so it predicts the check
+    thresholds (drift.psi_of_counts), so it predicts the check
     from what the check reads. green where there is no reference, or nothing
     placed to compare."""
-    from qa_tools.common import evidently_common
+    from asset_model import drift
 
     entry = _drift_entry(dataset_id)
     if entry is None or reference_rows is None:
         return "green"
-    _psi, status = evidently_common.psi_of_counts(
+    _psi, status = drift.psi_of_counts(
         value_counts(rows, entry["column"], dataset_id),
         value_counts(reference_rows, entry["column"], dataset_id), entry)
     return {"fail": "red", "warn": "amber"}.get(status, "green")
@@ -841,7 +840,7 @@ class LinkageProducts(Provider):
 
     @property
     def depends_on(self) -> tuple[str, ...]:
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         out = []
         for did in self._read():
@@ -857,7 +856,7 @@ class LinkageProducts(Provider):
         # Protection's and Emergency Department's histories (and importing
         # pandas) just to check seed ranges.
         from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         n = len(schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date()))
         geo = len({p.name for d, _src, _cols in geocoded()
@@ -897,7 +896,7 @@ class LinkageProducts(Provider):
         """Every quarter any linked dataset has a generated supply filed to,
         whose round has come (criterion 2)."""
         from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         sources = self._sources()
         wanted = {s.period for did, _c, _cols in linked() for s in sources[did]}
@@ -909,7 +908,7 @@ class LinkageProducts(Provider):
         filed to, whose round has come (criterion 8) - for one dataset, or
         any."""
         from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         sources = self._sources()
         found: dict = {}
@@ -932,7 +931,7 @@ class LinkageProducts(Provider):
 
     def _received(self, job: Job) -> datetime:
         """An ordinary release's receipt: on the round, 17:05 to 17:55."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         minute = (job.seed * 37) % 50
         hhmm = (datetime.combine(job.period.round_date, RECEIVED_FROM)
@@ -945,7 +944,7 @@ class LinkageProducts(Provider):
         ordinary red's release and its green resupply, or one release."""
         import numpy as np
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if job.period.name in plan.state["suppressed"]:
             return []
@@ -1017,7 +1016,7 @@ class LinkageProducts(Provider):
 
     def _geo_received(self, job: Job) -> datetime:
         """A geocoding release's receipt: on the round, 18:05 to 18:55."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         minute = (job.seed * 37) % 50
         hhmm = (datetime.combine(job.period.round_date, GEO_RECEIVED_FROM)
@@ -1034,7 +1033,7 @@ class LinkageProducts(Provider):
         import numpy as np
 
         from generator import scenario_injection, targeting
-        from qa_tools.common import asset_time, check_bands, hierarchy
+        from asset_model import asset_time, check_bands, hierarchy
 
         geo = geocoded()
         if not geo:
@@ -1304,7 +1303,7 @@ class LinkageProducts(Provider):
 
     def slot(self, plan: Plan, job: Job) -> list | None:
         from generator.resupply import Delivery
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if job.stream == GEO_STREAM:
             found = self._geo_arrivals(plan, job)
@@ -1346,14 +1345,14 @@ class LinkageProducts(Provider):
                 for n, d in enumerate(deliveries, start=1)]
 
     def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if job.stream == GEO_STREAM:
             return asset_time.isoformat(self._geo_arrivals(plan, job)[n - 1][0])
         return asset_time.isoformat(plan.state["arrivals"][job.slot_id][n - 1][0])
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if job.stream == GEO_STREAM:
             if n == 1:
@@ -1399,7 +1398,7 @@ def marked_quarters(periods) -> list[tuple[str, str]]:
 
 def named_placements(provider, plan: Plan) -> list:
     from generator import scenario_injection
-    from qa_tools.common import arrivals as arrivals_mod
+    from asset_model import arrivals as arrivals_mod
 
     periods = [job.period for job in plan.jobs]
     marked = marked_quarters(periods)
@@ -1446,7 +1445,7 @@ def _before(supplies, dataset_id: str, period: str, at) -> list:
     and a linkage release describes only what could have been linked
     (REQ-GEN-334 criterion 5 as amended 2026-11-02, Keith, morning report
     D1)."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return [s for s in supplies if s.period == period and s.carried
             and asset_time.parse_instant(s.received_at, dataset_id) < at]
@@ -1476,7 +1475,8 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
     same-round promotion is before `at` by construction
     (_refuse_geocoding_unschedulable). Refused, naming the supply, where a
     scripted decision's instant cannot be said."""
-    from qa_tools.common import amber_setting, asset_time, scripted_decisions
+    from asset_model import amber_setting, asset_time
+    from qa_tools.common import scripted_decisions
 
     # ONLY A SUPPLY WHOSE FILE ARRIVES (GeneratedSupply.carried): a delivery
     # its scenario's file shape leaves the table out of is no supply of the
@@ -1535,7 +1535,7 @@ def _meta(tried, files: dict, warehouse: dict, slot_id: str) -> dict:
     source supply the warehouse holds then - None where it holds none."""
     if not tried:
         return {}
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out = {}
     for d in tried:
@@ -1570,7 +1570,7 @@ def _named_held_sources(resolved, jobs, base, warehouse) -> dict:
 def geo_named_placements(provider, plan: Plan) -> list:
     """Criterion 8's files as placements, nothing planted (REQ-GEN-045)."""
     from generator import scenario_injection
-    from qa_tools.common import arrivals as arrivals_mod, asset_time
+    from asset_model import arrivals as arrivals_mod, asset_time
 
     named = plan.state.get("geo_named") or {}
     if not named:
@@ -1598,7 +1598,7 @@ def geo_named_placements(provider, plan: Plan) -> list:
 
 
 def _source_name(dataset_id: str) -> str:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(hierarchy.dataset(dataset_id).linked[0][0]).dataset_name
 
@@ -1608,7 +1608,7 @@ def _refuse_geocoding_scenario_quarters(resolved, linkage_resolved, ridden) -> N
     scenario never on a round REQ-GEN-205's corrections alter, nor in a
     quarter holding another scenario of its source dataset or of the linkage
     delivery - said, and never moved."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     linkage = {placement.period: inj.scenario_id for inj, placement in linkage_resolved}
     for inj, placement in resolved:
@@ -1664,7 +1664,7 @@ def _refuse_scenario_quarters(resolved) -> None:
     from generator import scenario_injection
 
     linked_ids = {d for d, _c, _cols in linked()}
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     ours = {d.dataset_id for did in linked_ids
             for d in hierarchy.datasets_in_collection(hierarchy.dataset(did).collection_id)}
@@ -1704,7 +1704,8 @@ def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
     naming the quarter, the release and the effective instant."""
     from datetime import timedelta
 
-    from qa_tools.common import asset_time, hierarchy, promotion, schedule, slots
+    from asset_model import asset_time, hierarchy, schedule, slots
+    from qa_tools.common import promotion
 
     # ONLY THE DATASETS THE LINKAGE RELEASE READS: a source only the
     # geocoding stream reads is that stream's refusal's (REQ-GEN-295).
@@ -1762,7 +1763,8 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
     of either stream reading the period. Refused naming the quarter."""
     from datetime import timedelta
 
-    from qa_tools.common import asset_time, hierarchy, promotion, schedule, slots
+    from asset_model import asset_time, hierarchy, schedule, slots
+    from qa_tools.common import promotion
 
     instants = {asset_time.parse_instant(s.received_at, did): f"{did} {s.received_at}"
                 for did, supplies in sources.items() for s in supplies}
@@ -1810,7 +1812,7 @@ def _refuse_unmet_preconditions(jobs, sources, arrivals, injected) -> None:
     """`awaits_resupply@<dataset>` (REQ-GEN-335 criterion 3): the dataset's
     quarter must have a supply received after the release - its resupply - and
     one before it; refused naming the scenario otherwise, never moved."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     for job in jobs:
         hit = injected.get(job.period.name)

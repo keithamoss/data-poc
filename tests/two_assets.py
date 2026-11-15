@@ -20,7 +20,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import assets
+from asset_model import assets
 
 #: The real asset copied into each fixture asset - the smaller of the two,
 #: one collection of one dataset.

@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from qa_tools.common import arrivals, asset_time, delivery, hand_filing
+from asset_model import arrivals, asset_time, delivery as delivery_tree
+from qa_tools.common import delivery, hand_filing
 
 #: What every kept supply now states (REQ-PIPE-103 criterion 13, REQ-PIPE-147
 #: criteria 2-4) - these tests are about the filing, not the statement,
@@ -66,7 +67,7 @@ class TestFilingGivesARealArrival:
             "civil-registration", "run_", received_at=when,
             deliveries_dir=deliveries, receipts_dir=receipts, **KEPT)
 
-        assert delivery.read_receipt(filed.delivery_name, receipts_dir=receipts) == when
+        assert delivery_tree.read_receipt(filed.delivery_name, receipts_dir=receipts) == when
         assert not list((deliveries / filed.delivery_name).glob("*.json"))
 
     def test_it_reaches_the_delivery_log_now_not_at_the_next_pipeline_run(

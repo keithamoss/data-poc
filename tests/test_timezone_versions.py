@@ -16,7 +16,7 @@ from datetime import date
 import pytest
 import yaml
 
-from qa_tools.common import amber_setting, slots
+from asset_model import amber_setting, slots
 from qa_tools.common import validate_schedule as vs
 from qa_tools.common.schemas import DataAsset
 
@@ -41,8 +41,8 @@ def _expected_time(monkeypatch, hhmm):
     the input slots.slot_instants takes per period (REQ-PIPE-113)."""
     import dataclasses
 
-    real = slots._participation_for
-    monkeypatch.setattr(slots, "_participation_for",
+    real = slots.participation_for
+    monkeypatch.setattr(slots, "participation_for",
                         lambda d, on, a: dataclasses.replace(real(d, on, a), expected_time=hhmm))
 
 

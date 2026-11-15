@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def _history(conn) -> None:
     import filing_support
-    from qa_tools.common.assignment import Assignment
+    from asset_model.assignment import Assignment
 
     filing_support.file(Assignment(dataset_id="cp-clients", supply_id="cp-clients@x",
                                    slot="2026-Q1", branch="open-slot-unfilled",
@@ -144,7 +144,8 @@ class TestNothingElseDeletes:
     def test_no_other_module_calls_it(self):
         """Criterion 23: not reachable from any other command."""
         callers = []
-        for path in list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py")):
+        for path in (list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py"))
+                     + list((ROOT / "asset_model").rglob("*.py"))):
             if path.name in ("synthetic_reset.py",):
                 continue
             text = path.read_text()

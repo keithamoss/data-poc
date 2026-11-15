@@ -13,7 +13,7 @@ import textwrap
 
 import pytest
 
-from qa_tools.common import check_bands as cb
+from asset_model import check_bands as cb
 
 BDM = "birth-registrations"
 FACILITY = (BDM, "place_of_birth_facility", "completeness")
@@ -73,7 +73,7 @@ class TestTheRealDefinitions:
         """Since REQ-QAC-223 each Evidently check's bands live in its own
         entry in its collection's check file, where the changelog gate sees
         them."""
-        from qa_tools.common.evidently_common import collection_checks
+        from asset_model.drift import collection_checks
 
         [psi] = [c for c in catalogue.checks if c.check_id.endswith("sex.drift_psi_evidently")]
         entry = collection_checks("civil-registration").checks[psi.check_id]
@@ -85,7 +85,7 @@ class TestTheRealDefinitions:
     @pytest.mark.parametrize("asset", [pytest.param("daily", marks=pytest.mark.asset("daily")),
                                        pytest.param("quarterly", marks=pytest.mark.asset("quarterly"))])
     def test_every_dataset_is_catalogued(self, catalogue, asset):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         expected = {d.dataset_id for d in hierarchy.all_datasets()}
         assert expected
@@ -319,7 +319,7 @@ class TestAUserDefinedMetricsBandIsRead:
     def test_large_key_groups(self):
         from pathlib import Path
 
-        from qa_tools.common import check_bands
+        from asset_model import check_bands
 
         path = (Path(__file__).resolve().parent.parent / "assets" / "quarterly" / "department-of-health"
                 / "linkage-products-soda-checks.yml")
@@ -335,7 +335,7 @@ class TestAUserDefinedMetricsBandIsRead:
         checks are (`<table>_coverage_percent`), where the table's name holds
         a digit - a valid Soda metric name the catalogue refused outright
         (found by REQ-TEST-339's thirty linked datasets)."""
-        from qa_tools.common import check_bands
+        from asset_model import check_bands
 
         path = tmp_path / "x-soda-checks.yml"
         path.write_text(

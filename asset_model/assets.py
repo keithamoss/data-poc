@@ -52,7 +52,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 #: Where a process is told which asset it acts for.
 ASSET_ENV = "MOTHMAN_ASSET"
@@ -70,11 +70,6 @@ class AssetNotSelected(AssetError):
 
 class NoModule(AssetError):
     """An asset's adapter or provider file does not exist."""
-
-
-class DbtPackagesMissing(AssetError):
-    """The selected asset's dbt packages are not installed (REQ-QAC-368
-    criterion 6)."""
 
 
 class BadAssetName(AssetNotSelected):
@@ -318,7 +313,7 @@ def names() -> list[str]:
 def every() -> list[Asset]:
     """Every asset folder found, as the resolver lays it out now - for the
     configuration-only reads that must tell another asset's name from a typo
-    (qa_tools/common/every_asset.py; Keith, 2026-11-03, morning report 12 Q6
+    (asset_model/every_asset.py; Keith, 2026-11-03, morning report 12 Q6
     and Q8). Selects nothing, and opens no database."""
     return [_layout.asset(n) for n in names()]
 
@@ -483,31 +478,6 @@ def receipts_dir() -> Path:
     return data_path("receipts")
 
 
-# ---- the asset's dbt project (REQ-QAC-368) ----
-
-def dbt_project_ready() -> Path:
-    """The selected asset's dbt project, once its packages are installed -
-    refused before dbt is invoked when they are not (REQ-QAC-368 criterion
-    6), naming the asset and the one command that fixes it, rather than
-    failing later with a FileNotFoundError on manifest.json."""
-    # ONE MEANING OF "INSTALLED" EVERYWHERE (Keith, 2026-11-03, morning
-    # report 12 Q10; criterion 6 as amended): dbt's own package-lock rule, the
-    # one `mothman env dbt-deps` decides by, so packages outdated by an edit to
-    # packages.yml, or deleted since, are refused as a missing folder is.
-    # REJECTED keeping the missing-or-empty folder test as first signed.
-    from qa_tools.common import dbt_common
-
-    asset = selected()
-    if not dbt_common.packages_installed(asset.dbt_project):
-        raise DbtPackagesMissing(
-            f"asset {asset.name!r} has no current dbt packages installed - "
-            f"{asset.dbt_project / dbt_common.PACKAGE_LOCK} is missing or stale against "
-            f"packages.yml, or a package it names is missing from {asset.dbt_packages}, so "
-            f"dbt cannot compile its checks. Run `mothman env dbt-deps` (with "
-            f"{ASSET_ENV}={asset.name}), then run this again.")
-    return asset.dbt_project
-
-
 # ---- adapters and providers, by path (REQ-PIPE-369, REQ-GEN-370) ----
 
 _KINDS = {"adapter": "adapters", "provider": "providers"}
@@ -578,14 +548,6 @@ def _load(kind: str, module: str):
 
 #: Which (asset, kind, module) each registered module name was loaded for.
 _owners: dict[str, tuple[str, str, str]] = {}
-
-
-def adapter_file(collection_id: str) -> str:
-    """The file a collection's adapter loads from - what a spawned process
-    reports back, and what a gate names."""
-    from qa_tools import collections
-
-    return collections.adapter_module(collection_id).__file__
 
 
 # ---- one asset per process (REQ-PIPE-343 criteria 5 and 6) ----

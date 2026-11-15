@@ -20,7 +20,7 @@ import yaml
 import pytest
 
 import agreement_split
-from qa_tools.common import schedule
+from asset_model import schedule
 
 
 def _asset_with(datasets: list[dict], tmp_path, monkeypatch, *, baseline: bool = True):
@@ -124,19 +124,12 @@ class TestADatasetMaySayItHasNoCalendar:
 
 class TestNotYetAgreedIsNotTheSameAsNever:
     """Criterion 3. Presenting a one-off extraction as waiting for a
-    schedule would put a permanent item on somebody's list."""
-
-    def test_sample_data_will_graduate(self, tmp_path, monkeypatch):
-        _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
-        assert schedule.will_graduate("cp-referrals") is True
-
-    def test_a_one_off_extraction_never_will(self, tmp_path, monkeypatch):
-        _asset_with([AGREED, PROJECT], tmp_path, monkeypatch)
-        assert schedule.will_graduate("one-off-extract") is False
+    schedule would put a permanent item on somebody's list.
+    (schedule.will_graduate, which nothing called, went with REQ-PIPE-376
+    criterion 6, and its tests with it.)"""
 
     def test_a_dataset_with_a_calendar_is_neither(self, tmp_path, monkeypatch):
         _asset_with([AGREED], tmp_path, monkeypatch)
-        assert schedule.will_graduate("birth-registrations") is False
         assert schedule.no_calendar("birth-registrations") is None
 
 
@@ -146,7 +139,7 @@ class TestItOwesNoSupply:
     on somebody's dashboard."""
 
     def test_it_owes_nothing(self, tmp_path, monkeypatch):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert slots.is_owed_supplies("cp-referrals") is False

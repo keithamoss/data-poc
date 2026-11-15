@@ -16,7 +16,7 @@ invented fresh."""
 from __future__ import annotations
 import os
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 
 def dataset_s3_config(contract_path: str) -> dict:

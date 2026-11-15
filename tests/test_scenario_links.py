@@ -19,7 +19,7 @@ from click.testing import CliRunner
 
 from cli import scenarios as scenarios_cli
 from generator import scenario_injection as si
-from qa_tools.common import asset_time
+from asset_model import asset_time
 from qa_tools.common import scripted_decisions as sd
 
 DS = "cp-carers"
@@ -350,7 +350,7 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
 
         due = _at(ANCHOR, "12:00")
         monkeypatch.setattr(sd, "_due_at", lambda ds, period: due)
-        monkeypatch.setattr("qa_tools.common.slots.relative_period", lambda *a, **k: "P-1")
+        monkeypatch.setattr("asset_model.slots.relative_period", lambda *a, **k: "P-1")
         script = _script(name="sub", operation="substitute", supply_index=None,
                          scope=sd.PERIOD, stands_on=-1, after_hours=7)
         placed = si.resolve(_injection(), _periods())
@@ -365,7 +365,7 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         criterion 10) is played there, not `after_hours` after its supply's
         receipt - found when TS-80's settlement bounded its link (REQ-GEN-203):
         the link read it as 09:20 on the arrival day rather than 11:00 the next."""
-        monkeypatch.setattr("qa_tools.common.schedule.round_of",
+        monkeypatch.setattr("asset_model.schedule.round_of",
                             lambda period, ds, agreement=None: date.fromisoformat(period))
         script = _script(name="settle", operation="choose-file", files=("reject", "supply"),
                          at="11:00", day_offset=1, after_hours=0)

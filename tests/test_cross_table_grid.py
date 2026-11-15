@@ -12,7 +12,7 @@ import pytest
 
 from pipeline import cross_table_grid as g
 from pipeline import cross_table_notices as ctn
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 P = "2024-Q3"
 N1, N2 = "cp-notifications@202407251000000800", "cp-notifications@202408051000000800"

@@ -76,7 +76,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Collection, Mapping, Sequence
 
-from qa_tools.common.asset_time import arrival_key
+from asset_model.asset_time import arrival_key
 
 import psycopg
 
@@ -260,7 +260,7 @@ def asset_database() -> str:
     """The selected asset's own database name, supply_<data_asset_id>
     (REQ-PIPE-343 criterion 7) - what supply_db_dsn() names when
     MOTHMAN_SUPPLY_DSN is unset."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return f"{ASSET_DATABASE_PREFIX}{hierarchy.data_asset_id()}"
 
@@ -307,7 +307,7 @@ def supply_db_dsn() -> str:
             f"command opens its asset's own supply_<asset> there; or set "
             f"{SUPPLY_DSN_ENV} to one database's connection string. A dev container "
             f"and the session hook set {SERVER_ENV}; see README's Development section.")
-    from qa_tools.common import assets
+    from asset_model import assets
 
     why = assets.why_not_selected()
     if why is not None:
@@ -446,7 +446,7 @@ def connect(read_only: bool = False, dsn: str | None = None,
     # opened, and a process that has opened a connection for one asset cannot
     # open one for another - so no shipped process holds two assets'
     # databases, or their credentials, at once.
-    from qa_tools.common import assets
+    from asset_model import assets
 
     assets.claim_for_connection(assets.selected().name)
     target = dsn if dsn is not None else supply_db_dsn()
@@ -1754,7 +1754,7 @@ def scratch_dir() -> Path:
     key = hashlib.sha256(supply_db_dsn().encode("utf-8")).hexdigest()[:12]
     # THE SELECTED ASSET'S data/, asked of the resolver now (REQ-PIPE-342
     # criterion 6).
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.data_path("dbt_scratch", key)
 
@@ -1931,7 +1931,7 @@ def expected_tables(recognition, received_at) -> dict[str, str]:
     hold is resolved by a person looking at both, so both must be
     accounted for.
     """
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out: dict[str, str] = {}
     for dataset_id, names in sorted(recognition.by_dataset.items()):

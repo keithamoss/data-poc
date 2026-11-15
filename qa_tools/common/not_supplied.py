@@ -40,7 +40,7 @@ class Mark:
 
 
 def _slot(dataset_id: str, period: str, at: datetime):
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     return next((s for s in slots_mod.slots_for_dataset(
         dataset_id, until=slots_mod.claimable_until(dataset_id, at.date()))
@@ -90,7 +90,8 @@ def mark(conn: supply_db.SupplyConnection, *, agency_id: str, collection_id: str
     """Record that a closed, unfilled period was not supplied. Refuses,
     naming the fix as a command a person can paste, where the slot is not
     closed and unfilled (criterion 6)."""
-    from qa_tools.common import asset_time, filing
+    from asset_model import asset_time
+    from qa_tools.common import filing
 
     at = asset_time.parse_instant(effective_at, "effective_at")
     slot = _slot(dataset_id, period, at)
@@ -99,7 +100,7 @@ def mark(conn: supply_db.SupplyConnection, *, agency_id: str, collection_id: str
             f"{period} is not a period {dataset_id} owes a supply for, so there is "
             f"nothing to mark. `mothman schedule show --dataset {dataset_id}` lists "
             f"the periods it does owe.")
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     if not slots_mod.is_closed(slot, at):
         raise decision_log.DecisionRefused(

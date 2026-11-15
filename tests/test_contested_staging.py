@@ -137,7 +137,7 @@ class TestTheContestedTablesOwnChecksDoNotRun:
     def test_a_logical_name_no_dataset_claims_is_an_error_not_a_pass(self):
         """The dangerous direction is failing to suppress, so an
         unrecognised table is loud rather than skipped."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
         with pytest.raises(hierarchy.UnknownDatasetError):
             ps.contested_own_checks(["not_a_table"], [self.OWN])
 

@@ -11,7 +11,7 @@ test_build_dashboard_data.py and test_build_dashboard_child_protection.py.
 """
 from __future__ import annotations
 
-from qa_tools.common import assets
+from asset_model import assets
 
 import json
 
@@ -19,8 +19,9 @@ import pytest
 import yaml
 
 from pipeline import build_dashboard_data as bdd
-from qa_tools import collections
-from qa_tools.common import hierarchy, presentation
+from asset_model import collections
+from asset_model import hierarchy
+from qa_tools.common import presentation
 from third_collection import FAKE_DATASET, FAKE_ID, FAKE_TABLE
 
 FAKE_AGENCY = "fake-agency"
@@ -51,7 +52,7 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     (hierarchy.data_asset_yaml().parent / "presentation.yaml").write_text(yaml.safe_dump(shown))
     # ITS PLACE IN THE DELIVERY CALENDAR, as any real collection has: on the
     # quarterly calendar, owing what a Child Protection dataset owes.
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     cal = yaml.safe_load(agreement.calendar_yaml().read_text())
     cp = next(c for c in cal["collections"] if c["id"] == "child-protection")
@@ -156,7 +157,7 @@ class TestTheEmbed:
         with pytest.raises(edd.MissingCollectionData) as refused:
             edd.embed()
         said = str(refused.value)
-        from qa_tools import collections
+        from asset_model import collections
 
         # The hierarchy's first collection is the one refused (the asset split:
         # Child Protection on the quarterly asset, where it was Civil Registration).

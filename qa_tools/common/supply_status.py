@@ -99,7 +99,7 @@ class Holdings:
     @property
     def tables(self):
         if self._tables is None:
-            from qa_tools.common import hierarchy
+            from asset_model import hierarchy
 
             self._tables = hierarchy.by_table()
         return self._tables
@@ -155,7 +155,7 @@ class HoldingsTimeline:
         """The hierarchy's {table: Dataset}, read once for this timeline and
         handed to every Holdings it makes (REQ-PIPE-254 criterion 19)."""
         if self._tables is None:
-            from qa_tools.common import hierarchy
+            from asset_model import hierarchy
 
             self._tables = hierarchy.by_table()
         return self._tables
@@ -270,7 +270,7 @@ def cleared_instants(conn, run_keys: list[str]) -> dict[str, datetime]:
 def declared_on(record: dict) -> str | None:
     """The dataset a check is declared on, from its id (asset.agency.
     collection.dataset...), else the dataset it was recorded for."""
-    from qa_tools.common import check_id as cid
+    from asset_model import check_id as cid
 
     parsed = cid.try_parse(record.get("check_id") or "")
     return parsed.dataset if parsed else record.get("dataset_id")
@@ -281,7 +281,7 @@ def dataset_of(table: str, tables=None) -> str | None:
     does not know (a sample's or a trial's). `tables` is a
     hierarchy.by_table() the caller already holds (REQ-PIPE-254 criterion
     19); without one the hierarchy is read now."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     entry = (hierarchy.by_table() if tables is None else tables).get(table)
     return entry.dataset_id if entry is not None else None
@@ -403,10 +403,11 @@ def _severity(record: dict, position: dict[int, int]) -> tuple:
     promotion.status_of still refuses it rather than a green hiding it);
     a recorded result over a stand-in of the same colour, then the newer."""
     from qa_tools.common import dataset_status
+    from asset_model import statuses
 
     colour = dataset_status.dashboard_status(record.get("status"))
-    rank = len(dataset_status.ORDERED_STATUSES) if colour is None else \
-        dataset_status.ORDERED_STATUSES.get(colour, -1)
+    rank = len(statuses.ORDERED_STATUSES) if colour is None else \
+        statuses.ORDERED_STATUSES.get(colour, -1)
     real = id(record) in position
     return rank, real, position.get(id(record), -1)
 
@@ -470,7 +471,7 @@ def _shown(conn, dataset_id: str, supply: str, *, application: int | None = None
     longer about the supply, and is dropped here. `as_at`: only a left-out
     recorded by then supersedes, so an earlier view never changes.
     """
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
     from qa_tools.common import qa_results_reader as reader
     from qa_tools.common import supply_files
 
@@ -619,7 +620,7 @@ def status(conn: supply_db.SupplyConnection, dataset_id: str, supply: str, *,
 
 def instant(value) -> datetime:
     """An instant from ISO text or a datetime, on the asset's terms."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return value if isinstance(value, datetime) else asset_time.parse_instant(
         value, "warehouse view")

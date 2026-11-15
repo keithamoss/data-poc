@@ -23,8 +23,10 @@ import os
 from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import asked_for, config_yaml, hierarchy, left_out, sample_keys, supply_db
-from qa_tools.common.check_lifecycle import name_by_check_id, parse_contract_check_metadata
+from asset_model import collections as declared_collections
+from qa_tools.common import asked_for, left_out, sample_keys, supply_db
+from asset_model import config_yaml, hierarchy
+from asset_model.check_lifecycle import name_by_check_id, parse_contract_check_metadata
 from qa_tools.common.datacontract_common import (
     DIMENSION_BY_METRIC, ENGINE_TAG, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     check_id_from_quality_definition, fail_threshold_from_quality_definition,
@@ -49,7 +51,7 @@ _QUALITY_CHECK_TYPES = {
 
 
 def contract_path(collection_id: str) -> str:
-    return os.path.join(ROOT, collections.by_id(collection_id).check_file("contract"))
+    return os.path.join(ROOT, declared_collections.by_id(collection_id).check_file("contract"))
 
 
 _AUTHORED_NAMES = config_yaml.Built()
@@ -77,7 +79,7 @@ def _unreadable_in(run_id: str, collection_id: str) -> frozenset[str]:
 
 
 def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     adapter = collections.adapter(coll)
     spec = adapter.datacontract
     tables = [d.table for d in coll.datasets]

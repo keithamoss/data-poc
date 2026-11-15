@@ -16,7 +16,7 @@ set -eo pipefail
 
 assets_dir="${MOTHMAN_ASSETS_DIR:-/mothman-assets}"
 
-# AN ASSET'S ID IS HELD TO THE ASSET-NAME PATTERN (qa_tools/common/assets.py's
+# AN ASSET'S ID IS HELD TO THE ASSET-NAME PATTERN (asset_model/assets.py's
 # NAME_PATTERN) before it goes into SQL: a bad one, or an asset with none,
 # fails the whole script, naming the folder - never a database silently
 # skipped or a name quoted into something else.

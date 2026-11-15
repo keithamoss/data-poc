@@ -195,7 +195,7 @@ def recorded(conn) -> Recorded:
 def supply_of(arrival) -> tuple[str, str]:
     """(dataset, base supply id) - filing._supply_id_for's own rule, without
     the contested suffix."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     (dataset_id,) = arrival.files_by_dataset
     return dataset_id, f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
@@ -218,7 +218,8 @@ def _waiting_for_package(conn, arrival, gate_mod) -> str | None:
     a contested pair's '#1' and '#2' too (post-build-review #274 D5). The id
     was rebuilt from the receipt instant alone, which no pair's supply is, so
     a pair waiting for its package was reported as a failure."""
-    from qa_tools.common import asset_time, qa_store
+    from asset_model import asset_time
+    from qa_tools.common import qa_store
 
     received = getattr(arrival, "received_at", None)
     if received is None:
@@ -250,7 +251,7 @@ def all_arrivals(deliveries_dir=None, receipts_dir=None) -> list:
     from qa_tools.common import arrivals
 
     found = []
-    from qa_tools import collections
+    from asset_model import collections
 
     for collection in collections.all_collections():
         found.extend(arrivals.arrivals_from_records(collection.id, deliveries_dir))
@@ -375,8 +376,8 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
 
     def out_of_time() -> bool:
         return deadline is not None and time.monotonic() >= deadline
-    from qa_tools.common import (asset_time, delivery_log, qa_store,
-                                 ticket_reconciler)
+    from asset_model import asset_time
+    from qa_tools.common import delivery_log, qa_store, ticket_reconciler
     from qa_tools.common.git_identity import get_run_by
 
     report = PassReport()
@@ -577,7 +578,7 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
             report.tickets.append("No ticketing is configured for this environment, so no "
                                   "ticket was reconciled.")
         else:
-            from qa_tools import collections
+            from asset_model import collections
 
             for collection in collections.all_collections():
                 outcome = ticket_reconciler.after_runs(collection.id)

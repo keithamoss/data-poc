@@ -15,7 +15,8 @@ import pytest
 
 import asset_params
 
-from qa_tools.common import asked_for, check_id, qa_results_writer, qa_store, supply_db
+from qa_tools.common import asked_for, qa_results_writer, qa_store, supply_db
+from asset_model import check_id
 from qa_tools.common import validate_check_lifecycle as vcl
 
 CP = "child-protection"
@@ -46,7 +47,7 @@ class TestWhatACollectionHolds:
 
     @pytest.mark.asset("daily")  # the asset holding the register's retired check
     def test_a_retired_check_is_never_asked_for(self):
-        from qa_tools import collections
+        from asset_model import collections
 
         retired = [c.check_id for c in vcl.collect_checks(None) if c.retired_as_of]
         assert retired, "precondition: the register holds a retired check"

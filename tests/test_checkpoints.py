@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.common import bootstrap, checkpoints, replay_inputs, supply_db
 
 
@@ -64,7 +64,7 @@ class TestOnlyASyntheticAsset:
 
     @pytest.fixture
     def real_asset(self, tmp_path, monkeypatch):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         doc = hierarchy.data_asset_yaml().read_text().replace("synthetic: true", "synthetic: false")
         assert "synthetic: false" in doc
@@ -289,7 +289,7 @@ class TestARefusalChangesNothing:
 
     def test_only_a_declared_true_counts_as_synthetic(self, tmp_path, monkeypatch):
         """#131 D9: a string "false" is truthy."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         doc = hierarchy.data_asset_yaml().read_text().replace("synthetic: true", 'synthetic: "false"')
         (tmp_path / "data-asset.yaml").write_text(doc)
@@ -309,7 +309,7 @@ class TestEachAssetSeesOnlyItsOwn:
     def as_daily(self, monkeypatch):
         """Act for the other asset from here on - one asset per process, so
         the claim the quarterly half made is let go first, as between tests."""
-        from qa_tools.common import assets
+        from asset_model import assets
 
         def switch(name="daily"):
             supply_db.release_connections()

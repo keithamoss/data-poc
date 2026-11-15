@@ -32,14 +32,14 @@ def _declared() -> dict[str, dict]:
     """{reference: {approver, date, reason}} from the configuration - empty
     where it cannot be read, so the page still builds and simply names no
     approver."""
-    from qa_tools.common import correction_apply, correction_trial
+    from asset_model import declared_corrections
 
     try:
-        docs = correction_trial.working()
-    except correction_trial.Unreadable:
+        docs = declared_corrections.working()
+    except declared_corrections.Unreadable:
         return {}
     return {p.reference: {"approver": p.approver, "date": p.date, "reason": p.reason}
-            for p in correction_apply._declared(*docs)}
+            for p in declared_corrections.pending_corrections(*docs)}
 
 
 def _name(identity: str | None) -> str | None:
@@ -182,9 +182,9 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
 
 
 def correction_trial_docs():
-    from qa_tools.common import correction_trial
+    from asset_model import declared_corrections
 
-    return correction_trial.working()
+    return declared_corrections.working()
 
 
 def applied_feed(conn: supply_db.SupplyConnection | None = None) -> list[dict]:

@@ -82,7 +82,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import asset_time, assets
+from asset_model import asset_time, assets
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
 # reads `reports/*.json`, which is built from the deployment's recorded
@@ -114,7 +114,7 @@ def _reports():
     """Every registered collection's dashboard file, from the registry - it
     named two, so Emergency Department's arrivals were never compared
     (post-build-review #250, the same class as #247)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     names = [c.dashboard_file for c in collections.all_collections()]
     # Not empty - the daily asset holds one collection since the split.
@@ -145,7 +145,7 @@ def _golden_for_this_asset() -> dict:
     reads as one); each asset's built reports are compared with its own
     part of it, and TestEveryDailyArrivalKeepsItsVerdict runs the same
     comparison for the daily asset (post-build-review #320)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
     golden = json.loads(GOLDEN.read_text())

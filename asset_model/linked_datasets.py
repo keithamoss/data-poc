@@ -13,15 +13,15 @@ import re
 from pathlib import Path
 
 import yaml
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
-REPO = Path(__file__).resolve().parent.parent.parent
+REPO = Path(__file__).resolve().parent.parent
 
 
-def _asset_folder(root: Path) -> Path:
+def asset_folder(root: Path) -> Path:
     """The selected asset's configuration folder in the checkout at `root`,
     asked of the resolver at call time (REQ-PIPE-342 criterion 6)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return root / assets.folder_on_disk()
 _ID = re.compile(r"^id_(\d+)$")
@@ -31,7 +31,7 @@ def _load(path: Path):
     return yaml.safe_load(path.read_text()) if path.exists() else None
 
 
-def _walk(asset: dict):
+def walk(asset: dict):
     """(agency, collection, dataset) for every dataset in the hierarchy."""
     for agency in ((asset.get("hierarchy") or {}).get("agencies") or []):
         for coll in agency.get("collections") or []:
@@ -49,8 +49,12 @@ def _calendar_of(cal: dict, coll_id: str, ds_id: str) -> str | None:
     return next(((c or {}).get("name") for c in cal.get("calendars") or []), None)
 
 
-def _columns(root: Path, contract: str, table: str) -> list[str]:
-    doc = _load(_asset_folder(root) / contract) or {}
+def table_columns(root: Path, contract: str, table: str) -> list[str]:
+    """The column names `contract` (relative to the selected asset's folder in
+    the checkout at `root`) declares for `table`, in contract order - [] where
+    it declares no such table. Not check_lifecycle.contract_columns, which
+    reads a contract's columns for the checks."""
+    doc = _load(asset_folder(root) / contract) or {}
     for t in doc.get("schema") or []:
         if t.get("name") == table:
             return [p.get("name") for p in t.get("properties") or []]
@@ -59,10 +63,10 @@ def _columns(root: Path, contract: str, table: str) -> list[str]:
 
 def _soda_checks(path: Path) -> list[tuple[str, dict]]:
     """(check_id, attributes) for every Soda check in a file."""
-    return [(cid, attrs) for cid, attrs, _body in _soda_bodies(path)]
+    return [(cid, attrs) for cid, attrs, _body in soda_bodies(path)]
 
 
-def _soda_bodies(path: Path, table: str | None = None) -> list[tuple[str, dict, dict]]:
+def soda_bodies(path: Path, table: str | None = None) -> list[tuple[str, dict, dict]]:
     """(check_id, attributes, the check's whole body) for every Soda check -
     or, given a table, for the checks of its own 'checks for <table>' block
     only (REQ-QAC-294 criterion 5)."""
@@ -159,19 +163,19 @@ CODE_COLUMN = "dataset"
 
 
 def problems(root: Path = REPO) -> list[str]:
-    asset = _load(_asset_folder(root) / "data-asset.yaml") or {}
-    cal = _load(_asset_folder(root) / "calendar.yaml") or {}
-    where = {ds.get("id"): (agency, coll, ds) for agency, coll, ds in _walk(asset)}
+    asset = _load(asset_folder(root) / "data-asset.yaml") or {}
+    cal = _load(asset_folder(root) / "calendar.yaml") or {}
+    where = {ds.get("id"): (agency, coll, ds) for agency, coll, ds in walk(asset)}
     out: list[str] = []
     #: (collection id, source dataset) -> the dataset declaring it alone, with no code
     sole: dict[tuple[str, str], str] = {}
-    for agency, coll, product in _walk(asset):
+    for agency, coll, product in walk(asset):
         linked = product.get("linked_datasets") or []
         if not linked:
             continue
         pid = product.get("id")
         product_cal = _calendar_of(cal, coll.get("id"), pid)
-        own = _columns(root, coll.get("contract", ""), product.get("table"))
+        own = table_columns(root, coll.get("contract", ""), product.get("table"))
         n = max((int(m.group(1)) for c in own if (m := _ID.match(c or ""))), default=0)
         has_code_column = CODE_COLUMN in own
         codeless = [e for e in linked if e.get("code") is None]
@@ -217,7 +221,7 @@ def problems(root: Path = REPO) -> list[str]:
                 # different-calendar case, only a side with no calendar.
                 out.append(f"{head}, but {pid} itself declares no calendar, so it has no "
                            f"period to read it for.")
-            source = _columns(root, l_coll.get("contract", ""), l_ds.get("table"))
+            source = table_columns(root, l_coll.get("contract", ""), l_ds.get("table"))
             for col in cols:
                 if col not in source:
                     out.append(f"{head} by the column {col!r}, which its contract does not declare.")
@@ -234,10 +238,10 @@ def participation_problems(root: Path = REPO) -> list[str]:
     owes exactly the periods its source owes - each side read after its own
     collection's files_go_to_period (REQ-PIPE-321), through the one schedule.
     Names the dataset and the first period they disagree."""
-    from qa_tools.common import agreement, schedule
+    from asset_model import agreement, schedule
 
-    asset = _load(_asset_folder(root) / "data-asset.yaml") or {}
-    path = _asset_folder(root) / "calendar.yaml"
+    asset = _load(asset_folder(root) / "data-asset.yaml") or {}
+    path = asset_folder(root) / "calendar.yaml"
     if not path.exists():
         return []
     try:
@@ -245,7 +249,7 @@ def participation_problems(root: Path = REPO) -> list[str]:
     except schedule.ScheduleConfigError:
         return []  # the schedule gate reports a calendar that cannot be read
     out = []
-    for _agency, _coll, product in _walk(asset):
+    for _agency, _coll, product in walk(asset):
         linked = product.get("linked_datasets") or []
         if len(linked) != 1 or linked[0].get("code") is not None:
             continue
@@ -279,7 +283,7 @@ def _check_problems(root: Path, coll: dict, pid: str, mapping: dict, table: str)
     the source dataset's id where the entry has none."""
     stem = str(coll.get("contract", "")).rsplit("/", 1)[-1].removesuffix("-contract.yaml")
     folder = str(coll.get("contract", "")).rsplit("/", 1)[0]
-    path = _asset_folder(root) / folder / f"{stem}-soda-checks.yml"
+    path = asset_folder(root) / folder / f"{stem}-soda-checks.yml"
     out: list[str] = []
     have: dict[str, set] = {did: set() for did in mapping}
     for check_id, attrs, body, check_key in _soda_items(path, table):

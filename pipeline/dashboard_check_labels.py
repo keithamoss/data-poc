@@ -59,9 +59,9 @@ from __future__ import annotations
 # 2026-09-19 until REQ-QAC-047 built it on 2026-09-23. Left recorded
 # rather than quietly corrected: a comment describing a guard that is
 # not there reads exactly like one describing a guard that is.
-from qa_tools.common.check_id import TOOLS, try_parse
+from asset_model.check_id import TOOLS, try_parse
+from asset_model.statuses import STATUS_ORDER  # noqa: F401
 from qa_tools.common.dataset_status import (  # noqa: F401
-    STATUS_ORDER,
     dashboard_status,
     dashboard_status_of,
     status_for_value,

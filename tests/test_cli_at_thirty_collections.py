@@ -74,7 +74,7 @@ class TestTheFixture:
         out = _run(thirty, "collections")
         assert out.returncode == 0, out.stderr
         rows = [r for r in out.stdout.splitlines() if r.strip()]
-        from qa_tools import collections
+        from asset_model import collections
 
         # Every real collection plus the twenty-eight added - thirty when
         # there were two real ones, one more for each collection since.
@@ -101,7 +101,7 @@ class TestHelpAtThirty:
         collections_panel = _panel(out.stdout, "Collections")
         tools_panel = _panel(out.stdout, "Tools")
         shorts = [row.split()[0] for row in collections_panel if row and not row.startswith(" ")]
-        from qa_tools import collections
+        from asset_model import collections
 
         expected = ([c.short for c in collections.all_collections()]
                     + [c["short"] for c in thirty_collections.added()])
@@ -310,11 +310,11 @@ class TestTheFilingMenuAtTwo:
         monkeypatch.setattr(common, "grouped_select",
                             lambda message, groups, flag_hint, **kw: asked.update(groups=groups) or None)
         filing_tui.filing_menu()
-        from qa_tools import collections
+        from asset_model import collections
 
         # At N_LIST or fewer, one ungrouped list: every collection the menu
         # offers, by its QA-menu label, in hierarchy order.
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         filed = {d.collection_id for d in hierarchy.all_datasets()}
         expected = [c.label for c in collections.all_collections() if c.id in filed]

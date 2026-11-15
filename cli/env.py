@@ -10,7 +10,7 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 from rich.table import Table
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 console = Console()
 
@@ -66,7 +66,7 @@ def _state_the_asset() -> None:
     """Which asset this terminal acts for, beside its environment
     (REQ-PIPE-363 criterion 8) - or why it acts for none. Reads the asset
     folder names only."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     asset = assets.selected_or_none()
     if asset is not None:
@@ -83,7 +83,8 @@ def dbt_deps_command() -> None:
     'already installed', when they are installed for its packages.yml as it
     reads now. Opens no database.
     """
-    from qa_tools.common import assets, dbt_common
+    from asset_model import assets
+    from qa_tools.common import dbt_common
     from qa_tools.tools import run_dbt
 
     asset = assets.selected()

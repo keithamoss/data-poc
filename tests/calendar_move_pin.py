@@ -29,7 +29,7 @@ def capture(by_round: bool = False) -> dict:
     fills - the pin was captured at files_go_to_period 0, where the two are
     one, so this is the comparison that keeps a collection at N honest
     without re-capturing anything."""
-    from qa_tools.common import hierarchy, schedule, slots
+    from asset_model import hierarchy, schedule, slots
 
     out: dict[str, dict] = {}
     for entry in hierarchy.all_datasets():

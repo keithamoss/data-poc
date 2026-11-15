@@ -99,7 +99,7 @@ def environment_statement() -> str | None:
     # AND THE ASSET, IN WORDS (REQ-PIPE-363 criterion 8), wherever the
     # environment is named - so a person switching assets can see which one
     # this terminal is acting for.
-    from qa_tools.common import assets
+    from asset_model import assets
 
     asset = assets.selected_or_none()
     return statement + (f" · Asset: {asset.name}" if asset is not None else "")
@@ -822,11 +822,12 @@ def record_delivery_of(arrival) -> None:
     """Record the delivery an arrival came in - write-once, as the batch's
     delivery_log.record_all() does for every delivery before it files one
     (REQ-PIPE-086 criterion 12: every per-arrival step on every route)."""
-    from qa_tools.common import arrivals, delivery, delivery_log
+    from qa_tools.common import delivery_log
+    from asset_model import arrivals as arrival_tree, delivery
 
     for d in delivery.list_deliveries():
         if d.name == arrival.delivery_name:
-            delivery_log.record(d, arrivals.recognise(d))
+            delivery_log.record(d, arrival_tree.recognise(d))
             return
 
 
@@ -898,7 +899,8 @@ def _file_or_trial(paths, collection_id, run_id_prefix, *, keep, route, original
     # anything is written (REQ-PIPE-147 criterion 4, REQ-PIPE-103 criteria
     # 9-17). A refusal here files nothing and offers no trial: the supply
     # is placeable, the operator only has to answer.
-    from qa_tools.common import asset_time, git_identity
+    from asset_model import asset_time
+    from qa_tools.common import git_identity
 
     try:
         who = git_identity.get_run_by()
@@ -1047,9 +1049,9 @@ def finish_kept(results: list[dict], filed, *, collection_id: str, run_id_prefix
 def kept_arrival(collection_id: str, run_id_prefix: str, run_id: str):
     """The recognised arrival a synthetic keep names - refused plainly where
     recognition finds none, rather than a bare StopIteration (#120 D13)."""
-    from qa_tools.common import arrivals
+    from asset_model import arrivals as arrival_tree
 
-    for arrival in arrivals.arrivals_for(collection_id, run_id_prefix):
+    for arrival in arrival_tree.arrivals_for(collection_id, run_id_prefix):
         if arrival.run_id == run_id:
             return arrival
     raise click.ClickException(
@@ -1170,7 +1172,7 @@ def check_label(result: dict) -> str:
     starts with the same asset, agency, collection and dataset on every
     row, so at a normal width that shared prefix was all anyone saw. An id
     that does not parse is shown whole."""
-    from qa_tools.common import check_id as cid
+    from asset_model import check_id as cid
 
     raw = result.get("check_id") or result.get("name") or "?"
     parsed = cid.try_parse(raw)
@@ -1213,12 +1215,12 @@ def _registered():
     """The selected asset's collections - none while no asset is selected,
     which is what lets the command modules build their options with nothing
     of any asset read (REQ-PIPE-363 criterion 2)."""
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections as declared_collections
+    from asset_model import assets
 
     if assets.selected_or_none() is None:
         return []
-    return collections.all_collections()
+    return declared_collections.all_collections()
 
 
 def many_collections() -> bool:

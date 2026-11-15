@@ -51,9 +51,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from qa_tools.common import assets
+from asset_model import assets
 from qa_tools.common import scenarios as scenarios_mod
-from qa_tools.common.dataset_status import status_words
+from asset_model.statuses import status_words
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 

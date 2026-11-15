@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import agreement_split
-from qa_tools.common import slots
+from asset_model import slots
 
 PERTH = timezone(timedelta(hours=8))
 

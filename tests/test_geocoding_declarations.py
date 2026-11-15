@@ -4,7 +4,7 @@ thing, and asks the gate the collections gate calls; the real files are
 untouched. Nothing here reads supply rows or the database."""
 from __future__ import annotations
 
-from qa_tools.common import assets
+from asset_model import assets
 
 import asset_folders
 import shutil
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from qa_tools.common import linked_datasets
+from asset_model import linked_datasets
 
 REAL = Path(__file__).resolve().parent.parent
 LP_SODA = Path("assets/quarterly/department-of-health/linkage-products-soda-checks.yml")
@@ -86,7 +86,7 @@ class TestTheDeclarations:
     """Criteria 1, 2, 6 to 10 and 12, read from the committed configuration."""
 
     def test_two_geocoding_datasets_each_linking_one_source_with_no_code(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         cp = hierarchy.dataset("geo-cp-clients")
         ed = hierarchy.dataset("geo-ed-presentations")
@@ -160,7 +160,7 @@ class TestTheCalendar:
     @pytest.mark.parametrize("geo,src", [("geo-cp-clients", "cp-clients"),
                                          ("geo-ed-presentations", "ed-presentations")])
     def test_each_owes_exactly_its_sources_periods(self, geo, src):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         owed = [p.name for p in schedule.periods_for_dataset(geo) if p.expected]
         assert owed, "precondition: the geocoding dataset owes periods"
@@ -169,7 +169,7 @@ class TestTheCalendar:
     def test_the_ed_gap_is_mirrored_and_the_due_time_is_its_own(self):
         from datetime import timedelta
 
-        from qa_tools.common import agreement, schedule
+        from asset_model import agreement, schedule
 
         assert "2015-Q4" not in {p.name for p in schedule.periods_for_dataset("geo-ed-presentations")}
         for ds in GEO:
@@ -358,7 +358,7 @@ class TestCriterionThreeThePlacingConfiguration:
         """Architecture rule with no behaviour to observe (criterion 3): the
         placing keys live in generator-only configuration, never on the
         shared schema or the hierarchy's linked tuple."""
-        for module in ("qa_tools/common/schemas.py", "qa_tools/common/hierarchy.py"):
+        for module in ("qa_tools/common/schemas.py", "asset_model/hierarchy.py"):
             text = (REAL / module).read_text()
             for word in ("place_by", "placed_column", "unplaced_value", "match_level"):
                 assert word not in text, (module, word)

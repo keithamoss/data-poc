@@ -33,7 +33,7 @@ import pytest
 import generator_isolation
 generate_runs = collection_modules.provider_module("civil-registration")
 from generator import scenario_injection as si
-from qa_tools.common import asset_time
+from asset_model import asset_time
 from generator import driver
 
 
@@ -293,6 +293,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     import hashlib
 
     from qa_tools.common import delivery
+    from asset_model import delivery as delivery_tree
 
     def _fingerprint(root):
         root = Path(root)
@@ -304,8 +305,8 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
                 for p in sorted(root.rglob("*"))]
 
     before = {name: _fingerprint(path)
-              for name, path in (("deliveries", delivery.default_deliveries_dir()),
-                                  ("receipts", delivery.default_receipts_dir()))}
+              for name, path in (("deliveries", delivery_tree.default_deliveries_dir()),
+                                  ("receipts", delivery_tree.default_receipts_dir()))}
     book_before = (delivery.bookkeeping_path().read_bytes()
                    if delivery.bookkeeping_path().exists() else None)
     # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
@@ -342,7 +343,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
     assert (tmp_path / "bookkeeping.json").exists()
-    for name, path in (("deliveries", delivery.default_deliveries_dir()), ("receipts", delivery.default_receipts_dir())):
+    for name, path in (("deliveries", delivery_tree.default_deliveries_dir()), ("receipts", delivery_tree.default_receipts_dir())):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.bookkeeping_path().read_bytes()
             if delivery.bookkeeping_path().exists() else None) == book_before
@@ -475,7 +476,7 @@ def test_every_lead_in_and_following_supply_arrives_on_time(manifest):
     from datetime import date as d
 
     from generator import scenario_injection as si
-    from qa_tools.common import asset_time, slots
+    from asset_model import asset_time, slots
 
     placements = json.loads(Path(si.placements_path()).read_text())
     if isinstance(placements, dict):
@@ -576,7 +577,7 @@ class TestTheEveningBeforeEra:
         assert grown[-1].date + timedelta(days=1) == generate_runs.original_periods()[0].date
 
     def test_every_era_supply_arrives_the_evening_before_on_time(self, manifest):
-        from qa_tools.common import asset_time, slots
+        from asset_model import asset_time, slots
 
         era = {p.name for p in generate_runs.grown_periods()}
         scenario_days = {si.resolve(i, generate_runs.generated_periods()).period

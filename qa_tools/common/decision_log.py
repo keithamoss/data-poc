@@ -753,7 +753,8 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
         # it is already out of staging, and rejecting it would let an
         # un-supersede bring a rejected supply back where the overlay reads
         # it. The two states say different things and one supply holds one.
-        from qa_tools.common import hierarchy, supersession
+        from asset_model import hierarchy
+        from qa_tools.common import supersession
 
         if supersession.is_superseded(conn, decision.dataset_id, decision.supply):
             collection = hierarchy.dataset(decision.dataset_id).collection_id
@@ -880,7 +881,7 @@ def _table_of(dataset_id: str) -> str | None:
     from the one hierarchy, so the log never holds a second mapping. None
     for a dataset the tree does not know (a test's), which concerns no
     table of this asset."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id).table

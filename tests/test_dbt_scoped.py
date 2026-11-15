@@ -72,7 +72,7 @@ class TestTheSelection:
         singular tests, which names_by_check_id's contract says it must not.
         Since the asset split each asset's dbt project is its own, so each
         collection is asked on its own asset, beside its siblings there."""
-        from qa_tools import collections
+        from asset_model import collections
 
         claimed = {c.id: run_dbt.test_names_by_check_id(c.id)
                    for c in collections.all_collections()}

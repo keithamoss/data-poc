@@ -1,4 +1,4 @@
-"""qa_tools/common/arrival_patterns.py and its configuration gate
+"""asset_model/arrival_patterns.py and its configuration gate
 (REQ-PIPE-058).
 
 The claim is about attribution - which dataset a delivered file belongs
@@ -13,7 +13,8 @@ import re
 
 import pytest
 
-from qa_tools.common import arrival_patterns, delivery, hierarchy, validate_arrival_patterns
+from asset_model import arrival_patterns, delivery, hierarchy
+from qa_tools.common import validate_arrival_patterns
 
 
 def _patterns(monkeypatch, mapping: dict[str, str]):
@@ -301,7 +302,7 @@ class TestAContestedFileIsHeldRatherThanFiled:
     pattern must not stop every other supply in the same drop."""
 
     def test_it_warns_and_keeps_going(self, monkeypatch, tmp_path):
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         _patterns(monkeypatch, {"alpha": r"shared\.csv", "beta": r"shared\.csv"})
         monkeypatch.setattr(hierarchy, "dataset",

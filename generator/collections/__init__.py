@@ -30,12 +30,12 @@ def provider_module(collection_id: str):
     """The module of the provider for `collection_id`, loaded by path from the
     selected asset's provider folder, or NoProviderError naming it.
 
-    The id is the registry's own (qa_tools.collections.by_id), so an
+    The id is the registry's own (asset_model.collections.by_id), so an
     undeclared collection is refused there by name; a declared one with no
     provider file is refused here by name - never generated with another
     collection's behaviour."""
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections
+    from asset_model import assets
 
     coll = collections.by_id(collection_id)
     if not collections.ID_PATTERN.fullmatch(coll.id):
@@ -58,7 +58,7 @@ def for_dataset(dataset_id: str) -> Provider:
     """The provider of the collection `dataset_id` belongs to - refused by
     name when the hierarchy does not declare the dataset, or its collection
     has no provider."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         collection_id = hierarchy.dataset(dataset_id).collection_id
@@ -71,7 +71,7 @@ def for_dataset(dataset_id: str) -> Provider:
 def providers() -> list[Provider]:
     """Every declared collection's provider, in hierarchy order - the
     collections without one are simply not generated."""
-    from qa_tools import collections
+    from asset_model import collections
 
     out = []
     for coll in collections.all_collections():

@@ -12,9 +12,15 @@ import baseline_periods
 import yaml
 
 import test_supersession as _base
-from qa_tools.common import (amber_setting, decision_log as dl, promotion, replacement_setting,
-                             substitution, supersession)
-from qa_tools.common.hierarchy import data_asset_yaml
+from asset_model import amber_setting
+from qa_tools.common import (
+    decision_log as dl,
+    promotion,
+    replacement_setting,
+    substitution,
+    supersession,
+)
+from asset_model.hierarchy import data_asset_yaml
 from test_supersession import DS, REAL_PERSON, TABLE, WHEN, _filed
 
 conn = _base.conn

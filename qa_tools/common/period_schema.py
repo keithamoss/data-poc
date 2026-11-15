@@ -53,9 +53,9 @@ from datetime import datetime
 from typing import Iterable, Mapping, Sequence
 
 from qa_tools.common import replay_clock as _replay_clock
-from qa_tools.common import check_id as check_id_mod
+from asset_model import check_id as check_id_mod
 from qa_tools.common import qa_store
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 from qa_tools.common import supply_db
 
 #: A period schema carries this prefix so it is distinguishable from
@@ -193,7 +193,7 @@ def ensure_period_schema(conn, period_name: str) -> str:
     The suite's made-up periods are declared on a test baseline (the
     `test_baseline` fixture), never exempted.
     """
-    from qa_tools.common import assets, schedule
+    from asset_model import assets, schedule
 
     if not schedule.on_baseline(period_name):
         base = schedule.baseline()
@@ -282,7 +282,8 @@ def open_period(conn, period_name: str, *, opened_by: str,
     two are not the same thing: that one is idempotent scaffolding a
     view needs, this one is an event.
     """
-    from qa_tools.common import asset_time, decision_log, inheritance
+    from asset_model import asset_time
+    from qa_tools.common import decision_log, inheritance
 
     schema = ensure_period_schema(conn, period_name)
     if opened(conn, period_name):
@@ -308,7 +309,7 @@ def open_period(conn, period_name: str, *, opened_by: str,
         if groups is None:
             if dataset_id is not None:
                 g = inheritance.offset_group(dataset_id, period_name)
-                from qa_tools.common import hierarchy
+                from asset_model import hierarchy
 
                 # A DATASET THE HIERARCHY DOES NOT HOLD has no collection and
                 # no offset group (offset_group already says None for it), so

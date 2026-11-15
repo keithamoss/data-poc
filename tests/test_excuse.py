@@ -14,8 +14,17 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import filing_support
-from qa_tools.common import (assignment, decision_log as dl, excuse, filing,
-                             filing_decisions as fd, people, qa_store, rejection, supply_db)
+from asset_model import assignment
+from qa_tools.common import (
+    decision_log as dl,
+    excuse,
+    filing,
+    filing_decisions as fd,
+    people,
+    qa_store,
+    rejection,
+    supply_db,
+)
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"

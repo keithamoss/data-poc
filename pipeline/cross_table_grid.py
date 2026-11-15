@@ -27,7 +27,8 @@ from __future__ import annotations
 import bisect
 from datetime import datetime
 
-from qa_tools.common import asset_time, decision_log, display_time, hierarchy, qa_store
+from asset_model import asset_time, hierarchy
+from qa_tools.common import decision_log, display_time, qa_store
 
 #: The two cells (criterion 6); None is neither (criterion 7's third bucket).
 STAGED = "staged"

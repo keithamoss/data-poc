@@ -19,7 +19,8 @@ from datetime import date
 import pytest
 
 import agreement_split
-from qa_tools.common import hierarchy, runway, schedule
+from asset_model import hierarchy, schedule
+from qa_tools.common import runway
 
 # The real quarterly calendar's last authored date. Written as a
 # constant so a test that goes stale when somebody authors 2028 fails

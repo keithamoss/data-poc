@@ -201,7 +201,8 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     filed supply, as a run of its own, against its filed period's overlay -
     exactly as an arrival's run is built. Returns (arrival, results). Raises
     whatever the run raises; the caller decides what owing it means."""
-    from qa_tools.common import filing, hierarchy, period_overlay
+    from qa_tools.common import filing, period_overlay
+    from asset_model import hierarchy
     from qa_tools.common.git_identity import get_run_by
 
     with supply_db.connect(label="mothman:recheck") as conn:
@@ -215,10 +216,11 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     received_at = filing.received_at_of(dataset_id, supply_id)
     entry_ds = hierarchy.dataset(dataset_id)
     from qa_tools import collections
+    from asset_model import collections as declared_collections
 
     from qa_tools.tools import orchestrate
 
-    coll = collections.by_id(entry_ds.collection_id)
+    coll = declared_collections.by_id(entry_ds.collection_id)
     # REFUSED BY NAME BEFORE ANYTHING IS STAGED OR OVERLAID (REQ-PIPE-240
     # criterion 6): a collection with no adapter raises NoAdapterError here.
     collections.adapter(coll)
@@ -301,7 +303,8 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     checks again, then the gate) or a re-evaluation (REQ-PIPE-121's knock-on,
     knock_on.complete) - and clear it. Read only after the claim, so an item
     another runner finished meanwhile reads as already run."""
-    from qa_tools.common import decision_log, hierarchy
+    from qa_tools.common import decision_log
+    from asset_model import hierarchy
 
     with supply_db.connect(label="mothman:recheck") as conn:
         item, cleared_at = _owed_item(conn, owed_id)
@@ -431,7 +434,7 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
 def _said(verdict: str | None) -> str:
     """A verdict in a message's words (REQ-TEST-360 criterion 7): 'failing',
     never the stored 'red'; 'no verdict' where there is none."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(verdict, "verb") if verdict else "no verdict"
 
@@ -540,7 +543,7 @@ def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),
     stay owed for the next pass (criterion 24)."""
     import time
 
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out: list[Outcome] = []
     tried: set[int] = set()

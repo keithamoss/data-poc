@@ -25,16 +25,16 @@ whether a slot is open or closed.
 
 A dataset's expected time of day, grace allowance and claim window come
 from its participation in the asset's calendar.yaml, read through the one
-loader (qa_tools/common/agreement.py, REQ-PIPE-110).
+loader (asset_model/agreement.py, REQ-PIPE-110).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, hierarchy, schedule
-from qa_tools.common import assets as _assets
-from qa_tools.common.schedule import Period
+from asset_model import asset_time, schedule
+from asset_model import assets as _assets
+from asset_model.schedule import Period
 
 
 @dataclass(frozen=True)
@@ -106,7 +106,7 @@ class SlotInstants:
     claim_opens_at: datetime
 
 
-def _participation_for(dataset_id: str, period_date: date, agreement):
+def participation_for(dataset_id: str, period_date: date, agreement):
     """The participation version that governs a period: the one in force on
     the period's OWN date (REQ-PIPE-113 criterion 2).
 
@@ -115,7 +115,7 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
     after a slot is what that slot closes against (REQ-PIPE-131) - so it
     takes the first version, the only one that could describe it.
     """
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
@@ -165,8 +165,8 @@ def slot_instants(dataset_id: str, round_date: date, agreement=None) -> SlotInst
     changes how early a supply may arrive and never the due instant
     (criterion 6).
     """
-    agreement = schedule._agreement(agreement)
-    version = _participation_for(dataset_id, round_date, agreement)
+    agreement = schedule.agreement_to_read(agreement)
+    version = participation_for(dataset_id, round_date, agreement)
     due_at = asset_time.wall_clock(round_date - timedelta(days=version.days_before),
                                    version.expected_time)
     window = schedule.claim_window(dataset_id, on=round_date, agreement=agreement)
@@ -178,7 +178,7 @@ def max_days_before(dataset_id: str, agreement=None) -> int:
     states - what every slot-generation horizon has to reach past
     (REQ-PIPE-113 criterion 11)."""
     return max((v.days_before for v in
-                schedule._agreement(agreement).resolved_versions(dataset_id)), default=0)
+                schedule.agreement_to_read(agreement).resolved_versions(dataset_id)), default=0)
 
 
 def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
@@ -210,9 +210,9 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     # the 01:00 case; a blunt round-up would add a day the daily feed can
     # never claim. The EARLIEST expected time any version has is the
     # conservative one.
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     versions = agreement.resolved_versions(dataset_id)
-    window = claim_window(dataset_id, agreement)
+    window = widest_claim_window(dataset_id, agreement)
     earliest = min((timedelta(hours=h, minutes=m) for h, m in
                     (asset_time.parse_hhmm(v.expected_time) for v in versions if v.expected_time)),
                    default=timedelta(0))
@@ -231,7 +231,7 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     return at + timedelta(days=reach + days)
 
 
-def claim_window(dataset_id: str, agreement=None) -> timedelta:
+def widest_claim_window(dataset_id: str, agreement=None) -> timedelta:
     """The WIDEST claim window this dataset has ever had - a bound on how
     far ahead to generate slots, not a property of any one slot.
 
@@ -243,7 +243,7 @@ def claim_window(dataset_id: str, agreement=None) -> timedelta:
     candidate; generating a period too many costs nothing, because the
     slot it makes is still filtered on its own `claim_opens_at`.
     """
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     candidates = [v.claim_window for v in
                   schedule.calendar_for_dataset(dataset_id, agreement).versions]
     candidates += [v.claim_window for v in agreement.resolved_versions(dataset_id)
@@ -263,7 +263,7 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     is still RETURNED by the schedule, flagged, so the dashboard can
     show "no November file, agreed" rather than a silent gap.
     """
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
 
     def claim_opens(period_date: date) -> datetime:
         # Resolved PER PERIOD, on that period's own date, so a new calendar
@@ -280,7 +280,7 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     # round fills and whether or not it opens a slot (REQ-PIPE-131 criterion
     # 1 as REQ-PIPE-321 amends it). Read by index, never by walking the
     # sequence per slot (NFR 1).
-    sequence = _calendar_periods(dataset_id, until, agreement)
+    sequence = period_sequence(dataset_id, until, agreement)
     following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
     preceding = {p.name: sequence[i - 1].date for i, p in enumerate(sequence) if i > 0}
 
@@ -363,7 +363,7 @@ def relative_period(dataset_id: str, period: str, offset: int,
     return names[at] if 0 <= at < len(names) else None
 
 
-def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
+def period_sequence(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
     asset's baseline's (REQ-PIPE-345: no dataset has dates of its own) - with
     the period AFTER `until` included, so the last slot generated still
@@ -469,58 +469,6 @@ def is_owed_supplies(dataset_id: str) -> bool:
     if calendar.current.is_cadence_rule:
         return True
     return bool(schedule.periods_for_dataset(dataset_id))
-
-
-def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
-    """Where `at` falls in a round that opens no slot because a FALL in its
-    collection's files_go_to_period means an earlier round already fills
-    that round's period (REQ-PIPE-322 criterion 3): the agreement change -
-    collection, version, round and the period it would be a second supply
-    for - or None. Cheap for a collection that never changes its value."""
-    agr = schedule._agreement(agreement)
-    try:
-        cid = hierarchy.dataset(dataset_id).collection_id
-        name = hierarchy.dataset(dataset_id).collection_name
-    except hierarchy.UnknownDatasetError:
-        return None
-    versions = agr.offsets.get(cid, ())
-    if len({v.value for v in versions}) < 2:
-        return None
-    try:
-        cal = schedule.calendar_for_dataset(dataset_id, agr).name
-    except schedule.NoCalendarAgreed:
-        return None
-    day = asset_time.local_date(at)
-    # Two years ahead BY DAYS, not day.replace(year+2), which raises on
-    # 29 February (critic finding 3).
-    rounds = schedule.periods_for_calendar(cal, until=day + timedelta(days=731),
-                                           agreement=agr)
-    k = None
-    for i, r in enumerate(rounds):
-        if slot_instants(dataset_id, r.date, agr).claim_opens_at <= at:
-            k = i
-        else:
-            break
-    if k is None:
-        return None
-    rnd = rounds[k]
-    n = agr.files_go_to_period_for(dataset_id, rnd.date) or 0
-    if k + n >= len(rounds):
-        return None
-    target = rounds[k + n]
-    filler = schedule.round_of(target.name, dataset_id, agr)
-    if filler is None or filler == rnd.date:
-        return None
-    version = max((v for v in versions if v.effective_from <= rnd.date),
-                  key=lambda v: v.effective_from)
-    # THE ROUND THE CHANGE TOOK EFFECT FROM (REQ-PIPE-322 criterion 3, critic
-    # finding 8) beside the round the supply arrived in: after a fall of 2 or
-    # more they differ, and the words name the change's.
-    from_round = next((r.date for r in rounds if r.date >= version.effective_from), rnd.date)
-    return {"collection_id": cid, "collection": name,
-            "version": version.effective_from.isoformat(), "round": rnd.date.isoformat(),
-            "from_round": from_round.isoformat(),
-            "period": target.name, "filled_by": filler.isoformat()}
 
 
 def period_claimed_at(dataset_id: str, at: datetime, agreement=None) -> str | None:

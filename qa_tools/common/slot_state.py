@@ -256,7 +256,7 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     first is how a queue tells somebody to chase a file that is sitting
     in front of them.
     """
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     # THE LAST DECISION THAT CHANGED THE SLOT, from qa.slot_holds
     # (REQ-PIPE-130 criterion 9) - not the last one naming it, which can
@@ -405,8 +405,9 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
     counts them together for the reason a ticket each would fail at
     thirty datasets.
     """
-    from qa_tools.common import asset_time, filing, hierarchy
-    from qa_tools.common import slots as slots_mod
+    from asset_model import asset_time, hierarchy
+    from qa_tools.common import filing
+    from asset_model import slots as slots_mod
 
     from qa_tools.common import dataset_blockers
 

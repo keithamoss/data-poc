@@ -13,7 +13,8 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from qa_tools.common import assignment, filing
+from asset_model import assignment
+from qa_tools.common import filing
 
 PERTH = timezone(timedelta(hours=8))
 

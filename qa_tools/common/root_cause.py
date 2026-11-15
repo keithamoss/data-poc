@@ -305,7 +305,8 @@ def red_only_owed(conn, dataset_id: str, supply: str, period: str) -> bool:
 def also_lines(held: list) -> list[str]:
     """'Also held back by this', one line per supply, with its period -
     datasets and periods only, never rows or filenames (REQ-DASH-204 NFR 4)."""
-    from qa_tools.common import display_time, hierarchy
+    from qa_tools.common import display_time
+    from asset_model import hierarchy
 
     out = []
     for s in sorted(held, key=lambda s: (s.dataset_id, s.period)):
@@ -571,7 +572,8 @@ def order_b_partner(conn, dataset_id: str, supply: str, period: str):
     result of the same check that read this supply and a WAITING supply of
     that table in its place passed - so promoting that one re-checks this
     one. From what each result recorded reading; None where there is none."""
-    from qa_tools.common import hierarchy, knock_on, supersession, supply_status
+    from asset_model import hierarchy
+    from qa_tools.common import knock_on, supersession, supply_status
 
     try:
         shown = supply_status.results_about(conn, dataset_id, supply,

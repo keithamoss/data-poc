@@ -171,7 +171,8 @@ def promote(conn: supply_db.SupplyConnection, *,
         decision_log.act_spans(conn, dataset_id,
                                [supply, h.holder if (substituted or displaced) else None])
         if substituted:
-            from qa_tools.common import hierarchy, substitution
+            from asset_model import hierarchy
+            from qa_tools.common import substitution
 
             substitution.de_substitute(
                 conn, agency_id=agency_id, collection_id=collection_id,
@@ -220,7 +221,7 @@ def _status_at_promotion(conn, dataset_id: str, supply: str, given: str | None) 
         return given if given in ("green", "amber", "red") else None
     from qa_tools.common import supply_status
 
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         found = supply_status.status(conn, dataset_id, supply)
@@ -358,7 +359,7 @@ def _status_label(status) -> str:
     """A status as the gate's reason names it ('Fail'). REFUSES one it has
     no word for (UnknownStatusError), never passing the raw value through -
     an unrecognised status is not evidence of anything (REQ-QAC-047)."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(status, "label")
 
@@ -416,7 +417,7 @@ def effective_at_for(received_at: datetime, *, now: datetime | None = None,
     should be inferred from one. The synthetic corpus is fiction
     throughout; this part of it is merely newer.
     """
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     now = now or asset_time.now()
     digest = hashlib.sha256((seed or "").encode()).digest()
@@ -463,7 +464,8 @@ def next_receipt(arrival) -> datetime | None:
     datasets = list((getattr(arrival, "files_by_dataset", None) or {}).keys())
     if received is None or len(datasets) != 1:
         return None
-    from qa_tools.common import arrivals, hierarchy, qa_store, supply_db
+    from asset_model import arrivals, hierarchy
+    from qa_tools.common import qa_store, supply_db
 
     with supply_db.connect(read_only=True, label="mothman:next-receipt") as conn:
         rows = conn.execute(
@@ -491,7 +493,8 @@ def _readers_next_receipts(dataset_id: str, received) -> list:
     readers are whatever the check declarations say (run_reads), and a
     reader's delivery for another period caps nothing. Live, the lag is
     'now' anyway, so this changes nothing outside a replay."""
-    from qa_tools.common import arrivals, filing, hierarchy, run_reads, slots
+    from asset_model import arrivals, hierarchy, slots
+    from qa_tools.common import filing, run_reads
 
     try:
         table = hierarchy.dataset(dataset_id).table
@@ -699,17 +702,17 @@ def _gating_status(record: dict) -> str | None:
 
 
 def _is_file_check(check_id: str | None) -> bool:
-    from qa_tools.common import check_id as cid, file_checks
+    from asset_model import check_id as cid, file_check_definitions
 
     parsed = cid.try_parse(check_id or "")
-    return bool(parsed and parsed.tool == file_checks.TOOL)
+    return bool(parsed and parsed.tool == file_check_definitions.TOOL)
 
 
 def _contributing_records(dataset_id: str, results: Sequence[dict],
                           reads: dict[str, list[str]]):
     """The records that contribute to this dataset's status - the one
     definition status_of() and gap_reds() share (see status_of)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         own_tables = {hierarchy.dataset(dataset_id).table}
@@ -1070,8 +1073,8 @@ def judge(conn, item: dict, status, *, results: Sequence[dict], reads: dict[str,
     UnreadableVerdictError reading it raised. `record` False writes nothing
     - an amber waiting note or a stood-on refusal is the caller's to write
     once the outcome is final."""
-    from qa_tools.common import (amber_setting, inheritance, rejection, replacement_setting,
-                                 supersession)
+    from asset_model import amber_setting
+    from qa_tools.common import inheritance, rejection, replacement_setting, supersession
 
     dataset_id = item["dataset_id"]
     if dataset_id in barred:

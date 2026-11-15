@@ -58,7 +58,7 @@ from datetime import datetime
 from functools import cached_property
 
 from qa_tools.common import replay_clock as _replay_clock
-from qa_tools.common.assignment import Assignment
+from asset_model.assignment import Assignment
 
 TABLE = "qa.hold"
 
@@ -136,7 +136,7 @@ def schedule_file() -> str:
     path, never a second literal copy of it (REQ-PIPE-110 criterion 17).
     Resolved at call time (REQ-PIPE-342 criterion 6); it was the import-time
     constant SCHEDULE_FILE."""
-    from qa_tools.common import agreement, assets
+    from asset_model import agreement, assets
 
     # By repository path through the resolver (the asset split: the folder is
     # assets/<asset>/, no longer a top-level contract/, so the file's
@@ -155,7 +155,7 @@ def reason_for(decided: Assignment) -> dict:
         reason.update(schedule_ended=True, last_period=decided.last_period,
                       fix_file=schedule_file())
         try:
-            from qa_tools.common import schedule
+            from asset_model import schedule
             calendar = schedule.calendar_for_dataset(decided.dataset_id).name
             year = (decided.received_at.year if decided.received_at else None)
             reason["fix_command"] = (f"mothman schedule candidate-dates --calendar {calendar}"
@@ -290,7 +290,7 @@ class Held:
         return "no period was open at its receipt"
 
     def _name(self) -> str:
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         try:
             return hierarchy.dataset(self.dataset_id).dataset_name
@@ -739,7 +739,8 @@ def held_supplies(conn, *, arrival_key: str, supply: str | None = None) -> dict[
     """held_tables()' answer with each table's held SUPPLY ID - what a
     result reading a held table records (REQ-PIPE-279 criterion 1), since a
     held table's physical name says nothing a reader can match a supply on."""
-    from qa_tools.common import hierarchy, supply_files
+    from asset_model import hierarchy
+    from qa_tools.common import supply_files
 
     own = supply_files.dataset_of(supply) if supply else None
     tables: dict[str, str] = {}

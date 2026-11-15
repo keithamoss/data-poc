@@ -10,8 +10,8 @@ import pytest
 
 from build_support import facts_for
 from pipeline import build_dashboard_data as bcd
-from qa_tools import collections
-from qa_tools.common import hierarchy
+from asset_model import collections
+from asset_model import hierarchy
 
 _CP = collections.by_id("child-protection")
 

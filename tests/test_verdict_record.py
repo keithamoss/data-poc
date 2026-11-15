@@ -15,8 +15,9 @@ import pytest
 import yaml
 
 import filing_support
-from qa_tools.common import agreement, assignment, filing, qa_store, supply_db, verdict
-from qa_tools.common import arrival_classification as classify_mod
+from asset_model import agreement, assignment
+from qa_tools.common import filing, qa_store, supply_db, verdict
+from asset_model import arrival_classification as classify_mod
 from tests import before_growth
 
 PERTH = timezone(timedelta(hours=8))
@@ -169,7 +170,7 @@ class TestReJudgement:
         """REQ-PIPE-112 criterion 13: a timezone correction is re-judged like
         any other. Under UTC+14, 2023-Q3's 09:00 due is 03:00 Perth and its
         8h grace ends 11:00 Perth, so the 12:00 supply becomes LATE."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         _file()
         corrected = asset_time.parse_timezone_versions({"timezone": {"versions": [

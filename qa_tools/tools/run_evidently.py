@@ -3,7 +3,7 @@ PSI drift checks, all on one dataset, and a relative volume check per table, as 
 Evidently check file declares them (REQ-QAC-241).
 
 The real evidently.Report + DataDriftPreset API, not a reimplementation -
-PSI is computed in qa_tools/common/evidently_common.py. Evidently's PSI
+PSI is computed in asset_model/drift.py. Evidently's PSI
 treats every DISTINCT VALUE observed in the column as its own category, so
 a dirty run with three different invalid codes gets three separate
 categories; PSI is sensitive to that binning (README.md's
@@ -25,12 +25,16 @@ from __future__ import annotations
 
 import psycopg
 
-from qa_tools import collections
-from qa_tools.common import (asked_for, drift_reference, evidently_common, hierarchy, left_out,
-                             supply_db)
-from qa_tools.common.evidently_common import (
-    ENGINE_TAG, NO_REFERENCE, collection_checks, compute_psi, frame_from_value_counts,
-    recorded_row_counts, reference_value_counts, status_for,
+from asset_model import collections
+from qa_tools.common import asked_for, drift_reference, left_out, supply_db
+from asset_model import drift, hierarchy
+from qa_tools.common.evidently_common import ENGINE_TAG, recorded_row_counts, reference_value_counts
+from asset_model.drift import (
+    NO_REFERENCE,
+    collection_checks,
+    compute_psi,
+    frame_from_value_counts,
+    status_for,
 )
 from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 
@@ -50,7 +54,7 @@ def drift_dataset(collection_id: str) -> str | None:
 def _excluding(frame, entry: dict):
     """evidently_common.excluding - the one copy, shared with the
     generator's drift planning (REQ-GEN-295 criterion 7 as amended)."""
-    return evidently_common.excluding(frame, entry)
+    return drift.excluding(frame, entry)
 
 
 def _table_of(check_id: str) -> str:

@@ -14,8 +14,8 @@ import pytest
 import yaml
 
 import filing_support
-from qa_tools.common import (agreement, agreement_drift, agreement_freeze, asset_time,
-                             assignment, qa_store, supply_db)
+from asset_model import agreement, declared_corrections, asset_time, assignment
+from qa_tools.common import agreement_drift, agreement_freeze, qa_store, supply_db
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
@@ -145,7 +145,7 @@ class TestOneDatasetNeverStopsAnother:
     def test_only_the_changed_dataset_is_refused(self, conn, monkeypatch):
         cal, asset = _docs()
         _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         found = agreement_drift.refusals(conn, ["cp-clients", "cp-carers"])
         assert set(found) == {"cp-clients"}
         assert "1 dataset refused" in agreement_drift.pass_line(found)
@@ -175,7 +175,7 @@ class TestTheCommandAndThePass:
         from cli import schedule as schedule_cli
         cal, asset = _docs()
         _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         got = CliRunner().invoke(schedule_cli.schedule_group,
                                  ["check-agreement", "--dataset", DATASET])
         assert got.exit_code == 3  # its own status (Keith, 2026-10-11, (h))
@@ -197,7 +197,7 @@ class TestTheCommandAndThePass:
         from qa_tools.common import filing, supply_holds
         cal, asset = _docs()
         _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         at = datetime(2023, 11, 1, 10, tzinfo=PERTH)
         filing_support.ensure_delivery("pytest-drift", "cp-clients", at)
         filing_support.ensure_delivery("pytest-drift", "cp-carers", at, "cp-carers.csv")
@@ -219,14 +219,14 @@ class TestTheCommandAndThePass:
         from qa_tools.common import filing, supply_holds
         cal, asset = _docs()
         _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         at = datetime(2023, 11, 1, 10, tzinfo=PERTH)
         filing_support.ensure_delivery("pytest-drift2", "cp-clients", at)
         arrival = SimpleNamespace(files_by_dataset={"cp-clients": ["a"]}, received_at=at,
                                   delivery_name="pytest-drift2", run_id="drift-run-2")
         monkeypatch.setattr(filing, "_supply_id_for", lambda arr, ds: f"{ds}@drift2")
         filing.file_arrivals([arrival])
-        monkeypatch.setattr(agreement_drift, "_load_docs", _docs)   # restored
+        monkeypatch.setattr(declared_corrections, "load_docs", _docs)   # restored
         done = agreement_drift.refile_cleared(say=lambda *_: None)
         assert ("cp-clients", "cp-clients@drift2", "2024-Q1") in done
         assert not [h for h in supply_holds.outstanding(conn)
@@ -287,7 +287,7 @@ class TestCriticFindingsOn173:
 
         from qa_tools.common import filing, supply_holds
         cal, asset = self._grace_one_hour()
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         at = datetime(2035, 3, 1, 10, tzinfo=PERTH)
         filing_support.ensure_delivery("pytest-drift-2035", "cp-clients", at)
         arrival = SimpleNamespace(files_by_dataset={"cp-clients": ["a"]}, received_at=at,
@@ -301,7 +301,7 @@ class TestCriticFindingsOn173:
 
     def test_9_a_dataset_that_cannot_be_evaluated_is_said_not_skipped(self, conn, monkeypatch):
         cal, asset = self._grace_one_hour()
-        monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (cal, asset))
         monkeypatch.setattr(agreement_drift, "refusal_for",
                             lambda *a, **k: (_ for _ in ()).throw(ValueError("bad grace")))
         errors = []

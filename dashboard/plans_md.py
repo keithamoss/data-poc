@@ -62,7 +62,7 @@ from urllib.parse import unquote_to_bytes
 from dashboard.markdown_text import join_wrapped
 from pathlib import Path
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 _ITEM_RE = re.compile(
     r"^(\d+)\.\s+\*\*\[([a-z-]+),\s*(\d{4}-\d{2}-\d{2})\]\*\*((?:\s*\*\*\[[^\]]+\]\*\*)+)\s*(.*)$"

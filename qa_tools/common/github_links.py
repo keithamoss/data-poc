@@ -63,7 +63,7 @@ def _rel_path(source_file: str, root: Path) -> str:
     file the checkout at `root` does not hold, as build_folder_links refuses
     its folder (C7, REQ-PIPE-342 decision 18; post-build-review #313 M3):
     a link is a repository path, never an absolute one."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     p = Path(source_file)
     if not p.is_absolute():
@@ -119,8 +119,8 @@ def build_folder_links(repo: str = DEFAULT_REPO, sha: str | None = None,
     at `root`, refused when the folder lies outside it (C7, REQ-PIPE-342
     decision 18) rather than linking to a path GitHub has never seen.
     """
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections
+    from asset_model import assets
 
     sha = sha or current_commit_sha(root)
     root = Path(root)

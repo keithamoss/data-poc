@@ -129,7 +129,7 @@ class TestTheBuildWarns:
                             lambda: ["warning: census x: the log says P holds t"])
         cli_dashboard._build_data()
         assert "warning: census x" in capsys.readouterr().out
-        from qa_tools import collections
+        from asset_model import collections
 
         written = sorted(p.name for p in tmp_path.iterdir())
         assert written == sorted(f"{c.id}.json" for c in collections.all_collections())

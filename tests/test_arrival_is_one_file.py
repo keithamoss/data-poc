@@ -29,7 +29,8 @@ dropped because `qa_run_run_5f_001` is what a person reads in psql.
 """
 from __future__ import annotations
 
-from qa_tools.common import arrivals, asset_time, hierarchy, supply_db
+from asset_model import arrivals, asset_time, hierarchy
+from qa_tools.common import supply_db
 
 CP = "child-protection"
 BDM = "civil-registration"
@@ -74,7 +75,7 @@ class TestOneArrivalIsOneFile:
         """Six datasets across eighteen deliveries, minus the ones a
         delivery genuinely did not carry - counted against the files
         themselves rather than against a number written here."""
-        from qa_tools.common import delivery
+        from asset_model import delivery
 
         files = 0
         for d in delivery.list_deliveries(*cp_delivery_dirs):

@@ -425,7 +425,8 @@ class TestTheBuildAgreesWithResultsAboutOnTheDeployment:
         from datetime import date, timedelta
 
         from pipeline import warehouse_counts
-        from qa_tools.common import asset_time, supply_status
+        from asset_model import asset_time
+        from qa_tools.common import supply_status
 
         monkeypatch.setattr(results_history, "reports_root", fixed(str(tmp_path / "reports")))
         monkeypatch.setattr(bdd, "reports_root", fixed(str(tmp_path / "reports")))

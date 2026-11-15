@@ -123,7 +123,8 @@ class TestSamplesAreNotLostToANameAnotherTableShares:
 
     def test_every_sampled_failure_names_rows_of_its_own_table(self, monkeypatch,
                                                                 cp_duckdb_dir):
-        from qa_tools.common import hierarchy, supply_db
+        from asset_model import hierarchy
+        from qa_tools.common import supply_db
 
         results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
         sampled = [r for r in results if r["failing_sample_keys"]]

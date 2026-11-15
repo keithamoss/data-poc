@@ -35,9 +35,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qa_tools.common import (decision_log, hierarchy, inheritance, people,
-                             promotion, rejection, substitution, supply_db)
-from qa_tools.common import assets as _assets
+from qa_tools.common import (
+    decision_log,
+    inheritance,
+    people,
+    promotion,
+    rejection,
+    substitution,
+    supply_db,
+)
+from asset_model import hierarchy
+from asset_model import assets as _assets
 
 #: The eight operations criterion 1 names, and the vocabulary both
 #: routes speak. They are the decision log's own action names rather
@@ -453,8 +461,8 @@ def _held_back_consequences(conn, request: Request) -> list[str]:
          promoting over a could-not-run whose table is not yet due.
 
     From recorded results and the decision log only."""
-    from qa_tools.common import (carried, hierarchy, knock_on, period_schema, promotion,
-                                 qa_store, supply_status)
+    from qa_tools.common import carried, knock_on, period_schema, promotion, qa_store, supply_status
+    from asset_model import hierarchy
 
     op, ds, period, supply = (request.operation, request.dataset_id, request.period,
                               request.supply)
@@ -627,7 +635,8 @@ def _readers_rechecked(conn, request: Request, besides=frozenset()) -> list[str]
     (REQ-PIPE-121) will re-check - said only where the decision really
     changes what the period holds, since a promise of a re-check that does
     not happen would be false."""
-    from qa_tools.common import hierarchy, knock_on, promotion
+    from asset_model import hierarchy
+    from qa_tools.common import knock_on, promotion
 
     period, ds, op = request.period, request.dataset_id, request.operation
     if not period:
@@ -784,7 +793,8 @@ def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     on the asset's own calendar, and supply ids only in the commands to
     paste - "This removes 2026-Q3's accepted Clients and supersedes
     2026-Q2's waiting Clients from 14 May"."""
-    from qa_tools.common import asset_time, refiling
+    from asset_model import asset_time
+    from qa_tools.common import refiling
 
     p = refiling.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
                       to_period=request.to_period)

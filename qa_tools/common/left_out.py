@@ -77,7 +77,7 @@ def reconcile(run_id: str, left_out: dict[str, set[str]], not_evaluated: list[di
     collection, and those belonging to other runs are theirs to account
     for.
     """
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
 
     recorded: dict[str, set[str]] = {}
     for r in not_evaluated:

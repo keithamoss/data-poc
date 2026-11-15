@@ -12,8 +12,8 @@ import pytest
 from qa_tools.common.datacontract_common import check_id_from_quality_definition
 from qa_tools.common.dbt_common import failing_sample_keys_direct, failing_sample_keys_via_values
 from qa_tools.common.sample_keys import SampleNotRecordable
-from qa_tools.common.evidently_common import status_for
-from qa_tools.common.evidently_common import collection_checks
+from asset_model.drift import status_for
+from asset_model.drift import collection_checks
 from qa_tools.common.soda_common import check_id_from_resource_attributes
 
 _BDM_CHECKS = collection_checks("civil-registration")

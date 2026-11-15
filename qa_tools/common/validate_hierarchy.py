@@ -55,13 +55,14 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import hierarchy, postgres_version, tables_read
-from qa_tools.common import assets as _assets
+from asset_model import hierarchy
+from qa_tools.common import postgres_version, tables_read
+from asset_model import assets as _assets
 
 def contract_dir() -> Path:
     """The selected asset's configuration folder, resolved now (REQ-PIPE-342
     criterion 6; it was the import-time constant CONTRACT_DIR)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.selected().folder
 

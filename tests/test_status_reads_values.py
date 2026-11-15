@@ -100,8 +100,8 @@ class TestTheGateSaysWhyAsAKind:
 
 
 def _judge(monkeypatch, *, status):
-    from qa_tools.common import (amber_setting, decision_log, inheritance, rejection,
-                                 supersession)
+    from asset_model import amber_setting
+    from qa_tools.common import decision_log, inheritance, rejection, supersession
 
     monkeypatch.setattr(supersession, "is_superseded", lambda *a: False)
     monkeypatch.setattr(amber_setting, "resolve", lambda *a: amber_setting.Resolved(

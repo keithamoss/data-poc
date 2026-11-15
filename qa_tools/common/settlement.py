@@ -124,7 +124,8 @@ class Plan:
 def pair_files(conn, dataset_id: str, supply: str) -> tuple[str, str | None, list[PairFile]]:
     """(delivery, period, the pair's files in RECEIPT order) - criterion 3's
     order: earlier first, by our own receipt then receipt sequence."""
-    from qa_tools.common import filing, hierarchy, load_log, supply_files
+    from qa_tools.common import filing, load_log, supply_files
+    from asset_model import hierarchy
 
     pair = supply_files.pair_supply(supply)
     rows = conn.execute(
@@ -154,7 +155,7 @@ def refused_before_asking(conn, dataset_id: str, supply: str) -> str | None:
     supply is not an open pair - or None."""
     from qa_tools.common import supply_files
 
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     name = hierarchy.dataset(dataset_id).dataset_name
     if supply_files.open_contest(conn, dataset_id, supply) is None:

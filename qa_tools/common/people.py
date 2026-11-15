@@ -26,8 +26,8 @@ from contextlib import contextmanager
 
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 def people_yaml() -> Path:
     """The selected asset's people.yaml, resolved now (REQ-PIPE-342 criterion
     6; it was the import-time constant PEOPLE_YAML)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.selected().file("people.yaml")
 
@@ -284,7 +284,7 @@ def this_asset_id() -> str | None:
     a `data_asset:` assignment must name to count (delivery-critic on 171,
     #2: an assignment copied from another asset's file granted nothing at
     the gate but everything at runtime)."""
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     with open(data_asset_yaml()) as f:
         return (config_yaml.parse(f) or {}).get("data_asset_id")
@@ -294,7 +294,7 @@ def _asset_is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares this asset synthetic - read
     here rather than through the module that resets synthetic history,
     which nothing but `mothman env` may name."""
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     with open(data_asset_yaml()) as f:
         return (config_yaml.parse(f) or {}).get("synthetic") is True

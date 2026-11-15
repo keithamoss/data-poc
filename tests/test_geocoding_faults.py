@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 
 from collection_modules import provider_module
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 lp = provider_module("linkage-products")
 
@@ -36,7 +36,7 @@ def plan():
 
 @pytest.fixture(scope="module")
 def catalogue():
-    from qa_tools.common import check_bands
+    from asset_model import check_bands
 
     return check_bands.catalogue()
 
@@ -151,7 +151,7 @@ class TestTheFaultsByConstruction:
 
 
 def _table(dataset_id):
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(dataset_id).table
 
@@ -258,7 +258,7 @@ class TestTheNamedScenarios:
         assert len(lp.members_in_force(CP, job.period)) >= 2
 
     def test_the_g1_route_is_in_a_quarter_whose_amber_setting_promotes(self, plan):
-        from qa_tools.common import amber_setting
+        from asset_model import amber_setting
 
         job = next(j for j in _geo(plan) if j.period.name == SCENARIOS["TS-111"][1])
         at = lp.PROVIDER._geo_arrivals(plan, job)[0][0]
@@ -340,7 +340,7 @@ class TestOnlyASupplyThatArrivesIsGeocoded:
     trial would have staged - a supply that never arrives."""
 
     def test_the_left_out_file_is_no_supply_the_geocoding_stream_reads(self, plan):
-        from qa_tools.common import asset_time as at_mod
+        from asset_model import asset_time as at_mod
 
         cp = plan.state["sources"]["cp-clients"]
         left_out = [s for s in cp if not s.carried]
@@ -415,9 +415,9 @@ def _mixed(n_suburb, n_postcode, start=0):
 
 
 def _drift_entry(dataset_id):
-    from qa_tools.common import evidently_common
+    from asset_model import drift
 
-    found = [m for i, m in evidently_common.collection_checks("linkage-products").checks.items()
+    found = [m for i, m in drift.collection_checks("linkage-products").checks.items()
              if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
     assert len(found) == 1
     return found[0]
@@ -436,14 +436,14 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         assert lp.drift_verdict(CP, rows, _rows(_mixed(300, 100, start=900))) == "green"
 
     def test_a_shifted_mix_plans_the_checks_own_band(self):
-        from qa_tools.common import evidently_common
+        from asset_model import drift
 
         entry = _drift_entry(CP)
         reference = _rows(_mixed(300, 100))
         seen = set()
         for n_postcode in (100, 160, 250, 380):
             current = _rows(_mixed(400 - n_postcode, n_postcode, start=900))
-            psi, status = evidently_common.psi_of_counts(
+            psi, status = drift.psi_of_counts(
                 lp.value_counts(current, entry["column"], CP),
                 lp.value_counts(reference, entry["column"], CP), entry)
             want = {"pass": "green", "warn": "amber", "fail": "red"}[status]
@@ -478,7 +478,7 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         """The generator's counts are the drift reference's shape exactly:
         every known value, zeros included, and anything else folded into
         '(invalid code)' - dataset_stats' own folding, shared."""
-        from qa_tools.common import evidently_common
+        from asset_model import drift
 
         rows = _rows(_mixed(300, 100))
         rows.loc[rows.index[:5], "match_level"] = "rooftop"
@@ -486,7 +486,7 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         pairs = [[v, int(n)] for v, n in rows["match_level"].value_counts().items()]
         known = lp.known_values(CP, "match_level")
         assert known and "rooftop" not in known
-        assert got == evidently_common.fold_value_counts(pairs, known)
+        assert got == drift.fold_value_counts(pairs, known)
         assert got[-1] == ["(invalid code)", 5]
         assert [k for k, _n in got[:-1]] == list(known), "every known value, zeros included"
 

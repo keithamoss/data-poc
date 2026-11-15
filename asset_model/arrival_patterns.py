@@ -53,7 +53,7 @@ import re
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from qa_tools.common import config_yaml, hierarchy
+from asset_model import config_yaml, hierarchy
 
 #: Longer than any filesystem this runs on will accept, so a name over
 #: this is already not a real file. Capping before the match is what

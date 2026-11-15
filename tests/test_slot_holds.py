@@ -147,7 +147,8 @@ def test_one_dataset_s_history_is_not_read_for_another(conn):
 def quarters(monkeypatch):
     from datetime import date
 
-    from qa_tools.common import drift_reference, schedule
+    from qa_tools.common import drift_reference
+    from asset_model import schedule
     dates = {"2099-Q1": date(2099, 1, 1), "2099-Q2": date(2099, 4, 1),
              "2099-Q3": date(2099, 7, 1), "2099-Q4": date(2099, 10, 1)}
     for mod in (schedule, drift_reference.schedule):

@@ -13,7 +13,7 @@ import pytest
 
 import fixture_ids
 
-from qa_tools.common import arrivals
+from asset_model import arrivals
 
 
 def test_bdm_fixture_run_ids_are_the_ones_recognition_actually_assigns(bdm_delivery_dirs):

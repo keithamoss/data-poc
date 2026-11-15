@@ -21,7 +21,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import filing_support
-from qa_tools.common import assignment, delivery, filing
+from asset_model import assignment, delivery as delivery_tree
+from qa_tools.common import delivery, filing
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -114,8 +115,8 @@ class TestFiledIsNotFilled:
     def test_the_cascade_that_would_follow_if_it_did(self, filings):
         """Run as the real sequence, so the consequence is visible
         rather than argued."""
-        from qa_tools.common.schedule import Period
-        from qa_tools.common.slots import Slot
+        from asset_model.schedule import Period
+        from asset_model.slots import Slot
 
         def slot(day):
             due = datetime(2026, 6, day, 12, tzinfo=PERTH)
@@ -178,13 +179,14 @@ class TestFilingRealArrivals:
         delivery.write_receipts(name, when, receipts, files=files, sequence=sequence)
         # RECORDED, as the batch records every delivery before filing: a
         # filing links to its delivery record (REQ-PIPE-144 criterion 10).
-        from qa_tools.common import arrivals, delivery_log
-        for d in delivery.list_deliveries(deliveries, receipts):
+        from asset_model import arrivals
+        from qa_tools.common import delivery_log
+        for d in delivery_tree.list_deliveries(deliveries, receipts):
             delivery_log.record(d, arrivals.recognise(d))
         return deliveries, receipts
 
     def _arrivals(self, tmp_path, collection="child-protection", prefix="cp_run_"):
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         deliveries, receipts = self._delivery(
             tmp_path, "monday",
@@ -214,8 +216,8 @@ class TestFilingRealArrivals:
         belongs on the record."""
         from datetime import timedelta
 
-        from qa_tools.common import arrivals
-        from qa_tools.common import schedule as schedule_mod
+        from asset_model import arrivals
+        from asset_model import schedule as schedule_mod
 
         # THE DATE COMES FROM THE CALENDAR, not from this file. It used
         # to be a hardcoded 2026-02-01, which fell outside the daily

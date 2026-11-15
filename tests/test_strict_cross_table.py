@@ -174,7 +174,7 @@ class TestNotInTheAgreement:
         left_out with its reason, no result and no red, and the reader's
         status decided without it. The same check in 2025-Q2, Clients not yet
         supplied, is red."""
-        from qa_tools.common import slots
+        from asset_model import slots
 
         real = slots.slots_for_dataset
 
@@ -224,7 +224,7 @@ class TestNotInTheAgreement:
         DATA it needs is here: the dataset's page carries each check left out
         of a run as not part of the agreement, with its reason."""
         from pipeline import build_dashboard_data as bdd
-        from qa_tools.common import slots
+        from asset_model import slots
         from qa_tools.tools import results_history
 
         real = slots.slots_for_dataset

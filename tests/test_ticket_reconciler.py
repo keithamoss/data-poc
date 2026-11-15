@@ -468,7 +468,7 @@ class TestAPersonsOperationGoesThroughTheSamePass:
 
         root = Path(tr.__file__).resolve().parent.parent.parent
         found = set()
-        for path in sorted(root.glob("qa_tools/**/*.py")) + \
+        for path in sorted(root.glob("asset_model/**/*.py")) + sorted(root.glob("qa_tools/**/*.py")) + \
                 sorted(root.glob("cli/**/*.py")) + \
                 sorted(root.glob("pipeline/**/*.py")):
             tree = ast.parse(path.read_text())
@@ -522,7 +522,7 @@ class TestAPersonsOperationGoesThroughTheSamePass:
         that needs somebody gets its ticket.
         """
         from qa_tools.common import qa_store, supply_db
-        from qa_tools.common import slots as slots_mod
+        from asset_model import slots as slots_mod
 
         svc = FakeTickets()
         monkeypatch.setattr(tr, "service_from_env", lambda: svc)

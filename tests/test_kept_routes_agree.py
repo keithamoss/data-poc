@@ -72,7 +72,7 @@ def _terminal():
     recognition finds."""
     from cli.collection_cli import of as _cli_of
     bdm = _cli_of('bdm')
-    from qa_tools.common import arrivals
+    from asset_model import arrivals
     [arrival] = arrivals.arrivals_for("civil-registration", "run_")
     bdm.run_check(arrival.run_id, "person@example.com", keep=True)
 

@@ -20,7 +20,7 @@ import pytest
 
 from generator import targeting
 from generator.daily_batch import generate_daily_batch
-from qa_tools.common import check_bands
+from asset_model import check_bands
 from generator import driver
 
 BDM_ID = "birth-registrations"
@@ -146,7 +146,7 @@ class TestTheGeneratedHistory:
     def test_birth_registrations_ambers_land_where_they_can_be_generated(self):
         """Criterion 9: none in the hold era, none on a period an injected
         scenario owns or empties, and as many as were drawn."""
-        from qa_tools.common import amber_setting, asset_time
+        from asset_model import amber_setting, asset_time
 
         g, periods, by_period, suppressed, sevs = self._bdm()
         drawn = [s for _n, s in g.RUN_PLAN[:len(periods)]]
@@ -373,7 +373,7 @@ class TestBirthRegistrationsTargets:
         """Criterion 5: a SQL check joining on the column makes it untouchable."""
         import dataclasses
 
-        from qa_tools.common import check_bands as cb
+        from asset_model import check_bands as cb
         reader = cb.Check("a.b.c.birth-registrations.date_of_birth.join_soda", "soda",
                           BDM_ID, "date_of_birth", "consistency", "failed_rows", "f",
                           fail=(cb.Bound(">", 0, cb.ROWS),),
@@ -574,7 +574,7 @@ class TestRefusedBeforeAnythingIsWritten:
         cp = collection_modules.provider_module("child-protection")
         from generator import scenario_injection as si
         from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         bad = si.Injection(
             scenario_id="TS-CPRED", dataset_id="cp-clients", anchor=-10, config="test",
@@ -635,7 +635,7 @@ class TestFindings155:
         uniqueness check fails."""
         import dataclasses
 
-        from qa_tools.common import check_bands as cb
+        from asset_model import check_bands as cb
         uniq = cb.Check("a.b.c.birth-registrations.place_of_birth_facility.unique_x_dbt",
                         "dbt", BDM_ID, "place_of_birth_facility", "uniqueness", "unique", "f",
                         fail=(cb.Bound(">", 0, cb.ROWS),))
@@ -647,7 +647,7 @@ class TestFindings155:
     def test_a_same_column_check_reading_other_columns_takes_it_away(self, batch, cat):
         import dataclasses
 
-        from qa_tools.common import check_bands as cb
+        from asset_model import check_bands as cb
         cross = cb.Check("a.b.c.birth-registrations.place_of_birth_facility.ordering_x_soda",
                          "soda", BDM_ID, "place_of_birth_facility", "consistency",
                          "failed_rows", "f", fail=(cb.Bound(">", 0, cb.ROWS),),
@@ -814,7 +814,7 @@ class TestLeadInsEndToEnd:
             assert len(mine) == 1 and mine[0]["dirty_severity"] is None, name
             # ON TIME, which the old assertion never checked (post-build-
             # review #156: 09-16 arrived 16:55 and was recorded late).
-            from qa_tools.common import asset_time, slots
+            from asset_model import asset_time, slots
             due = slots.slot_instants(BDM_ID, date.fromisoformat(name))
             got = asset_time.parse_instant(mine[0]["received_at"], "received_at")
             assert due.due_at <= got <= due.due_at + due.grace, (name, got)
@@ -977,7 +977,8 @@ class TestEachPlantedScenarioSitsInItsEra:
     def test_each_anchor_falls_under_the_setting_it_needs(self):
         g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
-        from qa_tools.common import amber_setting, asset_time, replacement_setting
+        from asset_model import amber_setting, asset_time
+        from qa_tools.common import replacement_setting
         periods = g.generated_periods()
         for inj in si.for_dataset(g.DATASET_ID):
             if inj.scenario_id not in self.ERAS:
@@ -997,7 +998,8 @@ class TestEachPlantedScenarioSitsInItsEra:
 
         from generator import scenario_injection as si
         civil_registration = collection_modules.provider_module("civil-registration")
-        from qa_tools.common import schedule, scripted_decisions
+        from asset_model import schedule
+        from qa_tools.common import scripted_decisions
         periods = civil_registration.generated_periods()
         day = {i.scenario_id: date.fromisoformat(
                    si.resolve(dataclasses.replace(i, links=()), periods).period)

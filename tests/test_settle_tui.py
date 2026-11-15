@@ -321,7 +321,7 @@ class TestTheTargetPrompt:
     and asked again."""
 
     def test_a_period_holding_an_open_pair_is_asked_again(self, conn, monkeypatch, capsys):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         period = "2026-11-02"
         first, second = (slots.relative_period(DS, period, 1),
@@ -439,7 +439,7 @@ class TestThePointerMatchesTheMenus:
         from types import SimpleNamespace
 
         from cli import bulk_recheck_tui, filing_tui
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import bulk_recheck, correction_apply, people, supply_files
 
         assert len(collections.all_collections()) == 1, "precondition: one collection"
@@ -471,7 +471,7 @@ class TestThePointerMatchesTheMenus:
         import dataclasses
 
         from cli import filing_tui
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import bulk_recheck, correction_apply, people, supply_files
 
         (real,) = collections.all_collections()
@@ -528,7 +528,7 @@ class TestThePointerMatchesTheMenus:
 
     @pytest.mark.asset("quarterly")
     def test_an_asset_of_several_collections_keeps_the_collection_step(self):
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import supply_files
 
         assert len(collections.all_collections()) > 1, "quarterly holds several collections"

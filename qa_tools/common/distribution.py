@@ -21,7 +21,7 @@ from pathlib import Path
 def declared(path: str | Path) -> dict[str, dict]:
     """{check_id: its histogram declaration} for every check in a Soda file
     that declares one."""
-    from qa_tools.common import config_yaml
+    from asset_model import config_yaml
 
     doc = config_yaml.parse(Path(path).read_text()) or {}
     out = {}

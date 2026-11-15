@@ -22,7 +22,7 @@ def _write(tmp_path, body: str):
     states its own, so each test still breaks exactly one thing."""
     import yaml
 
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     doc = yaml.safe_load(textwrap.dedent(body)) or {}
     doc.setdefault("roles", ["qa", "peer_review", "manager"])

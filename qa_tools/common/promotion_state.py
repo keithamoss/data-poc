@@ -23,7 +23,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qa_tools.common import asset_time, decision_log, supply_db
+from asset_model import asset_time
+from qa_tools.common import decision_log, supply_db
 
 #: Why an arrival is not the promoted supply (criterion 4). Three
 #: reasons, and they are different actions for whoever reads them: wait,

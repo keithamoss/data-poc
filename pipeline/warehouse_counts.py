@@ -28,7 +28,8 @@ per-render walk of history.
 """
 from __future__ import annotations
 
-from qa_tools.common import asset_time, qa_store, supply_status
+from asset_model import asset_time
+from qa_tools.common import qa_store, supply_status
 
 #: A point's reasons where no result counts: an owed check reads red with
 #: one of supply_status's two reasons; NOT_COUNTED is a check owed nothing

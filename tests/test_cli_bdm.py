@@ -44,7 +44,7 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # tests reading the real data/deliveries/ tree.
     from pathlib import Path
 
-    from qa_tools.common import delivery
+    from asset_model import delivery
     monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(Path(raw_dir) / "deliveries"))
     monkeypatch.setattr(delivery, "default_receipts_dir", fixed(Path(raw_dir) / "receipts"))
     # The warehouse used to be three module attributes pointing at a
@@ -66,7 +66,7 @@ def _patch_delivery_dirs(monkeypatch, root):
     would read - and answer from - the real data/deliveries/ tree."""
     from pathlib import Path
 
-    from qa_tools.common import delivery
+    from asset_model import delivery
     monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(Path(root) / "deliveries"))
     monkeypatch.setattr(delivery, "default_receipts_dir", fixed(Path(root) / "receipts"))
 
@@ -135,7 +135,7 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     import shutil
     from pathlib import Path
 
-    from qa_tools.common import delivery
+    from asset_model import delivery
 
     raw_copy = tmp_path / "raw_copy"
     shutil.copytree(bdm_raw_dir, raw_copy)

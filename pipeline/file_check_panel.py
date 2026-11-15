@@ -17,7 +17,8 @@ own receipt so the page can pick the attempt in force on the date on show.
 """
 from __future__ import annotations
 
-from qa_tools.common import asset_time, dataset_status, file_checks, hierarchy
+from asset_model import asset_time, file_check_definitions, hierarchy
+from qa_tools.common import dataset_status
 from qa_tools.common import qa_results_reader as reader
 
 #: The pseudo-column's key in a URL (`/column/_file/check/<key>`). A leading
@@ -32,7 +33,7 @@ def for_dataset(dataset_id: str, conn=None) -> dict:
     from qa_tools.common.validate_check_lifecycle import collect_checks
 
     ds = hierarchy.dataset(dataset_id)
-    lifecycle = {c.check_id: c for c in collect_checks(None) if c.tool == file_checks.TOOL}
+    lifecycle = {c.check_id: c for c in collect_checks(None) if c.tool == file_check_definitions.TOOL}
     results = reader.read_file_results(ds.agency_id, ds.collection_id, dataset_id, conn=conn)
     by_check: dict[str, list[dict]] = {}
     for r in results:
@@ -50,13 +51,13 @@ def for_dataset(dataset_id: str, conn=None) -> dict:
             "attempt": r["load_attempt"],
         })
     checks = []
-    for definition in file_checks.definitions():
-        check_id = file_checks.check_id_for(ds, definition.check)
+    for definition in file_check_definitions.definitions():
+        check_id = file_check_definitions.check_id_for(ds, definition.check)
         meta = lifecycle.get(check_id)
         history = by_check.get(check_id, [])
         checks.append({
             "check_id": check_id,
-            "key": f"{definition.check}_{file_checks.TOOL}",
+            "key": f"{definition.check}_{file_check_definitions.TOOL}",
             "name": definition.name,
             "tool_ref": f"file:{definition.check}",
             "severity": definition.severity,

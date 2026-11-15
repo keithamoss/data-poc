@@ -67,7 +67,8 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 
-from qa_tools.common import holds, qa_store, supply_db
+from asset_model import holds
+from qa_tools.common import qa_store, supply_db
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -403,9 +404,9 @@ def record_arrival(arrival) -> dict | None:
     a true picture of a moment, and nothing processed early can see a
     delivery from its own future. Write-once, so every later arrival of the
     same delivery - in either collection - is a no-op."""
-    from qa_tools.common import arrivals, delivery
+    from asset_model import arrivals, delivery as delivery_tree
 
-    d = delivery.read_delivery(arrival.delivery_name)
+    d = delivery_tree.read_delivery(arrival.delivery_name)
     return record(d, arrivals.recognise(d))
 
 
@@ -414,7 +415,7 @@ def record_all() -> None:
     it - the one loop both orchestrators used to carry a copy of, and
     what a bootstrap runs ONCE before running both collections side by
     side (REQ-TEST-116)."""
-    from qa_tools.common import arrivals, delivery
+    from asset_model import arrivals, delivery as delivery_tree
 
-    for d in delivery.list_deliveries():
+    for d in delivery_tree.list_deliveries():
         record(d, arrivals.recognise(d))

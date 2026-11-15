@@ -228,7 +228,7 @@ def test_drift_excludes_the_declared_value_from_both_sides():
     alone moves no drift, while the same frames unexcluded would drift."""
     import pandas as pd
 
-    from qa_tools.common.evidently_common import compute_psi
+    from asset_model.drift import compute_psi
     from qa_tools.tools.run_evidently import _excluding
 
     entry = {"column": "match_level", "exclude_values": ["not geocoded"]}

@@ -6,7 +6,7 @@ import asset_folders
 import pytest
 import yaml
 
-from qa_tools.common import arrival_patterns
+from asset_model import arrival_patterns
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
 

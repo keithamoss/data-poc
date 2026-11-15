@@ -22,9 +22,17 @@ import baseline_periods
 
 import filing_support
 import attempt_support
-from qa_tools.common import (assignment, decision_log as dl, filing, filing_decisions as fd,
-                              hierarchy, inheritance, people, qa_store, recheck, schedule,
-                              supply_db)
+from asset_model import assignment, hierarchy, schedule
+from qa_tools.common import (
+    decision_log as dl,
+    filing,
+    filing_decisions as fd,
+    inheritance,
+    people,
+    qa_store,
+    recheck,
+    supply_db,
+)
 
 WHEN = "2026-09-29T09:00:00+08:00"
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"

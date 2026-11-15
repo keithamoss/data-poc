@@ -169,7 +169,8 @@ def _check_reads(check_id: str, declared: dict[str, list[str]], res, run_id: str
     read with no supply recorded anywhere else is a resolution that did not
     say which supply it was, and recording NO-SUPPLY for it would be a
     guess with a tidier name."""
-    from qa_tools.common import carried, hierarchy, qa_store, sample_data, trial
+    from qa_tools.common import carried, qa_store, sample_data, trial
+    from asset_model import hierarchy
 
     tables = carried._reads_of(check_id, declared) or set(declared.get(check_id) or ())
     no_supply_allowed = trial.is_trial(run_id)
@@ -220,7 +221,8 @@ def run_owner(run_id: str) -> tuple[str, str] | None:
     the id rather than taking an argument is what lets all eight tool
     callers stay as they are.
     """
-    from qa_tools.common import bulk_recheck, hierarchy, supply_db
+    from qa_tools.common import bulk_recheck, supply_db
+    from asset_model import hierarchy
 
     # A RE-CHECK TRIAL'S (REQ-PIPE-178): its id names no table, and its owner
     # is the supply the trial is re-checking, held where it runs.
@@ -362,7 +364,7 @@ def scope_of_run(run_id: str):
 def base_scope_of_run(run_id: str):
     """The scope before anything is carried - what carried.decide() picks
     from. Everything else asks scope_of_run()."""
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
     from qa_tools.common import reevaluation, supply_db
 
     owner = run_owner(run_id)
@@ -609,7 +611,7 @@ def _participants(check_id: str | None, declared: dict[str, list[str]]) -> list[
     calendar-less dataset, so it cannot be the participant that makes this
     check in-development.
     """
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out = []
     for table in declared.get(check_id) or ():
@@ -957,7 +959,8 @@ def _arrival_purpose(conn, run_id: str, dataset_id: str | None, *,
     such a run is about no ONE supply, and its file checks are placed by
     the file each names (supply_status).
     """
-    from qa_tools.common import filing, hierarchy, period_schema, qa_store, supply_db, supply_files
+    from qa_tools.common import filing, period_schema, qa_store, supply_db, supply_files
+    from asset_model import hierarchy
 
     if dataset_id is None:
         return {"dataset_id": None, "supply_id": None}

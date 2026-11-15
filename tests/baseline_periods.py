@@ -22,7 +22,7 @@ from pathlib import Path
 import yaml
 
 import asset_folders
-from qa_tools.common import assets
+from asset_model import assets
 
 #: Where an undated made-up period falls: August 2099 and on, a day apiece -
 #: after every real date, and in a month every quarterly dataset owes (Child
@@ -44,7 +44,7 @@ def _undated_from(versions: list) -> date:
     generated a day at a time - ending it in 2099 made each such call build
     some 27,000 daily slots (test_door_flag_parity's two-files case, about
     three minutes)."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     rule = any((v or {}).get("cadence") for v in versions
                if CHANGE not in str((v or {}).get("changelog")))
@@ -63,7 +63,7 @@ def declare(*names: str, dates: dict | None = None, root: Path | None = None) ->
     The test version starts on the earliest declared date, so no real
     period's version of effect changes. On a cadence-rule baseline the rule
     then ends the day before - 2099, decades past any real date."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     dates = {k: (v if isinstance(v, date) else date.fromisoformat(str(v)))
              for k, v in (dates or {}).items()}

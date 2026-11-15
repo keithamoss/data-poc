@@ -21,7 +21,7 @@ class TestTheCommittedFile:
     def test_it_owns_the_four_files(self, name):
         """Criterion 1 - each asset's own three, by repository path through the
         resolver (the asset split: they were contract/'s), and CODEOWNERS."""
-        from qa_tools.common import assets
+        from asset_model import assets
 
         path = f"{assets.folder_rel()}/{name}" if name else ".github/CODEOWNERS"
         assert freeze.code_owners(CODEOWNERS, path)
@@ -31,7 +31,7 @@ class TestTheCommittedFile:
         code owner nobody can name as approver is a file out of step."""
         people = yaml.safe_load((asset_folders.real_folder() / "people.yaml").read_text())
         handles = {str(p.get("github", "")).lower() for p in freeze.approvers(people)}
-        from qa_tools.common import assets
+        from asset_model import assets
 
         owners = freeze.code_owners(CODEOWNERS, f"{assets.folder_rel()}/calendar.yaml")
         assert owners, "nobody owns the asset's calendar - this would prove nothing"
@@ -40,8 +40,8 @@ class TestTheCommittedFile:
     def test_it_owns_nothing_else(self):
         """A real contract file of the asset's - one that exists, so the case
         is not trivially unowned (the asset split moved the old path)."""
-        from qa_tools import collections
-        from qa_tools.common import assets
+        from asset_model import collections
+        from asset_model import assets
 
         contract = f"{assets.folder_rel()}/{collections.all_collections()[0].contract}"
         assert (ROOT / contract).is_file(), contract
@@ -104,7 +104,7 @@ class TestCriticFindingsOn174:
         import copy
         from datetime import date, datetime, timedelta, timezone
 
-        from qa_tools.common import assets
+        from asset_model import assets
 
         cal = yaml.safe_load((asset_folders.real_folder() / "calendar.yaml").read_text())
         asset = yaml.safe_load((asset_folders.real_folder() / "data-asset.yaml").read_text())

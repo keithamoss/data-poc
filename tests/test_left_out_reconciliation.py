@@ -14,7 +14,8 @@ from __future__ import annotations
 import pytest
 
 import filing_support
-from qa_tools.common import assignment, left_out, supply_db
+from asset_model import assignment
+from qa_tools.common import left_out, supply_db
 
 P = "quarterly.child-protection-family-support.child-protection"
 REL = f"{P}.cp-placements.carer_id.relationships_dbt"

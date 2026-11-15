@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from qa_tools.common import delivery as delivery_module
+from asset_model import delivery as delivery_module
 from qa_tools.common import delivery_log, supply_db, validate_arrival_patterns
 
 PERTH = timezone.utc

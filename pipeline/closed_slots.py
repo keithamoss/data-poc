@@ -73,8 +73,9 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     first fill, so a period filled and then emptied again read as filled
     for ever (delivery-critic #105). `marks` is every mark that it was
     not supplied; one stands only until the slot next changes."""
-    from qa_tools.common import asset_time, supply_holds
-    from qa_tools.common import slots as slots_mod
+    from asset_model import asset_time
+    from qa_tools.common import supply_holds
+    from asset_model import slots as slots_mod
 
     from pipeline import slot_timeline
 
@@ -173,8 +174,8 @@ def late_slots(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     date on show. A file is what ends lateness here, not a promotion - the
     question is whether the supplier has sent it.
     """
-    from qa_tools.common import asset_time
-    from qa_tools.common import slots as slots_mod
+    from asset_model import asset_time
+    from asset_model import slots as slots_mod
 
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:late-slots") as opened:

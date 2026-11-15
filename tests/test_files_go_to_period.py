@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import agreement, asset_time, assignment, schedule, slots
+from asset_model import agreement, asset_time, assignment, schedule, slots
 
 REAL = asset_folders.SelectedFolder("calendar.yaml")
 
@@ -156,7 +156,10 @@ class TestTwoCollectionsReceivingOnOneDay:
         cp = _slot("cp-clients", "2026-Q2", at_one).period
         ed = _slot("ed-presentations", "2026-Q2", at_one).period
         assert cp == ed
-        assert schedule.schema_name(cp) == schedule.schema_name(ed) == "period_2026_q2"
+        from qa_tools.common import period_schema
+
+        assert period_schema.period_schema(cp.name) == period_schema.period_schema(ed.name) \
+            == "period_2026_q2"
 
 
 class TestAtZeroNothingMoves:

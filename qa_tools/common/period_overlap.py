@@ -15,7 +15,7 @@ opens whether or not anything is owed for Q2.
 
 COMPUTED AS FILING COMPUTES IT (criterion 2) - through the one
 slot-instants function filing uses (slots.slot_instants, REQ-PIPE-113
-criterion 10), over the same period sequence (slots._calendar_periods,
+criterion 10), over the same period sequence (slots.period_sequence,
 which honours a dataset's own authored dates), so this check and filing
 can never disagree about where a boundary falls. Across a change of
 calendar or participation version the two neighbours are compared like
@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, hierarchy, schedule
+from asset_model import asset_time, hierarchy, schedule
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ def horizon(today: date | None = None) -> date:
 def overlaps_for(dataset_id: str, until: date | None = None,
                  agreement=None) -> list[Overlap]:
     """Every overlapping pair of consecutive periods for one dataset."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     try:
         calendar = schedule.calendar_for_dataset(dataset_id, agreement)
@@ -80,12 +80,12 @@ def overlaps_for(dataset_id: str, until: date | None = None,
     # the module docstring - or the dataset's own dates where it states
     # them, exactly the sequence its slots close against.
     if bound is None:
-        periods = slots._calendar_periods(dataset_id, None, agreement)
+        periods = slots.period_sequence(dataset_id, None, agreement)
     else:
-        periods = [p for p in slots._calendar_periods(dataset_id, bound, agreement)
+        periods = [p for p in slots.period_sequence(dataset_id, bound, agreement)
                    if p.date <= bound]
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     turned_off = agr.ever_turned_off(dataset_id)
     found: list[Overlap] = []
     previous = None

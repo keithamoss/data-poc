@@ -593,7 +593,7 @@ def read_cross_table_results_reading(agency: str, collection: str, tables, conn=
     (architect M3). Recorded QA metadata only, never a supply row. Every
     supply_state, as the rebuild reads its own; whether a result reaches a page
     - read, held, in development, not evaluated - is the build's to decide."""
-    from qa_tools import collections
+    from asset_model import collections
 
     wanted = set(tables)
     conn, mine = _conn(conn)

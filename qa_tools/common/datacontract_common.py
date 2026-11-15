@@ -17,7 +17,8 @@ import copy
 import functools
 
 import yaml
-from qa_tools.common import config_yaml, sample_keys
+from asset_model import config_yaml
+from qa_tools.common import sample_keys
 
 ENGINE_TAG = "datacontract-cli 1.2.0"
 
@@ -197,7 +198,7 @@ def run_against_warehouse(contract_path: str, schema: str, *,
 def selection_for(contract_path: str, asked: list[str]) -> dict:
     """The options a run asks datacontract-cli with: its rules by id, and
     their model where they all sit on one (REQ-PIPE-190 criterion 3)."""
-    from qa_tools.common import check_lifecycle
+    from asset_model import check_lifecycle
 
     models = {check_lifecycle.contract_rule_models(contract_path).get(c) for c in asked}
     options: dict = {"quality_ids": {check_lifecycle.odcs_quality_id(c) for c in asked}}

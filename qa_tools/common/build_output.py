@@ -59,6 +59,6 @@ def reports_dir(default: str | None = None) -> str:
         return os.path.join(out, "reports")
     if default is not None:
         return default
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return str(assets.reports_dir())

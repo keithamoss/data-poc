@@ -68,7 +68,7 @@ class TestTimestamps:
 
 class TestBothCollectionsSupplyTheirHalf:
     def test_the_shared_orchestrator_gives_every_collection_its_steps(self):
-        from qa_tools import collections
+        from asset_model import collections
 
         for coll in collections.all_collections():
             assert isinstance(orchestrate.steps(coll.id), arrival_lifecycle.Steps), coll.id

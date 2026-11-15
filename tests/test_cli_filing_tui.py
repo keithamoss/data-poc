@@ -355,7 +355,8 @@ class TestTheCommandReallyWritesTheLog:
         test's decisions in an append-only log."""
         from datetime import date
 
-        from qa_tools.common import inheritance, schedule
+        from qa_tools.common import inheritance
+        from asset_model import schedule
 
         name = baseline_periods.made_up("C", 6)
         for mod in (schedule, inheritance.schedule):
@@ -383,7 +384,7 @@ class TestTheCommandReallyWritesTheLog:
 
     def test_a_promote_from_the_terminal_lands_in_the_decision_log(
             self, conn, period, monkeypatch):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
         supply = self._stage(conn, dataset, filed_to=period)
@@ -419,7 +420,7 @@ class TestTheCommandReallyWritesTheLog:
             self, conn, period, monkeypatch):
         """Criterion 26, end to end. Two people working the same slot is
         the ordinary case, not an error state."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
         supply = self._stage(conn, dataset, filed_to=period)
@@ -443,7 +444,7 @@ class TestTheCommandReallyWritesTheLog:
         """Criterion 18 and criterion 34 together: the filing state the
         decision resolves to, with a person's name on it rather than a
         rule's."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
         supply = self._stage(conn, dataset, filed_to=period)

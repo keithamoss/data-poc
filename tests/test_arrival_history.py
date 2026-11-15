@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from qa_tools.common import arrival_history, delivery, delivery_log, load_log
+from asset_model import delivery as delivery_tree
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -31,7 +32,7 @@ def logs(clean_delivery_log):
 
 def _drop(tmp_path, logs, name, files, when, sequence):
     """One real delivery, recognised and recorded the real way."""
-    from qa_tools.common import arrivals
+    from asset_model import arrivals
 
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     folder = deliveries / name
@@ -40,7 +41,7 @@ def _drop(tmp_path, logs, name, files, when, sequence):
     for filename in files:
         (folder / filename).write_text("a\n1\n")
     delivery.write_receipts(name, when, receipts, files=files, sequence=sequence)
-    d = delivery.read_delivery(name, deliveries, receipts)
+    d = delivery_tree.read_delivery(name, deliveries, receipts)
     delivery_log.record(d, arrivals.recognise(d), conn=logs)
     return d
 

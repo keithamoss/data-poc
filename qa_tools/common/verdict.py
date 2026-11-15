@@ -83,15 +83,15 @@ def resolved(dataset_id: str, period_date: date, agreement=None, *,
     Raises where the slot cannot be built; the caller decides what that
     means.
     """
-    from qa_tools.common import asset_time, in_force, schedule, slots
+    from asset_model import asset_time, in_force, schedule, slots
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     instants = slots.slot_instants(dataset_id, period_date, agreement)
-    version = slots._participation_for(dataset_id, period_date, agreement)
+    version = slots.participation_for(dataset_id, period_date, agreement)
     offset = agreement.files_go_to_period_for(dataset_id, period_date) or 0
     window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
-    cal_version = schedule._version_in_force(cal, period_date)
+    cal_version = schedule.version_in_force_or_first(cal, period_date)
     due_date = period_date - timedelta(days=version.days_before)
     zone = in_force.version_on(asset_time.timezone_versions(), due_date)
     inputs = {
@@ -146,7 +146,7 @@ def judge(dataset_id: str, slot, received_at: datetime | None, agreement=None) -
     field. Where the inputs cannot be resolved the verdict is still
     recorded, with no inputs.
     """
-    from qa_tools.common import arrival_classification
+    from asset_model import arrival_classification
 
     if received_at is None:
         return Judged(None, None, None)
@@ -250,7 +250,7 @@ def rejudged(conn, dataset_id: str, agreement=None) -> list[Rejudgement]:
     A supply whose verdict was recorded with no inputs is not judged here:
     there is nothing to say what changed.
     """
-    from qa_tools.common import arrival_classification, schedule, slots
+    from asset_model import arrival_classification, schedule, slots
 
     out = []
     for c in compared(conn, dataset_id, agreement):
@@ -313,9 +313,9 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     correction can move a period's date, which the fingerprint leaves out.
     Resolved once per slot (NFR 2). Recorded metadata and configuration only.
     """
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     rows = conn.execute(
         f"SELECT f.supply_id, f.slot, v.id, v.classification, v.inputs, v.fingerprint, "
         f"r.received_instant, v.recorded_at "

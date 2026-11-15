@@ -27,7 +27,7 @@ import rich_click as click
 from rich.console import Console
 
 from cli import common
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 console = Console()
 
@@ -35,7 +35,7 @@ console = Console()
 def _one_table(short: str) -> bool:
     """Whether the collection is the one-table shape, whose arrivals carry
     the csv a run id guards (REQ-TEST-245: by shape, never by name)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     return len(collections.by_short(short).datasets) == 1
 
@@ -96,7 +96,7 @@ def run_dbt_command(collection: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
     _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import run_dbt
     results = run_dbt.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
     _print_results(results, run_id, collection)
@@ -109,7 +109,7 @@ def run_soda_command(collection: str, run_id: str) -> None:
     """Run real Soda Core in isolation against one run already on disk."""
     _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import run_soda
     results = run_soda.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
     _print_results(results, run_id, collection)
@@ -122,7 +122,7 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
     _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import run_datacontract
     if _one_table(collection):
         # LOOKED UP AS A GUARD, not for a path (REQ-PIPE-102). The
@@ -147,7 +147,7 @@ def run_evidently_command(collection: str, run_id: str, reference_run_id: str | 
     """Run real Evidently AI in isolation against one run already on disk."""
     _refuse_an_evaluated_run(run_id)
     run_timestamp = asset_time.now().isoformat()
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import run_evidently
     if _one_table(collection):
         _manifest_entry(collection, run_id)  # a guard, as above

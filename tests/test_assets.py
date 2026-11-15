@@ -21,7 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets, config_yaml
+from asset_model import assets, config_yaml
+from qa_tools import collections
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -251,7 +252,7 @@ class TestTheFixture:
             (ROOT / "assets" / "quarterly" / "data-asset.yaml").read_text()
 
     def test_the_hierarchy_reads_through_it(self, asset_folder):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         text = (ROOT / "assets" / "quarterly" / "data-asset.yaml").read_text()
         asset_folder({"data-asset.yaml": text.replace("data_asset_id: quarterly",
@@ -300,12 +301,13 @@ class TestLoadingByPath:
 
     def test_an_id_failing_the_pattern_is_refused_before_any_path(self, monkeypatch):
         from qa_tools import collections
+        from asset_model import collections as declared_collections
 
         built = []
         monkeypatch.setattr(assets, "load", lambda *a, **k: built.append(a))
-        bad = collections.Collection(id="../../etc", name="x", agency_id="a", agency_name="a",
+        bad = declared_collections.Collection(id="../../etc", name="x", agency_id="a", agency_name="a",
                                      short="x", run_prefix="x", contract="x", datasets=())
-        with pytest.raises(collections.UnknownCollectionError):
+        with pytest.raises(declared_collections.UnknownCollectionError):
             collections.adapter_module(bad)
         assert built == []
 
@@ -375,7 +377,7 @@ class TestLoadingByPath:
         monkeypatch.delenv(assets.ASSET_ENV, raising=False)
         with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn"),
                                  initializer=assets.select, initargs=("quarterly",)) as pool:
-            got = pool.submit(assets.adapter_file, "child-protection").result()
+            got = pool.submit(collections.adapter_file, "child-protection").result()
         assert Path(got) == ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"
 
 
@@ -515,7 +517,7 @@ def _asset_folder_of(entry: dict) -> list:
 
 def _which_asset_and_adapter(key: str, sequential: bool):
     """What a stream process would load - run in the spawned child."""
-    return os.environ.get(assets.ASSET_ENV), assets.adapter_file(key)
+    return os.environ.get(assets.ASSET_ENV), collections.adapter_file(key)
 
 
 class TestLoadingIsSafeAcrossThreads:

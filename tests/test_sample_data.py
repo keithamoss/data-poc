@@ -18,7 +18,8 @@ from __future__ import annotations
 import pytest
 
 import agreement_split
-from qa_tools.common import qa_store, sample_data, schedule, supply_db
+from qa_tools.common import qa_store, sample_data, supply_db
+from asset_model import schedule
 from qa_tools.common.qa_results_writer import write_qa_result
 from staging_support import stage_bdm, stage_cp
 
@@ -276,9 +277,11 @@ class TestWhereTheDataItself_Lands:
         one of them to forget."""
         import pathlib
 
-        for name in ("assignment", "slots", "period_schema", "backlog", "outstanding",
-                     "runway", "landed_on_accepted"):
-            source = pathlib.Path("qa_tools/common", f"{name}.py").read_text()
+        for name in ("asset_model/assignment", "asset_model/slots",
+                     "qa_tools/common/period_schema", "qa_tools/common/backlog",
+                     "qa_tools/common/outstanding", "qa_tools/common/runway",
+                     "qa_tools/common/landed_on_accepted"):
+            source = pathlib.Path(f"{name}.py").read_text()
             assert "SAMPLE_SCHEMA" not in source, name
             assert "sample_data" not in source, name
 
@@ -328,7 +331,7 @@ class TestDiscardingIsSomethingAPersonDoes:
 
         out = subprocess.run(
             ["grep", "-rn", r"sample_data\.discard\|from qa_tools.common.sample_data import",
-             "--include=*.py", "qa_tools", "pipeline", "cli", "generator", "dashboard",
+             "--include=*.py", "asset_model", "qa_tools", "pipeline", "cli", "generator", "dashboard",
              "aws", "scripts"],
             capture_output=True, text=True).stdout
         callers = {line.split(":")[0] for line in out.splitlines() if line.strip()}

@@ -36,7 +36,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools import collections as _registry
+from asset_model import collections as _registry
 
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats
 
@@ -61,7 +61,7 @@ def _deployment_dsn():
     """The deployment database of the asset this test acts for (the asset
     split: each asset's own, supply_<asset> - conftest.deployment_dsn_for)."""
     import conftest
-    from qa_tools.common import assets
+    from asset_model import assets
     return conftest.deployment_dsn_for(os.environ.get(assets.ASSET_ENV))
 
 
@@ -128,7 +128,7 @@ def built_dashboard_html(supply_dsn, worker_id, tmp_path_factory,
     """The selected asset's page, built once per worker per asset (below).
     CLASS-SCOPED rather than session-scoped so a class of the other asset
     gets its own asset's page; the build itself still happens once."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     asset = os.environ.get(assets.ASSET_ENV)
     if asset not in _BUILT:
@@ -235,7 +235,7 @@ class TestTheBuildIsTheWorkersOwn:
 
     def test_the_page_is_built_into_a_directory_named_for_this_worker(self, built_dashboard_html,
                                                                        worker_id):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         asset = os.environ.get(assets.ASSET_ENV)
         assert built_dashboard_html.parent.name == f"dashboard-build-{worker_id}-{asset}"
@@ -828,7 +828,7 @@ class TestTheInPlaceOnPanelSaysWhichPeriod:
         # the same chosen date is a different period on each calendar.
         import yaml
 
-        from qa_tools.common import agreement
+        from asset_model import agreement
 
         names = [c["name"] for c in yaml.safe_load(
             agreement.calendar_yaml().read_text())["calendars"]]
@@ -2569,9 +2569,9 @@ class TestSupplyAndTableLevelSectionsOnTheDailyAsset:
         IN PLACE ON ITS NEWEST SUPPLY'S DAY, read from the data: a daily
         dataset read on today's date has no current supply once its history
         ends, and every section reads "No data" (CLAUDE.md's shelf-life note)."""
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
-        built = json.loads((_reports_of(built_dashboard_html) / collections.by_id(
+        built = json.loads((_reports_of(built_dashboard_html) / declared_collections.by_id(
             "civil-registration").dashboard_file).read_text())
         newest = max(r["run_date"] for r in built["datasets"][0]["runs"])
         _goto(clean_page, built_dashboard_html, _BDM, in_place_on=newest)
@@ -2586,7 +2586,7 @@ class TestSupplyAndTableLevelSectionsOnTheDailyAsset:
 @pytest.mark.shared_page
 class TestTheRenderedTreeComesFromTheHierarchy:
     def _config_tree(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
         out = {}
         for entry in hierarchy.all_datasets():
             out.setdefault((entry.agency_id, entry.agency_name), set()).add(
@@ -2640,7 +2640,7 @@ class TestTheRenderedTreeComesFromTheHierarchy:
 
 class TestTodayIsTheAssetsToday:
     def _asset_today(self) -> str:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
         return asset_time.now().date().isoformat()
 
     @pytest.mark.parametrize("viewer_tz", [
@@ -2670,7 +2670,7 @@ class TestTodayIsTheAssetsToday:
         own clock, which agrees with the asset's for most of the day -
         so every test above would pass on the broken build for sixteen
         hours out of every twenty-four."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
         _goto(clean_page, built_dashboard_html, {"tier": "executive"})
         # EVERY VERSION (REQ-PIPE-112 criterion 11), as the config states them.
         assert clean_page.evaluate("() => ASSET_TIMEZONES") == [
@@ -2730,7 +2730,7 @@ class TestAnExhaustedScheduleIsLoud:
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
         # Every dataset on the quarterly calendar, from configuration, so a
         # new quarterly collection (Emergency Department) is counted.
-        from qa_tools.common import hierarchy, schedule
+        from asset_model import hierarchy, schedule
         quarterly = []
         for ds in hierarchy.all_datasets():
             try:
@@ -2744,7 +2744,7 @@ class TestAnExhaustedScheduleIsLoud:
     def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator(".notice-exhausted").inner_text().split())
-        from qa_tools.common import assets
+        from asset_model import assets
         assert f"{assets.folder_rel()}/calendar.yaml" in text
         assert "candidate-dates" in text, "and how to get the next dates proposed"
 
@@ -2778,7 +2778,7 @@ class TestAnExhaustedScheduleIsLoud:
         _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
         text = " ".join(page.locator("#view").inner_text().split())
         assert "delivery schedule has ended" in text.lower()
-        from qa_tools.common import assets
+        from asset_model import assets
         assert f"{assets.folder_rel()}/calendar.yaml" in text
 
     def test_it_names_the_datasets_own_last_period(self, page, dashboard_html_without_blockers):
@@ -4009,9 +4009,9 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
     longer has is a shape the real data can never produce, and a test
     built on one proves nothing about the real page.
     """
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    name = collections.by_id("child-protection").dashboard_file
+    name = declared_collections.by_id("child-protection").dashboard_file
     data = json.loads((_reports_of(built_dashboard_html) / name).read_text())
 
     # How many of each dataset's own runs to keep. One is left whole,
@@ -5817,7 +5817,8 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
 
     import filing_support
     from pipeline import promotion_timeline, slot_timeline
-    from qa_tools.common import assignment, promotion, qa_store, rejection, schedule, supply_db
+    from asset_model import assignment, schedule
+    from qa_tools.common import promotion, qa_store, rejection, supply_db
     from qa_tools.common import decision_log as dl
 
     ds = f"cp-{uuid.uuid4().hex[:10]}"
@@ -5992,7 +5993,7 @@ class TestASettledPairOnThePage:
     """REQ-PIPE-194 criteria 10, 11 and 12, in a real browser."""
 
     def _where(self, ds):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         e = hierarchy.dataset(ds)
         return {"tier": "dataset", "agencyId": e.agency_id, "collectionId": e.collection_id,
@@ -6508,7 +6509,7 @@ class TestThePeriodComposition:
             self, clean_page, built_dashboard_html, deployment_history):
         from qa_tools.common import period_schema, supply_db
 
-        from qa_tools.common import slots
+        from asset_model import slots
 
         found = None
         periods = [s.name for s in slots.slots_for_dataset("cp-clients")]
@@ -6542,7 +6543,8 @@ class TestThePeriodComposition:
 
     def test_an_earlier_date_agrees_with_the_decision_log_then(
             self, clean_page, built_dashboard_html, deployment_history):
-        from qa_tools.common import asset_time, qa_store, scenario_map, supply_db
+        from asset_model import asset_time
+        from qa_tools.common import qa_store, scenario_map, supply_db
 
         placement = scenario_map.read_placements().get("TS-76")
         assert placement is not None and placement.in_place_on
@@ -6641,9 +6643,9 @@ class TestTheGitHubLinks:
     agency folder is assets/<asset>/<agency-id>/ since the asset split."""
 
     def test_every_dataset_opens_its_contract_at_its_entry(self, clean_page, built_dashboard_html):
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
-        every = collections.all_collections()
+        every = declared_collections.all_collections()
         assert every, "the registry must hold collections for this test to mean anything"
         for coll in every:
             contract = coll.check_file("contract")
@@ -6659,13 +6661,13 @@ class TestTheGitHubLinks:
                 assert contract in title, (d.dataset_id, title)
 
     def test_every_agency_opens_its_folder(self, clean_page, built_dashboard_html):
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
         # The selected asset's own folder, assets/<asset>/ since the split
         # (it was contract/ before it).
         folder = asset_folders.real_folder().resolve().relative_to(
             Path(__file__).resolve().parent.parent).as_posix()
-        for agency_id in dict.fromkeys(c.agency_id for c in collections.all_collections()):
+        for agency_id in dict.fromkeys(c.agency_id for c in declared_collections.all_collections()):
             _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": agency_id})
             link = clean_page.locator("a", has_text="View on GitHub").first
             href, title = link.get_attribute("href"), link.get_attribute("title")
@@ -7439,12 +7441,13 @@ class _CpPages:
 
     def at(self, instant: str) -> None:
         """Now is `instant` - as replay_clock's simulated clock would make it."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         self.monkeypatch.setenv(asset_time.PINNED_NOW_VARIABLE, instant)
 
     def reject(self, supply: str, period: str, at: str) -> None:
-        from qa_tools.common import hierarchy, rejection, supply_db, supply_files
+        from asset_model import hierarchy
+        from qa_tools.common import rejection, supply_db, supply_files
 
         self.at(at)
         dataset_id = supply.split("@", 1)[0]

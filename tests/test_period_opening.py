@@ -22,7 +22,7 @@ from carry_forward_support import CASE_WORKERS, KEYS, NAME, entries, promote, vi
 
 conn = carry_forward_support.conn
 world = carry_forward_support.world
-from qa_tools.common import assignment as assign_mod
+from asset_model import assignment as assign_mod
 from qa_tools.common import carry_forward, filing, inheritance, period_schema
 from qa_tools.common import decision_log as dl
 
@@ -340,8 +340,15 @@ class TestOweNothingQuarter:
         from pathlib import Path
 
         from fixture_ids import CP_REF_RUN_ID
-        from qa_tools.common import (arrival_lifecycle, arrivals, delivery, delivery_log,
-                                     hierarchy, knock_on, qa_store, schedule, supply_db)
+        from qa_tools.common import (
+            arrival_lifecycle,
+            delivery,
+            delivery_log,
+            knock_on,
+            qa_store,
+            supply_db,
+        )
+        from asset_model import arrivals, delivery as delivery_tree, hierarchy, schedule
         from qa_tools.tools import orchestrate, stage
 
         tag = _uuid.uuid4().hex[:6]
@@ -381,7 +388,7 @@ class TestOweNothingQuarter:
             f"{t}.csv": (ref / f"{t}.csv").read_text() for t in five},
             received_at=t2, deliveries_dir=deliveries, receipts_dir=receipts)
         stage.build_all("child-protection", deliveries_dir=deliveries, receipts_dir=receipts)
-        for d in delivery.list_deliveries(deliveries, receipts):
+        for d in delivery_tree.list_deliveries(deliveries, receipts):
             delivery_log.record(d, arrivals.recognise(d))
         found = sorted(arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
                                              receipts),

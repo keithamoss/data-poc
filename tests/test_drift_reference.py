@@ -14,9 +14,16 @@ import pytest
 import baseline_periods
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (drift_reference, inheritance, promotion,
-                             qa_store, rejection, schedule, substitution,
-                             supply_db)
+from qa_tools.common import (
+    drift_reference,
+    inheritance,
+    promotion,
+    qa_store,
+    rejection,
+    substitution,
+    supply_db,
+)
+from asset_model import schedule
 
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"

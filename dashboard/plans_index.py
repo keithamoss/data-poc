@@ -61,7 +61,7 @@ _MIN_BOLD_LEAD = 8
 # own suggestion on being told that: "what if the index pointed to
 # implementation in code?" Thread D's entry names the dashboard template,
 # which is exactly the signal both runs needed and neither got.
-_SRC_ROOTS = ("qa_tools", "pipeline", "dashboard", "generator", "cli", "contract",
+_SRC_ROOTS = ("asset_model", "qa_tools", "pipeline", "dashboard", "generator", "cli", "contract",
               "tests", "dbt_project", "scripts", "aws", "synthetic_data_generator")
 _PATH_RE = re.compile(
     r"\b((?:" + "|".join(_SRC_ROOTS) + r")/[A-Za-z0-9_./-]+\.(?:py|html|yml|yaml|sql|js|md))")

@@ -188,7 +188,8 @@ class TestExitCodes:
         limit on REQ-PIPE-266): nothing is gated yet, so the pass exits as
         that file's own results say - 1 red, 0 green - and reports it
         waiting, not failed."""
-        from qa_tools.common import arrival_lifecycle, asset_time, processing_pass as pp
+        from qa_tools.common import arrival_lifecycle, processing_pass as pp
+        from asset_model import asset_time
         from qa_tools.tools import stage
 
         established(sc)
@@ -835,8 +836,8 @@ class TestCriticFindings:
         pass counts every supply the gate touched - Clients v2, checked first
         and green on its own run, re-checked against Notifications v1 and
         held back when the amber Notifications v2 completes the package."""
-        from qa_tools.common import (amber_setting, arrival_lifecycle, asset_time,
-                                     processing_pass as pp)
+        from asset_model import amber_setting, asset_time
+        from qa_tools.common import arrival_lifecycle, processing_pass as pp
         from qa_tools.tools import stage
 
         established(sc)

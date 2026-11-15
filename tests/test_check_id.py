@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/check_id.py - the check_id grammar
+"""Tests for asset_model/check_id.py - the check_id grammar
 (REQ-QAC-023).
 
 The grammar existed before this module, but only in prose: Thread D
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from qa_tools.common import check_id as ci
+from asset_model import check_id as ci
 from qa_tools.common import validate_check_lifecycle as vcl
 
 _REAL = ("daily.registry-services.civil-registration.birth-registrations"
@@ -141,7 +141,7 @@ def test_every_real_contract_rule_sits_under_the_column_its_id_names():
     'the column comes from schema structure' true rather than merely
     intended - the id and the attachment were free to disagree before,
     and nothing would have said so."""
-    from qa_tools.common.check_lifecycle import contract_rule_attachments
+    from asset_model.check_lifecycle import contract_rule_attachments
     for path in ("assets/daily/registry-services/bdm-birth-registrations-contract.yaml",
                  "assets/quarterly/child-protection-family-support/child-protection-contract.yaml"):
         assert ci.validate_column_matches(contract_rule_attachments(path)) == [], path

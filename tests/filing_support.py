@@ -89,7 +89,8 @@ def checked(conn, dataset_id: str, supply_id: str) -> str:
     (post-build-review #173 fix 2)."""
     import uuid
 
-    from qa_tools.common import hierarchy, qa_store
+    from asset_model import hierarchy
+    from qa_tools.common import qa_store
 
     ds = hierarchy.dataset(dataset_id)
     run_key = f"pytest-run-{uuid.uuid4().hex[:12]}"

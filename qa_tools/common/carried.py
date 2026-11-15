@@ -85,8 +85,8 @@ def _reads_of(check_id: str, reads: dict[str, list[str]]) -> set[str] | None:
     """Every table a cross-table check reads: those it declares and its own
     dataset's, which it reads implicitly. None for a check that declares
     no reads - not a cross-table check."""
-    from qa_tools.common import check_id as check_id_mod
-    from qa_tools.common import hierarchy
+    from asset_model import check_id as check_id_mod
+    from asset_model import hierarchy
 
     declared = reads.get(check_id) or []
     parsed = check_id_mod.try_parse(check_id)
@@ -141,7 +141,7 @@ def decide(conn, run_id: str, in_scope, reads: dict[str, list[str]]) -> dict[str
     cross-table check in its scope that a sibling evaluated over the same
     supplies - the earliest-opened such sibling. Empty for a run with no
     siblings."""
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
     from qa_tools.common import supply_db
 
     others = siblings(conn, run_id)

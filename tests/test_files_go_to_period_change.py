@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 import yaml
 
-from qa_tools.common import agreement, schedule, slots
+from asset_model import agreement, schedule, slots, assignment
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
@@ -150,7 +150,7 @@ class TestASupplyInTheDoublyFedRoundIsHeldForAPerson:
     def _held(contract, monkeypatch):
         from datetime import datetime, timedelta, timezone
 
-        from qa_tools.common import agreement as agreement_mod, assignment
+        from asset_model import agreement as agreement_mod, assignment
 
         _, cal_path = contract(1, 0)
         agr = agreement.load(cal_path)
@@ -231,11 +231,12 @@ def test_draft_correction_prints_a_rises_not_expected_entries(contract, monkeypa
 
     from cli import schedule as schedule_cli
     from qa_tools.common import correction_trial
+    from asset_model import declared_corrections
 
     _, cal_path = contract(0, 1)
     cal = yaml.safe_load(cal_path.read_text())
     asset = yaml.safe_load((cal_path.parent / "data-asset.yaml").read_text())
-    monkeypatch.setattr(correction_trial, "working", lambda: (cal, asset))
+    monkeypatch.setattr(declared_corrections, "working", lambda: (cal, asset))
     monkeypatch.setattr(correction_trial, "draft", lambda *a, **k: [])
     assert correction_trial.rise_entries(), "the working copy's rise was not found"
     got = CliRunner().invoke(schedule_cli.schedule_group, ["draft-correction"])
@@ -264,7 +265,7 @@ def test_where_an_arrival_falls_is_answered_on_29_february(contract):
     _, cal_path = contract(1, 0)
     agr = agreement.load(cal_path)
     at = datetime(2028, 2, 29, 10, tzinfo=timezone(timedelta(hours=8)))
-    assert slots.fall_hold("cp-clients", at, agr) is None
+    assert assignment.fall_hold("cp-clients", at, agr) is None
 
 
 def test_a_slot_is_found_when_now_is_29_february(monkeypatch):
@@ -272,7 +273,7 @@ def test_a_slot_is_found_when_now_is_29_february(monkeypatch):
     by replace(year=)): on 29 February every look-up from now raised."""
     from datetime import datetime, timedelta, timezone
 
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     monkeypatch.setattr(asset_time, "now",
                         lambda: datetime(2028, 2, 29, 10, tzinfo=timezone(timedelta(hours=8))))
@@ -304,8 +305,8 @@ class TestTheRoundFillingAPeriodAgreesWithTheSlotsAfterAFall:
         agr = agreement.load(cal_path)
         monkeypatch.setattr(agreement, "current", lambda: agr)
         at = datetime(2026, 8, 1, 10, tzinfo=timezone(timedelta(hours=8)))
-        assert slots.fall_hold("cp-case-workers", at, agr) is None
-        assert slots.fall_hold("cp-clients", at, agr) is not None
+        assert assignment.fall_hold("cp-case-workers", at, agr) is None
+        assert assignment.fall_hold("cp-clients", at, agr) is not None
 
 
 def test_the_gate_names_the_round_a_version_takes_effect_from(capsys):
@@ -330,7 +331,7 @@ def test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from(
     _, cal_path = contract(2, 0)
     agr = agreement.load(cal_path)
     at = datetime(2026, 11, 1, 10, tzinfo=timezone(timedelta(hours=8)))
-    fed = slots.fall_hold("cp-clients", at, agr)
+    fed = assignment.fall_hold("cp-clients", at, agr)
     assert fed["round"] == "2026-11-01"
     assert fed["from_round"] == "2026-08-01"
 

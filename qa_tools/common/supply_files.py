@@ -159,7 +159,8 @@ def resolve(conn, dataset_id: str, supply_id: str) -> Supply | None:
     its one plain staged table - a pair's file cannot be told apart without
     the delivery, so an unfiled `#N` resolves to nothing. None only for a
     string that is not a supply id."""
-    from qa_tools.common import filing, hierarchy
+    from qa_tools.common import filing
+    from asset_model import hierarchy
 
     if "@" not in (supply_id or ""):
         return None
@@ -221,7 +222,7 @@ def run_id_of(dataset_id: str, supply_id: str) -> str:
     own run - is named from: `<table>__<key>`, with `__<N>` for a pair's
     `#N`. AN IDENTITY FOR THE SUPPLY'S RUNS ALONE (criterion 14), never a
     way to find its table - resolve() is."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     logical = hierarchy.dataset(dataset_id).table
     ordinal = ordinal_of(supply_id)
@@ -232,7 +233,7 @@ def arrival_run_id_of(dataset_id: str, supply_id: str) -> str:
     """The run the supply's ARRIVAL recorded - one per arrival, so a pair's
     two supplies share it (it is the 'could not run' run) and its run_index
     is the one their own runs carry (criterion 14)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return f"{hierarchy.dataset(dataset_id).table}__{staging_key_of(supply_id)}"
 
@@ -254,8 +255,8 @@ def filing_collections() -> list:
     both ask by (post-build-review #315 L1) - the pointer counted every
     registered collection, so a registered collection with no datasets yet
     made it name a step the menu never asks."""
-    from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from asset_model import collections
+    from asset_model import hierarchy
 
     filed = {d.collection_id for d in hierarchy.all_datasets()}
     return [c for c in collections.all_collections() if c.id in filed]
@@ -304,8 +305,8 @@ def where_to_settle(dataset_id: str, conn=None) -> str:
     every picker) - a one-table collection by its dataset's name. It named
     the collection's own name, which that menu no longer shows. `conn`: a
     connection the caller already holds, read on rather than opening one."""
-    from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from asset_model import collections
+    from asset_model import hierarchy
 
     # THE STEP IS NAMED WHENEVER THE MENU WILL ASK IT, by the menu's own
     # condition (collection_step_asked): a one-collection asset's menu skips

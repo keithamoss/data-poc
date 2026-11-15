@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 
-from qa_tools.common import amber_setting
+from asset_model import amber_setting
 from qa_tools.common import decision_log as dl
 from qa_tools.common import promotion, qa_store, supply_db
 

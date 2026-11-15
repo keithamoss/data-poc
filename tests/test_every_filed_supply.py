@@ -28,7 +28,8 @@ __all__ = ["_forget_its_filings", "minted", "quiet"]
 def _failed_resupply(conn, period: str) -> str:
     """A supply filed to `period` whose load failed, received after the good one."""
     import filing_support
-    from qa_tools.common import assignment, load_log
+    from asset_model import assignment
+    from qa_tools.common import load_log
 
     arrival = f"t{uuid.uuid4().hex[:10]}"
     load_log.record(f"probe-{arrival}", DS, f"{TABLE}__{arrival}", load_log.FAILED,
@@ -291,7 +292,8 @@ class TestThePromotedSupplyIsInPlaceWhateverElseHappened:
         from pair_support import DS as BR
         from pair_support import TABLE as BRT
         from pair_support import Pair, _at, free_day
-        from qa_tools.common import hierarchy, supply_db
+        from asset_model import hierarchy
+        from qa_tools.common import supply_db
 
         day = free_day(conn, date(2026, 11, 1))
         pair = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),

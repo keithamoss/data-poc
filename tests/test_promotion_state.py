@@ -17,8 +17,8 @@ import baseline_periods
 
 import filing_support
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (assignment, promotion, promotion_state,
-                              qa_store, rejection, schedule, supply_db)
+from asset_model import assignment, schedule
+from qa_tools.common import promotion, promotion_state, qa_store, rejection, supply_db
 
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"

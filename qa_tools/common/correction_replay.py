@@ -27,45 +27,30 @@ synthetic (people.require_role). Nothing here writes a move of its own.
 
 Only during a replay (`replay_clock.active()`): the processing pass files
 against the agreement on disk, as a real asset always does.
+
+WHEN A CORRECTION WAS MERGED AND THE CONFIGURATION AS IT STOOD THEN
+(merge_instant, docs_at) are asset_model/declared_corrections.py
+(REQ-PIPE-380 criterion 2), which the generator's correction claims read;
+this player half reads the database, and goes to the bootstrap with
+REQ-GEN-381.
 """
 from __future__ import annotations
-
 import contextlib
-from datetime import date, datetime
+from datetime import datetime
 
-from qa_tools.common import asset_time, correction_apply, correction_trial, decision_log
-from qa_tools.common import assets as _assets
-
-
-def merge_instant(p: correction_apply.Pending) -> datetime:
-    """The first instant of the correction's date, on the asset's clock."""
-    return asset_time.start_of_day(date.fromisoformat(p.date[:10]))
-
-
-def _declared(docs) -> list[correction_apply.Pending]:
-    return correction_apply._declared(*docs)
-
-
-def docs_at(instant: datetime, docs: tuple[dict, dict] | None = None) -> tuple[dict, dict]:
-    """The configuration as it stood at `instant`: every declared correction
-    merged after it reverted, the latest first."""
-    from qa_tools.common import agreement_freeze
-
-    cal, asset = docs or correction_trial.working()
-    for p in reversed(_declared((cal, asset))):
-        if merge_instant(p) > instant:
-            cal, asset = agreement_freeze.revert(cal, asset, list(p.changes))
-    return cal, asset
+from asset_model import asset_time, declared_corrections
+from qa_tools.common import correction_apply, correction_trial, decision_log
+from asset_model import assets as _assets
 
 
 def staged(instant: datetime):
     """A context in which the agreement is as it stood at `instant`, or None
     where every declared correction was already merged by then - the common
     case, which then costs nothing."""
-    docs = correction_trial.working()
-    if not any(merge_instant(p) > instant for p in _declared(docs)):
+    docs = declared_corrections.working()
+    if not any(declared_corrections.merge_instant(p) > instant for p in declared_corrections.pending_corrections(*docs)):
         return None
-    return correction_trial.configured(*docs_at(instant, docs))
+    return correction_trial.configured(*declared_corrections.docs_at(instant, docs))
 
 
 def for_arrival(arrival):
@@ -133,7 +118,7 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
         qa_store.ensure_schema(db)
         actor = people.synthetic_actor()
         for p in correction_apply.pending(db):
-            if merge_instant(p) > until:
+            if declared_corrections.merge_instant(p) > until:
                 continue
             script = scripted.get(p.reference)
             if script is not None and script.pending:
@@ -141,7 +126,7 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
                     f"for the data asset's manager.")
                 continue
             stamp = at if history_end is None or effective_at else \
-                max(history_end, merge_instant(p)).isoformat()
+                max(history_end, declared_corrections.merge_instant(p)).isoformat()
             keep = scripted_corrections.resolve(script) if script is not None else {}
             try:
                 applied = correction_apply.confirm(

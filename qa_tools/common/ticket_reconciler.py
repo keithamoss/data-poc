@@ -40,8 +40,8 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from qa_tools.common import slot_state
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 #: The marker that makes a comment THIS reconciler's own (criterion 11).
 #: An HTML comment, so it is invisible on the rendered ticket and exact
@@ -196,7 +196,7 @@ def policy_from_config(config: dict | None = None) -> str:
     """
     if config is None:
 
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         with open(hierarchy.data_asset_yaml()) as handle:
             config = config_yaml.parse(handle) or {}

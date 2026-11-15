@@ -19,7 +19,7 @@ from datetime import date, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import agreement, schedule, slots
+from asset_model import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
@@ -62,7 +62,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
         assert got["days_before"] == 60
 
     def test_every_real_dataset_has_one(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         for entry in hierarchy.all_datasets():
             assert agreement.cadence(entry.dataset_id)["expected_time"]
@@ -314,7 +314,7 @@ class TestTheContractsDetection:
         and each is still checked as a contract: every collection's of the
         asset the test acts for, from the registry (the asset split - each
         asset's contracts are its own; the module's other asset runs it too)."""
-        from qa_tools import collections
+        from asset_model import collections
 
         names = [c.contract for c in collections.all_collections()]
         assert names, "the registry names no contract"
@@ -332,7 +332,7 @@ class TestAnAssetWithNoCalendarsAtAll:
     def test_an_empty_list_of_calendars_is_accepted(self, broken):
         """Criterion 36 - the project-extraction shape: every dataset has
         supplies and no cadence, so the asset has no calendar to name."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         def mutate(doc):
             doc["calendars"] = []

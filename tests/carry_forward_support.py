@@ -20,7 +20,8 @@ import pytest
 import baseline_periods
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import hierarchy, promotion, qa_store, schedule, supply_db
+from asset_model import hierarchy, schedule
+from qa_tools.common import promotion, qa_store, supply_db
 
 CASE_WORKERS = "cp-case-workers"
 #: Its name, as every sentence says a dataset (Keith, 2026-10-24, K1).

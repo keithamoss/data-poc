@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/schedule.py - delivery calendars
+"""Tests for asset_model/schedule.py - delivery calendars
 (REQ-PIPE-049).
 
 Against the REAL contract/data-asset.yaml wherever the real config is
@@ -21,7 +21,8 @@ from datetime import date, timedelta
 import pytest
 
 import agreement_split
-from qa_tools.common import asset_time, hierarchy, schedule, slots
+from asset_model import asset_time, hierarchy, schedule, slots
+from qa_tools.common import period_schema
 
 
 def _repoint(tmp_path, monkeypatch, doc):
@@ -158,7 +159,7 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         """The consequence, asserted through the real assignment rule
         rather than through the slot count - a count can look wrong and
         be harmless, and this is the thing that is actually harmful."""
-        from qa_tools.common import assignment
+        from asset_model import assignment
 
         first = self._generator_first_period()
         # Twenty days in, past REQ-GEN-044's evening-before era (the first
@@ -410,14 +411,16 @@ class TestAPeriodIsANameAndADateAndNothingElse:
 class TestAPeriodNamesAWarehouseSchema:
     """Criterion 6, and the NFR's own warning attached to it: this is
     the concept a schema is named after, so how a period is named is a
-    change to physical storage. Name it once and do not revisit."""
+    change to physical storage. Name it once and do not revisit. Through
+    period_schema.period_schema, the one namer since REQ-PIPE-376 criterion 5
+    removed schedule.schema_name, its unused copy."""
 
     def test_an_authored_period_name_becomes_a_schema_name(self):
-        assert schedule.schema_name(schedule.Period("2026-Q1", date(2026, 2, 1))) == "period_2026_q1"
+        assert period_schema.period_schema(schedule.Period("2026-Q1", date(2026, 2, 1)).name) == "period_2026_q1"
 
     def test_a_cadence_rule_period_names_a_schema_from_its_date(self):
-        assert schedule.schema_name(
-            schedule.Period("2026-09-01", date(2026, 9, 1))) == "period_2026_09_01"
+        assert period_schema.period_schema(
+            schedule.Period("2026-09-01", date(2026, 9, 1)).name) == "period_2026_09_01"
 
     @pytest.mark.parametrize("dataset_id, until", [
         pytest.param("cp-clients", None, marks=pytest.mark.asset("quarterly")),
@@ -425,11 +428,11 @@ class TestAPeriodNamesAWarehouseSchema:
     def test_a_schema_name_is_a_legal_bare_identifier(self, dataset_id, until):
         import re
         for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
-            name = schedule.schema_name(dataset_period.period)
+            name = period_schema.period_schema(dataset_period.period.name)
             assert re.fullmatch(r"[a-z][a-z0-9_]*", name), name
 
     def test_two_different_periods_never_share_a_schema_name(self):
-        names = [schedule.schema_name(p) for p in schedule.periods_for_calendar("quarterly")]
+        names = [period_schema.period_schema(p.name) for p in schedule.periods_for_calendar("quarterly")]
         assert len(names) == len(set(names))
 
 
@@ -527,7 +530,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         ARE the agreement. A calendar library predicts what was probably
         agreed; it does not constitute it."""
         import yaml as _yaml
-        from qa_tools.common import agreement
+        from asset_model import agreement
         raw = _yaml.safe_load(agreement.calendar_yaml().read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
@@ -548,7 +551,7 @@ class TestAnUnknownCalendarNamesTheAssetsFile:
     contract/calendar.yaml, which no longer exists."""
 
     def test_it_names_the_selected_assets_calendar_file(self):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         with pytest.raises(schedule.UnknownCalendarError) as e:
             schedule.calendar("nowhere")

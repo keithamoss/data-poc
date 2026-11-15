@@ -96,7 +96,7 @@ class TestATableTwoFilesClaimRaisesOneDatasetItem:
         reads what is pending asset-wide; in the dashboard build's path it
         opened a connection of its own for each blocker - twice, for the
         reason and the record - ignoring the one it was given."""
-        from qa_tools import collections
+        from asset_model import collections
 
         _pair()
         mine = collections.by_id("child-protection")

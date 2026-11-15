@@ -50,10 +50,11 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time, assets, period_schema, schedule
+from asset_model import asset_time, assets, schedule
+from qa_tools.common import period_schema
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -896,7 +897,7 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
     no commit holds it yet: the version is being added now, today."""
     from datetime import datetime
 
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     # THE COMMITTER INSTANT, FLOORED AT THE BASE COMMIT'S (REQ-PIPE-111
     # criteria 12 and 28): the author date (%aI) can be set to anything,
@@ -924,10 +925,10 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
         # the replacement setting and each entry list_settings declares are
         # versioned by the same mechanism, so dated the same way - the list
         # settings iterated, never named.
-        if any(start in amber_setting._versions(setting)
+        if any(start in amber_setting.versions_by_date(setting)
                for key in (amber_setting.KEY, "replacement_setting",
                            *amber_setting.list_setting_keys(doc))
-               for setting in amber_setting._settings(doc, key).values()):
+               for setting in amber_setting.stated_settings(doc, key).values()):
             return asset_time.local_date(datetime.fromisoformat(stamp))
     return None
 
@@ -1046,7 +1047,7 @@ def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
     seen too."""
     from types import SimpleNamespace
 
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     ref = ref or diff_base(root=ROOT)
     name = _repo_path(src.asset_path)
@@ -1083,7 +1084,7 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     Compared against `diff_base()`, the same previous commit the calendar
     guard above reads, and silent where there is none.
     """
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     module = module or amber_setting
     key = module.KEY
@@ -1894,7 +1895,7 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
     alone (criterion 9). A value's type and sign are the schema's (criterion
     6). Nothing here defaults a missing value: the two deployments want
     opposite ones, so the gate names every collection that says nothing."""
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     out: list[ConfigError] = []
     name = src.calendar_name
@@ -2030,7 +2031,7 @@ def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
     dataset version, at its first offending round."""
     from datetime import timedelta
 
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     try:
         agr = agreement_mod.from_doc(cal_raw, src.agreement_path)
@@ -2038,7 +2039,7 @@ def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
         return []  # the parse error is another check's to report
     name = src.calendar_name
     out: list[ConfigError] = []
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     for did in sorted(d for d in (e.dataset_id for e in agr.datasets.values()) if d):
         try:
@@ -2122,7 +2123,7 @@ def _change_rounds(cal_name: str, versions, agr):
 def _participates_in(did: str, rnd, agr) -> tuple[bool, str]:
     """Whether a dataset supplies in a round, and why not where it does not -
     on the round's own date (REQ-PIPE-321 criterion 2)."""
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     begins = schedule.owes_from(did, agr)
     if begins is not None and rnd.date < begins:
@@ -2198,7 +2199,7 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
 def _collection_calendars(cid: str, agr) -> tuple[str, list[str]]:
     """(collection name, the calendar its datasets are on) - the asset's
     baseline, once, where any member is on it (REQ-PIPE-345)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         members = hierarchy.datasets_in_collection(cid)
@@ -2384,7 +2385,7 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
     uses."""
     from datetime import timedelta
 
-    from qa_tools.common import hierarchy, slots
+    from asset_model import hierarchy, slots
 
     out = []
     until = asset_time.local_date(asset_time.now()) + timedelta(days=DAYLIGHT_SAVING_HORIZON_DAYS)
@@ -2395,8 +2396,8 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
         # traceback in filing rather than an error here (delivery-critic on
         # REQ-PIPE-113, #2).
         try:
-            agreement = schedule._agreement()
-            periods = [p for p in slots._calendar_periods(entry.dataset_id, until, agreement)
+            agreement = schedule.agreement_to_read()
+            periods = [p for p in slots.period_sequence(entry.dataset_id, until, agreement)
                        if p.date <= until]
         except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
             continue
@@ -2404,7 +2405,7 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
             # The participation version in force on the period's own date,
             # and the day its due instant falls on (REQ-PIPE-113).
             try:
-                version = slots._participation_for(entry.dataset_id, period.date, agreement)
+                version = slots.participation_for(entry.dataset_id, period.date, agreement)
             except schedule.ScheduleConfigError:
                 continue  # reported by the participation checks
             expected_time = version.expected_time
@@ -2570,7 +2571,7 @@ def main(src: Source | None = None) -> int:
     # A FALL IS INFORMATION, NOT A REFUSAL (REQ-PIPE-322 criterion 10): each
     # doubly-fed period and the round whose files will be held, said once.
     try:
-        from qa_tools.common import agreement as agreement_mod
+        from asset_model import agreement as agreement_mod
 
         loaded = agreement_mod.load(src.agreement_path)
         for line in effective_lines(loaded) + fall_lines(loaded):

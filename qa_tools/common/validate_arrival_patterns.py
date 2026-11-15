@@ -30,7 +30,7 @@ overlap on a shape of name nobody has sent yet -
 on `cp_clients_part2.csv` - and this stays green until the day that
 file arrives. Proving non-overlap properly is decidable and was
 rejected on cost; the half that cannot be wrong is the RUNTIME HOLD in
-qa_tools/common/arrivals.py, which sees every collision that actually
+asset_model/arrivals.py, which sees every collision that actually
 occurs and does not care whether anyone remembered to run this. The
 protection is the pair. This half is nearly free on top and catches a
 careless edit when it is cheapest to fix.
@@ -39,9 +39,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qa_tools.common import (
-    arrival_patterns, delivery_log, hierarchy, slots, supply_db)
-from qa_tools.common import assets as _assets
+from asset_model import arrival_patterns, hierarchy, slots
+from qa_tools.common import delivery_log, supply_db
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 

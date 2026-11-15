@@ -29,10 +29,16 @@ import functools
 import os
 import sys
 
-from qa_tools import collections
+from asset_model import collections
+from asset_model import arrivals, hierarchy
 from qa_tools.common import (
-    arrivals, file_checks, hierarchy, load_log, replay_clock, sample_data,
-    supply_db, supply_holds, trial,
+    file_checks,
+    load_log,
+    replay_clock,
+    sample_data,
+    supply_db,
+    supply_holds,
+    trial,
 )
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 

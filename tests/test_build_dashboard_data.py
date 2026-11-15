@@ -14,10 +14,10 @@ import json
 
 import pytest
 
-from qa_tools.common.check_lifecycle import CheckMetadata
+from asset_model.check_lifecycle import CheckMetadata
 from build_support import facts_for
 from pipeline import build_dashboard_data as bdd
-from qa_tools import collections
+from asset_model import collections
 
 #: The shared builder takes a collection (REQ-DASH-244); these are its tests
 #: on Birth Registrations, whose one dataset is the document itself.

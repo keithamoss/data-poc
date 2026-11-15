@@ -42,7 +42,7 @@ def _read() -> dict:
 def _now(monkeypatch, instant: str) -> None:
     """Now is `instant`, so every record is stamped on the scenario's own
     clock and the reader's days are the scenario's."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     monkeypatch.setenv(asset_time.PINNED_NOW_VARIABLE, instant)
 

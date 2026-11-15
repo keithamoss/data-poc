@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sys
 
-from qa_tools.common import check_lifecycle as cl
+from asset_model import check_lifecycle as cl
 
 
 def main() -> int:

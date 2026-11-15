@@ -26,7 +26,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import schedule
+from asset_model import schedule
 from qa_tools.common.validate_schedule import _merged_view, _walk_datasets
 
 _MOVED = ("calendar", schedule.NO_CALENDAR_KEY, "delivery_months", "dates",

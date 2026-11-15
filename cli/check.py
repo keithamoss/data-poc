@@ -114,7 +114,7 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a config typo can never leave a dataset expecting nothing", True),
     # REQ-PIPE-058 criterion 13. Half of a PAIR: this catches a careless
     # pattern edit at the moment it is cheapest to fix, and the runtime
-    # hold in qa_tools/common/arrivals.py catches every collision that
+    # hold in asset_model/arrivals.py catches every collision that
     # actually occurs. Neither alone is enough at thirty datasets.
     ("patterns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_arrival_patterns"],
      "one filename can only ever belong to one dataset", False),
@@ -215,7 +215,7 @@ def _asset_passes(label: str) -> list[dict]:
     found, each run told its asset; with one selected, once, for it - told it
     too, so its output is named for it like any other pass (REQ-PIPE-364
     criterion 1)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     if label in _REPOSITORY_WIDE:
         return [{}]
@@ -226,7 +226,7 @@ def _asset_passes(label: str) -> list[dict]:
 
 
 def _asset_of(extra: dict) -> str | None:
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return extra.get(assets.ASSET_ENV)
 
@@ -372,7 +372,7 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list
 #: path (REQ-PIPE-369 criterion 6, REQ-TEST-353 criterion 9).
 #: `fail_under` itself is read from pyproject.toml by pytest-cov (REQ-TEST-375
 #: criterion 9: enforced in this gate, never in push CI).
-COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard", "assets")
+COVERAGE_PACKAGES = ("asset_model", "qa_tools", "pipeline", "generator", "dashboard", "assets")
 
 
 def _pytest_argv(argv: list[str], reports: Path) -> list[str]:

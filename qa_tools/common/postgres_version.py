@@ -21,8 +21,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 COMPOSE = ROOT / ".devcontainer" / "docker-compose.yml"
@@ -42,7 +42,7 @@ _majors: dict = {}
 
 
 def _declared_value(path=None):
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     text = Path(path or data_asset_yaml()).read_text()
     if text not in _majors:

@@ -43,8 +43,8 @@ def _config_refusal(exc) -> str:
 try:
     from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
                    pipeline, plans, population, scenarios, schedule, supply)
-    from qa_tools import collections as _registry
-    from qa_tools.common import assets as _assets
+    from asset_model import collections as _registry
+    from asset_model import assets as _assets
 
     # EVERY COLLECTION'S GROUP, FROM THE REGISTRY (REQ-TEST-245 criterion 1),
     # built here inside the YAML guard: building them reads the hierarchy.

@@ -40,7 +40,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from qa_tools.common import check_id as check_id_mod
+from asset_model import check_id as check_id_mod
 from qa_tools.common import period_schema, slot_state, supply_db
 
 #: The pseudo-tool these are recorded under, beside `held`. Not in
@@ -92,7 +92,7 @@ def supply_state(conn, dataset_id: str, period: str, as_at: datetime) -> str | N
     falls through to the catch-all rather than being guessed at.
     """
     from qa_tools.common import filing
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     try:
         dataset_slots = slots_mod.slots_for_dataset(
@@ -113,7 +113,7 @@ def _slot_of(dataset_id: str, period: str, as_at: datetime):
     """The dataset's slot named `period`, as at the arrival - or None where
     it owes nothing for that period; raises where its schedule cannot be
     built."""
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     dataset_slots = slots_mod.slots_for_dataset(
         dataset_id, until=slots_mod.claimable_until(dataset_id, as_at.date()))
@@ -148,7 +148,7 @@ def in_agreement(conn, dataset_id: str, period: str, as_at: datetime) -> bool:
     from datetime import timedelta
 
     from qa_tools.common import filing
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     try:
         # THE AGREEMENT, NOT WHAT THIS RECEIPT COULD CLAIM: generated far
@@ -175,7 +175,7 @@ def out_of_agreement(conn, *, own_table: str, own_dataset: str, period: str,
     `decided_by`: the instant a person's not-supplied mark is read as at -
     the run's own, so that a re-run a later mark owes sees it (REQ-PIPE-332
     criterion 9); `as_at`, the receipt, where not given."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     missing = ((set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
                - set(resolution.resolved))
@@ -268,7 +268,7 @@ def results_for(conn, *, run_id: str, run_timestamp: str, own_table: str,
     criterion 6): where the period holds none, the reason is "held back with
     its package". `outside` is out_of_agreement()'s answer, whose checks
     are out of scope and get no record."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     missing = ((set(resolution.absent) | set(resolution.ambiguous)) - set(resolution.held)
                - set(resolution.resolved))
@@ -402,7 +402,7 @@ def results_for_trial(*, run_id: str, run_timestamp: str, collection_id: str,
                - set(resolution.resolved))
     if not missing:
         return []
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     checks_by_id = checks_by_id or {}
     out: list[dict] = []

@@ -115,7 +115,8 @@ def for_dataset(dataset_id: str, conn=None) -> dict[str, dict]:
         with supply_db.connect(read_only=True, label="mothman:red-promoted") as opened:
             return for_dataset(dataset_id, conn=opened)
     from pipeline import slot_timeline
-    from qa_tools.common import hierarchy, promotion, supply_status
+    from asset_model import hierarchy
+    from qa_tools.common import promotion, supply_status
 
     reads = promotion._declared_reads()
     # The hierarchy's table index, read once for the dataset and given to
@@ -229,7 +230,7 @@ def _person(entry: dict) -> str | None:
 
 
 def _name(ds: str) -> str:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(ds).dataset_name
@@ -240,7 +241,7 @@ def _name(ds: str) -> str:
 def status_on(health: dict, on: str) -> str | None:
     """The status in force at the end of asset day `on` - the page's own
     lookup (redPromotedBadge), here so a test can ask it of the build."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     found = None
     for step in health.get("timeline") or []:

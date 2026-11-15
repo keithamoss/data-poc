@@ -54,7 +54,7 @@ COLLECTION = "child-protection"
 
 
 def _cp_evidently():
-    from qa_tools.common.evidently_common import collection_checks
+    from asset_model.drift import collection_checks
     return collection_checks("child-protection")
 
 
@@ -312,8 +312,8 @@ class TestOneAgreedOrdering:
         import json as _json
         from collections import Counter
 
-        from qa_tools import collections
-        from qa_tools.common import assets as _assets
+        from asset_model import collections
+        from asset_model import assets as _assets
 
         for c in collections.all_collections():
             # The asset's own reports/ folder since the split (post-build-review
@@ -380,7 +380,7 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
     """
 
     def test_every_child_protection_dataset_has_exactly_one(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
         ROW_COUNT_GROWTH_CHECK_IDS = _cp_evidently().row_drop
 
         real = {d.table: d.dataset_id
@@ -393,7 +393,7 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
         """A check id filed under the wrong dataset renders on the wrong
         page and folds into the wrong status - silently, because every
         id is well-formed either way."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
         ROW_COUNT_GROWTH_CHECK_IDS = _cp_evidently().row_drop
 
         real = {d.table: d.dataset_id

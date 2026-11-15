@@ -41,7 +41,7 @@ def _fresh_command_objects():
 
 
 def _coll(cid):
-    from qa_tools import collections
+    from asset_model import collections
 
     return collections.by_id(cid)
 
@@ -100,7 +100,7 @@ class TestTheTUIMenus:
         ran = []
         monkeypatch.setattr(collection_cli.of(FAKE_ID), "run_qa_interactive",
                             lambda: ran.append(FAKE_ID))
-        from qa_tools import collections
+        from asset_model import collections
 
         for cid in (c.id for c in collections.all_collections() if c.id != FAKE_ID):
             monkeypatch.setattr(collection_cli.of(cid), "run_qa_interactive",
@@ -110,7 +110,7 @@ class TestTheTUIMenus:
 
     def test_a_third_collection_is_offered_and_runs_its_own_flow(self, third_collection,
                                                                 monkeypatch):
-        from qa_tools import collections
+        from asset_model import collections
 
         choices, ran = self._drive(monkeypatch, "Fake Things")
         # Every registered collection by its label, in hierarchy order, the
@@ -180,7 +180,7 @@ class TestTheSharedCollectionOption:
         # REQ-TEST-252 criterion 13: at N_LIST or fewer the refusal still lists
         # every collection, short and id, and says where they are all listed.
         flat = " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())
-        from qa_tools import collections
+        from asset_model import collections
 
         every = collections.all_collections()
         assert len(every) <= common.N_LIST, "this case is the listing one, at N_LIST or fewer"

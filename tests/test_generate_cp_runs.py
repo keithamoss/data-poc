@@ -46,7 +46,7 @@ cp_provider = collection_modules.provider_module("child-protection")
 TABLES = collection_modules.provider_module("child-protection").TABLES
 ChildProtectionProvider = collection_modules.provider_module("child-protection").ChildProtectionProvider
 _pick_dirty_tables = collection_modules.provider_module("child-protection")._pick_dirty_tables
-from qa_tools.common import asset_time
+from asset_model import asset_time
 from generator import driver
 
 
@@ -381,6 +381,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     import hashlib
 
     from qa_tools.common import delivery
+    from asset_model import delivery as delivery_tree
 
     def _fingerprint(root):
         root = Path(root)
@@ -392,8 +393,8 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
                 for p in sorted(root.rglob("*"))]
 
     before = {name: _fingerprint(path)
-              for name, path in (("deliveries", delivery.default_deliveries_dir()),
-                                  ("receipts", delivery.default_receipts_dir()))}
+              for name, path in (("deliveries", delivery_tree.default_deliveries_dir()),
+                                  ("receipts", delivery_tree.default_receipts_dir()))}
     book_before = (delivery.bookkeeping_path().read_bytes()
                    if delivery.bookkeeping_path().exists() else None)
     # THE SCENARIO PLACEMENTS TOO (post-build-review #225): Child
@@ -422,7 +423,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
-    for name, path in (("deliveries", delivery.default_deliveries_dir()), ("receipts", delivery.default_receipts_dir())):
+    for name, path in (("deliveries", delivery_tree.default_deliveries_dir()), ("receipts", delivery_tree.default_receipts_dir())):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.bookkeeping_path().read_bytes()
             if delivery.bookkeeping_path().exists() else None) == book_before
@@ -544,7 +545,8 @@ def test_a_partial_resupply_survives_as_a_real_delivery_on_disk(tmp_path, monkey
     about which FILES a delivery carries, not what is wrong inside
     them - a distinction worth stating rather than implying.
     """
-    from qa_tools.common import arrivals, delivery
+    from asset_model import arrivals
+    from qa_tools.common import delivery
     from generator import resupply as resupply_mod
 
     class ShapeOnlyProvider(ChildProtectionProvider):
@@ -737,14 +739,14 @@ class TestTheContestedClientRegisterPairs:
 
     @staticmethod
     def _receipts(name):
-        from qa_tools.common import delivery
+        from asset_model import delivery as delivery_tree
 
-        return {f: r[0] for f, r in delivery.read_file_receipts(
+        return {f: r[0] for f, r in delivery_tree.read_file_receipts(
             name, driver.receipts_dir()).items()}
 
     @staticmethod
     def _slot(record):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         return slots.slot_instants("cp-clients", date.fromisoformat(
             next(p.round_date.isoformat() for p in cp_provider.generated_periods()
@@ -783,7 +785,7 @@ class TestTheContestedClientRegisterPairs:
 
     def test_ts42s_later_client_register_comes_alone_after_due_before_the_next_window(
             self, manifest, raw_dir):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         record = self._placement("TS-42a")
         _pair, later = self._deliveries(manifest, record)

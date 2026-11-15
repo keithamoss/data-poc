@@ -39,10 +39,15 @@ pre-commit hook, comparing the staged file against HEAD), it is now.
 
 CONFIGURATION ONLY (criterion 16): two versions of two files, git, and the
 slot arithmetic - no database and nothing under data/.
+
+THE PURE CORRECTION READERS (corrections_by_owner, owner_label, revert)
+are asset_model/declared_corrections.py (REQ-PIPE-380 criterion 2,
+architect B4): this gate compares the agreement between git refs and runs
+git, so only what reads configuration moved; the git half stays here.
 """
 from __future__ import annotations
 
-import copy
+from asset_model import declared_corrections
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -51,7 +56,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time, assets
+from asset_model import asset_time, assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -122,20 +127,13 @@ def _windows(versions: list[dict]) -> list[tuple[str, str | None]]:
     return [(a, starts[i + 1] if i + 1 < len(starts) else None) for i, a in enumerate(starts)]
 
 
-_SKIPPED = ("changelog", "corrections")
-#: A turn-off is ITS OWN ITEM (REQ-PIPE-179 criteria 11 and 12, amending
-#: REQ-PIPE-111 criterion 2): it freezes when the periods it flips start to
-#: matter, not when its version took effect.
-_TURN_OFF_KEYS = ("effective_to", "turned_off_reason")
-
-
 def _turn_off_item(add, key: str, owner: tuple, v: dict, ctx: dict) -> None:
     """The turn-off of one version, where it states one - its effective_to
     and its turned_off_reason, frozen together (criterion 12)."""
-    if not any(k in v for k in _TURN_OFF_KEYS):
+    if not any(k in v for k in declared_corrections.TURN_OFF_KEYS):
         return
     add(Item(f"{key} effective_to", owner, "turn_off",
-             _plain({k: v[k] for k in _TURN_OFF_KEYS if k in v}), dict(ctx)))
+             _plain({k: v[k] for k in declared_corrections.TURN_OFF_KEYS if k in v}), dict(ctx)))
 
 
 def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
@@ -162,7 +160,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             first = inside[0] if inside else (eff if v.get("cadence") else None)
             add(Item(f"calendar {name} version {eff}", ("calendar", name), "cal_version",
                      _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + ("dates", "effective_from")}),
+                             if k not in declared_corrections.SKIPPED_KEYS + ("dates", "effective_from")}),
                      {"calendar": name, "eff": eff, "first": first}))
             # THE DATES IN FORCE, not the entries listed (delivery-critic on
             # 111, H1): a version that starts later takes the earlier one's
@@ -188,7 +186,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             eff = str(v.get("effective_from"))
             add(Item(f"dataset {ds} participation {eff}", owner, "participation",
                      _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + _TURN_OFF_KEYS + ("effective_from",)}),
+                             if k not in declared_corrections.SKIPPED_KEYS + declared_corrections.TURN_OFF_KEYS + ("effective_from",)}),
                      {"dataset": ds, "eff": eff, "end": windows.get(eff)}))
             _turn_off_item(add, f"dataset {ds} participation {eff}", owner, v,
                            {"datasets": [ds]})
@@ -211,7 +209,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             add(Item(f"collection {cid} participation_defaults {eff}", ("collection", cid),
                      "defaults",
                      _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + _TURN_OFF_KEYS + ("effective_from",)}),
+                             if k not in declared_corrections.SKIPPED_KEYS + declared_corrections.TURN_OFF_KEYS + ("effective_from",)}),
                      {"collection": cid, "eff": eff, "end": windows.get(eff)}))
             _turn_off_item(add, f"collection {cid} participation_defaults {eff}",
                            ("collection", cid), v, {"collection": cid})
@@ -265,7 +263,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
 # ---- when each one froze --------------------------------------------
 
 def _datasets_on(calendar_name: str, agr) -> list[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out = []
     for entry in hierarchy.all_datasets():
@@ -281,7 +279,7 @@ def _datasets_on(calendar_name: str, agr) -> list[str]:
 
 
 def _claim_open(dataset_id: str, day: date, agr) -> datetime | None:
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
         return slots.slot_instants(dataset_id, day, agr).claim_opens_at
@@ -290,10 +288,10 @@ def _claim_open(dataset_id: str, day: date, agr) -> datetime | None:
 
 
 def _first_period_on_or_after(dataset_id: str, day: date, end: date | None, agr) -> date | None:
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
-        periods = slots._calendar_periods(dataset_id, day + timedelta(days=400), agr)
+        periods = slots.period_sequence(dataset_id, day + timedelta(days=400), agr)
     except (schedule.ScheduleConfigError, KeyError, ValueError):
         return None
     dates = [p.date for p in periods if p.date >= day and (end is None or p.date < end)]
@@ -305,7 +303,7 @@ def _counts_on(dataset_id: str, day: date, agr) -> bool:
     criterion 30, amending REQ-PIPE-111 criterion 2): always, unless it is
     turned off on that day - then only for the first period of its gap,
     whose opening closes its last owed slot."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     try:
         standing = agr.standing_on(dataset_id, day)
@@ -374,12 +372,12 @@ def freeze_instant(item: Item, agr) -> datetime | None:
                 opens.append(_claim_open(ds, first, agr))
         return _min(asset_time.start_of_day(eff), *opens)
     if item.kind == "not_expected":
-        from qa_tools.common import slots
+        from asset_model import slots
 
         try:
-            periods = slots._calendar_periods(c["dataset"], None, agr)
+            periods = slots.period_sequence(c["dataset"], None, agr)
         except Exception:  # noqa: BLE001 - a cadence rule needs a bound
-            periods = slots._calendar_periods(
+            periods = slots.period_sequence(
                 c["dataset"], asset_time.local_date(datetime.now(UTC)) + timedelta(days=400), agr)
         match = next((p for p in periods if p.name == c["period"]), None)
         return _claim_open(c["dataset"], match.date, agr) if match else None
@@ -397,7 +395,7 @@ def freeze_instant(item: Item, agr) -> datetime | None:
     if item.kind == "tz_version":
         from zoneinfo import ZoneInfo
 
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         eff = date.fromisoformat(c["eff"])
         try:
@@ -437,28 +435,6 @@ def commits_since(ref: str, rel_paths: tuple[str, ...]) -> list[tuple[str, datet
         if sha and stamp:
             rows.append((sha, datetime.fromisoformat(stamp)))
     return rows
-
-
-# ---- the corrections ------------------------------------------------
-
-def _corrections_by_owner(cal_doc: dict, asset_doc: dict) -> dict[tuple, list]:
-    out: dict[tuple, list] = {}
-    for cal in (cal_doc or {}).get("calendars") or []:
-        out[("calendar", str((cal or {}).get("name")))] = list((cal or {}).get("corrections") or [])
-    for entry in (cal_doc or {}).get("datasets") or []:
-        out[("dataset", str((entry or {}).get("id")))] = list((entry or {}).get("corrections") or [])
-    for coll in (cal_doc or {}).get("collections") or []:
-        out[("collection", str((coll or {}).get("id")))] = list((coll or {}).get("corrections") or [])
-    tz = (asset_doc or {}).get("timezone") or {}
-    if isinstance(tz, dict):
-        out[("timezone",)] = list(tz.get("corrections") or [])
-    return out
-
-
-def _owner_label(owner: tuple) -> str:
-    if owner[0] == "timezone":
-        return f"the timezone in {assets.config_dir()}/data-asset.yaml"
-    return f"{owner[0]} {owner[1]!r} in {assets.config_dir()}/calendar.yaml"
 
 
 def approvers(people_doc: dict) -> list[dict]:
@@ -585,7 +561,7 @@ def _paste_ready(owner: tuple, changes: list[tuple[str, object, object]], allowe
     """The correction entry to paste - placeholders for whatever was not
     given (REQ-PIPE-169 criterion 14), the same text the refusal prints."""
     who = ", ".join(p.get("email") for p in allowed) or "nobody - people.yaml names no approver"
-    lines = [f"Add to the corrections list of {_owner_label(owner)}:",
+    lines = [f"Add to the corrections list of {declared_corrections.owner_label(owner)}:",
              "  corrections:",
              f"    - change_reference: {_quoted(reference) if reference else '<CHANGE-REF>'}",
              f"      date: '{today.isoformat()}'",
@@ -614,7 +590,7 @@ def old_asset_like(new_asset: dict) -> dict:
 
 def _agreements(old_cal: dict | None, new_cal: dict):
     """(new, old) agreements; raises where the NEW file cannot be read."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     new_agr = agreement.from_doc(new_cal)
     try:
@@ -648,7 +624,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
     (REQ-PIPE-179 criterion 11), computed with criterion 14's inputs. A
     change of the reason alone flips nothing, and freezes with the periods
     it already turned off (criterion 12)."""
-    from qa_tools.common import agreement, slots
+    from asset_model import agreement, slots
 
     tos = [date.fromisoformat(str(v["effective_to"])) for v in (before, after)
            if isinstance(v, dict) and v.get("effective_to")]
@@ -658,7 +634,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
     out = []
     for ds in sorted(set(_turn_off_datasets(item, old_agr)) | set(_turn_off_datasets(item, new_agr))):
         try:
-            periods = slots._calendar_periods(ds, start + _FLIP_REACH, new_agr)
+            periods = slots.period_sequence(ds, start + _FLIP_REACH, new_agr)
         except Exception:  # noqa: BLE001 - a dataset with no calendar flips nothing
             continue
         reason_only = len(tos) == 2 and tos[0] == tos[1]
@@ -676,7 +652,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
                 # opened by the time the change was introduced.
                 # NAMED BY THE PERIOD THE ROUND FILLS (REQ-PIPE-179 criterion 11
                 # as REQ-PIPE-321 amends it), not the round's own name.
-                from qa_tools.common import schedule as schedule_mod
+                from asset_model import schedule as schedule_mod
 
                 filled = schedule_mod.period_filled_by(ds, p, new_agr)
                 out.append((ds, filled.name if filled is not None else p.name, opens))
@@ -761,8 +737,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
     # CRITERION 21: a corrections list is append-only; and criteria 4, 5, 22
     # on what was appended.
     declared: set[str] = set()
-    old_corr = _corrections_by_owner(old_cal, old_asset)
-    new_corr = _corrections_by_owner(new_cal, new_asset)
+    old_corr = declared_corrections.corrections_by_owner(old_cal, old_asset)
+    new_corr = declared_corrections.corrections_by_owner(new_cal, new_asset)
     for owner, before in old_corr.items():
         if before and owner not in new_corr:
             file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
@@ -835,10 +811,10 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                 if item.owner != owner:
                     out.append(Finding(file, key,
                                        f"the correction for {key} is declared on {where}, and the "
-                                       f"item belongs to {_owner_label(item.owner)}. Nothing was "
+                                       f"item belongs to {declared_corrections.owner_label(item.owner)}. Nothing was "
                                        f"committed.",
                                        f"Move it to the corrections list of "
-                                       f"{_owner_label(item.owner)}."))
+                                       f"{declared_corrections.owner_label(item.owner)}."))
                     continue
                 if _norm(change.get("old")) != _norm(old) or _norm(change.get("new")) != _norm(new):
                     out.append(Finding(
@@ -1030,7 +1006,7 @@ def _appended_dates_allowed(changes, old_items, old_agr, new_agr) -> set[str]:
     previous date, where - for each dataset on the calendar - the earliest
     claim-opening of the appended entries is no earlier than the closing
     instant that dataset's previous last slot had."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     allowed: set[str] = set()
     by_calendar: dict[str, list[Item]] = {}
@@ -1075,7 +1051,7 @@ def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asse
     check(old_cal, new_cal, old_asset, new_asset, base_people, today=today,
           base_codeowners=base_codeowners, needs=needs)
     out = []
-    for owner in sorted(needs, key=_owner_label):
+    for owner in sorted(needs, key=declared_corrections.owner_label):
         rows = needs[owner]
         owners = _base_owners(base_codeowners, asset_rel() if owner[0] == "timezone"
                              else calendar_rel())
@@ -1085,149 +1061,3 @@ def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asse
                                 reference=reference, author=author, approver=approver,
                                 reason=reason))
     return out
-
-
-# ---- putting a declared correction back (REQ-PIPE-170) ---------------------
-
-def _own(container: dict, key: str, default):
-    """`container[key]`, a copy of its own - the file shares participation
-    versions between datasets through YAML anchors, and deepcopy keeps that
-    sharing, so an edit to one would reach every dataset sharing it."""
-    container[key] = copy.deepcopy(container.get(key) if container.get(key) is not None
-                                   else default)
-    return container[key]
-
-
-def _version(versions: list, eff: str) -> dict | None:
-    return next((v for v in versions if str((v or {}).get("effective_from")) == eff), None)
-
-
-def _set_settings(versions: list, eff: str, old, *, keep: tuple) -> None:
-    """A versioned item's settings back to `old`: removed where `old` is
-    None (it was added), restored where it was removed, else replaced -
-    keeping the keys an item does not hold (its dates, changelog)."""
-    found = _version(versions, eff)
-    if old is None:
-        if found is not None:
-            versions.remove(found)
-        return
-    if found is None:
-        versions.append({"effective_from": eff, **copy.deepcopy(old)})
-        versions.sort(key=lambda v: str(v.get("effective_from")))
-        return
-    for k in [k for k in found if k not in keep and k != "effective_from"]:
-        del found[k]
-    found.update(copy.deepcopy(old))
-
-
-def _set_period(versions: list, period: str, old) -> None:
-    """A dated period back to `old`: removed where `old` is None, else moved
-    or restored - into the version whose window holds the old date."""
-    for v in versions:
-        v["dates"] = [d for d in (v.get("dates") or []) if str((d or {}).get("period")) != period]
-    if old is None:
-        return
-    when = str(old)
-    holder = None
-    for v in sorted(versions, key=lambda v: str(v.get("effective_from"))):
-        if str(v.get("effective_from")) <= when:
-            holder = v
-    holder = holder or versions[0]
-    holder.setdefault("dates", []).append({"period": period, "date": when})
-    holder["dates"].sort(key=lambda d: str(d.get("date")))
-
-
-def revert(cal_doc: dict, asset_doc: dict,
-           changes: list[tuple[str, object, object]]) -> tuple[dict, dict]:
-    """The two files as they stood before `changes` - each (item key, old,
-    new), as a declared correction lists them - copies, never the documents
-    given. Raises ValueError for an item key it does not know, rather than
-    leave a change silently in place.
-
-    Versions before their dates and periods: a removed version comes back
-    first, so its restored dates have somewhere to go."""
-    cal, asset = copy.deepcopy(cal_doc), copy.deepcopy(asset_doc)
-    calendars = {str((c or {}).get("name")): c for c in cal.get("calendars") or []}
-    entries = {str((e or {}).get("id")): e for e in cal.setdefault("datasets", [])}
-
-    def entry(ds: str) -> dict:
-        if ds not in entries:
-            entries[ds] = {"id": ds}
-            cal["datasets"].append(entries[ds])
-        return entries[ds]
-
-    def order(change):
-        parts = change[0].split()
-        return 0 if "version" in parts else 1
-
-    for key, old, _new in sorted(changes, key=order):
-        p = key.split()
-        if len(p) == 4 and p[0] == "calendar" and p[2] in ("version", "period") \
-                and p[1] in calendars:
-            versions = _own(calendars[p[1]], "versions", [])
-            if p[2] == "version":
-                _set_settings(versions, p[3], old, keep=("dates",) + _SKIPPED)
-            else:
-                _set_period(versions, p[3], old)
-        elif len(p) == 4 and p[0] == "dataset" and p[2] == "participation":
-            part = _own(entry(p[1]), "participation", {})
-            _set_settings(part.setdefault("versions", []), p[3], old,
-                          keep=_SKIPPED + _TURN_OFF_KEYS)
-        elif len(p) == 4 and p[0] == "collection" and p[2] == "participation_defaults":
-            coll = next((c for c in cal.get("collections") or [] if str((c or {}).get("id")) == p[1]),
-                        None)
-            if coll is None:
-                raise ValueError(f"{key!r} names a collection the file does not hold.")
-            part = _own(coll, "participation_defaults", {})
-            _set_settings(part.setdefault("versions", []), p[3], old,
-                          keep=_SKIPPED + _TURN_OFF_KEYS)
-        elif len(p) == 5 and p[4] == "effective_to" and (
-                (p[0] == "dataset" and p[2] == "participation")
-                or (p[0] == "collection" and p[2] == "participation_defaults")):
-            # A TURN-OFF (REQ-PIPE-179): its two keys on the one version.
-            if p[0] == "dataset":
-                block = _own(entry(p[1]), "participation", {})
-            else:
-                coll = next((c for c in cal.get("collections") or []
-                             if str((c or {}).get("id")) == p[1]), None)
-                if coll is None:
-                    raise ValueError(f"{key!r} names a collection the file does not hold.")
-                block = _own(coll, "participation_defaults", {})
-            found = _version(block.setdefault("versions", []), p[3])
-            if found is None:
-                raise ValueError(f"{key!r} names a version the file does not hold.")
-            for k in _TURN_OFF_KEYS:
-                found.pop(k, None)
-            found.update(copy.deepcopy(old or {}))
-        elif len(p) == 4 and p[0] == "dataset" and p[2] == "not_expected":
-            listed = [n for n in _own(entry(p[1]), "not_expected", [])
-                      if str((n or {}).get("period")) != p[3]]
-            if old is not None:
-                listed.append({"period": p[3], "reason": old})
-            entry(p[1])["not_expected"] = listed
-        elif len(p) == 3 and p[0] == "dataset" and p[2] == "calendar":
-            # A CALENDAR NAME REVERTS TO BEING ON THE BASELINE (REQ-PIPE-345):
-            # nothing names a calendar, so a dataset that was on one is on the
-            # asset's baseline, and only a no-calendar declaration is written.
-            text = "" if old is None else str(old)
-            baseline = next((str((c or {}).get("name")) for c in cal.get("calendars") or []), None)
-            is_none = text.startswith("no calendar (") and text.endswith(")")
-            if old is not None and not is_none and text != baseline:
-                raise ValueError(
-                    f"{key!r} was on calendar {text!r}, which is not this asset's baseline "
-                    f"{baseline!r} - nothing names a calendar (REQ-PIPE-345), so the "
-                    f"agreement before this correction cannot be rebuilt")
-            e = entry(p[1])
-            e.pop("calendar", None)
-            e.pop("no_calendar", None)
-            if is_none:
-                e["no_calendar"] = text[len("no calendar ("):-1]
-        elif len(p) == 3 and p[:2] == ["timezone", "version"]:
-            tz = asset.setdefault("timezone", {})
-            versions = tz.setdefault("versions", [])
-            _set_settings(versions, p[2], None if old is None else {"zone": old},
-                          keep=_SKIPPED)
-        else:
-            raise ValueError(f"{key!r} cannot be reverted - it is not an item the schedule gate "
-                             f"names, so the agreement before this correction cannot be rebuilt")
-    return cal, asset

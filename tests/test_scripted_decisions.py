@@ -140,7 +140,7 @@ def _not_synthetic(tmp_path: Path) -> Path:
     that one line: the hierarchy is read from the patched path too, and is
     keyed on its content (REQ-PIPE-254), so a one-line asset is an asset
     with no hierarchy, not one that is merely not synthetic."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     text = Path(hierarchy.data_asset_yaml()).read_text()
     assert "\nsynthetic: true\n" in text
@@ -156,7 +156,7 @@ class TestNoBackDoor:
     def test_only_decision_log_inserts_into_the_decision_table(self):
         pattern = re.compile(r"INSERT INTO \{(?:decision_log|dl)\.TABLE\}|INSERT INTO[^\n]*\.decision\b")
         offenders = []
-        for top in ("qa_tools", "pipeline", "cli", "generator", "dashboard"):
+        for top in ("asset_model", "qa_tools", "pipeline", "cli", "generator", "dashboard"):
             for path in (ROOT / top).rglob("*.py"):
                 if path.name in ("decision_log.py", "qa_store.py"):
                     continue
@@ -356,7 +356,7 @@ class TestThePeriodsDueInstantIsTheCalendars:
     the 1 August 2024 round."""
 
     def test_due_at_is_the_slots_due_instant_not_its_claim_opening(self):
-        from qa_tools.common import schedule, slots
+        from asset_model import schedule, slots
 
         on = schedule.round_of("2024-Q4", "cp-placements")
         due = sd._due_at("cp-placements", "2024-Q4")
@@ -410,13 +410,13 @@ class TestTheRelativePeriodCountsTheDatasetsOwnPeriods:
     sequence - case-workers is delivered in February and August only."""
 
     def test_case_workers_skips_the_quarter_it_owes_nothing_for(self):
-        from qa_tools.common import slots
+        from asset_model import slots
         # Its February and August rounds fill Q2 and Q4 (REQ-GEN-325).
         assert slots.relative_period("cp-case-workers", "2024-Q4", -1) == "2024-Q2"
         assert slots.relative_period("cp-clients", "2024-Q3", -1) == "2024-Q2"
 
     def test_none_before_the_first_period_or_for_an_unknown_one(self):
-        from qa_tools.common import slots
+        from asset_model import slots
         first = slots.slots_for_dataset("cp-clients")[0].name
         assert slots.relative_period("cp-clients", first, -1) is None
         assert slots.relative_period("cp-clients", "no-such-period", -1) is None
@@ -433,7 +433,7 @@ class TestAPeriodScopedDecisionIsPlayed:
         earlier = period + "-before"
         baseline_periods.declare(earlier)
         monkeypatch.setattr(sd, "_due_at", lambda ds, p: self.DUE if p == period else None)
-        monkeypatch.setattr("qa_tools.common.slots.relative_period",
+        monkeypatch.setattr("asset_model.slots.relative_period",
                             lambda ds, p, off: earlier if (p, off) == (period, -1) else None)
         return period, earlier
 
@@ -661,7 +661,7 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
             ("2013-Q3", "cp-clients", "mark-not-supplied")]
 
     def test_it_is_timed_after_the_slot_closes(self):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         # 2015-Q2, the first emptied quarter Child Protection owes: since
         # REQ-GEN-238 dropped 2013 and 2014 its first round is 2015-Q1's,
@@ -678,7 +678,7 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
         Protection dataset's owed periods among those a correction ridden only
         by another collection alters, and nothing else."""
         from generator import correction_claims
-        from qa_tools.common import hierarchy, schedule
+        from asset_model import hierarchy, schedule
 
         emptied = correction_claims.foreign_altered("child-protection")
         assert emptied, "no quarter is emptied - the test proves nothing"

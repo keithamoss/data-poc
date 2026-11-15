@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 #: What every collection's entry must carry.
 COLLECTION_KEYS = ("provider", "delivery_format", "provenance")
@@ -28,7 +28,7 @@ def _load(path: Path) -> dict:
 def _default() -> Path:
     """Beside the hierarchy, wherever that is read from - the repository's
     contract/ unless a test has moved it."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return Path(hierarchy.data_asset_yaml()).parent / "presentation.yaml"
 
@@ -87,7 +87,7 @@ def linked_source(dataset, path: Path | None = None) -> dict | None:
 
 def problems(path: Path | None = None) -> list[str]:
     """Every registered collection the dashboard could not describe."""
-    from qa_tools import collections
+    from asset_model import collections
 
     path = Path(path or _default())
     if not path.is_file():
@@ -112,7 +112,7 @@ def _tile_word_problems(path: Path) -> list[str]:
     """Every list setting the asset declares, and every dataset linking one
     source with no code, has its tile's word (REQ-DASH-299 criteria 9 and 10;
     NFR 2) - so the page never shows a tile it cannot name."""
-    from qa_tools.common import amber_setting, config_yaml, hierarchy
+    from asset_model import amber_setting, config_yaml, hierarchy
 
     out = []
     doc = config_yaml.load(Path(hierarchy.data_asset_yaml())) or {}

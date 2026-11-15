@@ -39,7 +39,7 @@ def _load(name):
 def _rel(name):
     """`name` in the selected asset's folder, by repository path - through
     the resolver, never a hard-coded folder (the asset split)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return f"{assets.folder_rel()}/{name}"
 

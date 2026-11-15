@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from qa_tools.common import amber_setting
+from asset_model import amber_setting
 from qa_tools.common.schemas import REPLACEMENT_SETTINGS
 
 NEVER, GREEN, GREEN_OR_AMBER = REPLACEMENT_SETTINGS
@@ -83,7 +83,7 @@ def conflicts(doc: dict) -> list[tuple[str, str]]:
     as set today."""
     changes = sorted({date.fromisoformat(str(v["effective_from"]))
                       for key in (KEY, amber_setting.KEY)
-                      for setting in amber_setting._settings(doc, key).values()
+                      for setting in amber_setting.stated_settings(doc, key).values()
                       for v in (setting.get("versions") or [])
                       if isinstance(v, dict) and v.get("effective_from")})
     out: list[tuple[str, str]] = []
@@ -92,8 +92,8 @@ def conflicts(doc: dict) -> list[tuple[str, str]]:
             for dataset in (collection.get("datasets") or []):
                 dataset_id = dataset.get("id")
                 for on in changes:
-                    replace = amber_setting._resolve_on(doc, dataset_id, on, KEY)
-                    amber = amber_setting._resolve_on(doc, dataset_id, on, amber_setting.KEY)
+                    replace = amber_setting.resolve_on(doc, dataset_id, on, KEY)
+                    amber = amber_setting.resolve_on(doc, dataset_id, on, amber_setting.KEY)
                     if (replace and amber and replace.value == GREEN_OR_AMBER
                             and amber.value == amber_setting.HOLD):
                         out.append((f"dataset {dataset_id}",

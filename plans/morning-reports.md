@@ -3620,4 +3620,15 @@ one or more component tags, and a date.
       --no-pytest` was green, with warnings only. The suite's first background
       job reached its two-hour limit during the e2e chunk; the resumed job
       finished it (437 passed, 32 minutes).
+    - **#134 STEP 2 MERGED (~00:50 Perth)**: REQ-PIPE-380 (`asset_model/`,
+      the shared reading code), REQ-PIPE-376 and REQ-PIPE-390 are built, and
+      the critic's six findings are fixed. PROVISIONAL, for Keith:
+      `linked_datasets.contract_columns` renamed `table_columns`;
+      `declared_corrections.declared` renamed `pending_corrections`; the
+      `status_rankings` imports rule widened to catch `.index()`/`enumerate()`
+      over the status words. **Q13.2**: the builder's CLAUDE.md row for
+      `asset_model/` (REQ-PIPE-380 c19) was LEFT OUT at the merge, because
+      CLAUDE.md edits need your approval. It is in
+      `docs/drafts/claude-md-asset-model-row.md`, so c19 is unmet until you
+      approve the wording. Step 2's review entries were renumbered #352-#353.
 

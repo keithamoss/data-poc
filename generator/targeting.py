@@ -4,7 +4,7 @@ checks define (REQ-GEN-184; Keith, 2026-10-11, plans/running-thoughts.md #63).
 NOT BY TRIAL AND ERROR. The blunt 'amber' preset blanks columns that a
 single-tier check fails on any single null, so an "amber" supply read red as a
 whole; and a rebuild was the only way to find out. This reads the catalogue of
-every check's bands (qa_tools/common/check_bands.py, REQ-GEN-183) and changes
+every check's bands (asset_model/check_bands.py, REQ-GEN-183) and changes
 only what a rule's own band allows, inside it with a margin.
 
 WHAT IS PROTECTED, said exactly: an ordinary amber protects multiple-birth
@@ -77,7 +77,7 @@ def levers_for(dataset_id: str, where: str) -> str:
     replaced treating every dataset that was not Birth Registrations as
     Child Protection (REQ-GEN-246 criterion 6)."""
     from generator import collections
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         provider = collections.for_dataset(dataset_id)
@@ -90,7 +90,7 @@ def levers_for(dataset_id: str, where: str) -> str:
 
 
 def _catalogue():
-    from qa_tools.common import check_bands
+    from asset_model import check_bands
 
     return check_bands.catalogue()
 
@@ -191,7 +191,7 @@ def check_target(target: Target, dataset_id: str, where: str, catalogue=None) ->
     (criterion 11: fail generation, never emit the history). Checked at
     the contract's ordinary size; a band that closes only at the real
     supply's size still refuses during generation, which stops it too."""
-    from qa_tools.common import check_bands
+    from asset_model import check_bands
 
     levers = levers_for(dataset_id, where)
     cat = catalogue or _catalogue()
@@ -439,7 +439,7 @@ def outside_hold(severities: list, dates: list[date], dataset_id: str,
     without knowing that generated three of six). `keep_clean` names
     positions that must stay clean whatever - a collection's own
     bookends."""
-    from qa_tools.common import amber_setting, asset_time
+    from asset_model import amber_setting, asset_time
 
     def held(i: int) -> bool:
         at = asset_time.start_of_day(dates[i])

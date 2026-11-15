@@ -6,7 +6,9 @@ folders were module constants a test reassigned; they are functions now,
 asked at call time, so a test replaces the function with one answering a
 fixed path:
 
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "d"))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "d"))
+
+with `from asset_model import delivery as delivery_tree`.
 """
 
 

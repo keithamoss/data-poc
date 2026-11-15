@@ -23,7 +23,7 @@ def _write_dashboard(path, collection_data):
 
 
 def _every_collection() -> str:
-    from qa_tools import collections
+    from asset_model import collections
 
     ids = [c.id for c in collections.all_collections()]
     assert ids, "the registry must hold collections for these tests to mean anything"
@@ -112,7 +112,7 @@ def test_resolve_chromium_path_returns_none_when_neither_is_available(monkeypatc
 
 def _split_page(tmp_path):
     from dashboard import data_files
-    from qa_tools import collections
+    from asset_model import collections
 
     files = []
     for c in collections.all_collections():

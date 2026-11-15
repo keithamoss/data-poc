@@ -311,10 +311,10 @@ class TestSkippingTheTrial:
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
         boot.bootstrap(sequential=True, skip_target_trial=True)
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
         # Every registered collection, in hierarchy order, none with a trial.
-        assert seen == [(c.id, False) for c in collections.all_collections()]
+        assert seen == [(c.id, False) for c in declared_collections.all_collections()]
         # The quarterly asset's order (the asset split).
         assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
@@ -459,10 +459,10 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
                             lambda c: (_ for _ in ()).throw(Stop()))
         with pytest.raises(Stop):
             boot.resume("ckpt")
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
         # Every registered collection, in hierarchy order, none with a trial.
-        assert seen == [(c.id, False) for c in collections.all_collections()]
+        assert seen == [(c.id, False) for c in declared_collections.all_collections()]
         # The quarterly asset's order (the asset split).
         assert [cid for cid, _ in seen[:2]] == ["child-protection", "emergency-department"]
 
@@ -576,9 +576,9 @@ class TestAPipelineRunComparesToo:
         out = CliRunner().invoke(pipeline.run_command, ["--publish"], env={"COLUMNS": "400"})
         said = " ".join(out.output.split())
         assert out.exit_code != 0 and "TS-43" in said and "did not read as built" in said
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
-        shorts = [c.short for c in collections.all_collections()]
+        shorts = [c.short for c in declared_collections.all_collections()]
         assert calls["compared"] == [shorts] and calls["published"] == []
 
     def test_agreement_lets_it_publish(self, monkeypatch):

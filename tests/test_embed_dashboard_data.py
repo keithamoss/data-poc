@@ -303,7 +303,7 @@ def test_the_embed_carries_every_named_calendar_and_which_one_each_dataset_follo
     is asked about a DATASET's period, and without the mapping it would
     have to guess which calendar to look in - or merge them, which is
     silently wrong for whichever calendar lost."""
-    from qa_tools.common import hierarchy, schedule
+    from asset_model import hierarchy, schedule
 
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
 
@@ -339,7 +339,7 @@ def test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule(
     mistake this replaces. AUTHORED DATES ARE THE REFERENCE, not a month
     set: REQ-GEN-205's correction authors 2013-Q4 and 2014-Q3 in October
     and July, and the embedded dates must be exactly those."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
     embedded = {(p["period"], p["date"][:10]) for p in sequences["calendars"]["quarterly"]}
@@ -354,7 +354,7 @@ def _furthest_open_period(name, now):
     `now` fills, across the datasets on calendar `name`."""
     from datetime import timedelta
 
-    from qa_tools.common import hierarchy, schedule, slots
+    from asset_model import hierarchy, schedule, slots
 
     reach = None
     for entry in hierarchy.all_datasets():
@@ -379,7 +379,7 @@ def test_nothing_no_slot_has_opened_for_is_embedded(monkeypatch, tmp_path):
 
     ON THE ASSET'S CLOCK, not this machine's: Perth is eight hours ahead of
     UTC, so for a third of every day the two are on different dates."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     now = asset_time.now()
     today = now.date().isoformat()
@@ -397,7 +397,7 @@ def test_the_period_an_open_slot_fills_IS_embedded(monkeypatch, tmp_path):
     Protection's next quarter - or a supply filed to it would have no period
     to sit under and its deep link would read Period not found (REQ-DASH-326
     criterion 10, the dashboard review's F1)."""
-    from qa_tools.common import asset_time, schedule
+    from asset_model import asset_time, schedule
 
     now = asset_time.now()
     sequences = _run_embed_and_extract_period_sequences(monkeypatch, tmp_path)
@@ -428,7 +428,7 @@ def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
     import builtins
     from pathlib import Path
 
-    from qa_tools.common import assets, hierarchy, schedule
+    from asset_model import assets, hierarchy, schedule
 
     data_dir = assets.data_dir()
     opened: list[str] = []
@@ -469,7 +469,7 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
     edd.embed()
     match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
     assert match, "SCHEDULE_RUNWAY const not found in built output"
-    from qa_tools.common import assets
+    from asset_model import assets
 
     # The selected asset's calendar, by repository path (the asset split).
     expected = f"{assets.folder_rel()}/calendar.yaml"
@@ -707,7 +707,7 @@ class TestABuildUnderAnOutDir:
 
     def test_every_reports_path_of_the_chain_is_the_out_dirs(self, monkeypatch, tmp_path):
         from pipeline import build_dashboard_data as bdd
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import build_output
         from qa_tools.tools import results_history
 

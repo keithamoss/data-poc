@@ -2265,7 +2265,7 @@ def _stamps(fingerprints: Mapping[str, str], results: Sequence[Mapping[str, Any]
             run_key: str) -> list[str]:
     """Each result's definition fingerprint, in order - or NoFingerprint
     naming the first check the map does not hold (REQ-QAC-176 criterion 14)."""
-    from qa_tools.common import check_fingerprint
+    from asset_model import check_fingerprint
 
     if fingerprints is None:
         raise TypeError("record_results and record_file_results take a fingerprints mapping "

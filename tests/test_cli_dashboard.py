@@ -24,7 +24,7 @@ def test_rebuild_results_rebuilds_every_registered_collection(monkeypatch):
     result = _runner.invoke(dashboard_cli.dashboard_group, ["rebuild-results"])
 
     assert result.exit_code == 0, result.output
-    from qa_tools import collections
+    from asset_model import collections
 
     assert called == [c.id for c in collections.all_collections()]
 
@@ -34,7 +34,7 @@ def test_build_data_writes_every_collections_output(monkeypatch, tmp_path):
     import json
 
     import pipeline.build_dashboard_data as build_dashboard_data
-    from qa_tools import collections
+    from asset_model import collections
 
     monkeypatch.setattr(build_dashboard_data, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
     monkeypatch.setattr(build_dashboard_data, "build", lambda cid: {"collection": cid})

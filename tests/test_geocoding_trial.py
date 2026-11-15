@@ -325,7 +325,7 @@ def _spec_from_plan(plan, period, dataset_id, tmp_path, *, stage_source: bool):
     """A trial's spec built from the provider's own plan - the file as the
     driver writes it, and the source rows the warehouse holds then."""
     from collection_modules import provider_module
-    from qa_tools.common import asset_time, hierarchy
+    from asset_model import asset_time, hierarchy
 
     lp = provider_module("linkage-products")
     jobs = [j for j in plan.jobs if j.stream == lp.GEO_STREAM]
@@ -467,7 +467,7 @@ class TestAnEmptySupplysDriftIsNotEvaluated:
     def test_drift_over_no_rows_is_recorded_not_evaluated(self, monkeypatch):
         import pandas as pd
 
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.tools import run_evidently
 
         coll = collections.by_id("linkage-products")

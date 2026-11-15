@@ -29,7 +29,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime
 
-from qa_tools.common import decision_log, hierarchy, period_schema, schedule, supply_db
+from qa_tools.common import decision_log, period_schema, supply_db
+from asset_model import hierarchy, schedule
 
 #: The rule's name on a warning it records.
 RULE_ACTOR = "carry-forward rule"
@@ -391,7 +392,7 @@ def warn_at_opening(conn: supply_db.SupplyConnection, *, dataset_id: str, period
 
 
 def _instant(value) -> datetime:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return value if isinstance(value, datetime) else asset_time.parse_instant(
         value, "carry-forward warning")
@@ -636,7 +637,7 @@ def for_dashboard(dataset_id: str, conn: supply_db.SupplyConnection | None = Non
 
     THE BUILD RULE (REQ-DOCS-101): recorded decisions only, never supply rows.
     """
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:carry-forward") as opened:

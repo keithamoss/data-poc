@@ -19,8 +19,8 @@ import pytest
 import baseline_periods
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (hierarchy, inheritance, period_schema, qa_store, schedule,
-                             supply_db)
+from asset_model import hierarchy, schedule
+from qa_tools.common import inheritance, period_schema, qa_store, supply_db
 from tests.test_inheritance import _promote_into, narrow
 
 WHEN = "2026-09-29T09:00:00+08:00"

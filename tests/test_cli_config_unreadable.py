@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 _DRIVER = """
 import sys, runpy
 from pathlib import Path
-from qa_tools.common import assets
+from asset_model import assets
 broken = Path(sys.argv[1])
 assets.use_folder(broken.parent)
 sys.argv = ["mothman", *sys.argv[2:]]

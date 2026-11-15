@@ -19,7 +19,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from qa_tools.common import asset_time, delivery
+from asset_model import asset_time, delivery as delivery_tree
+from qa_tools.common import delivery
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -69,18 +70,18 @@ class TestTheBoundaryIsADirectory:
             f"cp_{t}.csv": "a\n1\n" for t in
             ("clients", "notifications", "investigations", "placements", "carers", "case_workers")})
         assert len(list(path.iterdir())) == 6
-        assert len(delivery.list_deliveries(*dirs)) == 1
+        assert len(delivery_tree.list_deliveries(*dirs)) == 1
 
     @pytest.mark.asset("quarterly")
     def test_a_delivery_with_no_files_is_refused(self, dirs):
         d, r = dirs
-        with pytest.raises(delivery.DeliveryFormatError, match="ARRIVAL"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="ARRIVAL"):
             delivery.write_delivery("empty", {}, WHEN, deliveries_dir=d, receipts_dir=r)
 
     @pytest.mark.asset("quarterly")
     def test_a_delivery_is_flat_not_a_tree(self, dirs):
         d, r = dirs
-        with pytest.raises(delivery.DeliveryFormatError, match="path separator"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="path separator"):
             delivery.write_delivery("x", {"sub/a.csv": "1"}, WHEN, deliveries_dir=d, receipts_dir=r)
 
 
@@ -105,7 +106,7 @@ class TestDeliveryNamesMeanNothing:
         people's machines as part of evaluating the PoC, and a colon is
         illegal in a path on Windows - which is also one reason the
         receipt instant lives in a file rather than a directory name."""
-        with pytest.raises(delivery.DeliveryFormatError):
+        with pytest.raises(delivery_tree.DeliveryFormatError):
             _write(dirs, bad)
 
     def test_deliveries_are_ordered_by_OUR_receipt_not_by_their_name(self, dirs):
@@ -113,7 +114,7 @@ class TestDeliveryNamesMeanNothing:
         be inventing a sequence out of nothing."""
         _write(dirs, "zzz-first", when=datetime(2026, 1, 1, tzinfo=PERTH))
         _write(dirs, "aaa-second", when=datetime(2026, 6, 1, tzinfo=PERTH))
-        assert [d.name for d in delivery.list_deliveries(*dirs)] == ["zzz-first", "aaa-second"]
+        assert [d.name for d in delivery_tree.list_deliveries(*dirs)] == ["zzz-first", "aaa-second"]
 
 
 class TestTheReceiptRecordIsOurs:
@@ -130,14 +131,14 @@ class TestTheReceiptRecordIsOurs:
         _write(dirs)
         record = json.loads(_receipt(r, "BDM_20260824").read_text())
         assert record["received_at"].endswith("+08:00")
-        assert delivery.read_receipt("BDM_20260824", r) == WHEN
+        assert delivery_tree.read_receipt("BDM_20260824", r) == WHEN
 
     @pytest.mark.asset("quarterly")
     def test_a_receipts_directory_inside_the_deliveries_directory_is_refused(self, dirs):
         """The boundary, enforced rather than documented: a receipts
         directory a supplier can write into is not ours."""
         d, _ = dirs
-        with pytest.raises(delivery.DeliveryFormatError, match="no path to write"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="no path to write"):
             delivery.write_delivery("x", {"a.csv": "1"}, WHEN,
                                      deliveries_dir=d, receipts_dir=d / "receipts")
 
@@ -149,8 +150,8 @@ class TestTheReceiptRecordIsOurs:
         d, r = dirs
         _write(dirs)
         shutil.rmtree(r / "BDM_20260824")
-        with pytest.raises(delivery.DeliveryFormatError, match="modification time"):
-            delivery.read_delivery("BDM_20260824", d, r)
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="modification time"):
+            delivery_tree.read_delivery("BDM_20260824", d, r)
 
 
 class TestNothingInsideADeliveryIsBelieved:
@@ -161,7 +162,7 @@ class TestNothingInsideADeliveryIsBelieved:
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "a\n1\n",
                              "receipt.json": '{"received_at": "1999-01-01T00:00:00+00:00"}'})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert got.received_at == WHEN, "the supplier's file must not have set our clock"
         assert "receipt.json" not in got.files, "it must not even be readable as a data file"
         assert any("setting our own clock" in a for a in got.anomalies)
@@ -173,7 +174,7 @@ class TestNothingInsideADeliveryIsBelieved:
     def test_a_lookalike_is_matched_loosely_because_nobody_would_use_our_exact_name(self, dirs, name):
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "a\n1\n", name: "{}"})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert name not in got.files
         assert got.anomalies
 
@@ -184,7 +185,7 @@ class TestNothingInsideADeliveryIsBelieved:
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "a\n1\n",
                              "manifest.json": '{"period": "2026-Q3", "slot": "slot_009"}'})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert "manifest.json" not in got.files
         assert any("what this delivery is for" in a for a in got.anomalies)
 
@@ -194,7 +195,7 @@ class TestNothingInsideADeliveryIsBelieved:
         the list would not prevent."""
         d, r = dirs
         _write(dirs, files={"real.csv": "a\n1\n", "manifest.json": "{}", "receipt.json": "{}"})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert got.files == ("real.csv",)
         assert len(got.anomalies) == 2
 
@@ -203,7 +204,7 @@ class TestNothingInsideADeliveryIsBelieved:
         flagging everything."""
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "a\n1\n", "readme.txt": "notes"})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert got.anomalies == ()
         assert got.files == ("birth_registrations.csv", "readme.txt")
 
@@ -217,20 +218,20 @@ class TestTheAwkwardDeliveriesRecognitionMustHandle:
     def test_two_files_matching_one_datasets_pattern(self, dirs):
         d, r = dirs
         _write(dirs, files={"cp_clients.csv": "a\n1\n", "cp_clients_part2.csv": "a\n2\n"})
-        assert len(delivery.read_delivery("BDM_20260824", d, r).files) == 2
+        assert len(delivery_tree.read_delivery("BDM_20260824", d, r).files) == 2
 
     def test_a_file_matching_no_pattern_including_one_that_is_not_tabular(self, dirs):
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "a\n1\n",
                              "covering_note.pdf": b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert "covering_note.pdf" in got.files, "reported, not swallowed"
         assert got.anomalies == (), "a covering note is normal, not anomalous"
 
     def test_a_file_that_cannot_be_parsed_as_the_format_its_name_claims(self, dirs):
         d, r = dirs
         _write(dirs, files={"birth_registrations.csv": "<html><body>504 Gateway Timeout</body></html>"})
-        got = delivery.read_delivery("BDM_20260824", d, r)
+        got = delivery_tree.read_delivery("BDM_20260824", d, r)
         assert got.files == ("birth_registrations.csv",)
         assert (got.path / "birth_registrations.csv").read_text().startswith("<html>")
 
@@ -238,7 +239,7 @@ class TestTheAwkwardDeliveriesRecognitionMustHandle:
         d, r = dirs
         blob = bytes(range(256))
         _write(dirs, files={"extract.parquet": blob})
-        assert (delivery.read_delivery("BDM_20260824", d, r).path / "extract.parquet").read_bytes() == blob
+        assert (delivery_tree.read_delivery("BDM_20260824", d, r).path / "extract.parquet").read_bytes() == blob
 
 
 class TestTwoArrivalsCanNeverShareADirectory:
@@ -257,16 +258,16 @@ class TestTwoArrivalsCanNeverShareADirectory:
     @pytest.mark.asset("quarterly")
     def test_writing_over_an_existing_delivery_is_refused(self, dirs):
         _write(dirs, "2026-08-corrected")
-        with pytest.raises(delivery.DeliveryFormatError, match="silently merge"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="silently merge"):
             _write(dirs, "2026-08-corrected", {"cp_clients.csv": "a\n1\n"})
 
     @pytest.mark.asset("quarterly")
     def test_the_refusal_leaves_the_first_delivery_untouched(self, dirs):
         d, r = dirs
         _write(dirs, "shared", {"birth_registrations.csv": "first\n"})
-        with pytest.raises(delivery.DeliveryFormatError):
+        with pytest.raises(delivery_tree.DeliveryFormatError):
             _write(dirs, "shared", {"cp_clients.csv": "second\n"})
-        got = delivery.read_delivery("shared", d, r)
+        got = delivery_tree.read_delivery("shared", d, r)
         assert got.files == ("birth_registrations.csv",)
 
     @pytest.mark.asset("quarterly")
@@ -296,7 +297,7 @@ class TestWhichClockStampedTheReceipt:
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r)
         record = json.loads(_receipt(r, "monday").read_text())
-        assert record["received_from"] == delivery.RECEIVED_FROM_STORAGE
+        assert record["received_from"] == delivery_tree.RECEIVED_FROM_STORAGE
         assert record["received_at"].startswith(WHEN.date().isoformat())
 
     def test_no_instant_means_our_own_clock_and_says_so(self, tmp_path):
@@ -308,7 +309,7 @@ class TestWhichClockStampedTheReceipt:
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  deliveries_dir=d, receipts_dir=r)
         record = json.loads(_receipt(r, "monday").read_text())
-        assert record["received_from"] == delivery.RECEIVED_FROM_OUR_CLOCK
+        assert record["received_from"] == delivery_tree.RECEIVED_FROM_OUR_CLOCK
         stamped = asset_time.parse_instant(record["received_at"], "test")
         assert stamped >= before, "our clock means now, not some other moment"
 
@@ -319,16 +320,16 @@ class TestWhichClockStampedTheReceipt:
         d, r = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r,
-                                 received_from=delivery.RECEIVED_FROM_OUR_CLOCK)
+                                 received_from=delivery_tree.RECEIVED_FROM_OUR_CLOCK)
         assert json.loads(_receipt(r, "monday").read_text())["received_from"] \
-            == delivery.RECEIVED_FROM_OUR_CLOCK
+            == delivery_tree.RECEIVED_FROM_OUR_CLOCK
 
     def test_a_third_source_is_refused(self, tmp_path):
         """There is no 'unknown' and no 'supplier'. The second of those is
         what criterion 3 forbids outright, and a vocabulary that admits it
         is how it arrives."""
         d, r = tmp_path / "deliveries", tmp_path / "receipts"
-        with pytest.raises(delivery.DeliveryFormatError, match="not a receipt source"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="not a receipt source"):
             delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                      WHEN, deliveries_dir=d, receipts_dir=r,
                                      received_from="the-filename")
@@ -337,8 +338,8 @@ class TestWhichClockStampedTheReceipt:
         d, r = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("monday", {"birth_registrations.csv": "a\n1\n"},
                                  WHEN, deliveries_dir=d, receipts_dir=r)
-        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
-        assert read.received_from == delivery.RECEIVED_FROM_STORAGE
+        read = delivery_tree.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        assert read.received_from == delivery_tree.RECEIVED_FROM_STORAGE
 
     def test_a_receipt_written_before_this_field_reads_as_our_clock(self, tmp_path):
         """The weaker of the two claims, deliberately. The alternative - a
@@ -353,8 +354,8 @@ class TestWhichClockStampedTheReceipt:
         record = json.loads(_receipt(r, "monday").read_text())
         del record["received_from"]
         _receipt(r, "monday").write_text(json.dumps(record))
-        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
-        assert read.received_from == delivery.RECEIVED_FROM_OUR_CLOCK
+        read = delivery_tree.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        assert read.received_from == delivery_tree.RECEIVED_FROM_OUR_CLOCK
 
     def test_it_is_never_taken_from_the_files_own_modification_time(self, tmp_path):
         """Criterion 3's own words - not from the supplier's file, its
@@ -370,7 +371,7 @@ class TestWhichClockStampedTheReceipt:
         target = d / "monday" / "birth_registrations.csv"
         ancient = 946_684_800          # 2000-01-01
         os.utime(target, (ancient, ancient))
-        read = delivery.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
+        read = delivery_tree.read_delivery("monday", deliveries_dir=d, receipts_dir=r)
         assert read.received_at.year > 2020, (
             "the receipt followed the file's mtime - a supplier who preserves "
             "timestamps on upload would be setting our own arrival record")

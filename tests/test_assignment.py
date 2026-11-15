@@ -18,9 +18,9 @@ import pytest
 
 from datetime import datetime, timedelta, timezone
 
-from qa_tools.common import assignment
-from qa_tools.common.schedule import Period
-from qa_tools.common.slots import Slot
+from asset_model import assignment
+from asset_model.schedule import Period
+from asset_model.slots import Slot
 
 PERTH = timezone(timedelta(hours=8))
 

@@ -27,12 +27,28 @@ import shutil
 from collections.abc import Callable
 
 from qa_tools import collections
+from asset_model import collections as declared_collections
 from qa_tools.common import (
-    arrival_lifecycle, arrivals, asked_for, asset_time, delivery, delivery_log,
-    drift_reference, filing, held_blast_radius, in_flight_log, left_out, own_table,
-    parallel_orchestrate, period_overlay, promotion, qa_store, replay_clock, supply_db,
-    ticket_reconciler, trial, unrunnable,
+    arrival_lifecycle,
+    asked_for,
+    delivery_log,
+    drift_reference,
+    filing,
+    held_blast_radius,
+    in_flight_log,
+    left_out,
+    own_table,
+    parallel_orchestrate,
+    period_overlay,
+    promotion,
+    qa_store,
+    replay_clock,
+    supply_db,
+    ticket_reconciler,
+    trial,
+    unrunnable,
 )
+from asset_model import arrivals as arrival_tree, asset_time, delivery
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_writer import (
     close_attempt, finish_run, open_run, run_owner, scope_of_run, write_qa_result,
@@ -138,7 +154,7 @@ def discard_run_schemas(run_id: str) -> None:
 def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: str,
                    run_by: str, reference_run_id: str | None,
                    on_step: Callable[[str], None] | None) -> list[dict]:
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     # BEFORE ANY TOOL WRITES, so the run exists with the identity only this
     # layer knows (REQ-PIPE-089 criterion 6).
     # AN ARRIVAL'S DATASET, DELIVERY AND RECEIPT come from its arrival
@@ -463,11 +479,11 @@ def _claim_window(collection_id: str, arrival):
     window of the datasets it carries (Keith, 2026-10-11), else the adapter's
     `claim_window_dataset`'s, else none: never a borrowed one (REQ-PIPE-243
     criterion 2)."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     if getattr(arrival, "received_at", None) is None:
         return None
-    adapter = collections.adapter(collections.by_id(collection_id))
+    adapter = collections.adapter(declared_collections.by_id(collection_id))
     on = asset_time.local_date(arrival.received_at)
     datasets = list(getattr(arrival, "files_by_dataset", None) or ())
     if not datasets and adapter.claim_window_dataset:
@@ -501,7 +517,7 @@ def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
     from qa_tools.common import gate, knock_on
 
     del got
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     applied = gate.after_arrival(
         coll.id, arrival, run_by=run_by, entry=entry or gate.PACKAGE,
         effective_at=effective_at_of(coll.id, arrival))
@@ -526,7 +542,7 @@ def steps(collection_id: str) -> arrival_lifecycle.Steps:
     is why this is not cached: a cached Steps outlived a registry change and
     skipped the refusal (post-build-review #220), and building four lambdas
     costs nothing."""
-    collections.adapter(collections.by_id(collection_id))
+    collections.adapter(declared_collections.by_id(collection_id))
     return arrival_lifecycle.Steps(
         file_and_overlay=lambda arrival, among: file_and_overlay(collection_id, arrival, among),
         entry_for=lambda arrival: entry_for(collection_id, arrival),
@@ -585,9 +601,9 @@ class _CollectionRun:
 def _begin(collection_id: str, player=None) -> _CollectionRun:
     from qa_tools.common import scripted_decisions
 
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     # RECOGNISED FROM DISK, never read from a declaration (REQ-GEN-043).
-    found_arrivals = arrivals.arrivals_for(coll.id, coll.run_prefix)
+    found_arrivals = arrival_tree.arrivals_for(coll.id, coll.run_prefix)
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7), on every run
     # with no threshold: a delivery whose boundary never closes must be visible

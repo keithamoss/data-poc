@@ -18,7 +18,7 @@ from datetime import date, timedelta
 import pytest
 
 from generator import scenario_injection as si
-from qa_tools.common import assets
+from asset_model import assets
 
 
 @dataclass(frozen=True)
@@ -360,7 +360,7 @@ class TestNothingSaysScenarioOnTheDashboard:
 
         from qa_tools.common import scenarios
 
-        from qa_tools import collections
+        from asset_model import collections
 
         ids = {s.id for s in scenarios.parse_register()}
         # WITH OR WITHOUT ITS HYPHEN: a change reference spelt "...-TS62"
@@ -412,7 +412,8 @@ class TestTheChildProtectionScenariosAreReallyThere:
 
     @staticmethod
     def _files_of(scenario_id: str, tree):
-        from qa_tools.common import arrivals, scenario_map
+        from asset_model import arrivals
+        from qa_tools.common import scenario_map
 
         placement = scenario_map.read_placements().get(scenario_id)
         if placement is None or not placement.supplies:
@@ -476,7 +477,7 @@ class TestTheChildProtectionScenariosAreReallyThere:
         """TS-38, which Keith called the most dangerous shape in the
         register: the matched files are processed and the renamed ones
         are not, so the supply is HALF and only a warning says so."""
-        from qa_tools.common import delivery
+        from asset_model import delivery
 
         sets = self._files_of("TS-38", self._tree())
         assert sets, "TS-38 placed no supply"
@@ -500,7 +501,7 @@ class TestTheChildProtectionScenariosAreReallyThere:
         """
         from collections import Counter
 
-        from qa_tools.common import delivery, hierarchy
+        from asset_model import delivery, hierarchy
 
         tree = self._tree()
         patterns = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")
@@ -565,8 +566,9 @@ class TestTheFileCheckShapes:
                "C3,Cy,Lee,foster,pending,2026-01-01T00:00:00\n")
 
     def _evaluate(self, tmp_path, content, table):
-        from qa_tools import collections
-        from qa_tools.common import file_checks, hierarchy
+        from asset_model import collections
+        from qa_tools.common import file_checks
+        from asset_model import hierarchy
 
         path = tmp_path / f"{table}.csv"
         path.write_text(content)
@@ -576,16 +578,17 @@ class TestTheFileCheckShapes:
             path, file_checks.expected_columns(contract, table))}
 
     def test_ts12_is_refused_by_fields_per_row(self, tmp_path):
-        from qa_tools.common import file_checks
+        from asset_model import file_check_definitions
 
         found = self._evaluate(tmp_path, si.unreadable(self._CARERS * 3), "cp_carers")
-        assert found[file_checks.FIELDS_PER_ROW].refuses
+        assert found[file_check_definitions.FIELDS_PER_ROW].refuses
 
     def test_ts56_only_warns(self, tmp_path):
         from qa_tools.common import file_checks
+        from asset_model import file_check_definitions
 
         found = self._evaluate(tmp_path, si.reordered(self._CARERS), "cp_carers")
-        assert found[file_checks.COLUMN_ORDER].status == file_checks.WARN
+        assert found[file_check_definitions.COLUMN_ORDER].status == file_checks.WARN
         assert file_checks.refusal(list(found.values())) is None
 
     def test_the_reorder_keeps_a_quoted_comma_in_its_field(self):
@@ -637,7 +640,7 @@ class TestTheEarlyEmergencyDepartmentSupplies:
 
         g = collection_modules.provider_module("emergency-department")
         from generator import scenario_injection
-        from qa_tools.common import asset_time, slots
+        from asset_model import asset_time, slots
 
         injection = next(i for i in scenario_injection.INJECTIONS
                          if i.scenario_id == scenario_id)

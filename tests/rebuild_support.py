@@ -14,7 +14,7 @@ from __future__ import annotations
 from state_paths import fixed
 import pathlib
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.tools import results_history
 
 #: The one rebuild, run for each collection (REQ-PIPE-243): a test
@@ -45,7 +45,7 @@ def check(collection_id: str, name: str, tool: str, dataset: str | None = None) 
     """One verified record, in the shape a tool's evaluation returns."""
     agency, collection = ids(collection_id)
     dataset = dataset or dataset_of(collection_id)
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return {"check_id": f"{hierarchy.data_asset_id()}.{agency}.{collection}.{dataset}.col.{name}_{tool}",
             "dataset_id": dataset, "status": "pass", "engine": tool}
@@ -56,7 +56,8 @@ def record_reads(run_id: str, check_ids) -> None:
     every table the given cross-table checks read - their own included - so a
     cross-table result can be recorded with what it read, as the overlay
     records it before any tool runs (REQ-PIPE-279 criteria 1 and 4)."""
-    from qa_tools.common import carried, hierarchy, promotion, supply_db
+    from qa_tools.common import carried, promotion, supply_db
+    from asset_model import hierarchy
 
     declared = promotion._declared_reads()
     tables = set()

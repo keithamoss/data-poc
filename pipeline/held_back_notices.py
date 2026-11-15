@@ -29,7 +29,8 @@ cross_table_grid.named, the one naming helper.
 from __future__ import annotations
 
 from pipeline.cross_table_grid import Receipts, dataset_segment, named, text
-from qa_tools.common import asset_time, decision_log, display_time
+from asset_model import asset_time
+from qa_tools.common import decision_log, display_time
 
 
 def _instant(value):
@@ -120,7 +121,7 @@ def _check_names() -> dict[str, str]:
 
 
 def _order(dataset_id: str) -> int:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     ids = [d.dataset_id for d in hierarchy.all_datasets()]
     return ids.index(dataset_id) if dataset_id in ids else len(ids)

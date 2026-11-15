@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from qa_tools.common import agreement as agreement_mod
-from qa_tools.common import asset_time, schedule, slots
+from asset_model import agreement as agreement_mod
+from asset_model import asset_time, schedule, slots
 
 #: The three kinds of period a dataset owes nothing in (criterion 2). The
 #: page words each; the build only names it.
@@ -31,14 +31,14 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
     before a dataset owes anything is not yet owing, which the SLA tile and
     the empty-dataset notice say instead (criterion 3).
     """
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     begins = schedule.owes_from(dataset_id, agr)
     skipped = schedule.not_expected_periods(dataset_id, agr)
     out: list[dict] = []
     # EACH ROUND, DECIDED ON THE ROUND'S OWN DATE, NAMED BY THE PERIOD ITS
     # FILES WOULD FILL (REQ-PIPE-321 criteria 6 and 13; REQ-DASH-182 criterion
     # 2 as amended): at files_go_to_period N the row is the period N on.
-    sequence = slots._calendar_periods(dataset_id, until, agr)
+    sequence = slots.period_sequence(dataset_id, until, agr)
     index = {p.name: i for i, p in enumerate(sequence)}
     for rnd in sequence:
         if begins is not None and rnd.date < begins:
@@ -81,7 +81,7 @@ def sla_timeline(dataset_id: str, agreement=None) -> dict:
     authored reason only while the dataset owes fewer periods than its
     calendar has, for the tile's muted second line.
     """
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     base = agreement_mod.cadence(dataset_id, agr)
     begins = schedule.owes_from(dataset_id, agr)
     versions = []

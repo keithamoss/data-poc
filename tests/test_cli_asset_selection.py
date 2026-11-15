@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets
+from asset_model import assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 _DRIVER = """
 import sys, runpy
 from pathlib import Path
-from qa_tools.common import assets
+from asset_model import assets
 if sys.argv[1]:
     assets.use_root(Path(sys.argv[1]))
 sys.argv = ["mothman", *sys.argv[2:]]

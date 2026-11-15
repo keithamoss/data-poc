@@ -59,7 +59,8 @@ class Plan:
 def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
     """Every consequence of re-filing `supply` into `to_period`, or a
     DecisionRefused naming what must come first (criteria 5, 10-12)."""
-    from qa_tools.common import filing, hierarchy, supersession
+    from qa_tools.common import filing, supersession
+    from asset_model import hierarchy
 
     rows = conn.execute(
         f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
@@ -216,7 +217,7 @@ def gap_problem(dataset_id: str, period: str) -> str | None:
 
 def _on_calendar(dataset_id: str, period: str) -> bool:
     """Whether `period` is one of this dataset's slots on its calendar."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     return slots.slot_named(dataset_id, period) is not None
 

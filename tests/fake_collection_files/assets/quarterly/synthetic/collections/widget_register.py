@@ -39,7 +39,7 @@ class WidgetRegister(Provider):
 
     def generated_periods(self):
         from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-N_QUARTERS:]
 
@@ -67,13 +67,13 @@ class WidgetRegister(Provider):
                 for n, d in enumerate(deliveries, start=1)]
 
     def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         return asset_time.record_source_instant(
             datetime.combine(delivery_obj.received_date, time(8, 30)), f"received_at for {entry['run_id']}")
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         out = io.StringIO()
         writer = csv.DictWriter(out, fieldnames=["widget_id", "colour", "made_on", "extract_timestamp"])

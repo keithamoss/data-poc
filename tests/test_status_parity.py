@@ -23,18 +23,17 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common.dataset_status import (  # noqa: I001
+from qa_tools.common.dataset_status import (
     rollup_statuses,
     CHECK_STATUSES,
     dashboard_status,
     DATASET_STATUSES,
-    ORDERED_STATUSES,
     UNORDERED_STATUSES,
-    UnknownStatusError,
     dashboard_status_of,
     is_retired,
     worst_of,
 )
+from asset_model.statuses import ORDERED_STATUSES, UnknownStatusError
 
 CASES_PATH = Path(__file__).resolve().parents[1] / "status-cases.json"
 CASES = json.loads(CASES_PATH.read_text())
@@ -94,7 +93,7 @@ class TestTheWordsAreTheOnesBothSidesAgreed:
         return {k: v for k, v in labels.items() if not k.startswith("_")}
 
     def test_the_words_match_the_table_exactly(self):
-        from qa_tools.common.dataset_status import STATUS_WORDS
+        from asset_model.statuses import STATUS_WORDS
 
         assert self._table(), "the labels block is empty"
         assert STATUS_WORDS == self._table()
@@ -107,14 +106,14 @@ class TestTheWordsAreTheOnesBothSidesAgreed:
 
     @pytest.mark.parametrize("form", ["label", "verb", "count"])
     def test_status_words_gives_each_form(self, form):
-        from qa_tools.common.dataset_status import status_words
+        from asset_model.statuses import status_words
 
         for value, words in self._table().items():
             assert status_words(value, form) == words[form]
 
     @pytest.mark.parametrize("value", ["purple", "", None, "Fail", "pass"])
     def test_a_status_it_has_no_word_for_is_refused(self, value):
-        from qa_tools.common.dataset_status import status_words
+        from asset_model.statuses import status_words
 
         with pytest.raises(UnknownStatusError):
             status_words(value)

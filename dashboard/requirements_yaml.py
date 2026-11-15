@@ -35,7 +35,7 @@ from pathlib import Path
 
 
 from qa_tools.common.schemas import Requirement
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 
 def parse_requirements(path: str | Path) -> list[dict]:

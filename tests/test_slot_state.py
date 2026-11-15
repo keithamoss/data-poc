@@ -15,10 +15,11 @@ import pytest
 
 import baseline_periods
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 from qa_tools.common import decision_log as dl
-from qa_tools.common import promotion, qa_store, slot_state, slots, supply_db
-from qa_tools.common.schedule import Period
+from qa_tools.common import promotion, qa_store, slot_state, supply_db
+from asset_model import slots
+from asset_model.schedule import Period
 
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"

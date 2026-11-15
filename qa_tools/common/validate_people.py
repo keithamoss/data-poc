@@ -32,7 +32,7 @@ from qa_tools.common.people import people_yaml
 
 
 def _data_asset_id() -> str | None:
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     try:
         return (yaml.safe_load(Path(data_asset_yaml()).read_text()) or {}).get("data_asset_id")

@@ -40,7 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILES_DIR = os.path.join(ROOT, "qa_tools", "dbt_profiles")
 def _project() -> str:
     """The selected asset's dbt project, asked of the resolver when used."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return str(assets.selected().dbt_project)
 

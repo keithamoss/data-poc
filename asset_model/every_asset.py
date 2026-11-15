@@ -39,7 +39,7 @@ class Declared:
 
 def declared() -> Declared:
     """The ids every asset declares, through the one hierarchy reader."""
-    from qa_tools.common import assets, hierarchy
+    from asset_model import assets, hierarchy
 
     agencies, collections, datasets = set(), set(), set()
     for asset in assets.every():

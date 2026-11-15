@@ -19,8 +19,8 @@ import baseline_periods
 
 import filing_support
 from pipeline import promotion_timeline, slot_timeline
-from qa_tools.common import (asset_time, assignment, promotion_state, qa_store,
-                              schedule, supply_db)
+from asset_model import asset_time, assignment, schedule
+from qa_tools.common import promotion_state, qa_store, supply_db
 from qa_tools.common import decision_log as dl
 
 AGENCY = "child-protection-family-support"
@@ -230,7 +230,7 @@ class TestTheBootstrappedHistoryAgreesWithTheReaders:
     """Criterion 22 on the deployment's real history, every dataset."""
 
     def test_every_dataset(self, deployment_history):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
         with supply_db.connect(read_only=True, label="test-promotion-timeline") as c:
             ids = [d.dataset_id for d in hierarchy.all_datasets()]
             assert ids, "precondition: the hierarchy names datasets"

@@ -66,7 +66,7 @@ def assets_top_problems(root: Path = ROOT) -> list[str]:
 
 
 def shared_tree_problems(root: Path = ROOT) -> list[str]:
-    from qa_tools.common import assets
+    from asset_model import assets
 
     root = Path(root)
     out = []

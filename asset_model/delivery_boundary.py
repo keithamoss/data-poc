@@ -32,8 +32,8 @@ to it.
 """
 from __future__ import annotations
 
-from qa_tools.common import hierarchy
-from qa_tools.common import assets as _assets
+from asset_model import hierarchy
+from asset_model import assets as _assets
 
 #: One directory under the deliveries root is one delivery. The only
 #: boundary this PoC's transport expresses.

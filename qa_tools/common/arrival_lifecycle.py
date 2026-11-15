@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 from qa_tools.common import replay_clock
 
 

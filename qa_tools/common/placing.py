@@ -36,7 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qa_tools.common import decision_log, supply_holds
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 #: The words every route uses for a placement (criterion 41).
 VERB = "placed into"
@@ -130,7 +130,7 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
     waiting = supersession.waiting_in(conn, dataset_id, to_period, besides=supply)
     if waiting:
         # Criterion 34.
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         first = waiting[0]
         at = supersession._receipt(conn, dataset_id, first)
@@ -201,11 +201,11 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     not generate it at all. One resolution, the participation in force on
     the date of the round that would fill it (REQ-PIPE-113 criterion 2, as
     REQ-PIPE-321 amends it)."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     horizon = slots.lookup_horizon()
     try:
-        sequence = slots._calendar_periods(dataset_id, horizon)
+        sequence = slots.period_sequence(dataset_id, horizon)
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
         return None
     found = next((p for p in sequence if p.name == period), None)
@@ -214,7 +214,7 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     reasons = schedule.not_expected_periods(dataset_id)
     if period in reasons:
         return f"it is listed not_expected: {reasons[period]}"
-    agr = schedule._agreement(None)
+    agr = schedule.agreement_to_read(None)
     # ON THE ROUND THAT WOULD FILL IT (REQ-PIPE-321 criterion 2): participation
     # and its delivery months are a round's, so at files_go_to_period 1 a
     # quarter is owed nothing because the round BEFORE it is not delivered in.
@@ -341,14 +341,14 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     run of periods the dataset owes nothing in is ONE row, marked with why
     and not selectable. `page` moves a window's width earlier (negative) or
     later. `states` is {period: slot_state value}, read by the caller."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     horizon = slots.lookup_horizon()
     try:
         owed = {s.name: s for s in slots.slots_for_dataset(dataset_id, until=horizon)}
-        sequence = [p for p in slots._calendar_periods(dataset_id, horizon)
+        sequence = [p for p in slots.period_sequence(dataset_id, horizon)
                     if p.date <= horizon or p.name in owed]
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
         # NO CALENDAR TO CHOOSE FROM (#188 D10) - an empty chooser, never a

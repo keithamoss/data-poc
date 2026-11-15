@@ -52,8 +52,8 @@ from rich.console import Console
 from rich.table import Table
 
 from cli import common
-from qa_tools.common import (arrivals, asset_time, decision_log, delivery,
-                             filing_decisions, hierarchy, people, supply_db)
+from asset_model import arrivals, asset_time, delivery as delivery_tree, hierarchy
+from qa_tools.common import decision_log, delivery, filing_decisions, people, supply_db
 
 console = Console()
 
@@ -63,7 +63,7 @@ def supply_group() -> None:
     """Deliveries - what arrived, and what could not be placed."""
 
 
-def _describe(d: delivery.Delivery, found, detailed: bool = False) -> tuple[str, str, str]:
+def _describe(d: delivery_tree.Delivery, found, detailed: bool = False) -> tuple[str, str, str]:
     """One delivery as a row.
 
     SUMMARISED BY DEFAULT, in full only for a named one. Listing every
@@ -111,7 +111,7 @@ def deliveries_command(wanted: str | None) -> None:
         # argument closes that loop rather than relying on it.
         wanted = delivery.validate_delivery_name(wanted)
 
-    survey = delivery.survey()
+    survey = delivery_tree.survey()
     received = [d for d in survey.received if wanted is None or d.name == wanted]
     in_flight = [f for f in survey.in_flight if wanted is None or f.name == wanted]
 
@@ -287,7 +287,8 @@ def log_command(as_sql: bool) -> None:
         console.print("No delivery has been logged yet. The log fills as the pipeline runs.")
         return
 
-    from qa_tools.common import asset_time, display_time
+    from asset_model import asset_time
+    from qa_tools.common import display_time
 
     table = Table("Delivery", "Received", "Files", "Attributed", "Other",
                    box=None, pad_edge=False)
@@ -327,7 +328,7 @@ def load_command(collection_id: str | None) -> None:
     # fan out afterwards, over views that are already built.
     from qa_tools.common import load_log
 
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import stage
 
     # THE OPTION HAS ALREADY TURNED A SHORT INTO ITS ID and refused anything
@@ -373,7 +374,8 @@ def failures_command() -> None:
     # re-reads the same bytes and writes a NEW record rather than
     # editing this one - the history of what went wrong survives the
     # fix.
-    from qa_tools.common import asset_time, dataset_blockers, display_time
+    from asset_model import asset_time
+    from qa_tools.common import dataset_blockers, display_time
 
     # A SUPPLY A PERSON HAS REJECTED IS SETTLED, and is not listed again
     # (REQ-PIPE-153 criterion 4).
@@ -409,7 +411,8 @@ def history_command(dataset_id: str, limit: int) -> None:
     gitignored `filings/` tree, which would have started committing state
     to the repository the day REQ-PIPE-062 turned recording on.
     """
-    from qa_tools.common import arrival_history, asset_time, display_time, hierarchy
+    from qa_tools.common import arrival_history, display_time
+    from asset_model import asset_time, hierarchy
 
     # Fails on an unknown id before anything is read, so the error is
     # about what was typed rather than about an empty result.
@@ -459,7 +462,8 @@ def filings_command(dataset_id: str, limit: int) -> None:
 
     Reads committed records only. No database is opened.
     """
-    from qa_tools.common import assignment, filing, hierarchy
+    from asset_model import assignment, hierarchy
+    from qa_tools.common import filing
 
     hierarchy.dataset(dataset_id)
     found = filing.filings_of(dataset_id)
@@ -532,8 +536,8 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
     the whole history is readable without write access, and a log nobody
     can read is a log nobody trusts.
     """
-    from qa_tools.common import (decision_log, display_time, hierarchy, qa_store,
-                                  supply_db)
+    from qa_tools.common import decision_log, display_time, qa_store, supply_db
+    from asset_model import hierarchy
 
     if dataset_id:
         hierarchy.dataset(dataset_id)
@@ -771,7 +775,8 @@ def discard_sample_command(dataset_id: str, yes: bool) -> None:
     real work and its record survives; this removes the DATA the checks
     ran against, which is a different thing in a different place.
     """
-    from qa_tools.common import hierarchy, sample_data, schedule, supply_db
+    from asset_model import hierarchy, schedule
+    from qa_tools.common import sample_data, supply_db
 
     try:
         hierarchy.dataset(dataset_id)
@@ -924,7 +929,8 @@ def _say_bulk_rechecks(collection_id: str) -> None:
 def _owed_in(conn, collection_id: str) -> list:
     """QA owed and not yet run for this collection - re-checks and
     re-evaluations (REQ-PIPE-140 criterion 7, REQ-PIPE-121 criterion 16)."""
-    from qa_tools.common import hierarchy, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import recheck
 
     mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
     return [o for o in recheck.owed(conn) if o.dataset_id in mine]
@@ -966,7 +972,8 @@ def _owed_words(o, conn=None) -> str:
     (<n> of <m> files checked)', or 'gate of <period>, re-applied from
     recorded results' for a retried application - never a re-evaluation of
     a period's readers."""
-    from qa_tools.common import display_time, gate, hierarchy, recheck
+    from qa_tools.common import display_time, gate, recheck
+    from asset_model import hierarchy
 
     if o.kind == recheck.RECHECK:
         return f"re-check of {o.supply_id}"
@@ -1090,7 +1097,7 @@ def amber_setting_command(collection_id: str | None) -> None:
 
     Plain lines, one per dataset, so the list can be read or grepped.
     """
-    from qa_tools.common import amber_setting, asset_time, hierarchy
+    from asset_model import amber_setting, asset_time, hierarchy
 
     today = asset_time.local_date(asset_time.now())
     entries = (hierarchy.datasets_in_collection(collection_id) if collection_id
@@ -1116,7 +1123,8 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
     is where a person finds one to bring back with `--operation
     un-supersede`.
     """
-    from qa_tools.common import hierarchy, supersession, supply_db
+    from asset_model import hierarchy
+    from qa_tools.common import supersession, supply_db
 
     # ONE PLAIN LINE PER SUPPLY, not a table: the ids are what a person
     # pastes into un-supersede, and a table column truncates or folds them.
@@ -1456,12 +1464,13 @@ def corrections_command(reference: str | None) -> None:
     look; only the asset manager confirms (`mothman supply
     confirm-correction`). Reads the database; changes nothing.
     """
-    from qa_tools.common import correction_apply, correction_trial
+    from qa_tools.common import correction_apply
+    from asset_model import declared_corrections
 
     with supply_db.connect(read_only=True, label="mothman:corrections") as conn:
         try:
             found = correction_apply.pending(conn)
-        except correction_trial.Unreadable as exc:
+        except declared_corrections.Unreadable as exc:
             raise click.ClickException(str(exc)) from exc
         parked = correction_apply.parked(conn)
         # A CONFIRMED REFERENCE shows its parked moves (delivery-critic #152,
@@ -1487,7 +1496,7 @@ def corrections_command(reference: str | None) -> None:
         if reference is None:
             console.print(f"{len(found)} correction(s) waiting for the data asset's "
                           f"manager to confirm, oldest first:", style="bold")
-            docs = correction_trial.working()
+            docs = declared_corrections.working()
             for p in found:
                 affected = correction_apply.affected_datasets(p, docs[0])
                 console.print(f"  {p.reference} ({p.date}) on {p.label}: {p.reason}",
@@ -1623,7 +1632,8 @@ def confirm_correction_command(reference: str, keeps: tuple[str, ...],
     reference.
     """
     from cli import filing_tui
-    from qa_tools.common import correction_apply, correction_trial
+    from qa_tools.common import correction_apply
+    from asset_model import declared_corrections
 
     actor = filing_tui.actor_at_the_keyboard()
     # REFUSED BEFORE ANY REASON IS ASKED FOR (criterion 18), naming the role,
@@ -1652,7 +1662,7 @@ def confirm_correction_command(reference: str, keeps: tuple[str, ...],
             return
         try:
             p, t = correction_apply.trial_for(conn, reference)
-        except (decision_log.DecisionRefused, correction_trial.Unreadable) as exc:
+        except (decision_log.DecisionRefused, declared_corrections.Unreadable) as exc:
             raise click.ClickException(str(exc)) from exc
         key = _show_correction(p, t)
         keep = _resolve_keeps(t, keeps)

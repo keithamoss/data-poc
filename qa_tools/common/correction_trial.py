@@ -28,13 +28,18 @@ not proposed, so nobody reads its absence as an oversight.
 CONFIGURATION AND RECORDED FACTS ONLY (criterion 8): qa.filing_current,
 qa.supply_receipt, qa.verdict and the decision log - never a schema holding
 supply rows.
+
+THE WORKING COPY'S READ (working, readable, Unreadable) is
+asset_model/declared_corrections.py (REQ-PIPE-380 criterion 2): it reads
+configuration on disk. Trialling against recorded filings, and reading the
+configuration at a git ref (at_ref), stay here: the database and git.
 """
 from __future__ import annotations
-
 import contextlib
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
-from qa_tools.common import assets as _assets
+
+from asset_model import declared_corrections
 
 #: The instants of a slot a correction can move, in the order a reader
 #: thinks in, with the dashboard's words for them (NFR 1).
@@ -180,7 +185,7 @@ def configured(cal_doc: dict, asset_doc: dict):
     files' zones would show a timezone correction as moving nothing. Scoped,
     and restored however the block ends; mothman is single-threaded.
     """
-    from qa_tools.common import agreement, asset_time
+    from asset_model import agreement, asset_time
 
     zones = asset_time.parse_timezone_versions(asset_doc or {})
     agr = agreement.from_doc(cal_doc)
@@ -279,7 +284,7 @@ def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> st
     """The turn-off's reason where `agr` turns `period` off for this dataset
     - the period one of its slots before the correction, standing turned off
     after it - else None. An empty reason reads 'turned off'."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     slot = next((s for s in slots_before if s.name == period), None)
     if slot is None:
@@ -292,7 +297,7 @@ def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> st
 
 
 def _slots(dataset_id: str, until: date, agr) -> list:
-    from qa_tools.common import slots
+    from asset_model import slots
 
     return slots.slots_for_dataset(dataset_id, until=until, agreement=agr)
 
@@ -311,7 +316,8 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
     reads. Computed and returned; nothing is written (criterion 10)."""
     from datetime import UTC
 
-    from qa_tools.common import assignment, asset_time, hierarchy, verdict
+    from asset_model import assignment, asset_time, hierarchy
+    from qa_tools.common import verdict
 
     at = at or datetime.now(UTC)
     changes = frozen_changes(base, work, at)
@@ -408,7 +414,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
 # ---- the report ------------------------------------------------------------
 
 def _when(value: datetime | None) -> str:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     if value is None:
         return "never"
@@ -531,66 +537,29 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
     return "\n".join(lines) + "\n"
 
 
-# ---- the two states, from disk and from git --------------------------------
-
-class Unreadable(ValueError):
-    """A state of the configuration that could not be read."""
-
-
-def _working_docs() -> tuple[dict, dict]:
-    from qa_tools.common import agreement_drift
-
-    return agreement_drift._load_docs()
-
-
-def _readable(docs: tuple[dict, dict], what: str) -> tuple[dict, dict]:
-    """The two documents, or Unreadable naming what is wrong (delivery-
-    critic on 169, F4): a working copy part-way through an edit is the state
-    the Calendar entry is most used in, and it must be said in words - never
-    a traceback, never a "nothing to declare"."""
-    from qa_tools.common import agreement, asset_time
-
-    try:
-        agreement.from_doc(docs[0])
-        asset_time.parse_timezone_versions(docs[1] or {})
-    except Exception as exc:  # noqa: BLE001 - every way a document can be wrong
-        raise Unreadable(f"{what} cannot be read, so nothing was compared: {exc}") from exc
-    return docs
-
-
-def working() -> tuple[dict, dict]:
-    """The configuration on disk - the working copy being corrected."""
-    try:
-        docs = _working_docs()
-    except Exception as exc:  # noqa: BLE001 - a YAML slip, or a missing file
-        raise Unreadable(f"the working copy cannot be read, so nothing was compared: "
-                         f"{exc}") from exc
-    return _readable(docs, f"the working copy of {_assets.config_dir()}/calendar.yaml or "
-                           f"{_assets.config_dir()}/data-asset.yaml")
-
-
 def at_ref(ref: str) -> tuple[dict, dict]:
     """The configuration at a git ref, as REQ-PIPE-111's gate reads it."""
-    from qa_tools.common import agreement_freeze, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import declared_corrections, config_yaml
     from qa_tools.common.validate_schedule import _content_at
 
     docs = []
     for rel in (agreement_freeze.calendar_rel(), agreement_freeze.asset_rel()):
         text = _content_at(rel, ref)
         if text is None:
-            raise Unreadable(f"{rel} could not be read at {ref!r} - is it a ref this "
+            raise declared_corrections.Unreadable(f"{rel} could not be read at {ref!r} - is it a ref this "
                              f"checkout has?")
         try:
             docs.append(config_yaml.parse(text) or {})
         except Exception as exc:  # noqa: BLE001 - a YAML slip at that ref
-            raise Unreadable(f"{rel} at {ref!r} cannot be read: {exc}") from exc
-    return _readable((docs[0], docs[1]), f"the configuration at {ref!r}")
+            raise declared_corrections.Unreadable(f"{rel} at {ref!r} cannot be read: {exc}") from exc
+    return declared_corrections.readable((docs[0], docs[1]), f"the configuration at {ref!r}")
 
 
 def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
     """The impact preview of the working copy against `ref` (by default the
     base REQ-PIPE-111's gate compares against) - one function for the
-    command and the terminal's Calendar entry. Raises Unreadable where a
+    command and the terminal's Calendar entry. Raises declared_corrections.Unreadable where a
     state cannot be read, and supply_db.SupplyDbError where the recorded
     facts cannot be reached (criterion 9): an impact computed from
     configuration alone is not complete, so none is offered."""
@@ -602,7 +571,7 @@ def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
     at = at or datetime.now(UTC)
-    base, work = at_ref(ref), working()
+    base, work = at_ref(ref), declared_corrections.working()
     with supply_db.connect(read_only=True, label="mothman:correction-preview") as conn:
         t = trial(conn, base, work, at=at)
     return report(t, as_at=at, database=database_label(), against=ref)
@@ -614,13 +583,14 @@ def draft(ref: str | None = None, **given) -> list[str]:
     text, with whatever the person gave filled in."""
     from datetime import UTC
 
-    from qa_tools.common import agreement_freeze, asset_time, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import declared_corrections, asset_time, config_yaml
     from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
-    base, work = at_ref(ref), working()
+    base, work = at_ref(ref), declared_corrections.working()
     people = config_yaml.parse(_content_at(agreement_freeze.people_rel(), ref) or "") or {}
     return agreement_freeze.drafts(
         base[0], work[0], base[1], work[1], people,
@@ -634,7 +604,7 @@ def rise_entries() -> list[str]:
     rise is drafted complete rather than refused first."""
     from qa_tools.common import validate_schedule
 
-    cal, asset = working()
+    cal, asset = declared_corrections.working()
     src = validate_schedule.Source.default()
     found = validate_schedule._files_go_to_period_errors(cal, asset, src)
     return [f"{e.scope}: {e.problem}\n  {e.fix}" for e in found if e.problem.startswith("rises from ")]
@@ -643,7 +613,8 @@ def rise_entries() -> list[str]:
 def may_approve(ref: str | None = None) -> list[str]:
     """Who the gate will accept as approver of a calendar correction, at the
     base - offered when the terminal asks (criterion 14)."""
-    from qa_tools.common import agreement_freeze, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import config_yaml
     from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
@@ -690,11 +661,12 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     alone: its calendar, which periods it owes and why not the others, and
     - for the next period owed - its due date and time, grace, claim window
     and days before, as resolved (REQ-PIPE-168's own resolution)."""
-    from qa_tools.common import asset_time, schedule, slots, verdict
+    from asset_model import asset_time, schedule, slots
+    from qa_tools.common import verdict
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
-    version = slots._participation_for(dataset_id, on, agreement)
+    version = slots.participation_for(dataset_id, on, agreement)
     entry = agreement.dataset(dataset_id)
     begins = [cal.versions[0].effective_from]
     if entry and entry.participation:
@@ -756,21 +728,22 @@ def declared(conn=None, cal_doc: dict | None = None,
     marked applied where a recorded verdict names its reference (REQ-PIPE-168)
     - pending otherwise, which is what REQ-PIPE-170's confirmation settles.
     Without `conn`, nothing can be known applied, so all read pending."""
-    from qa_tools.common import agreement_freeze, verdict
+    from qa_tools.common import verdict
+    from asset_model import declared_corrections
 
     if cal_doc is None or asset_doc is None:
-        cal_doc, asset_doc = working()
+        cal_doc, asset_doc = declared_corrections.working()
     applied: set[str] = set()
     if conn is not None:
         applied = {r[0] for r in conn.execute(
             f"SELECT DISTINCT correction_ref FROM {verdict.TABLE} "
             "WHERE correction_ref IS NOT NULL").fetchall()}
     out = []
-    for owner, entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).items():
+    for owner, entries in declared_corrections.corrections_by_owner(cal_doc, asset_doc).items():
         for corr in entries:
             corr = corr or {}
             ref = str(corr.get("change_reference") or "")
-            out.append(Declared(agreement_freeze._owner_label(owner), ref,
+            out.append(Declared(declared_corrections.owner_label(owner), ref,
                                 str(corr.get("date") or ""), str(corr.get("reason") or ""),
                                 tuple(str((c or {}).get("item")) for c in corr.get("changes")
                                       or []), ref in applied))

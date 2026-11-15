@@ -44,14 +44,14 @@ GROWN_COLLECTIONS = ("child-protection", "emergency-department")
 def _grown_here() -> tuple[str, ...]:
     """The grown collections the selected asset holds - none in an asset
     whose history did not grow (the asset split)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     held = {c.id for c in collections.all_collections()}
     return tuple(c for c in GROWN_COLLECTIONS if c in held)
 
 
 def _datasets_of(doc: dict) -> set[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return {d.dataset_id for c in _grown_here() for d in hierarchy.datasets_in_collection(c)}
 

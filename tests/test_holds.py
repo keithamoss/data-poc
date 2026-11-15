@@ -1,4 +1,4 @@
-"""qa_tools/common/holds.py - two files for one dataset are held, never
+"""asset_model/holds.py - two files for one dataset are held, never
 chosen between (REQ-PIPE-059).
 
 Every rule for picking one is a guess dressed as a policy, and each
@@ -18,7 +18,8 @@ import pytest
 
 import dbsupport
 
-from qa_tools.common import arrivals, delivery, delivery_log, holds, supply_db
+from asset_model import arrivals, delivery as delivery_tree, holds
+from qa_tools.common import delivery, delivery_log, supply_db
 
 WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone(timedelta(hours=8)))
 
@@ -27,8 +28,8 @@ WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone(timedelta(hours=8)))
 def dirs(tmp_path, monkeypatch):
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     deliveries.mkdir(); receipts.mkdir()
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
-    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
     return deliveries, receipts
 
 
@@ -48,7 +49,7 @@ def _drop(dirs, name, files, when=WHEN):
 
 
 def _recognise(dirs, name):
-    [d] = [x for x in delivery.list_deliveries(*dirs) if x.name == name]
+    [d] = [x for x in delivery_tree.list_deliveries(*dirs) if x.name == name]
     with pytest.warns(UserWarning):
         return d, arrivals.recognise(d)
 
@@ -102,7 +103,7 @@ class TestItRefusesToChoose:
                                   "birth_registrations_2026-08-02.csv": "a\n2\n"})
         with pytest.warns(UserWarning):
             [arrival] = arrivals.arrivals_for("civil-registration", "run_", *dirs)
-        with pytest.raises(delivery.DeliveryFormatError, match="silently drop"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="silently drop"):
             arrival.path_for("birth-registrations")
 
 
@@ -201,7 +202,7 @@ class TestTheHoldIsRecorded:
     def test_a_delivery_with_no_hold_records_an_empty_list(
             self, dirs, clean_delivery_log):
         _drop(dirs, "fine", {"birth_registrations_2026-08-01.csv": "a\n1\n"})
-        [d] = delivery.list_deliveries(*dirs)
+        [d] = delivery_tree.list_deliveries(*dirs)
         record = delivery_log.record(d, arrivals.recognise(d), conn=clean_delivery_log)
         assert record["contested"] == []
 

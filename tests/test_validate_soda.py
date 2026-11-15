@@ -18,10 +18,10 @@ def test_the_real_check_files_pass():
     """It must find every collection's Soda file first, or [] == [] proves
     nothing (post-build-review #273: since REQ-QAC-241 moved them under
     contract/<agency-id>/, a top-level glob found none)."""
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
     files = validate_soda.check_files()
-    assert files and sorted(files) == sorted(collections.check_files("soda"))
+    assert files and sorted(files) == sorted(declared_collections.check_files("soda"))
     assert validate_soda.problems() == []
 
 

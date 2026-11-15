@@ -59,7 +59,7 @@ class TestTheOverlayIsGivenTheForeignTablesFromTheWarehouse:
         assert seen["foreign"] == ("cp_clients", "ed_presentations")
 
     def test_an_own_only_collection_is_unchanged(self, monkeypatch):
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import filing, period_overlay
         from qa_tools.tools import orchestrate
 
@@ -168,7 +168,7 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         Keith's G2): a check whose OWN dataset declares no calendar reading a
         calendared table is refused too, naming the declaring dataset - it
         has no period of its own to read the other's for."""
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         real = schedule.calendar_for_dataset
 
@@ -183,7 +183,7 @@ class TestADeclaredReadAcrossCollectionsIsGated:
         assert "linkage-keys" in p and "declares no calendar" in p
 
     def test_a_dataset_with_no_calendar(self, monkeypatch):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         real = schedule.calendar_for_dataset
 
@@ -279,7 +279,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         from pathlib import Path
 
         repo = Path(__file__).resolve().parent.parent
-        from qa_tools.common import assets
+        from asset_model import assets
 
         for part in ("models", "tests"):
             shutil.copytree(repo / assets.dbt_rel() / part, tmp_path / assets.dbt_rel() / part)
@@ -288,14 +288,14 @@ class TestDbtReadsAnotherCollectionThroughSource:
     def test_the_real_tree_passes(self):
         from pathlib import Path
 
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import validate_collections as vc
 
         root = Path(__file__).resolve().parent.parent
         assert vc.dbt_cross_collection_ref_problems(root, collections.all_collections()) == []
 
     def test_a_ref_to_another_collections_model_is_refused(self, tmp_path):
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
@@ -306,7 +306,7 @@ class TestDbtReadsAnotherCollectionThroughSource:
         assert "bad_ref.sql" in p and "stg_cp_clients" in p and "source(" in p
 
     def test_source_is_allowed(self, tmp_path):
-        from qa_tools import collections
+        from asset_model import collections
         from qa_tools.common import validate_collections as vc
 
         root = self._tree(tmp_path)
@@ -325,10 +325,10 @@ class TestACollectionWithNoDriftChecksRuns:
     def test_collection_checks_has_no_psi(self, monkeypatch):
         """Linkage Products declared none until its geocoding tables gained
         drift checks (REQ-QAC-297), so an empty file is stood in for."""
-        from qa_tools.common import check_lifecycle, evidently_common
+        from asset_model import check_lifecycle, drift
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {})
-        got = evidently_common.collection_checks("linkage-products")
+        got = drift.collection_checks("linkage-products")
         assert got.psi == () and got.row_drop == {}
 
     def test_evaluate_runs_nothing_and_records_nothing_red(self, monkeypatch):

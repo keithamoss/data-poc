@@ -35,7 +35,8 @@ from __future__ import annotations
 import json
 import os
 
-from qa_tools.common import assets, delivery
+from asset_model import assets, delivery as delivery_tree
+from qa_tools.common import delivery
 
 
 # WHERE THE GENERATOR WRITES, asked of the resolver at CALL TIME (REQ-PIPE-342
@@ -125,7 +126,7 @@ def no_instant_shared_with_another_collection(key, manifest: list[dict]) -> None
     later of the two. `key` is this collection's bookkeeping key, or every
     key its delivery streams write under (REQ-GEN-295 criterion 1) - none of
     which is another collection's."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     path = bookkeeping_path()
     if not path.exists():
@@ -155,7 +156,7 @@ def generate(collection_id: str) -> list[dict]:
     bookkeeping. Refused by name for a collection with no provider."""
     from generator import collections, delivery_names, scenario_injection
     from generator.resupply import MAX_ATTEMPTS
-    from qa_tools.common import arrivals
+    from asset_model import arrivals
 
     provider = collections.provider(collection_id)
     # 1. BEFORE THE FIRST WRITE. A scenario naming a dataset no provider
@@ -237,7 +238,7 @@ def generate(collection_id: str) -> list[dict]:
             # STORAGE, because in this PoC the generator IS storage
             # (REQ-PIPE-105 criterion 4): it stands in for the moment our
             # own object store took a supplier's file.
-            received_from=delivery.RECEIVED_FROM_STORAGE)
+            received_from=delivery_tree.RECEIVED_FROM_STORAGE)
 
         tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
         resupply_tag = (f"  [resupply {n - 1}, received "
@@ -251,7 +252,7 @@ def generate(collection_id: str) -> list[dict]:
     # 5.
     # NO ORDINARY ARRIVAL REFILED BY A VERSION-LEVEL CORRECTION (REQ-GEN-205
     # criterion 10): its instants exist only once written.
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     correction_claims.check_written(
         [d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)], manifest,
@@ -262,7 +263,7 @@ def generate(collection_id: str) -> list[dict]:
             continue
         # A STREAM OF SEVERAL DATASETS writes each entry under every dataset
         # whose file its delivery carries.
-        from qa_tools.common import hierarchy as _h
+        from asset_model import hierarchy as _h
 
         for d in st.dataset_ids:
             table = _h.dataset(d).table

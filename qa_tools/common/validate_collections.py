@@ -31,12 +31,13 @@ import ast
 import re
 import sys
 from pathlib import Path
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: Where product code lives (criterion 8).
-SCANNED = ("qa_tools", "pipeline", "generator", "cli", "dashboard")
+#: asset_model/ joined with REQ-PIPE-380 criterion 17.
+SCANNED = ("asset_model", "qa_tools", "pipeline", "generator", "cli", "dashboard")
 
 #: EXEMPT, each for its reason (criterion 9, as amended by A18 for the asset
 #: split). qa_tools/collections/ and generator/collections/ are no longer
@@ -93,7 +94,10 @@ def _reaches_another_module(name: str, adapters: set[str], providers: set[str]) 
     parts = name.split(".")
     if parts[0] == "assets" or parts[0].startswith(("mothman_adapter_", "mothman_provider_")):
         return True
-    if parts[:2] == ["qa_tools", "collections"] and len(parts) > 2:
+    # The registry's two halves (REQ-PIPE-380 criterion 3): the pipeline's
+    # adapter loader and asset_model's declarations, neither a way to an adapter.
+    if parts[:2] in (["qa_tools", "collections"], ["asset_model", "collections"]) \
+            and len(parts) > 2:
         return parts[2] in adapters
     if parts[:2] == ["generator", "collections"] and len(parts) > 2:
         return parts[2] in providers
@@ -133,9 +137,9 @@ def adapter_import_problems(package: Path | None = None) -> list[str]:
     """Every import statement in the selected asset's adapters that reaches
     another adapter, a generator provider or anything under assets/
     (REQ-PIPE-369 criterion 3), naming the file and the statement. Shared code
-    - qa_tools.collections.base, qa_tools.common, generator.collections.base -
+    - qa_tools.collections.base, qa_tools.common, asset_model, generator.collections.base -
     and the standard library are what an adapter may import."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     asset = assets.selected()
     package = package or asset.adapters
@@ -172,16 +176,17 @@ def config_problems(package: Path | None = None) -> list[str]:
     """`package` is the selected asset's adapter folder unless a test names
     another."""
     from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from asset_model import collections as declared_collections
+    from asset_model import hierarchy
 
     problems: list[str] = []
     try:
-        declared = collections.all_collections()
+        declared = declared_collections.all_collections()
     except ValueError as exc:
         # A hierarchy that cannot be read at all - a dataset id declared
         # twice, a collection missing its short - is reported, not raised.
         return [str(exc)]
-    from qa_tools.common import assets
+    from asset_model import assets
 
     package = package or assets.selected().adapters
     modules = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
@@ -316,8 +321,8 @@ def check_file_problems(root: Path | None = None) -> list[str]:
     """`root` holds the asset's configuration folder and dbt project - the
     repository unless a test names another; the hierarchy is read from the
     selected asset's folder."""
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections as declared_collections
+    from asset_model import assets
 
     # The checkout the asset's paths are relative to (assets.folder_rel): the
     # repository, wherever the asset folder sits inside it; for a folder
@@ -326,7 +331,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
         folder = assets.selected().folder
         root = assets.ROOT if folder.is_relative_to(assets.ROOT) else folder.parent
     try:
-        declared = collections.all_collections()
+        declared = declared_collections.all_collections()
     except ValueError:
         return []  # config_problems() reports a hierarchy that cannot be read
     problems: list[str] = []
@@ -423,7 +428,7 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
     folders = [c.dbt_models + "/" for c in declared] + [c.dbt_tests + "/" for c in declared]
     folders += [c.dbt_retired_schema.rsplit("/", 1)[0] + "/" for c in declared]
     singular: dict[str, str] = {}
-    from qa_tools.common import assets
+    from asset_model import assets
 
     project = assets.dbt_on_disk()
     for top in (f"{project}/models", f"{project}/tests", f"{project}/retired"):
@@ -455,8 +460,8 @@ def _names() -> tuple[set[str], tuple[str, ...]]:
     text - a keyboard-neighbour table's "wr", an agency short "rs" - while an
     id or run prefix is unambiguous, and a hard-coded short still shows
     itself as a broken command."""
-    from qa_tools import collections
-    from qa_tools.common import config_yaml, hierarchy
+    from asset_model import collections as declared_collections
+    from asset_model import config_yaml, hierarchy
 
     doc = config_yaml.parse(hierarchy.data_asset_yaml().read_text()) or {}
     ids = set()
@@ -465,7 +470,7 @@ def _names() -> tuple[set[str], tuple[str, ...]]:
         for coll in agency.get("collections") or []:
             ids.add(coll["id"])
             ids.update(d["id"] for d in coll.get("datasets") or [])
-    return ids, tuple(c.run_prefix for c in collections.all_collections())
+    return ids, tuple(c.run_prefix for c in declared_collections.all_collections())
 
 
 def _segment_patterns(ids: set[str]) -> list[re.Pattern]:
@@ -621,14 +626,14 @@ def line_report(adapters: Path | None = None, providers: Path | None = None) -> 
     Each from the selected asset's own folders (the asset split: adapters in
     assets/<asset>/collections/, providers in assets/<asset>/synthetic/
     collections/), unless a test names others."""
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections as declared_collections
+    from asset_model import assets
 
     asset = assets.selected()
     adapters = adapters or asset.adapters
     providers = providers or asset.providers
     out = []
-    for coll in collections.all_collections():
+    for coll in declared_collections.all_collections():
         adapter = adapters / f"{coll.module_name}.py"
         provider = providers / f"{coll.module_name}.py"
         if not adapter.is_file():
@@ -643,11 +648,12 @@ def line_report(adapters: Path | None = None, providers: Path | None = None) -> 
 
 
 def main() -> int:
-    from qa_tools.common import linked_datasets, list_setting_members, run_reads
+    from asset_model import linked_datasets, set_member_checks
+    from qa_tools.common import run_reads
 
     problems = (config_problems() + check_file_problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
-                + list_setting_members.problems())
+                + set_member_checks.problems())
     for line in line_report():  # reported whether or not the gate passes
         print(f"  {line}")
     if problems:

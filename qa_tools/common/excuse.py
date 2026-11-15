@@ -188,13 +188,13 @@ def why_not_withdrawable(conn, dataset_id: str, supply: str, slot: str | None) -
 
 def _period_dates(dataset_id: str) -> dict[str, date]:
     """Every period name of the dataset's calendar to its date."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     cal = schedule.calendar_for_dataset(dataset_id)
     try:
         periods = schedule.periods_for_calendar(cal.name)
     except Exception:  # noqa: BLE001 - a cadence rule needs a horizon
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         periods = schedule.periods_for_calendar(
             cal.name, until=asset_time.local_date(asset_time.now()))

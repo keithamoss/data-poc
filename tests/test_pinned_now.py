@@ -13,7 +13,7 @@ from datetime import datetime
 
 import pytest
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 
 @pytest.fixture

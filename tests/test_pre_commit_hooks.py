@@ -89,7 +89,7 @@ class TestTheScheduleConfigIsGatedAtCommitTime:
     """
 
     def test_editing_the_asset_configuration_triggers_a_hook(self):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         # The asset's own file by repository path (the asset split).
         rel = f"{assets.folder_rel()}/data-asset.yaml"

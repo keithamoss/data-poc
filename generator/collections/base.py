@@ -121,7 +121,7 @@ class Provider:
 
     @property
     def run_prefix(self) -> str:
-        from qa_tools import collections
+        from asset_model import collections
 
         return collections.by_id(self.collection_id).run_prefix
 
@@ -266,7 +266,7 @@ def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedS
 
     Generic: it runs the driver's own hook order without writing, so a
     provider needs nothing of its own beyond `table_rows`."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     table = hierarchy.dataset(dataset_id).table
     plan = provider.plan()
@@ -285,7 +285,7 @@ def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedS
                                            entry.get("dirty_severity"),
                                            provider.carries_table(plan, job, n, delivery_obj,
                                                                   table)))
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return sorted(out, key=lambda s: asset_time.parse_instant(s.received_at, "a receipt"))
 

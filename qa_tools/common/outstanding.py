@@ -79,8 +79,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import (dataset_status, delivery_log, display_time, hierarchy,
-                             in_flight_log)
+from asset_model import statuses, hierarchy
+from qa_tools.common import delivery_log, display_time, in_flight_log
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -637,9 +637,9 @@ def _rechecked_worse_item(w, received, ran_at=None) -> Item:
         verdict=w.now,
         detail=(f"The supply received {when} was promoted into "
                 f"{display_time.format_period(w.period)} "
-                f"{dataset_status.status_words(w.promoted_on, 'verb')}; a re-check "
+                f"{statuses.status_words(w.promoted_on, 'verb')}; a re-check "
                 f"{display_time.format_instant(ran_at or w.recheck_at)} came back "
-                f"{dataset_status.status_words(w.now, 'verb')}. It stays "
+                f"{statuses.status_words(w.now, 'verb')}. It stays "
                 f"promoted until a person demotes it, or acknowledges its new verdict."),
         agency_id=agency, collection_id=collection, dataset_id=w.dataset_id,
         observed_at=_iso_text(ran_at or w.recheck_at),
@@ -733,9 +733,9 @@ def _from_pending_corrections(conn=None) -> list[Item]:
     try:
         with delivery_log._db(conn) as db:
             found = correction_apply.pending(db)
-            from qa_tools.common import correction_trial
+            from asset_model import declared_corrections
 
-            cal = correction_trial.working()[0]
+            cal = declared_corrections.working()[0]
             affected = {p.reference: correction_apply.affected_datasets(p, cal) for p in found}
     except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
         print(f"note: could not read pending corrections ({type(exc).__name__}: {exc}) - "

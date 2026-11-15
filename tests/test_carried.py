@@ -16,7 +16,8 @@ from pathlib import Path
 import pytest
 
 from fixture_ids import CP_DIRTY_RUN_IDS
-from qa_tools.common import arrivals, carried, promotion, qa_store, supply_db
+from asset_model import arrivals
+from qa_tools.common import carried, promotion, qa_store, supply_db
 from qa_tools.tools import orchestrate
 
 CP = "child-protection"
@@ -36,7 +37,7 @@ def _arrival(cp_raw_dir, run_id):
 def _reading_clients_from_notifications() -> set[str]:
     """The checks filed under Notifications that declare they read the
     Client Register, for the tools that can carry."""
-    from qa_tools.common import check_id
+    from asset_model import check_id
 
     out = set()
     for check, tables in promotion._declared_reads().items():

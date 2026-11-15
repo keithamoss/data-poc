@@ -139,7 +139,7 @@ def run_plan() -> tuple:
 def generated_periods() -> list:
     """Every quarterly period Emergency Department owes, up to the anchor."""
     from generator.anchor_date import get_anchor_date
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())
 
@@ -227,7 +227,7 @@ class EmergencyDepartment(Provider):
                 for n, d in enumerate(deliveries, start=1)]
 
     def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         injected = plan.injected_by_period.get(job.period.name)
         if injected is not None:
@@ -247,7 +247,7 @@ class EmergencyDepartment(Provider):
 
     def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
         from generator import receipt_instants, scenario_injection
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         csvs = self.arrival_files(plan, job, n, delivery_obj)
         first = asset_time.parse_instant(entry["received_at"], entry["run_id"])

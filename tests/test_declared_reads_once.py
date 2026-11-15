@@ -117,7 +117,7 @@ class TestTheBusiestParsersAskOnce:
 
     @pytest.fixture
     def parses(self, monkeypatch):
-        from qa_tools.common import config_yaml
+        from asset_model import config_yaml
 
         calls = []
         real = config_yaml.parse

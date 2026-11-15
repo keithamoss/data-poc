@@ -61,7 +61,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SPRINTS_FILE = ROOT / "plans" / "supply-model.md"

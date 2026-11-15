@@ -8,7 +8,7 @@ import threading
 import pytest
 import yaml
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 
 @pytest.fixture(autouse=True)
@@ -108,8 +108,8 @@ class TestItIsWhatTheRunPathReads:
         import shutil
         from datetime import date
 
-        from qa_tools.common import (agreement, asset_time, environments, hierarchy,
-                                     postgres_version, slots)
+        from asset_model import agreement, asset_time, hierarchy, slots
+        from qa_tools.common import environments, postgres_version
 
         # FRESH COPIES, so nothing built earlier in this process can answer
         # (REQ-PIPE-254 keys every built value on its file's path and text).

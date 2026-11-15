@@ -15,7 +15,7 @@ import pytest
 from click.testing import CliRunner
 
 import cli.pipeline as pipeline_cli
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.tools import orchestrate
 
 _runner = CliRunner()
@@ -273,7 +273,8 @@ def _log_one(conn, name):
     """
     from types import SimpleNamespace
 
-    from qa_tools.common import asset_time, delivery, delivery_log
+    from asset_model import asset_time, delivery as delivery_tree
+    from qa_tools.common import delivery_log
 
     return delivery_log.record(
         SimpleNamespace(name=name, files=[], anomalies=[],
@@ -283,7 +284,7 @@ def _log_one(conn, name):
                         # OUR_CLOCK because this fixture is the one taking
                         # the instant, which is the weaker claim and the
                         # honest one.
-                        received_from=delivery.RECEIVED_FROM_OUR_CLOCK),
+                        received_from=delivery_tree.RECEIVED_FROM_OUR_CLOCK),
         SimpleNamespace(by_dataset={}, contested={}, collections=[]),
         conn=conn)
 
@@ -308,7 +309,8 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     place where it does not.
     """
     import cli.pipeline as pipeline_cli
-    from qa_tools.common import delivery, delivery_log
+    from qa_tools.common import delivery_log
+    from asset_model import delivery as delivery_tree
 
     # A record for a delivery, straight into this worker's own database
     # - REQ-PIPE-089 made the delivery log a table, so there is no
@@ -316,7 +318,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     _log_one(clean_delivery_log, "monday")
     # Nothing on disk, so a delivery still recorded is one the prune
     # has every reason to think is gone - the worst case for the log.
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "no-deliveries"))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "no-deliveries"))
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
@@ -337,6 +339,7 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
     """The other half, and the one that actually guards the incident."""
     import cli.pipeline as pipeline_cli
     from qa_tools.common import delivery, delivery_log
+    from asset_model import delivery as delivery_tree
 
     # A record for a delivery, straight into this worker's own database
     # - REQ-PIPE-089 made the delivery log a table, so there is no
@@ -353,8 +356,8 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
     # (REQ-PIPE-061).
     delivery.write_receipts("monday", "2026-09-25T09:00:00+08:00", receipts,
                             files=["cp_clients.csv"], sequence=1)
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
-    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))

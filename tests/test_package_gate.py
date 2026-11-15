@@ -169,7 +169,8 @@ class TestAFileWaitingForItsDelivery:
         rebuilt the supply id without the pair's '#1', so the package lookup
         found nothing and the waiting pair was failed."""
         from gate_support import CP_REF_RUN_ID
-        from qa_tools.common import asset_time, delivery, processing_pass
+        from asset_model import asset_time
+        from qa_tools.common import delivery, processing_pass
 
         established(sc)
         at = asset_time.parse_instant("2024-08-05T10:00:00+08:00", "test")
@@ -683,7 +684,8 @@ class TestCascade:
 class TestRecheckEntry:
 
     def _refile(self, sc, supply: str, to_period: str) -> None:
-        from qa_tools.common import asset_time, filing_decisions as fd, people, supply_db
+        from asset_model import asset_time
+        from qa_tools.common import filing_decisions as fd, people, supply_db
         from test_carry_forward import REAL_PERSON
 
         dataset_id = supply.split("@", 1)[0]
@@ -700,7 +702,8 @@ class TestRecheckEntry:
         is not joined to Clients v2's application and never promoted on its
         2024-Q4 results; once both have run, each is promoted on results
         recorded for 2025-Q1."""
-        from qa_tools.common import amber_setting, gate, replacement_setting, supply_db
+        from asset_model import amber_setting
+        from qa_tools.common import gate, replacement_setting, supply_db
 
         # A FILLED Q3 WAITS FOR A PERSON here: a resupply may not replace.
         monkeypatch.setattr(replacement_setting, "resolve",
@@ -1066,7 +1069,8 @@ class TestAFiledSupplyWithNoReceipt:
 def _first_attempts_instant(sc, supplies: dict):
     """The effective instant the gate gives the package `supplies` came in,
     by the arrival path's own rule, for the arrival processed last."""
-    from qa_tools.common import asset_time, promotion
+    from asset_model import asset_time
+    from qa_tools.common import promotion
     from qa_tools.tools import orchestrate
 
     mine = set(supplies.values())
@@ -1094,7 +1098,8 @@ def _warehouse(sc, period: str) -> dict:
 
 
 def _reject(sc, supply: str, period: str) -> None:
-    from qa_tools.common import hierarchy, rejection, supply_db, supply_files
+    from asset_model import hierarchy
+    from qa_tools.common import rejection, supply_db, supply_files
 
     dataset_id = supply.split("@", 1)[0]
     ds = hierarchy.dataset(dataset_id)

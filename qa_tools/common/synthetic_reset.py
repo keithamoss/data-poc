@@ -26,10 +26,10 @@ refuses those (criterion 29), and its message points here.
 """
 from __future__ import annotations
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 from qa_tools.common import qa_store, supply_db
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 
 class NotSynthetic(Exception):
@@ -38,7 +38,7 @@ class NotSynthetic(Exception):
 
 def is_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares this asset synthetic."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     raw = config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {}
     return raw.get("synthetic") is True
@@ -55,7 +55,7 @@ def in_production() -> bool:
 
 
 def asset_id() -> str:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return (config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {})["data_asset_id"]
 

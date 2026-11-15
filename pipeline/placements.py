@@ -52,7 +52,8 @@ def for_dataset(dataset_id: str,
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:placements") as opened:
             return for_dataset(dataset_id, opened)
-    from qa_tools.common import people, slots
+    from qa_tools.common import people
+    from asset_model import slots
 
     from pipeline import slot_timeline
 

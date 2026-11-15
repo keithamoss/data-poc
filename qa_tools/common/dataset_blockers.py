@@ -265,7 +265,8 @@ def _how_it_ended(db, dataset_id: str, pair: str, delivery: str,
 
 
 def _contested(db) -> list[Blocker]:
-    from qa_tools.common import asset_time, display_time, load_log, supply_db
+    from asset_model import asset_time
+    from qa_tools.common import display_time, load_log, supply_db
 
     decided = _deciding(db)
     # EVERY LOAD THAT FAILED, NOT THE QUEUE OF ONES STILL WAITING: a
@@ -333,7 +334,8 @@ def _pair_tables(dataset_id: str, received_at, n: int) -> tuple[str, ...]:
     """The staged tables of a pair's `n` files - ordinal by name order, the
     rule staging names them by (supply_db.staged_table) - or () for a dataset
     the tree no longer knows."""
-    from qa_tools.common import hierarchy, supply_db
+    from asset_model import hierarchy
+    from qa_tools.common import supply_db
 
     try:
         table = hierarchy.dataset(dataset_id).table
@@ -414,7 +416,8 @@ def _failed_loads(db) -> list[Blocker]:
 
 
 def _refused_in_contests(db) -> set[tuple[str, str]]:
-    from qa_tools.common import asset_time, load_log, supply_db
+    from asset_model import asset_time
+    from qa_tools.common import load_log, supply_db
 
     keys = {(dataset_id, asset_time.arrival_key(received_at))
             for dataset_id, received_at in db.execute(

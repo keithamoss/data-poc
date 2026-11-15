@@ -424,7 +424,8 @@ def sandbox_marked_scratch(supply_dsn, worker_id):
     never one of the real supply_* databases (M2)."""
     from psycopg import conninfo
 
-    from qa_tools.common import db_identity, hierarchy
+    from qa_tools.common import db_identity
+    from asset_model import hierarchy
 
     admin = os.environ["MOTHMAN_TEST_DSN"]
     name = f"supply_fu_scratch_{worker_id}"

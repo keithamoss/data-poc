@@ -10,8 +10,15 @@ from datetime import timedelta, timezone
 
 import pytest
 
-from qa_tools.common import (correction_apply, correction_replay, decision_log, scenario_map,
-                             scripted_corrections, scripted_decisions)
+from qa_tools.common import (
+    correction_apply,
+    correction_replay,
+    decision_log,
+    scenario_map,
+    scripted_corrections,
+    scripted_decisions,
+)
+from asset_model import declared_corrections
 import test_correction_replay as _replay
 
 #: The replay tests' fixtures: CAB-1 and CAB-2 declared, one supply filed.
@@ -96,9 +103,8 @@ class TestValidationRefusesEachFault:
         assert any("correction 1 already names 'CAB-2'" in p for p in found), found
 
     def test_the_committed_file_passes(self):
-        from qa_tools.common import correction_trial
 
-        declared = {p.reference for p in correction_apply._declared(*correction_trial.working())}
+        declared = {p.reference for p in declared_corrections.pending_corrections(*declared_corrections.working())}
         from generator import scenario_injection
 
         assert scripted_corrections.problems(scripted_corrections.load(), declared=declared,

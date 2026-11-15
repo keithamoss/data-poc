@@ -19,12 +19,13 @@ import pandas as pd
 import pytest
 
 from qa_tools.common import evidently_common as ec
+from asset_model import drift
 
 
 class TestRebuildingAReferenceFromRecordedCounts:
     def test_the_frame_matches_the_recorded_distribution(self):
         counts = [["M", 897], ["F", 815], ["X", 25]]
-        frame = ec.frame_from_value_counts(counts, "sex")
+        frame = drift.frame_from_value_counts(counts, "sex")
         assert len(frame) == 1737
         assert frame["sex"].value_counts().to_dict() == {"M": 897, "F": 815, "X": 25}
 
@@ -41,10 +42,10 @@ class TestRebuildingAReferenceFromRecordedCounts:
             {"sex": rng.choice(["M", "F", "U"], size=3500, p=[.40, .55, .05])})
 
         recorded = [[v, int(c)] for v, c in real_reference["sex"].value_counts().items()]
-        rebuilt = ec.frame_from_value_counts(recorded, "sex")
+        rebuilt = drift.frame_from_value_counts(recorded, "sex")
 
-        from_rows, _ = ec.compute_psi(current, real_reference, "sex")
-        from_counts, _ = ec.compute_psi(current, rebuilt, "sex")
+        from_rows, _ = drift.compute_psi(current, real_reference, "sex")
+        from_counts, _ = drift.compute_psi(current, rebuilt, "sex")
         assert from_rows == from_counts
 
     def test_scaling_every_count_down_preserves_psi_exactly(self):
@@ -55,13 +56,13 @@ class TestRebuildingAReferenceFromRecordedCounts:
         in full if it ever matters."""
         current = pd.DataFrame({"sex": ["M"] * 100 + ["F"] * 80 + ["U"] * 5})
         big, small = [["F", 240000], ["M", 240000], ["U", 12000]], [["F", 20], ["M", 20], ["U", 1]]
-        psi_big, _ = ec.compute_psi(current, ec.frame_from_value_counts(big, "sex"), "sex")
-        psi_small, _ = ec.compute_psi(current, ec.frame_from_value_counts(small, "sex"), "sex")
+        psi_big, _ = drift.compute_psi(current, drift.frame_from_value_counts(big, "sex"), "sex")
+        psi_small, _ = drift.compute_psi(current, drift.frame_from_value_counts(small, "sex"), "sex")
         assert psi_big == psi_small
 
     def test_an_empty_recording_gives_an_empty_frame(self):
-        assert len(ec.frame_from_value_counts([], "sex")) == 0
-        assert len(ec.frame_from_value_counts(None, "sex")) == 0
+        assert len(drift.frame_from_value_counts([], "sex")) == 0
+        assert len(drift.frame_from_value_counts(None, "sex")) == 0
 
 
 class TestItRefusesRatherThanGuessing:
@@ -76,11 +77,11 @@ class TestItRefusesRatherThanGuessing:
     ])
     def test_a_malformed_entry_raises(self, bad):
         with pytest.raises(ValueError, match="value_counts"):
-            ec.frame_from_value_counts(bad, "sex")
+            drift.frame_from_value_counts(bad, "sex")
 
     def test_a_negative_count_raises(self):
         with pytest.raises(ValueError, match="negative"):
-            ec.frame_from_value_counts([["M", -1]], "sex")
+            drift.frame_from_value_counts([["M", -1]], "sex")
 
 
 class TestReadingTheRealCommittedHistory:

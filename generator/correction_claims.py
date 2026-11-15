@@ -21,25 +21,25 @@ from datetime import date, timedelta
 from typing import Mapping, Sequence
 
 from generator.scenario_injection import CannotPlace
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 
 def _docs_either_side(reference: str, docs):
-    from qa_tools.common import correction_apply, correction_replay, correction_trial
+    from asset_model import declared_corrections
 
-    docs = docs or correction_trial.working()
-    p = next((p for p in correction_apply._declared(*docs) if p.reference == reference), None)
+    docs = docs or declared_corrections.working()
+    p = next((p for p in declared_corrections.pending_corrections(*docs) if p.reference == reference), None)
     if p is None:
         return None, None, None
-    at = correction_replay.merge_instant(p)
-    return (p, correction_replay.docs_at(at - timedelta(microseconds=1), docs),
-            correction_replay.docs_at(at, docs))
+    at = declared_corrections.merge_instant(p)
+    return (p, declared_corrections.docs_at(at - timedelta(microseconds=1), docs),
+            declared_corrections.docs_at(at, docs))
 
 
 def _slots(dataset_id: str, cal: dict, until: date) -> dict:
-    from qa_tools.common import agreement, slots
+    from asset_model import agreement, slots
 
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     agr = agreement.from_doc(cal)
     try:
@@ -96,7 +96,7 @@ def claimed(reference: str, generated: Mapping[str, Sequence], *,
 
 
 def _collection_of(dataset_id: str) -> str:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id).collection_id
@@ -191,7 +191,7 @@ def check_all(collection_id: str | None = None) -> None:
     planning its sources)."""
     from generator import collections, scenario_injection
     from generator.anchor_date import get_anchor_date
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     # The selected asset's own scenarios only (PROVISIONAL, the asset split -
     # scenario_injection.this_assets_injections).
@@ -286,7 +286,7 @@ def check_version_after(injections: Sequence, *, docs=None,
 
 
 def _datasets_of(collection_id: str) -> list[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return [d.dataset_id for d in hierarchy.all_datasets() if d.collection_id == collection_id]
 
@@ -328,7 +328,7 @@ def filing_changes(reference: str, dataset_id: str, instants, *, docs=None,
     `instants`: each instant's open slot before and after it, by the filing
     rule's own function (assignment.open_slot, as the impact trial uses -
     REQ-PIPE-169 criterion 6), both named where they differ."""
-    from qa_tools.common import agreement, assignment, slots
+    from asset_model import agreement, assignment, slots
 
     p, before, after = _docs_either_side(reference, docs)
     if p is None:
@@ -356,7 +356,7 @@ def re_judges(reference: str, dataset_id: str, at, *, docs=None) -> str | None:
     own slot (assignment.open_slot) and the verdict rule's own function
     (arrival_classification.classify), as REQ-PIPE-168's re-judgement does -
     or None (REQ-GEN-237 criterion 4)."""
-    from qa_tools.common import agreement, arrival_classification, assignment, slots
+    from asset_model import agreement, arrival_classification, assignment, slots
 
     p, before, after = _docs_either_side(reference, docs)
     if p is None:
@@ -376,7 +376,7 @@ def re_judges(reference: str, dataset_id: str, at, *, docs=None) -> str | None:
 def _injected_instants(injections, generated) -> dict[str, list]:
     """Each dataset's injected arrival instants, from configuration."""
     from generator import scenario_injection as si
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     out: dict[str, list] = {}
     for inj in injections:
@@ -396,7 +396,7 @@ def _carries(entry, dataset_id) -> bool:
     counts = entry.get("row_counts")
     if not counts:
         return True
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(dataset_id).table in counts
 
@@ -404,7 +404,7 @@ def _carries(entry, dataset_id) -> bool:
 def _on_a_calendar(dataset_id: str) -> bool:
     """A DATASET ON NO CALENDAR has no filing a correction could change - as
     _slots() says of its slots."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
         slots.slots_for_dataset(dataset_id, until=_history_end())
@@ -426,7 +426,7 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
     corrected agreement as it arrived, so a confirmation has nothing of its to
     move. REQ-GEN-218's gap deliveries are those."""
     from generator import scenario_injection
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     riders = {}
     for inj in scenario_injection.this_assets_injections():

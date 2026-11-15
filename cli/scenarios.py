@@ -121,11 +121,12 @@ def validate_command() -> None:
     found += scenario_injection.mixed_asset_problems()
     # SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205 criterion 5), against
     # the declared corrections.
-    from qa_tools.common import correction_apply, correction_trial, scripted_corrections
+    from asset_model import declared_corrections
+    from qa_tools.common import scripted_corrections
 
     confirmations = scripted_corrections.load()
     found += scripted_corrections.problems(confirmations, declared={
-        p.reference for p in correction_apply._declared(*correction_trial.working())},
+        p.reference for p in declared_corrections.pending_corrections(*declared_corrections.working())},
         injections=scenario_injection.this_assets_injections())
     if found:
         for problem in found:
@@ -160,7 +161,7 @@ def bands_command(dataset_id: str | None, rows: int | None) -> None:
     the committed definitions the tools run; opens no database. What the
     synthetic generator reads to build a supply to a verdict.
     """
-    from qa_tools.common import check_bands as cb, hierarchy
+    from asset_model import check_bands as cb, hierarchy
 
     try:
         cat = cb.catalogue()

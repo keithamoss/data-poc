@@ -37,7 +37,7 @@ def _out_dir_option(command):
 
 
 def _rebuild_results() -> None:
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import results_history
 
     for coll in collections.all_collections():
@@ -53,7 +53,7 @@ def rebuild_results_command() -> None:
 
 def _build_data() -> None:
     from pipeline import build_dashboard_data
-    from qa_tools import collections
+    from asset_model import collections
 
     # EVERY REGISTERED COLLECTION, through the one builder (REQ-DASH-244
     # criteria 1 and 9).

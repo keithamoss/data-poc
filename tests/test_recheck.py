@@ -155,7 +155,7 @@ class TestOnlyFromTheOrchestratorPath:
 
     def test_no_build_path_imports_the_executor(self):
         offenders = []
-        for top in ("pipeline", "dashboard"):
+        for top in ("asset_model", "pipeline", "dashboard"):
             for path in sorted((ROOT / top).rglob("*.py")):
                 for node in ast.walk(ast.parse(path.read_text())):
                     names = []
@@ -279,7 +279,8 @@ class TestALiveRecheckTakesEffectWhenItRan:
         from datetime import datetime, timedelta, timezone
         from types import SimpleNamespace
 
-        from qa_tools.common import asset_time, qa_store, recheck, supply_db
+        from asset_model import asset_time
+        from qa_tools.common import qa_store, recheck, supply_db
         from qa_tools.common import decision_log as dl
 
         ds = f"cp-{uuid.uuid4().hex[:10]}"

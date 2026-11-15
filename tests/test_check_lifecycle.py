@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/check_lifecycle.py - parsing check-lifecycle
+"""Tests for asset_model/check_lifecycle.py - parsing check-lifecycle
 metadata from all 4 tools' own definition formats, and the two
 validations that gate publishing (plans/publishing-and-history.md
 Thread D, Phase 1): globally-unique check_id, and no undocumented
@@ -11,7 +11,7 @@ import textwrap
 
 import pytest
 
-from qa_tools.common import check_lifecycle as cl
+from asset_model import check_lifecycle as cl
 
 
 #: REQ-TEST-375: in the hand-picked set every push runs in CI.

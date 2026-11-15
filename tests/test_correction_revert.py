@@ -14,7 +14,8 @@ import copy
 import pytest
 import yaml
 
-from qa_tools.common import agreement, agreement_freeze, asset_time
+from asset_model import agreement, declared_corrections, asset_time
+from qa_tools.common import agreement_freeze
 
 
 def _docs():
@@ -89,7 +90,7 @@ def test_reverting_the_changes_gives_back_the_original(change):
     changes = [(key, old, new) for key, (_i, old, new, _f) in agreement_freeze.changed(
         base_cal, work_cal, base_asset, work_asset).items()]
     assert changes, "the change is one the gate sees"
-    got_cal, got_asset = agreement_freeze.revert(work_cal, work_asset, changes)
+    got_cal, got_asset = declared_corrections.revert(work_cal, work_asset, changes)
     assert {k: i.norm for k, i in agreement_freeze.flatten(got_cal, got_asset).items()} == \
         {k: i.norm for k, i in agreement_freeze.flatten(base_cal, base_asset).items()}
 
@@ -101,14 +102,14 @@ def test_it_leaves_the_documents_it_was_given_alone():
     before = copy.deepcopy(work_cal)
     changes = [(k, o, n) for k, (_i, o, n, _f) in agreement_freeze.changed(
         base_cal, work_cal, base_asset, work_asset).items()]
-    agreement_freeze.revert(work_cal, work_asset, changes)
+    declared_corrections.revert(work_cal, work_asset, changes)
     assert work_cal == before
 
 
 def test_an_item_it_does_not_know_is_refused():
     cal, asset = _docs()
     with pytest.raises(ValueError, match="cannot be reverted"):
-        agreement_freeze.revert(cal, asset, [("calendar quarterly sideways 1", 1, 2)])
+        declared_corrections.revert(cal, asset, [("calendar quarterly sideways 1", 1, 2)])
 
 
 #: The data asset this module's tests act for, unless a test says otherwise
@@ -124,7 +125,7 @@ def test_reverting_a_membership_to_another_calendar_is_refused_not_dropped():
     dataset on the baseline (post-build-review #340)."""
     base_cal, base_asset = _docs()
     with pytest.raises(ValueError, match="'monthly'"):
-        agreement_freeze.revert(base_cal, base_asset,
+        declared_corrections.revert(base_cal, base_asset,
                                 [("dataset cp-clients calendar", "monthly", "quarterly")])
 
 
@@ -132,6 +133,6 @@ def test_reverting_a_membership_to_the_baseline_drops_the_declaration():
     base_cal, base_asset = _docs()
     work = copy.deepcopy(base_cal)
     _entry(work, "cp-clients")["no_calendar"] = "never"
-    got, _asset = agreement_freeze.revert(
+    got, _asset = declared_corrections.revert(
         work, base_asset, [("dataset cp-clients calendar", "quarterly", "no calendar (never)")])
     assert "no_calendar" not in _entry(got, "cp-clients")

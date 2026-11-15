@@ -16,7 +16,8 @@ WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
 #: under cli/).
 #: The shared inputs; each asset's key adds that asset's own folder
 #: (REQ-PIPE-365 criterion 3).
-INPUTS = ("generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
+INPUTS = ("asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**",
+          "qa_tools/**",
           "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml", "assets/environments.yaml")
 #: What each asset's cache must carry beside its dump - the generated inputs

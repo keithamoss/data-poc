@@ -20,7 +20,8 @@ import shutil
 import yaml
 
 from pipeline import build_dashboard_data as bdd
-from qa_tools.common import hierarchy, presentation
+from asset_model import hierarchy
+from qa_tools.common import presentation
 
 
 def _geo():

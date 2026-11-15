@@ -434,7 +434,7 @@ class TestEveryFailureNamesItsAsset:
 
     @pytest.fixture
     def two_passes(self, monkeypatch):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         monkeypatch.delenv(assets.ASSET_ENV, raising=False)
         monkeypatch.setattr(assets, "names", lambda: ["one", "two"])
@@ -468,7 +468,7 @@ class TestEveryFailureNamesItsAsset:
         assert "[two] duplicate short 'x'\n" in output and "[one] checked one\n" in output
 
     def test_one_selected_asset_is_named_too(self, monkeypatch):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         monkeypatch.setenv(assets.ASSET_ENV, "quarterly")
         monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")

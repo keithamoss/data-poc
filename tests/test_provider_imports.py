@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets
+from asset_model import assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -121,10 +121,10 @@ class TestTheRule:
         assert EDITED in problems[0]
 
     @pytest.mark.parametrize("line, needle", [
-        ("from qa_tools.common import assets as _a\n"
+        ("from asset_model import assets as _a\n"
          "def _p():\n    return _a.load('provider', 'child_protection')",
          "_a.load('provider', 'child_protection')"),
-        ("from qa_tools.common import assets\n"
+        ("from asset_model import assets\n"
          "def _p():\n    return assets.module_file('adapter', 'x')",
          "assets.module_file('adapter', 'x')"),
         ("import importlib", "import importlib"),
@@ -132,12 +132,12 @@ class TestTheRule:
         ("def _p():\n    return __import__('mothman_provider_quarterly_child_protection')",
          "__import__("),
         # THE CRITIC'S ROUTES ROUND THE GATE (2026-11-15), each one refused.
-        ("from qa_tools.common.assets import load as L",
-         "from qa_tools.common.assets import load as L"),
-        ("import qa_tools.common.assets\n"
-         "def _p():\n    return qa_tools.common.assets.load('provider', 'child_protection')",
-         "qa_tools.common.assets.load('provider', 'child_protection')"),
-        ("from qa_tools.common import assets\n"
+        ("from asset_model.assets import load as L",
+         "from asset_model.assets import load as L"),
+        ("import asset_model.assets\n"
+         "def _p():\n    return asset_model.assets.load('provider', 'child_protection')",
+         "asset_model.assets.load('provider', 'child_protection')"),
+        ("from asset_model import assets\n"
          "def _p():\n    return getattr(assets, 'load')('provider', 'child_protection')",
          "getattr(assets, 'load')"),
         ("import runpy", "import runpy"),
@@ -167,7 +167,7 @@ class TestTheRule:
     def test_shared_code_and_the_standard_library_pass(self, providers_root):
         _add(providers_root,
              "import json\nimport re\nfrom generator.collections.base import Job\n"
-             "from generator import targeting as _t\nfrom qa_tools.common import hierarchy\n"
+             "from generator import targeting as _t\nfrom asset_model import hierarchy\n"
              "from qa_tools.collections.base import CollectionAdapter\n"
              "import re as _re\n_x = _re.compile('a')\n"
              "def _read(f):\n    return json.load(f)")

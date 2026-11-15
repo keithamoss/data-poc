@@ -128,7 +128,7 @@ class TestShow:
         range moves, and says nothing true while it does."""
         from datetime import timedelta
 
-        from qa_tools.common import schedule as schedule_mod
+        from asset_model import schedule as schedule_mod
 
         fourth_day = schedule_mod.calendar("daily").current.effective_from + timedelta(days=3)
         result = _runner.invoke(schedule_cli.schedule_group,
@@ -147,7 +147,7 @@ class TestCandidateDates:
     # constant that goes stale the moment somebody authors 2028.
 
     def _next_year(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
         return max(p.date.year for p in schedule.periods_for_calendar("quarterly")) + 1
 
     def test_it_says_plainly_that_nothing_evaluates_against_its_output(self):

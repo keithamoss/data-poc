@@ -76,7 +76,7 @@ def declared_reads() -> dict[str, list[str]]:
 def checks_reading(table: str, declared_on: str) -> list[str]:
     """The cross-table checks declared on `declared_on`'s dataset that read
     `table`."""
-    from qa_tools.common import check_id as cid
+    from asset_model import check_id as cid
 
     out = []
     for check, tables in declared_reads().items():
@@ -115,7 +115,8 @@ class Scenario:
         """Deliver files at `at` - one instant for a zip, or {table: instant}
         for staggered files of one delivery - each labelled ({table: "N2"}).
         Returns {label: supply id}."""
-        from qa_tools.common import asset_time, delivery
+        from asset_model import asset_time
+        from qa_tools.common import delivery
 
         self._n += 1
         name = name or f"cp-scenario-{self._n:03d}"
@@ -135,7 +136,7 @@ class Scenario:
         return out
 
     def arrivals(self) -> list:
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         return arrivals.arrivals_for(CP, "cp_run_", self.deliveries, self.receipts)
 
@@ -183,7 +184,7 @@ class Scenario:
             run_by="pytest@example.org")
 
     def label_of(self, arrival) -> str | None:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         (dataset_id,) = arrival.files_by_dataset
         return self.labels.get(f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}")
@@ -196,8 +197,8 @@ class Scenario:
         whatever the gate made of it (REQ-PIPE-267 criterion 19). Through
         promotion.promote, the one move; `follow_up` then runs the knock-on
         as a person's decision at the terminal does."""
-        from qa_tools.common import (asset_time, decision_log, hierarchy, knock_on,
-                                     promotion, supply_db, supply_files)
+        from asset_model import asset_time, hierarchy
+        from qa_tools.common import decision_log, knock_on, promotion, supply_db, supply_files
 
         dataset_id = supply.split("@", 1)[0]
         ds = hierarchy.dataset(dataset_id)
@@ -320,7 +321,7 @@ class Scenario:
 
 
 def _instant(value) -> datetime:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return value if isinstance(value, datetime) else asset_time.parse_instant(value, "scenario")
 
@@ -333,10 +334,11 @@ def install_fake_tools(monkeypatch, scenario: Scenario) -> None:
     """Stand in for the four tools' evaluation - see the module docstring -
     and point every reader of the delivery tree at the scenario's own."""
     from qa_tools.common import delivery
+    from asset_model import delivery as delivery_tree
     from qa_tools.tools import run_datacontract, run_dbt, run_evidently, run_soda
 
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(scenario.deliveries))
-    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(scenario.receipts))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(scenario.deliveries))
+    monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(scenario.receipts))
     monkeypatch.setattr(delivery, "bookkeeping_path", fixed(scenario.root / "bookkeeping.json"))
 
     for module, tool in ((run_dbt, "dbt"), (run_soda, "soda"),
@@ -346,9 +348,10 @@ def install_fake_tools(monkeypatch, scenario: Scenario) -> None:
 
 def _fake(tool: str, scenario: Scenario):
     def evaluate(collection_id: str, run_id: str, run_timestamp: str, **_kw) -> list[dict]:
-        from qa_tools import collections
-        from qa_tools.common import asked_for, hierarchy, left_out, supply_db
-        from qa_tools.common import check_id as cid
+        from asset_model import collections
+        from qa_tools.common import asked_for, left_out, supply_db
+        from asset_model import hierarchy
+        from asset_model import check_id as cid
         from qa_tools.common.qa_results_writer import write_qa_result
 
         coll = collections.by_id(collection_id)
@@ -432,7 +435,8 @@ def pin_replacement_setting(monkeypatch) -> None:
     """A GREEN RESUPPLY MAY REPLACE A PROMOTED ONE, pinned rather than read
     from configuration (REQ-PIPE-267 criterion 16), so a 'hold' setting can
     never make a green branch read as a deadlock."""
-    from qa_tools.common import amber_setting, replacement_setting
+    from asset_model import amber_setting
+    from qa_tools.common import replacement_setting
 
     monkeypatch.setattr(replacement_setting, "resolve",
                         lambda dataset_id, at, **kw: amber_setting.Resolved(

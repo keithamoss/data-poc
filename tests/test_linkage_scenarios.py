@@ -14,7 +14,7 @@ import pytest
 
 from generator import scenario_injection as si
 lp = collection_modules.provider_module("linkage-products")
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 pytestmark = pytest.mark.filterwarnings("ignore::UserWarning")
 
@@ -346,7 +346,7 @@ class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
     @staticmethod
     def _quarter(name="2024-Q3"):
         from generator.collections.base import Job
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         period = next(p for p in schedule.periods_for_dataset(lp.DATASET_ID)
                       if p.name == name)
@@ -389,7 +389,8 @@ class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
         orchestrate.effective_at_of computes it."""
         from datetime import timedelta
 
-        from qa_tools.common import promotion, schedule
+        from qa_tools.common import promotion
+        from asset_model import schedule
 
         job, period = self._quarter()
         src = self._source(period, "16:00")

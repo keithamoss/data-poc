@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 import qa_tools.tools.run_evidently as run_evidently
-from qa_tools.common.evidently_common import collection_checks
+from asset_model.drift import collection_checks
 
 _CHECKS = collection_checks("child-protection")
 

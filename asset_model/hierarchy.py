@@ -15,7 +15,7 @@ graduating out of sample data is a configuration change a running process
 must see (plans/post-build-review.md #217) - and an unchanged one costs a
 read and a lookup rather than a parse. The registry and the arrival
 patterns, which are built from this tree, build it from the same one read
-of the file through `_from_text()`.
+of the file through `from_text()`.
 
 NO FALLBACKS, DELIBERATELY. An unknown dataset id raises rather than
 returning None or an empty scope. Every caller here is asking "where
@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-from qa_tools.common import assets, config_yaml
+from asset_model import assets, config_yaml
 
 
 def data_asset_yaml() -> Path:
@@ -94,7 +94,7 @@ class Dataset:
     linked: tuple = ()
 
 
-def _require(node: dict, key: str, where: str):
+def require(node: dict, key: str, where: str):
     """One required config key, or an error naming where it is missing.
 
     A bare KeyError here surfaces as the word 'contract' with no
@@ -114,10 +114,10 @@ def _load() -> tuple[str, "MappingProxyType[str, Dataset]", "MappingProxyType[st
     """(data_asset_id, {dataset id: Dataset}, {table: Dataset}) for the file
     as it reads now."""
     path = data_asset_yaml()
-    return _from_text(path, config_yaml.read(path))
+    return from_text(path, config_yaml.read(path))
 
 
-def _from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]",
+def from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]",
                                                "MappingProxyType[str, Dataset]"]:
     """The tree built from one read of `path` - what the registry and the
     arrival patterns build from, so their value and the tree's are always
@@ -147,7 +147,7 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
                     dataset_id=dataset["id"],
                     dataset_name=dataset["name"],
                     table=dataset["table"],
-                    contract=_require(collection, "contract",
+                    contract=require(collection, "contract",
                                        f"collection {collection.get('id')!r}"),
                     arrival_pattern=(dataset.get("arrival_pattern") or "").strip(),
                     delivery_boundary=(collection.get("delivery_boundary") or "").strip(),
@@ -174,7 +174,17 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
         raise ValueError(f"{path} defines no datasets under hierarchy.agencies")
     by_table: dict[str, Dataset] = {}
     for entry in datasets.values():
-        by_table.setdefault(entry.table, entry)
+        # TWO DATASETS, ONE TABLE IS REFUSED (REQ-PIPE-376 criterion 7): it
+        # kept the first (setdefault), so dataset_for_table answered for one
+        # of two silently - not the inverse it is.
+        if entry.table in by_table:
+            raise ValueError(
+                f"{path}: datasets {by_table[entry.table].dataset_id!r} (collection "
+                f"{by_table[entry.table].collection_id!r}) and {entry.dataset_id!r} "
+                f"(collection {entry.collection_id!r}) both name the table "
+                f"{entry.table!r} - each dataset's table is its own, so "
+                f"dataset_for_table can name one")
+        by_table[entry.table] = entry
     return data_asset_id, MappingProxyType(datasets), MappingProxyType(by_table)
 
 
@@ -190,9 +200,9 @@ def all_datasets() -> list[Dataset]:
 def datasets_declared_in(path: Path) -> list[Dataset]:
     """Every dataset ONE data-asset.yaml declares, in its order - for a
     configuration-only read of an asset that need not be the selected one
-    (qa_tools/common/every_asset.py; post-build-review #315 L3). The same
+    (asset_model/every_asset.py; post-build-review #315 L3). The same
     build, keyed on the file's content, as the selected asset's tree."""
-    return list(_from_text(path, config_yaml.read(path))[1].values())
+    return list(from_text(path, config_yaml.read(path))[1].values())
 
 
 def dataset(dataset_id: str) -> Dataset:

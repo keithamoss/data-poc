@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-from qa_tools.common import assets
+from asset_model import assets
 
 
 def adapter_module(collection_id: str):

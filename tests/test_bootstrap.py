@@ -17,7 +17,7 @@ from __future__ import annotations
 import dbsupport
 import pytest
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.common import bootstrap as boot
 from qa_tools.common import supply_db
 

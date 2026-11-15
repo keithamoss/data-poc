@@ -1364,7 +1364,7 @@ but it still needs a `QAC` requirement of its own.
 **A live trap found by running the real code rather than reading it.**
 *(Removed 2026-10-04 with REQ-PIPE-131 - `next_unfilled_claimable()` no
 longer exists.)*
-`qa_tools/common/slots.py`'s `next_unfilled_claimable()` implements
+`asset_model/slots.py`'s `next_unfilled_claimable()` implements
 "oldest claimable unfilled slot" with **no on-time-wins branch and no
 monotonic filling** - which is exactly the rule Thread E proves
 catastrophic. Nothing calls it yet, so it is a trap rather than a bug.
@@ -5751,7 +5751,7 @@ code, after the scoper reported):
 
 | Scoper's claim | Verdict |
 |---|---|
-| `slots.py` already computes `due_at`, `late_after`, `claim_opens_at` | Confirmed - `qa_tools/common/slots.py:63-82,128` |
+| `slots.py` already computes `due_at`, `late_after`, `claim_opens_at` | Confirmed - `asset_model/slots.py:63-82,128` |
 | A retrospective-edit gate already ships, as a say-what-you-did gate | Confirmed - `validate_schedule.py:778`, wired at `:896` |
 | Comparing against `HEAD` reintroduces a closed hole; use `diff_base()` | Confirmed - `qa_tools/common/diff_base.py:55` |
 | The gap invariant holds today with real margin | Re-measured independently, identical: daily 19:00:00 over 495 slots, the quarterly datasets 74d 16:00 over 20, `cp-case-workers` 166d 16:00 over 10 |
