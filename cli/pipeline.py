@@ -353,7 +353,7 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     # 4): the pinned digest, dimmed, then the closing line.
     if result.pin_digest:
         console.print(boot.pinned_line(result.pin_digest), style="dim")
-    console.print(f"Populated: {boot.closing_line(result)}", style="green")
+    console.print(f"Populated: {boot.closing_line(result)}", style="green", soft_wrap=True)
     # A STARTED PROCESS UNDER ANOTHER PIN FAILS THE BOOTSTRAP (criterion 3).
     mismatch = boot.pin_mismatch_message(result.pin_differences)
     if mismatch:

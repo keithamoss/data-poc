@@ -39,7 +39,7 @@ from asset_model import asset_time
 
 #: How many (agreement, zones) pairs are remembered: the committed one and a
 #: few staged corrections' (a replay stages one per arrival it re-reads).
-AGREEMENTS = 8
+AGREEMENTS = 16
 
 
 class Memo:
@@ -74,6 +74,10 @@ class Memo:
             while len(self._held) > self._limit:
                 self._held.popitem(last=False)
         return value
+
+    def __len__(self) -> int:
+        """How many (agreement, zones) pairs it holds."""
+        return len(self._held)
 
     def clear(self) -> None:
         with self._lock:

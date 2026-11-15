@@ -491,10 +491,33 @@ def load(path: Path | None = None) -> Agreement:
     return from_doc(doc, path)
 
 
+#: Agreements built from a document, keyed on its content (REQ-PIPE-400).
+_FROM_DOC = config_yaml.Built(versions=16)
+
+
 def from_doc(doc: dict, path: Path | str = "assets/<asset>/calendar.yaml") -> Agreement:
     """An `Agreement` from an already-parsed calendar.yaml document - what
     REQ-PIPE-111's freeze gate needs for the file as it stood at an earlier
-    commit, which is text from git rather than a path."""
+    commit, which is text from git rather than a path.
+
+    THE SAME INSTANCE FOR THE SAME CONTENT (REQ-PIPE-400): a generation and a
+    replay build the agreement either side of each declared correction again
+    and again, and the values derived from an agreement are remembered per
+    instance (asset_model/derived.py) - so a fresh instance for the same
+    document would work everything out again. Keyed on the document's
+    canonical text, as config_yaml.Built keys a file on its text; an Agreement
+    is immutable, so one instance serves every caller. A document that cannot
+    be written canonically is built afresh."""
+    import json
+
+    try:
+        text = json.dumps(doc, sort_keys=True, default=repr)
+    except (TypeError, ValueError):
+        return _from_doc(doc, path)
+    return _FROM_DOC.get(str(path), text, lambda: _from_doc(doc, path))
+
+
+def _from_doc(doc: dict, path: Path | str) -> Agreement:
     from asset_model import schedule
 
     calendars: dict = {}

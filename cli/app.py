@@ -254,7 +254,7 @@ def _bootstrap_menu() -> None:
     if changed:
         console.print(changed, style="red")
         return
-    console.print(f"Ready - {boot.closing_line(result)}", style="green")
+    console.print(f"Ready - {boot.closing_line(result)}", style="green", soft_wrap=True)
 
 
 class _MothmanGroup(click.RichGroup):

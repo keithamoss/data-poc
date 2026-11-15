@@ -979,7 +979,9 @@ def _run_concurrently(names: list[str], sequential: bool):
     adapter object, which a path-loaded module cannot be unpickled into.
     """
     with stream_pool(len(names)) as pool:
-        futures = {n: pool.submit(_run_stream_reporting, n, sequential) for n in names}
+        # _run_stream LOOKED UP HERE and handed by reference, so the process
+        # runs whatever this module names it now.
+        futures = {n: pool.submit(_reporting, _run_stream, n, sequential) for n in names}
         ran = {n: f.result() for n, f in futures.items()}
     return {n: r[0] for n, r in ran.items()}, {n: r[1] for n, r in ran.items()}
 
@@ -998,8 +1000,8 @@ def stream_pool(workers: int):
                                initializer=assets.adopt, initargs=assets.handoff())
 
 
-def _run_stream_reporting(key: str, sequential: bool):
-    """_run_stream in a started process, with the pin it ran under
+def _reporting(run, *args):
+    """`run(*args)` in a started process, with the pin it ran under
     (REQ-GEN-399 criterion 3). TOP LEVEL, so a spawned process can import it
     by name."""
-    return _run_stream(key, sequential), pin_report()
+    return run(*args), pin_report()
