@@ -186,7 +186,17 @@ def ensure_period_schema(conn, period_name: str) -> str:
     Creating one is cheap and idempotent. It is NOT promotion - an
     empty period schema says "nothing has been promoted into this
     period", which is a true and useful thing for a check to read.
+
+    ONLY FOR A PERIOD ON THE ASSET'S BASELINE (REQ-PIPE-345 criterion 5):
+    one period schema per baseline period, and none for a period the
+    baseline does not name - refused before anything reaches the database.
     """
+    from qa_tools.common import schedule
+
+    if not schedule.on_baseline(period_name):
+        raise PeriodSchemaError(
+            f"period {period_name!r} is not on this asset's baseline calendar, so it has no "
+            f"period schema - one schema per baseline period, and none for any other.")
     schema = period_schema(period_name)
     supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     ensure_manifest(conn, period_name)

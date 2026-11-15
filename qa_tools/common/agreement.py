@@ -1,11 +1,12 @@
 """The delivery agreement, read into one immutable value (REQ-PIPE-110).
 
-ONE FILE, contract/calendar.yaml, holds an asset's whole delivery
-agreement: the named calendars, which calendar each collection and dataset
-is on, and each dataset's participation - which periods it owes, its
+ONE FILE, assets/<asset>/calendar.yaml, holds an asset's whole delivery
+agreement: its one baseline calendar (REQ-PIPE-345 - every dataset is on it,
+and no collection or dataset names a calendar or dates of its own), and each
+dataset's participation - which of the baseline's periods it owes, its
 expected time of day, its grace allowance and any claim-window override, as
-effective-dated versions - with `not_expected`, a dataset's own authored
-dates, and the deliberate no-calendar declaration (REQ-PIPE-106).
+effective-dated versions - with `not_expected` and the deliberate
+no-calendar declaration (REQ-PIPE-106).
 
 ONE LOADER, ONE VALUE, PASSED AS AN ARGUMENT (criterion 31; delivery-
 architect B1). `load(path)` reads a file into an `Agreement`; `current()` is
@@ -138,13 +139,9 @@ class Standing:
 @dataclass(frozen=True)
 class DatasetAgreement:
     dataset_id: str
-    #: The calendar the dataset names itself, or None to take its collection's.
-    calendar: str | None
     no_calendar: str | None
     participation: tuple[ParticipationVersion, ...]
     not_expected: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
-    #: A dataset's own authored dates, as a calendar of its own, or None.
-    own_dates: object | None = None
 
 
 @dataclass(frozen=True)
@@ -163,8 +160,9 @@ class Agreement:
     """The whole delivery agreement of one asset, immutable."""
 
     path: Path
-    calendars: MappingProxyType          # name -> schedule.Calendar
-    collections: MappingProxyType        # collection id -> calendar name
+    #: name -> schedule.Calendar; at most one, the asset's baseline
+    #: (REQ-PIPE-345) - the schedule gate refuses a second.
+    calendars: MappingProxyType
     datasets: MappingProxyType           # dataset id -> DatasetAgreement
     #: collection id -> its participation_defaults versions, oldest first
     #: (REQ-PIPE-181 criterion 1).
@@ -192,14 +190,14 @@ class Agreement:
         return self.datasets.get(dataset_id)
 
     def calendar_name_for(self, dataset_id: str) -> str | None:
-        """The calendar a dataset is on: its own, else its collection's
-        (criteria 10 and 11)."""
-        from qa_tools.common import hierarchy
+        """The calendar a dataset is on: the asset's baseline, whatever the
+        dataset or its collection (REQ-PIPE-345 criterion 2) - or None where
+        the asset declares none. Never a calendar named on a collection or a
+        dataset, which the schedule gate refuses and nothing reads."""
+        from qa_tools.common import schedule
 
-        own = self.dataset(dataset_id)
-        if own is not None and own.calendar:
-            return own.calendar
-        return self.collections.get(hierarchy.dataset(dataset_id).collection_id)
+        base = schedule.baseline(self)
+        return base.name if base is not None else None
 
     def collection_of(self, dataset_id: str) -> str | None:
         from qa_tools.common import hierarchy
@@ -210,16 +208,10 @@ class Agreement:
             return None
 
     def defaults_for(self, dataset_id: str) -> tuple[ParticipationVersion, ...]:
-        """The collection defaults a dataset may take values from - none
-        where it names a calendar other than its collection's, whose months
-        and windows were written for another calendar (REQ-PIPE-181
-        criterion 9; the gate refuses the configuration that would rely
-        on them)."""
-        collection = self.collection_of(dataset_id)
-        own = self.dataset(dataset_id)
-        if own is not None and own.calendar and own.calendar != self.collections.get(collection):
-            return ()
-        return self.defaults.get(collection, ())
+        """The collection defaults a dataset may take values from - always
+        its collection's, since every dataset is on the one baseline its
+        collection's months and windows were written for (REQ-PIPE-345)."""
+        return self.defaults.get(self.collection_of(dataset_id), ())
 
     def participation_on(self, dataset_id: str, on: date) -> ParticipationVersion | None:
         """The participation in force on a date, each value RESOLVED from the
@@ -479,25 +471,6 @@ def _offset_versions(block, where: str) -> tuple[OffsetVersion, ...]:
     return tuple(sorted(out, key=lambda v: v.effective_from))
 
 
-def _own_dates(raw: dict, dataset_id: str):
-    """A dataset's own authored dates as a calendar of its own, versioned like
-    any calendar (criterion 25) - or None."""
-    from qa_tools.common import schedule
-
-    block = raw.get("dates")
-    if not block:
-        return None
-    versions = []
-    for i, version in enumerate(block.get("versions") or []):
-        # A dataset's own dates borrow its calendar's claim window, so the
-        # version carries none of its own; a zero placeholder keeps the one parser.
-        versions.append(schedule._parse_version({**version, "claim_window": "0h"},
-                                                f"dataset {dataset_id!r} dates", i))
-    versions.sort(key=lambda v: v.effective_from)
-    return schedule.Calendar(name=f"{dataset_id} (own dates)", description="",
-                             versions=tuple(versions))
-
-
 def load(path: Path | None = None) -> Agreement:
     """Read one calendar.yaml into an `Agreement` - the selected asset's
     unless `path` names another. The one loader."""
@@ -522,13 +495,13 @@ def from_doc(doc: dict, path: Path | str = "assets/<asset>/calendar.yaml") -> Ag
         if name in calendars:
             raise schedule.ScheduleConfigError(f"{path}: calendar {name!r} is defined twice")
         calendars[name] = schedule.parse_calendar(raw)
-    collections: dict = {}
+    seen: set = set()
     for c in doc.get("collections") or []:
-        if c.get("id") in collections:
+        if c.get("id") in seen:
             raise schedule.ScheduleConfigError(
                 f"{path}: collection {c.get('id')!r} is listed twice - the later entry would "
-                f"silently decide its calendar.")
-        collections[c.get("id")] = c.get("calendar")
+                f"silently decide its participation.")
+        seen.add(c.get("id"))
     defaults: dict = {}
     for c in doc.get("collections") or []:
         where = f"collection {c.get('id')!r} participation_defaults"
@@ -567,12 +540,12 @@ def from_doc(doc: dict, path: Path | str = "assets/<asset>/calendar.yaml") -> Ag
                     f"supply and no reason is indistinguishable from one somebody forgot to "
                     f"configure.")
             not_expected[name] = reason
+        # A `calendar:` or `dates:` here is not read (REQ-PIPE-345 criterion
+        # 2): the schedule gate refuses it, naming the asset and the file.
         datasets[ds] = DatasetAgreement(
-            dataset_id=ds, calendar=raw.get("calendar"), no_calendar=raw.get("no_calendar"),
-            participation=versions, not_expected=MappingProxyType(not_expected),
-            own_dates=_own_dates(raw, ds))
+            dataset_id=ds, no_calendar=raw.get("no_calendar"),
+            participation=versions, not_expected=MappingProxyType(not_expected))
     return Agreement(path=Path(path), calendars=MappingProxyType(calendars),
-                     collections=MappingProxyType(collections),
                      datasets=MappingProxyType(datasets),
                      defaults=MappingProxyType({k: v for k, v in defaults.items() if v}),
                      offsets=MappingProxyType(offsets))
@@ -608,7 +581,7 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
     from qa_tools.common import schedule
 
     agreement = agreement or current()
-    cal = schedule.calendar(agreement.calendar_name_for(dataset_id), agreement)
+    cal = schedule.calendar_for_dataset(dataset_id, agreement)
     version = cal.current
     if version.is_cadence_rule:
         out: dict = {"type": version.cadence_rule}

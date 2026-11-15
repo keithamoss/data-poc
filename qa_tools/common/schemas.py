@@ -595,10 +595,11 @@ class DatasetConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
     table: NonEmptyStr
-    #: The delivery agreement - which calendar, participation, not_expected,
-    #: a dataset's own dates and the no-calendar declaration - lives in
-    #: contract/calendar.yaml since REQ-PIPE-110, and none of it is accepted
-    #: here: a key stated in two files is two answers that can disagree.
+    #: The delivery agreement - participation, not_expected and the
+    #: no-calendar declaration - lives in assets/<asset>/calendar.yaml since
+    #: REQ-PIPE-110, and none of it is accepted here: a key stated in two
+    #: files is two answers that can disagree. No dataset or collection names
+    #: a calendar anywhere (REQ-PIPE-345).
     #: How this dataset's files are named, as a regular expression
     #: (REQ-PIPE-058). Optional HERE because a dataset can coherently
     #: exist while its pattern is being added; whether a dataset that is
@@ -744,23 +745,14 @@ class Participation(_Strict):
     versions: list[ParticipationVersionConfig] = Field(min_length=1)
 
 
-class OwnDatesVersion(_Strict):
-    effective_from: str = Field(pattern=_DATE_PATTERN)
-    changelog: list[AgreementChangelogEntry] = Field(min_length=1)
-    dates: list[CalendarDate] = Field(min_length=1)
-
-
-class OwnDates(_Strict):
-    versions: list[OwnDatesVersion] = Field(min_length=1)
-
-
 class DatasetAgreementConfig(_Strict):
+    """A dataset's participation in its asset's baseline. It names no
+    calendar and states no dates of its own (REQ-PIPE-345): the schedule
+    gate refuses either by name."""
     id: NonEmptyStr
-    calendar: NonEmptyStr | None = None
     no_calendar: NonEmptyStr | None = None
     participation: Participation | None = None
     not_expected: list[NotExpectedPeriod] | None = None
-    dates: OwnDates | None = None
     #: Declared corrections to this dataset's frozen items (REQ-PIPE-111).
     corrections: list[Correction] = Field(default_factory=list)
 
@@ -779,8 +771,9 @@ class FilesGoToPeriod(_Strict):
 
 
 class CollectionAgreementConfig(_Strict):
+    """A collection's defaults and offset. It names no calendar: its datasets
+    are on the asset's baseline (REQ-PIPE-345)."""
     id: NonEmptyStr
-    calendar: NonEmptyStr | None = None
     #: Which period a round's files go into (REQ-PIPE-320) - on the
     #: collection only, never a dataset (criterion 3).
     files_go_to_period: FilesGoToPeriod | None = None
@@ -794,8 +787,10 @@ class CollectionAgreementConfig(_Strict):
 
 
 class CalendarFile(_Strict):
-    #: May be empty where every dataset declares no calendar (criterion 36)
-    #: - the project-extraction asset shape.
+    #: The asset's baseline - at most one, which the schedule gate enforces
+    #: with REQ-PIPE-345's own words. May be empty where every dataset
+    #: declares no calendar (REQ-PIPE-110 criterion 36) - the
+    #: project-extraction asset shape.
     calendars: list[CalendarConfig] = Field(default_factory=list)
     collections: list[CollectionAgreementConfig] = Field(default_factory=list)
     datasets: list[DatasetAgreementConfig] = Field(default_factory=list)

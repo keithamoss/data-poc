@@ -196,23 +196,6 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             ne = ne or {}
             add(Item(f"dataset {ds} not_expected {ne.get('period')}", owner, "not_expected",
                      _plain(ne.get("reason")), {"dataset": ds, "period": str(ne.get("period"))}))
-        own = [(v or {}) for v in (((entry.get("dates") or {}).get("versions")) or [])]
-        own_windows = dict(_windows(own))
-        for v in own:
-            eff = str(v.get("effective_from"))
-            end = own_windows.get(eff)
-            dates = sorted(str((d or {}).get("date")) for d in (v.get("dates") or []))
-            add(Item(f"dataset {ds} dates version {eff}", owner, "own_version",
-                     _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + ("dates", "effective_from")}),
-                     {"dataset": ds, "eff": eff, "first": dates[0] if dates else None}))
-            for d in (v.get("dates") or []):
-                d = d or {}
-                when = str(d.get("date"))
-                if when < eff or (end is not None and when >= end):
-                    continue
-                add(Item(f"dataset {ds} dates period {d.get('period')}", owner,
-                         "own_date", _plain(d.get("date")), {"dataset": ds, "date": when}))
     # A COLLECTION'S DEFAULTS FREEZE LIKE A DATASET'S OWN VERSIONS
     # (REQ-PIPE-181, amending REQ-PIPE-111 criterion 4): a value its datasets
     # take governs their filings as much as one they state, and the
@@ -246,13 +229,15 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                       "first_version": i == 0}))
     # WHICH CALENDAR EACH DATASET IS ON, as resolved (delivery-critic on
     # 111, H2; PROVISIONAL, Keith's fork from REQ-PIPE-110 and
-    # plans/running-thoughts.md #79): moving a dataset - or its whole
-    # collection - to another calendar, or to none, re-judges its history
-    # against a different schedule, so it freezes like a date. Per dataset,
-    # on the dataset's own entry, because that is the owner a correction
-    # names; a collection move is one change to each of its datasets.
-    collections = {(c or {}).get("id"): (c or {}).get("calendar")
-                   for c in (cal_doc or {}).get("collections") or []}
+    # plans/running-thoughts.md #79): moving a dataset to none, or the asset
+    # to another baseline, re-judges its history against a different
+    # schedule, so it freezes like a date. Per dataset, on the dataset's own
+    # entry, because that is the owner a correction names. THE ASSET'S
+    # BASELINE, never a calendar a collection or dataset names (REQ-PIPE-345
+    # criterion 2): the first calendar declared, which the gate requires to
+    # be the only one.
+    baseline = next((str((c or {}).get("name"))
+                     for c in (cal_doc or {}).get("calendars") or []), None)
     entries = {(e or {}).get("id"): (e or {}) for e in (cal_doc or {}).get("datasets") or []}
     for agency in (((asset_doc or {}).get("hierarchy") or {}).get("agencies") or []):
         for coll in ((agency or {}).get("collections") or []):
@@ -262,7 +247,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                 if entry.get("no_calendar") is not None:
                     value = f"no calendar ({entry['no_calendar']})"
                 else:
-                    value = entry.get("calendar") or collections.get((coll or {}).get("id"))
+                    value = baseline
                 if value is None:
                     continue
                 add(Item(f"dataset {ds} calendar", ("dataset", ds), "membership", value,
@@ -398,14 +383,6 @@ def freeze_instant(item: Item, agr) -> datetime | None:
                 c["dataset"], asset_time.local_date(datetime.now(UTC)) + timedelta(days=400), agr)
         match = next((p for p in periods if p.name == c["period"]), None)
         return _claim_open(c["dataset"], match.date, agr) if match else None
-    if item.kind == "own_version":
-        eff = date.fromisoformat(c["eff"])
-        first = date.fromisoformat(c["first"]) if c.get("first") else None
-        return _min(asset_time.start_of_day(eff),
-                    _claim_open(c["dataset"], first, agr) if first else None)
-    if item.kind == "own_date":
-        day = date.fromisoformat(c["date"])
-        return _claim_open(c["dataset"], day, agr) or asset_time.start_of_day(day)
     if item.kind == "membership":
         # From the first instant the dataset's first slot could be filed:
         # its first participation version's freeze point.

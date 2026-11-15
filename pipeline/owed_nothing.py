@@ -34,7 +34,6 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
     agr = schedule._agreement(agreement)
     begins = schedule.owes_from(dataset_id, agr)
     skipped = schedule.not_expected_periods(dataset_id, agr)
-    own_dates = schedule.dataset_dates_override(dataset_id, agr) is not None
     out: list[dict] = []
     # EACH ROUND, DECIDED ON THE ROUND'S OWN DATE, NAMED BY THE PERIOD ITS
     # FILES WOULD FILL (REQ-PIPE-321 criteria 6 and 13; REQ-DASH-182 criterion
@@ -61,7 +60,7 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
             out.append({**row, "kind": TURNED_OFF, "reason": standing.turned_off.reason,
                         "months": None})
             continue
-        months = None if own_dates else schedule.delivery_months(dataset_id, rnd.date, agr)
+        months = schedule.delivery_months(dataset_id, rnd.date, agr)
         if months is not None and rnd.date.month not in months:
             version = agr.participation_on(dataset_id, rnd.date)
             out.append({**row, "kind": PARTICIPATION, "reason": (version.reason or "").strip(),

@@ -733,9 +733,12 @@ def drawn_grown_periods() -> list:
     # criterion 3): the plan's draws stay on the rounds they were drawn on,
     # and a round's quarter is the one its files go into, as generated_periods'
     # are - so at files_go_to_period 1 every name moves on by one together.
-    sequence = schedule.periods_for_calendar("quarterly")
+    # THE ASSET'S BASELINE, asked for rather than named (REQ-PIPE-345
+    # criterion 6).
+    baseline = schedule.baseline().name
+    sequence = schedule.periods_for_calendar(baseline)
     index = {p.name: i for i, p in enumerate(sequence)}
-    rounds = schedule.periods_for_calendar("quarterly", until=get_anchor_date())[-n:-len(run_plan())]
+    rounds = schedule.periods_for_calendar(baseline, until=get_anchor_date())[-n:-len(run_plan())]
     out = []
     for r in rounds:
         offset = schedule._agreement(None).files_go_to_period_for(DATASET_ID, r.date) or 0

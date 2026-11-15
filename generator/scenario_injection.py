@@ -1406,20 +1406,21 @@ def check_suppressed_days_are_empty(placements: Sequence[Placement], recognised)
 
 def _lands_in(dataset_id: str, day: str, received_at) -> bool:
     """Whether an arrival received at `received_at` belongs to the suppressed
-    period `day`. For a DAILY dataset that is the period's own claim window,
-    from its opening to the next day's (REQ-GEN-044): in the evening-before
-    era a day's supply arrives the evening before, so the calendar day of
-    receipt names the wrong period. For any other cadence, the calendar day,
-    as before."""
+    period `day`. On a CADENCE-RULE baseline - the only rule there is is
+    daily - that is the period's own claim window, from its opening to the
+    next day's (REQ-GEN-044): in the evening-before era a day's supply arrives
+    the evening before, so the calendar day of receipt names the wrong period.
+    On authored dates, the calendar day, as before. Asked of the baseline's
+    kind, never its name (REQ-PIPE-345 criterion 6)."""
     from qa_tools.common import hierarchy, schedule, slots
 
     received = (received_at if isinstance(received_at, datetime)
                 else datetime.fromisoformat(str(received_at)))
     try:
-        daily = schedule.calendar_for_dataset(dataset_id).name == "daily"
+        by_rule = schedule.calendar_for_dataset(dataset_id).is_cadence_rule
     except hierarchy.UnknownDatasetError:
-        daily = False  # a dataset the asset does not declare has no window
-    if not daily:
+        by_rule = False  # a dataset the asset does not declare has no window
+    if not by_rule:
         return str(received_at)[:10] == day
     period = date.fromisoformat(day)
     opens = slots.slot_instants(dataset_id, period).claim_opens_at
