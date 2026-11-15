@@ -15242,3 +15242,17 @@ twice. It deliberately did not re-find the `TypeError`.
      requirement, because REQ-GEN-381 criterion 5 ("pipeline run needs
      nothing of the bootstrap package") cannot be met while it calls
      `targets_agree` and `_confirm_corrections`.
+
+358. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **tests/test_carried.py's module fixture can meet a 2026-Q1 inherit another module left behind.**
+     Seen in two of four full non-deployment runs on the step-3 tree (both
+     with every other module green): its `cp_duckdb_dir_for_module` fixture
+     files the dirty delivery to 2026-Q1 and is refused - "Nothing was
+     expected from cp-case-workers for 2026-Q1: it is inherited" - because an
+     earlier module on the same xdist worker recorded that inherit in the
+     shared worker database. It passed alone, after `test_period_opening`,
+     `test_inheritance`, `test_carry_forward`, `test_not_supplied` and
+     `test_files_go_to_period`, and in the verbose full run. Not shown to be
+     caused or cured by step 3 (REQ-PIPE-382's real-asset promotions now take
+     effect at the instant they are made, which changes what an inherit sees);
+     the fixture's 2026-Q1 is a shared real period, so the likely fix is a
+     private database or a made-up period for it. Not fixed here.

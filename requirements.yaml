@@ -33141,7 +33141,7 @@ requirements:
     - bootstrap/target_agreement.py::after_replay
     - cli/collection_cli.py::CollectionCLI::try_targets
     - cli/collection_cli.py::CollectionCLI::generate_synthetic_data
-    - cli/pipeline.py::generated_targets
+    - generator/public.py::generated_targets
     - cli/pipeline.py::disagreement_message
     - cli/pipeline.py::run_command
     - cli/app.py::_bootstrap_menu
@@ -35849,16 +35849,15 @@ requirements:
       - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_after_the_history_is_refused"
       - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_an_undeclared_correction_is_refused_naming_it"
       - "tests/test_correction_replay.py"
-      - "tests/test_cli_pipeline.py::TestCorrectionsAfterAFullRun::test_after_both"
       - "tests/test_correction_apply.py"
     implemented_by:
-      - "qa_tools/common/scripted_corrections.py::load"
-      - "qa_tools/common/scripted_corrections.py::problems"
-      - "qa_tools/common/scripted_corrections.py::resolve"
-      - "qa_tools/common/correction_replay.py::confirm_due"
-      - "qa_tools/common/bootstrap.py::_confirm_corrections"
-      - "qa_tools/common/bootstrap.py::_run_what_the_confirmations_owe"
-      - "qa_tools/common/bootstrap.py::resume"
+      - "bootstrap/scripted_corrections.py::load"
+      - "bootstrap/scripted_corrections.py::problems"
+      - "bootstrap/scripted_corrections.py::resolve"
+      - "bootstrap/correction_replay.py::confirm_due"
+      - "bootstrap/bootstrap.py::_confirm_corrections"
+      - "bootstrap/bootstrap.py::_run_what_the_confirmations_owe"
+      - "bootstrap/bootstrap.py::resume"
       - "generator/correction_claims.py::check"
       - "generator/correction_claims.py::filing_changes"
       - "generator/correction_claims.py::check_written"
@@ -37703,7 +37702,7 @@ requirements:
     - qa_tools/common/processing_pass.py::_steps
     - qa_tools/common/recheck.py::execute
     - cli/dashboard.py::_rebuild_results
-    - cli/pipeline.py::_run_collection
+    - cli/pipeline.py::run_command
     - cli/one_table.py::OneTableCLI::_run_single
     - pipeline/build_dashboard_data.py::build_one_table
     - qa_tools/common/validate_collections.py::ALLOWLIST
@@ -37879,7 +37878,7 @@ requirements:
       - cli/common.py::short_collection_option
       - cli/common.py::id_collection_option
       - cli/common.py::CollectionParam
-      - cli/pipeline.py::_run_collection
+      - cli/pipeline.py::run_command
       - cli/debug.py::_manifest_entry
       - qa_tools/tools/steps.py::RUN_STEPS
     open_questions: []
@@ -38060,7 +38059,7 @@ requirements:
       - generator/targeting.py::levers_for
       - generator/targets.py::_trialled
       - cli/pipeline.py::generate_collection
-      - cli/pipeline.py::target_datasets
+      - generator/public.py::target_datasets
       - 'generator/scenario_injection.py::this_assets_injections'
       - 'asset_model/every_asset.py::declared'
       - 'asset_model/assets.py::every'
@@ -39222,13 +39221,12 @@ requirements:
     linked_tests:
       - "tests/test_collections_registry.py"
       - "tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_corrections_are_confirmed_once_both_replays_finish"
-      - "tests/test_cli_pipeline.py::TestCorrectionsAfterAFullRun::test_after_both"
       - "tests/test_collection_cli.py"
       - "tests/test_cli_at_thirty_collections.py"
     implemented_by:
       - "assets/quarterly/collections/emergency_department.py::ADAPTER"
-      - "qa_tools/common/bootstrap.py::bootstrap"
-      - "qa_tools/common/bootstrap.py::_confirm_corrections"
+      - "bootstrap/bootstrap.py::bootstrap"
+      - "bootstrap/bootstrap.py::_confirm_corrections"
     evidence:
       - "Criterion 1: `python -m qa_tools.common.validate_collections` (REQ-TEST-249's report), same tree, 2026-10-19: 'emergency-department: adapter 16 lines of logic against a budget of 150; its generator provider 170.' (civil-registration 71 and 441, child-protection 63 and 493)."
       - "The collections gate (criterion 2's 'no Emergency Department name outside its configuration, check files, adapter and provider'): `mothman check --only collections`, same tree, 2026-10-19, 'passed', reporting '0 file(s) still wait on the requirement that rewires them'."
@@ -39803,7 +39801,7 @@ requirements:
     - qa_tools/common/arrival_lifecycle.py::process_stream
     - qa_tools/common/period_schema.py::open_period
     - qa_tools/common/knock_on.py::follow_up_stream
-    - cli/pipeline.py::_run_stream
+    - cli/pipeline.py::run_command
     evidence:
     - >-
       2026-10-19, a fresh bootstrap from empty into a scratch database (225 deliveries, all three collections, exit 0):
@@ -40949,7 +40947,7 @@ requirements:
     - "qa_tools/common/filing_decisions.py::apply"
     - "cli/filing_tui.py::_gate_busy"
     - "cli/lifecycle_report.py::_gate_line"
-    - "qa_tools/common/checkpoints.py::snapped"
+    - "bootstrap/checkpoints.py::snapped"
     - "qa_tools/common/filing_queue.py::from_run"
     - "qa_tools/common/decision_log.py::Decision"
     - "qa_tools/common/qa_store.py::ensure_schema"
@@ -42620,15 +42618,15 @@ requirements:
     - tests/test_target_agreement.py::TestGateOutcomes::test_a_declaration_on_a_dataset_with_no_targets_is_compared_too
     - tests/test_scenario_injection.py::TestTheGateOutcomeScenarios
     implemented_by:
-    - "qa_tools/common/target_agreement.py::own_results"
-    - "qa_tools/common/target_agreement.py::replay_report"
-    - "qa_tools/common/target_agreement.py::after_replay"
-    - "qa_tools/common/target_agreement.py::gate_outcome_differences"
-    - "qa_tools/common/target_agreement.py::GateOutcomeDifference"
-    - "qa_tools/common/bootstrap.py::targets_agree"
+    - "bootstrap/target_agreement.py::own_results"
+    - "bootstrap/target_agreement.py::replay_report"
+    - "bootstrap/target_agreement.py::after_replay"
+    - "bootstrap/target_agreement.py::gate_outcome_differences"
+    - "bootstrap/target_agreement.py::GateOutcomeDifference"
+    - "bootstrap/bootstrap.py::targets_agree"
     - "generator/targets.py::gate_outcomes"
     - "generator/targets.py::DeclaredGateOutcome"
-    - "cli/pipeline.py::generated_gate_outcomes"
+    - "generator/public.py::generated_gate_outcomes"
     - generator/scenario_injection.py::GateOutcome
     - generator/scenario_injection.py::Placement
     - generator/scenario_injection.py::apply_file_shape
@@ -46027,8 +46025,8 @@ requirements:
       date: '2026-10-30'
     implemented_by:
     - "assets/quarterly/collections/linkage_products.py::ADAPTER"
-    - "qa_tools/common/bootstrap.py::with_what_it_reads"
-    - "qa_tools/common/bootstrap.py::reads_others"
+    - "bootstrap/bootstrap.py::with_what_it_reads"
+    - "bootstrap/bootstrap.py::reads_others"
     - "asset_model/drift.py::collection_checks"
     linked_tests:
     - "tests/test_bootstrap_carries_what_it_reads.py::test_linkage_alone_brings_the_collections_it_links"
@@ -47473,7 +47471,7 @@ requirements:
     - 'qa_tools/common/ticket_sync.py::_label'
     - 'qa_tools/common/bulk_recheck.py::summary_lines'
     - 'qa_tools/common/recheck.py::_said'
-    - 'qa_tools/common/target_agreement.py::_said'
+    - 'bootstrap/target_agreement.py::_said'
     evidence:
     - '2026-11-01, tree f22855b, empty warehouse: 33 touched and neighbouring test modules, 1035 passed, 2 failed and 3 errors, all five a worker test database that did not exist (''database "mothman_test_gw3" does not exist''); re-run alone, 11 of 11 passed.'
     - 'Criterion 3 SEEN FAILING FIRST: tests/test_status_reads_values.py failed 15 of 17 before the change; its overdue-reason case passed on the old code until root_cause was reworded, then failed (''could not run: failing because cp-clients ...''), and passed once filing_tui read root_cause._overdue_reason. 17 of 17 pass after.'
@@ -48089,21 +48087,24 @@ requirements:
     - REQ-GEN-246
     - REQ-PIPE-363
     retired_criteria:
-      - criterion: 4
-        date: "2026-11-15"
-        by: Keith
-        replaced_by: [REQ-GEN-392]
-        reason: "superseded by REQ-GEN-392, which derives the presets where they are in generator/dirty.py; the move to providers is dropped"
-      - criterion: 6
-        date: "2026-11-15"
-        by: Keith
-        replaced_by: [REQ-GEN-392]
-        reason: "population keeps its own literal rates and dirties both assets in one process (QC, 2026-11-14)"
-      - criterion: 8
-        date: "2026-11-15"
-        by: Keith
-        replaced_by: [REQ-PIPE-385]
-        reason: "an asset with no synthetic/ folder is REQ-PIPE-385's"
+    - criterion: 4
+      date: '2026-11-15'
+      by: Keith
+      replaced_by:
+      - REQ-GEN-392
+      reason: superseded by REQ-GEN-392, which derives the presets where they are in generator/dirty.py; the move to providers is dropped
+    - criterion: 6
+      date: '2026-11-15'
+      by: Keith
+      replaced_by:
+      - REQ-GEN-392
+      reason: population keeps its own literal rates and dirties both assets in one process (QC, 2026-11-14)
+    - criterion: 8
+      date: '2026-11-15'
+      by: Keith
+      replaced_by:
+      - REQ-PIPE-385
+      reason: an asset with no synthetic/ folder is REQ-PIPE-385's
     decisions:
     - 'SYNTHETIC CONFIGURATION GETS ITS OWN HOME INSIDE EACH ASSET (Keith, 2026-10-31, #134 (a), then sign-off Q4c): synthetic/<asset>/ folded into assets/<asset>/synthetic/. The code separation of the generator and the bootstrap follows as its own batch (#134''s code half, queued behind the split).'
     - 'daily_batch AND THE PRESETS FOLD INTO THEIR PROVIDERS - Q5 CLOSED (Keith, 2026-10-31, v3 Q5 (a), built as the architect showed it can be, v3 BLOCKING 3): providers are one file each and loaded by path, and a provider may import nothing under assets/, so daily_batch.py cannot sit beside civil_registration.py as a second module. REJECTED leaving daily_batch.py and the per-collection presets in shared code.'
@@ -48112,11 +48113,7 @@ requirements:
     - 'SEED RANGES UNIQUE WITHIN AN ASSET (delivery-scoper, v3): providers of two assets never run in one generator process.'
     - 'WHAT LANDED (2026-11-02): providers under assets/<asset>/synthetic/collections/ and scripted_decisions.yaml and synthetic_inputs.yaml under assets/<asset>/synthetic/ (the move commit de009e91), read there through Asset.synthetic (fe2a8fd3). NOT YET DONE: criterion 4''s fold of daily_batch.py and the apply_*_presets into their providers, and criterion 6''s per-asset `mothman population` - synthetic_data_generator/agency_datasets.py also imports daily_batch, so the fold needs population to load the daily provider by path while it builds both assets'' tables, a design question for this requirement''s own build.'
     - 'ONE SCENARIO TABLE UNTIL EACH ASSET HOLDS ITS OWN (SETTLED by Keith 2026-11-02, the move critic''s decision 2; was PROVISIONAL): generator/scenario_injection.py INJECTIONS stays one repository-wide list, so generation, correction claims and `mothman scenarios validate` walk only the injections naming a dataset the selected asset declares (scenario_injection.this_assets_injections); another asset''s are passed over, and one naming a dataset in no asset is no longer refused - it WAITS for REQ-PIPE-354, and meanwhile a warning names each scenario dropped. Recorded as REQ-GEN-246''s unmet criterion 8. REJECTED reading both assets now, and dropping silently. (Earlier the same day, morning report C14: accepted until REQ-PIPE-352 criterion 3, as recommended; the move critic''s decision 2 then named REQ-PIPE-354 as what it waits for.)'
-    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5; c4, c6 and c8 retired): met c2 (providers loaded by path, generator/collections/ holding the base only) and c7 (the providers gate per asset, seed
-      ranges within an asset - `[daily] providers OK`, `[quarterly] providers OK`). PARTLY c1 - providers, scripted_decisions.yaml and synthetic_inputs.yaml are under assets/<asset>/synthetic/, but eras.yaml
-      does not exist (REQ-GEN-371, a feature after #134). UNMET c3 - no test that staging, checks, the gate, promotion and the dashboard read nothing under synthetic/; c5 - no gate refuses a provider importing
-      another provider (the imports gate sides providers with the generator, so a provider-to-provider import is allowed, and only adapters have an import gate); c9 - of its live tests only the provider-by-path
-      one exists (tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_its_assets_folder). Left not_started.'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5; c4, c6 and c8 retired): met c2 (providers loaded by path, generator/collections/ holding the base only) and c7 (the providers gate per asset, seed ranges within an asset - `[daily] providers OK`, `[quarterly] providers OK`). PARTLY c1 - providers, scripted_decisions.yaml and synthetic_inputs.yaml are under assets/<asset>/synthetic/, but eras.yaml does not exist (REQ-GEN-371, a feature after #134). UNMET c3 - no test that staging, checks, the gate, promotion and the dashboard read nothing under synthetic/; c5 - no gate refuses a provider importing another provider (the imports gate sides providers with the generator, so a provider-to-provider import is allowed, and only adapters have an import gate); c9 - of its live tests only the provider-by-path one exists (tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_its_assets_folder). Left not_started.'
     - 'STATUS PASS 2026-11-15 (split T4, branch wip/split-t4 from 647861ed): built with c3 and c1''s eras.yaml remainder unmet. c1 CHECKED: contract/ is gone; generator/collections/ holds base.py only; the four providers and synthetic_inputs.yaml moved at 100% similarity in de009e91; scripted_decisions.yaml was split into the two assets'' files there, every one of the 37 decisions and 2 corrections in exactly one of them (compared entry by entry).'
     - 'c3 WAITS FOR REQ-GEN-381 (Keith, 2026-11-15): the one synthetic/ read left is the scripted-decision Player the batch pass builds (qa_tools/tools/orchestrate.py _begin), which reads synthetic/scripted_decisions.yaml; REQ-GEN-381 criteria 1 and 4 move it into bootstrap/ and forbid the pipeline importing it. c3 stays unmet, blocked_by REQ-GEN-381, and this requirement is built with that criterion open. REJECTED rewording c3 to exclude the Player. The test excuses that read only when the Player was built by _begin, so any other read fails and the test stays green when it goes.'
     - 'c5, THE PROVIDER-IMPORT RULE IN THE PROVIDERS GATE (generator/validate_providers.py provider_import_problems, run by problems() so `mothman check --only providers` fails naming the file and the statement): an import - module level, function level or under TYPE_CHECKING - naming another provider (mothman_provider_*, assets.*, generator.collections.<provider>), an adapter (mothman_adapter_*, qa_tools.collections.<adapter>, of any asset) or anything under assets/; any relative import; and any load by path or by name - the resolver''s load or module_file however reached (an alias, the dotted name, a from-import, getattr), generator.collections.provider_module, importlib (but its resources and metadata), runpy, pkgutil, sys.modules, and the builtins __import__, exec, eval and compile (post-build-review #339). Read from the syntax tree before anything loads. The imports gate (REQ-TEST-384) could not say it: it sides every provider with the generator.'
@@ -48125,6 +48122,7 @@ requirements:
     - 'c3 SHOWN BY AN AUDIT HOOK, NOT A PATCHED READER (the T4 builder; tests/synthetic_unread_support.py): real generated deliveries go through orchestrate.run_pipeline - staged as they arrive, the four tools, the arrival gate, promotion and one played scripted decision - into a fresh database, and the dashboard is built from what was recorded (rebuild-results, build-data, embed), with the asset''s synthetic/ folder present and with it removed, for Birth Registrations (daily) and Emergency Department (quarterly, about 55s a module). It found post-build-review #337 (the check fingerprint listed synthetic/ and read scripted_decisions.yaml during staging), fixed.'
     - 'WHAT THE HOOK SEES AND DOES NOT (post-build-review #338, the critic on 0d07a178): it sees every open made through Python (open, Path.read_text, os.open, io.open_code), every listing through os.listdir, os.scandir (a descriptor resolved through /proc/self/fd) and glob, and every subprocess.Popen whose executable, arguments (a path inside one too) or working directory is under synthetic/. It does NOT see an os.stat or exists() check (no audit event), a C extension''s own file opens, or what a child process reads without being handed the path (dbt runs as one). A relative path opened against a directory descriptor is unresolvable, but getting the descriptor opens the folder, which is seen. Accepted as the limit of an in-process check; REQ-PIPE-385 criterion 14 blocks the generator side''s imports in a subprocess.'
     - 'c9 READ AFTER THE 2026-11-15 RETIREMENTS (PROVISIONAL, the T4 builder): of its five tests, three belong to retired criteria and go with them - the folder-removed fixture "passing criterion 8" (REQ-PIPE-385 criteria 1 and 14), population applying one asset''s presets (c6, REQ-GEN-392) and the fold''s byte compare (c4, REQ-GEN-392). The two live ones are built: a provider found by path under each asset (tests/test_assets.py, quarterly and daily) and a provider importing another provider refused (tests/test_provider_imports.py). The folder-removed runs of c3''s tests overlap REQ-PIPE-385 criterion 1 for staging to the dashboard build only; they do not block imports, run the gates or the CLI, which REQ-PIPE-385 criterion 14 does.'
+    - 'c3 MET (2026-11-15, step 3 of #134, with REQ-GEN-381 and REQ-PIPE-383): the batch pass builds no scripted-decision Player, so tests/synthetic_unread_support.py''s excuse for orchestrate._begin (excused_player_frame, the "allowed" list) is deleted and every read under synthetic/ fails. Seen failing first against a mutant restoring the Player default in _begin: tests/test_synthetic_folder_unread.py''s test_nothing_under_synthetic_was_read[present] and test_the_batch_pass_plays_no_scripted_decision failed, and pass on the built tree.'
     linked_tests:
     - tests/test_provider_imports.py
     - tests/test_synthetic_folder_unread.py
@@ -48153,19 +48151,14 @@ requirements:
     - '2026-11-15: c3''s tests - tests/test_synthetic_folder_unread.py failed first on the present variant (75 reads under synthetic/ from sources_fingerprint, #337) and again under a mutant undoing that fix; tests/test_synthetic_unread_hook.py 5 failed against the first hook (child processes, a descriptor listing, a Player built outside the batch pass), then 9 passed; the daily module 6 passed (49s) and the quarterly 6 passed (54s), all four tools, a promotion and the played scripted decision recorded in each.'
     - '2026-11-15: tests/test_validate_check_lifecycle.py::test_the_fingerprint_reads_nothing_under_synthetic failed first (#337), then the module 33 passed.'
     - '2026-11-15: tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_the_daily_assets_folder_too NOT seen failing first - it was written after the behaviour it tests (REQ-GEN-370 c2, built 2026-11-02) and passed on arrival; it was shown able to fail against a mutant that loaded providers from the adapters folder.'
+    - '2026-11-15: c3 - tests/test_synthetic_folder_unread.py failed first against a mutant restoring the batch pass''s Player (test_nothing_under_synthetic_was_read[present] and test_the_batch_pass_plays_no_scripted_decision), then passed; the daily and quarterly modules both green in the full non-deployment run of 2026-11-16.'
     unmet_criteria:
-    - criterion: 'Criterion 1, its eras.yaml half - eras.yaml under assets/<asset>/synthetic/.'
-      why: eras.yaml does not exist yet; REQ-GEN-371 creates it (a feature after #134).
+    - criterion: Criterion 1, its eras.yaml half - eras.yaml under assets/<asset>/synthetic/.
+      why: eras.yaml does not exist yet; REQ-GEN-371 creates it (a feature after
       owner: REQ-GEN-371
       blocked_by:
         requirements:
         - REQ-GEN-371
-    - criterion: 'Criterion 3 - staging, the checks, the gate, promotion and the dashboard build read nothing under synthetic/.'
-      why: 'The batch pass''s scripted-decision Player (orchestrate._begin) reads synthetic/scripted_decisions.yaml; every other read is gone and the tests excuse only that one (Keith, 2026-11-15: c3 waits for REQ-GEN-381).'
-      owner: REQ-GEN-381, criteria 1 and 4
-      blocked_by:
-        requirements:
-        - REQ-GEN-381
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged
@@ -49408,7 +49401,7 @@ requirements:
     - 'qa_tools/common/dbt_common.py::dbt_project_ready'
     - 'qa_tools/common/validate_caches.py::SCANNED'
     - 'qa_tools/common/validate_collections.py::SCANNED'
-    - 'qa_tools/common/replay_inputs.py::INPUTS'
+    - 'bootstrap/replay_inputs.py::INPUTS'
     - 'cli/check.py::COVERAGE_PACKAGES'
     evidence:
     - '2026-11-15, built on wip/sep-step2 from 6cc3eb55: 21 modules moved whole into asset_model/ (git mv) and nine split, every importer, monkeypatch target, string-embedded import and implemented_by/linked_tests path rewritten, no forwarding module. imports-allowlist.yaml went 69 -> 11 entries: all 58 REQ-PIPE-380 entries deleted, none added, and `mothman dashboard validate-imports` reports no forbidden edge outside it (asset_model''s last import of the pipeline, check_bands -> validate_check_lifecycle, removed by check_sources). Importing every asset_model module loads no pandas, numpy, psycopg, evidently, dbt, soda, subprocess or pipeline module. Runs, on the tree before the final small test fixes: the fast half (-m ''not needs_deployment'' -n 3) 18 failed / 5578 passed / 1826 errors, the errors all FileNotFoundError on /tmp/pytest-of-root/.../popen-gwN (another session''s pytest pruning the shared basetemp mid-run) plus string-embedded imports the rewrite missed; every module with a failure or error re-run with its own --basetemp after the fixes (196 modules): 3 failed / 3659 passed / 18 errors, then the remaining nine modules after their fixes: 160 passed. The bootstrap-time NFR was NOT measured.'
@@ -49450,7 +49443,10 @@ requirements:
     date_written: '2026-11-02'
     story: As whoever would take this to a real deployment, I want everything that exists only to replay a synthetic history in one package outside the pipeline, so that a deployment leaves it out and the pipeline cannot come to depend on it.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: '2026-11-14'
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31; ''the bootstrap and replay machinery out of qa_tools''); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with B3 (the register parser to scenarios/), QA (clock events), CLI A and the architect''s B6. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL hold in one top-level package, bootstrap/ (Q2, SETTLED by Keith 2026-11-02), the modules that exist only to replay a synthetic history: today''s qa_tools/common/bootstrap (783 lines at 72ec04d7), checkpoints (335), replay_inputs (263), target_agreement (387), synthetic_reset (211) and scripted_corrections (190); the player half of scripted_decisions (Player and what plays a scripted decision; its file reader goes to scenarios/, REQ-GEN-386); the player half of correction_replay (staged, for_arrival, confirm_due, history_end; merge_instant and docs_at go to asset_model/, REQ-PIPE-380); and the replay clock that acts on REQ-PIPE-382''s clock events and answers its ''when does a decision take effect'' question with scenarios/'' seeded lag. None of them SHALL remain under qa_tools/.'
@@ -49489,16 +49485,67 @@ requirements:
     - 'pipeline run READS TWO THINGS OF bootstrap.py (delivery-scoper, v6, from cli/pipeline.py): v5 moved only streams; the history refusal is a real command''s too, so it moves with it. targets_agree and _confirm_corrections leave `pipeline run` altogether (CLI A, REQ-PIPE-385 criterion 4).'
     - 'THE CACHE KEY FOLLOWS THE CODE (delivery-scoper, v5; architect B6): INPUTS lists qa_tools/**, generator/**, assets/** and cli/pipeline.py; the new packages are outside every pattern, and the KEY_PREFIX bump stops an old cache matching a new meaning, as its own comment says it exists to do.'
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5''s criterion 9 and BEHAVIOUR-PRESERVING NFR are gone; the test suite is the proof. REQ-TEST-239 leaves the dependencies.'
+    - 'WHAT LANDED (2026-11-15, step 3 of #134, branch wip/sep-step3 from 8e94183e): bootstrap.py, checkpoints.py, replay_inputs.py, target_agreement.py, synthetic_reset.py, scripted_corrections.py, correction_replay.py and replay_clock.py moved from qa_tools/common/ to bootstrap/ (git mv, then the replay clock rewritten as ReplayClock over asset_time''s seam), with the scripted-decision player half as bootstrap/decision_player.py and the generation step as bootstrap/generation.py. streams, StreamRefused, holds_history and HISTORY_REFUSAL are qa_tools/common/streams.py, read by pipeline run and knock_on.follow_up_stream. The 7 cli.pipeline reaches go through generator/public.py; the imports allowlist went 11 entries to 7 (the three cli.pipeline entries and linkage_products'' qa_tools.common.promotion).'
+    - 'THE GENERATOR''S PUBLIC MODULE LANDED AHEAD OF REQ-GEN-386 (PROVISIONAL): generator/public.py offers generate, has_target_trial, target_datasets, generated_collections, generated_targets, generated_gate_outcomes, generated_into and this_assets_scenarios - what cli/pipeline.py offered the bootstrap - because criterion 3 cannot be met without it. REQ-GEN-386 criterion 3 owns its final shape.'
+    - 'THE TARGET TRIAL IS HANDED IN BY cli/ (PROVISIONAL, post-build-review #356): it runs the real QA tools through the collection command (cli/collection_cli.py try_targets, cli/target_trial.py), which neither the generator nor - without cli/ - the bootstrap can reach, so bootstrap.bootstrap and generation.generate_collection take try_targets; the command, the terminal''s set-up menu and generate-synthetic-data pass cli.pipeline.try_targets, and a trial asked for with nothing to run it is refused by name. REJECTED moving the trial and the collection command''s local-file check into bootstrap/ in this step.'
+    - 'CLI A BUILT HERE (REQ-PIPE-385 criterion 4, post-build-review #357): criterion 5 cannot hold while pipeline run calls targets_agree and _confirm_corrections, so pipeline run generates nothing, compares no target, confirms no correction and runs each stream through orchestrate.run_stream; its help and the module docstring say nothing of synthetic data, manifests, regeneration or targets. tests/test_target_agreement.py''s TestAPipelineRunComparesToo (#157 finding 2) went with the behaviour.'
+    - 'THE BOOTSTRAP''S REFUSAL WORDING (criterion 2): ''<asset> is not declared synthetic in <config dir>/data-asset.yaml - the bootstrap replays a synthetic history, and nothing was generated. A real asset''s first run is `mothman pipeline run`.'', modelled on reset-synthetic''s, read through asset_time.declared_synthetic.'
+    - 'NOT MEASURED - THE 5 PERCENT NFR: no bootstrap from empty was timed before and after on a quiet machine; the daily bootstrap run for this build shared the sandbox with the test suite. Left for the next measured bootstrap.'
+    - 'TWO LINKED TESTS REMOVED WITH THE BEHAVIOUR (CLI A): tests/test_cli_pipeline.py''s TestCorrectionsAfterAFullRun went, because pipeline run no longer confirms corrections, so REQ-GEN-205''s and REQ-PIPE-233''s linked_tests entries for test_after_both were removed; both keep the bootstrap''s own confirmation tests. Their implemented_by entries naming moved modules were rewritten path only (criterion 9), and cli/pipeline.py''s generated_* helpers, now generator/public.py''s, repointed there.'
+    linked_tests:
+    - tests/test_bootstrap_package.py
+    - tests/test_bootstrap.py
+    - tests/test_bootstrap_streams.py
+    - tests/test_validate_imports.py
+    - tests/test_replay_inputs.py
+    - tests/test_ci_bootstrap_cache.py
+    - tests/test_checkpoints.py
+    - tests/test_target_agreement.py
+    - tests/test_reset_synthetic.py
+    - tests/test_scripted_corrections.py
+    - tests/test_cli_pipeline.py
+    - tests/test_collections_registry.py
+    implemented_by:
+    - bootstrap/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::not_synthetic
+    - bootstrap/bootstrap.py::resume
+    - bootstrap/bootstrap.py::_generate
+    - bootstrap/bootstrap.py::targets_agree
+    - bootstrap/generation.py::generate_collection
+    - bootstrap/checkpoints.py::save
+    - bootstrap/replay_inputs.py::INPUTS
+    - bootstrap/replay_inputs.py::KEY_PREFIX
+    - bootstrap/target_agreement.py::compare
+    - bootstrap/synthetic_reset.py::reset
+    - bootstrap/scripted_corrections.py::load
+    - bootstrap/correction_replay.py::confirm_due
+    - bootstrap/decision_player.py::Player
+    - bootstrap/replay_clock.py::ReplayClock
+    - generator/public.py::generate
+    - generator/public.py::generated_into
+    - qa_tools/common/streams.py::streams
+    - qa_tools/common/streams.py::holds_history
+    - qa_tools/common/streams.py::HISTORY_REFUSAL
+    - qa_tools/common/knock_on.py::follow_up_stream
+    - cli/pipeline.py::run_command
+    - cli/pipeline.py::try_targets
+    - qa_tools/common/validate_caches.py::SCANNED
+    - qa_tools/common/validate_collections.py::SCANNED
+    - cli/check.py::COVERAGE_PACKAGES
+    evidence:
+    - '2026-11-15: tests/test_bootstrap_package.py, green in the full run below. Seen failing first against mutants: the bootstrap''s synthetic refusal removed (2 failed); cli/pipeline.py''s run command importing the bootstrap (test_pipeline_run_runs_with_the_bootstrap_package_absent failed). `mothman dashboard validate-imports`: no forbidden edge, 7 allowlist entries left (11 before).'
+    - '2026-11-16, the full non-deployment suite on this tree (`-m ''not needs_deployment'' -n 3 -v`, scratchpad basetemp): 7470 passed, 1 failed, 0 skipped in 1985s - the one failure tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group, present on the base (post-build-review #340). The run before it, on the same code, also had tests/test_carried.py''s module fixture erroring (4 errors) on a 2026-Q1 inherit left in its worker database by an earlier module; it passed in this run, alone and after its likeliest neighbours, so it is order-dependent and reported open rather than waived.'
+    - '2026-11-16, real bootstraps from empty into scratch databases (marked test, dropped after): daily 791s, quarterly 3402s, both exit 0 with no target disagreement; 19 and 40 scripted decisions played; no decision or run recorded on 2026-11-14 or later (the replay clock stamped every record with the replay''s own time). Both shared the sandbox with the test suite, so neither is a timing for the 5 percent NFR.'
     open_questions: []
-    signed_off:
-      by: Keith
-      date: '2026-11-14'
   - id: REQ-PIPE-382
     title: The real pipeline reads the time through one clock in asset_model/ - the instant it stamps on a record and 'today' alike - and announces neutral clock events that only an installed replay of a synthetic asset acts on, so no real pipeline module imports replay_clock or knows a replay is running
     date_written: '2026-11-02'
     story: As whoever would take this to a real deployment, I want the pipeline to ask one clock for the time and to say only what happened - an arrival received, a decision taking effect - never whether a replay is running, so that the replay can leave with the bootstrap and a real record's time can still never be invented.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: '2026-11-14'
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31; ''the replay clock untangled from the real pipeline''); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with QA (neutral clock events) and B1 (one clock), SETTLED by Keith 2026-11-14. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL give the real pipeline one clock, asset_time.now() in asset_model/ (asset_time extended, no third time module), and every real pipeline module that reads replay_clock today SHALL read the time from it and import nothing of replay_clock: 17 modules at 72ec04d7 (stage and orchestrate in qa_tools/tools/; arrival_lifecycle, census, correction_apply, decision_log, delivery_log, file_checks, filing, gate, inheritance, knock_on, period_schema, qa_store, recheck, schedule_ended and supply_holds in qa_tools/common/).'
@@ -49551,16 +49598,77 @@ requirements:
     - 'THE LAG RULE SITS IN scenarios/, APPLIED BY THE REPLAY CLOCK IN bootstrap/ (delivery-scoper, v6, forced by the edges; SETTLED by Keith 2026-11-14, option (a)): the Linkage Products provider predicts each promotion''s effective instant with the same rule (linkage_products.py lines 1742 and 1797), and the generator may not import bootstrap/ (REQ-TEST-384). scenarios/ is synthetic-only, left out of a real deployment and importable by both, so the lag leaves shipped code as Keith asked and stays one copy. REJECTED a copy in the generator (against the one-copy precedent of Q1 of 2026-11-14), and an allowlisted generator-to-bootstrap edge.'
     - 'FOR THE NEXT BATCH (architect): the speed batch''s pinned mode (S2) must go through this seam, or it puts back the replay flag this requirement removes; so this lands before it.'
     - 'THE TWO REVERSAL AMENDMENTS APPROVED AS WORDED (Keith, 2026-11-14): the REQ-PIPE-081 and REQ-PIPE-267 appends in ''THE TWO REVERSALS, WORDED FOR KEITH'' are approved verbatim, applied in the change that builds this requirement.'
+    - 'WHAT LANDED (2026-11-15, step 3 of #134, branch wip/sep-step3 from 8e94183e): asset_time gained one Clock seam - now() reads the installed clock, else MOTHMAN_PINNED_NOW''s pinned clock, else the wall clock - and the neutral events processing_arrival (a context), receiving and taking_effect, and the question when_effective. The 17 real pipeline modules read the time from asset_time and import nothing of replay_clock (gate, recheck, knock_on, census, filing, period_schema, supply_holds, schedule_ended, inheritance, qa_store, file_checks, correction_apply, decision_log, delivery_log, arrival_lifecycle, stage, orchestrate); every replay_clock.active() read and both @on_replay_clock decorations are gone; the bootstrap installs its ReplayClock around its own calls (bootstrap._run_collection, _run_stream, _record_deliveries, _confirm_corrections). promotion.effective_at_for, _LAG_MIN and _LAG_SPAN are deleted; the lag is scenarios/promotion_lag.py, applied by ReplayClock.when_effective.'
+    - 'THE ARRIVAL EVENT SPANS THE WHOLE TURN, AND THE RECEIPT IS ANNOUNCED AGAIN BEFORE PROCESSING (PROVISIONAL, the step-3 builder): processing_arrival is entered around everything the lifecycle does for one arrival - staging it, the caller''s player, then processing it - which is the span today''s correction scope (_as_it_stood) had, so a staged correction covers staging and the played decisions as before. Staging announces receiving() per file and a player anchors at each decision''s instant, so the lifecycle announces receiving(arrival.received_at) once more just before process(), the site the old anchor (arrival_lifecycle line 199) was at. orchestrate''s resume anchor (line 557) is subsumed: a resume''s first arrival enters the same context. REJECTED a second context around process() alone, which would have narrowed the correction scope.'
+    - 'A BATCH STAMPS EACH ARRIVAL AS IT STARTS, ON EVERY ASSET (PROVISIONAL, post-build-review #355, for Keith): run_pipeline and run_stream pass no pass-wide run_timestamp, because under one clock the instant taken at _begin is the clock beneath a replay before its first event - the wall clock - which would stamp every replayed run with today. A real pipeline run''s runs now carry when each started, as the hand-filed path already did.'
+    - 'PINNED THROUGH THE SAME GATE (PROVISIONAL reading of criterion 12): MOTHMAN_PINNED_NOW is read at each call, as before, as the ambient clock beneath any installed one, and admitted by asset_time._admitted - the one gate installed() also passes - raising PinnedClockRefused (a ClockRefused, as ClockInstallRefused is) on an asset not declared synthetic. REJECTED installing a pinned clock once at process start, which would outlive a test''s monkeypatched variable.'
+    - 'NEVER AFTER THE REAL PRESENT READ AS THE TRUE WALL CLOCK (PROVISIONAL): ReplayClock.when_effective caps at asset_time.real_now(), which ignores a pin, as the criterion''s ''real wall-clock present'' says; the replay''s own simulated instant is not the cap.'
+    - 'scenarios/ CREATED FOR THE LAG ALONE (PROVISIONAL; OQ1 (a) SETTLED by Keith 2026-11-14 put the rule there): REQ-GEN-386 is not built, but the replay clock (bootstrap/) and the Linkage Products provider (the generator side) both need the rule and neither may import the other, so scenarios/promotion_lag.py landed now with its B6 lists (validate_caches.SCANNED, validate_collections.SCANNED, coverage sources, replay_inputs.INPUTS, validate-config.yml paths) and the layout docs. The provider imports it, removing its allowlisted qa_tools.common.promotion import early.'
+    - 'THE TWO REVERSALS APPLIED (criterion 14): REQ-PIPE-081''s and REQ-PIPE-267''s decisions carry the appended wording verbatim, and REQ-PIPE-081''s and REQ-GEN-185''s implemented_by entries for promotion.py::effective_at_for now name asset_model/asset_time.py::when_effective and scenarios/promotion_lag.py::effective_at. tests/test_package_gate.py''s retried-gate test now asserts the real-asset half (the retry''s instant, wall clock); tests/test_one_clock.py holds the replay half.'
+    - 'BUILT WITH c7''s FOOTER HALF OPEN (the step-3 builder): the register records a partly met requirement as built with unmet_criteria, as REQ-GEN-370 is, and refuses unmet_criteria on in_progress; the one open half waits for REQ-PIPE-385 criterion 12, which has no footer wording to read the declaration yet.'
+    linked_tests:
+    - tests/test_one_clock.py
+    - tests/test_replay_clock.py
+    - tests/test_pinned_now.py
+    - tests/test_promotion_effective_at.py
+    - tests/test_promotion_waits_for_next_receipt.py
+    - tests/test_reader_caps_promotion_lag.py
+    - tests/test_package_gate.py
+    - tests/test_correction_replay.py
+    - tests/test_bootstrap_streams.py
+    - tests/test_promotion_actor.py
+    implemented_by:
+    - asset_model/asset_time.py::now
+    - asset_model/asset_time.py::Clock
+    - asset_model/asset_time.py::WallClock
+    - asset_model/asset_time.py::PinnedClock
+    - asset_model/asset_time.py::ambient
+    - asset_model/asset_time.py::current
+    - asset_model/asset_time.py::installed
+    - asset_model/asset_time.py::processing_arrival
+    - asset_model/asset_time.py::receiving
+    - asset_model/asset_time.py::taking_effect
+    - asset_model/asset_time.py::when_effective
+    - asset_model/asset_time.py::real_now
+    - asset_model/asset_time.py::declared_synthetic
+    - asset_model/asset_time.py::ClockInstallRefused
+    - asset_model/asset_time.py::PinnedClockRefused
+    - bootstrap/replay_clock.py::ReplayClock
+    - bootstrap/replay_clock.py::replaying
+    - bootstrap/correction_replay.py::for_instant
+    - scenarios/promotion_lag.py::effective_at
+    - qa_tools/tools/orchestrate.py::effective_at_of
+    - qa_tools/tools/orchestrate.py::run_pipeline
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - qa_tools/common/arrival_lifecycle.py::process_stream
+    - qa_tools/common/arrival_lifecycle.py::staged_as_it_arrives
+    - qa_tools/common/decision_log.py::_recorded_at
+    - qa_tools/common/delivery_log.py::_recorded_stamp
+    - qa_tools/tools/stage.py::stage_table
+    - qa_tools/common/gate.py::_completing_instant
+    - bootstrap/synthetic_reset.py::is_synthetic
+    - bootstrap/checkpoints.py::require_synthetic
+    evidence:
+    - '2026-11-15: tests/test_one_clock.py, green in the full run below. Seen failing first against mutants: the old lag rule on the wall clock in orchestrate.effective_at_of (4 of TestWhenAPromotionTakesEffect failed); asset_time.installed without its gate (3 failed across test_one_clock and test_bootstrap_package); ReplayClock.processing_arrival without correction staging (1 failed); decision_log._recorded_at not announcing taking_effect (tests/test_replay_clock.py''s test_a_rule_decision_is_recorded_as_it_takes_effect failed).'
+    - '2026-11-16, the full non-deployment suite on this tree (`-m ''not needs_deployment'' -n 3 -v`, scratchpad basetemp): 7470 passed, 1 failed, 0 skipped in 1985s - the one failure tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group, present on the base (post-build-review #340). The run before it, on the same code, also had tests/test_carried.py''s module fixture erroring (4 errors) on a 2026-Q1 inherit left in its worker database by an earlier module; it passed in this run, alone and after its likeliest neighbours, so it is order-dependent and reported open rather than waived.'
+    - '2026-11-16, real bootstraps from empty into scratch databases (marked test, dropped after): daily 791s, quarterly 3402s, both exit 0 with no target disagreement; 19 and 40 scripted decisions played; no decision or run recorded on 2026-11-14 or later (the replay clock stamped every record with the replay''s own time). Both shared the sandbox with the test suite, so neither is a timing for the 5 percent NFR.'
+    unmet_criteria:
+    - criterion: Criterion 7, its footer half - the dashboard footer's synthetic wording takes its answer from asset_time.declared_synthetic.
+      why: 'The footer wording that would read it is REQ-PIPE-385 criterion 12''s, not built; every other reader of `synthetic: true` (the clock''s gate, synthetic_reset.is_synthetic, checkpoints.require_synthetic, the scripted-decision player, the bootstrap''s refusal, pipeline run''s dim line) asks the one reader.'
+      owner: REQ-PIPE-385, criterion 12
+      blocked_by:
+        requirements:
+        - REQ-PIPE-385
     open_questions: []
-    signed_off:
-      by: Keith
-      date: '2026-11-14'
   - id: REQ-PIPE-383
     title: Scripted decisions are played by the bootstrap through the player a replay takes, scripted corrections are staged through REQ-PIPE-382's arrival event, and the real pipeline neither builds a player nor imports scripted_decisions or correction_replay
     date_written: '2026-11-02'
     story: As whoever would take this to a real deployment, I want the real pipeline to offer a place to act between arrivals rather than to play scripted decisions itself, so that a synthetic history's scripted people go with the bootstrap and the pipeline only ever processes what arrived.
     moscow: must
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: '2026-11-14'
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31 scan: ''orchestrate plays scripted decisions''); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with QA (corrections through the arrival event, not a hook) and CLI review finding 11. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL let a caller of a collection's replay and of a stream's replay (orchestrate.run_pipeline and run_stream today) pass a player run before each arrival and after the last, the shape scripted_decisions.Player and orchestrate.StreamPlayer have today, and SHALL run none WHERE none is passed.
@@ -49586,10 +49694,37 @@ requirements:
     - 'ONLY THE BOOTSTRAP PLAYS SCRIPTED DECISIONS (Q5, SETTLED by Keith 2026-11-02): REJECTED `mothman pipeline run` playing them on a synthetic asset as it does today. Any test asserting that `pipeline run` plays them changes with this requirement.'
     - 'pipeline run ON A SYNTHETIC ASSET IS THE REAL PATH (delivery-scoper, v6, following CLI A and Q5): it generates nothing (REQ-PIPE-385 criterion 4), plays nothing and installs no replay clock, so its records carry the wall clock - exactly what it would do on a real asset. A replayed history is the bootstrap''s. Recorded so that wall-clock stamps on a `pipeline run` over generated files are not read as a regression of REQ-PIPE-081.'
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5 criterion 6''s ''every decision-log entry is unchanged'' and the BEHAVIOUR-PRESERVING NFR are gone; the tests in criterion 7 are the proof.'
+    - 'WHAT LANDED (2026-11-15, step 3 of #134): orchestrate._begin builds no player (its scripted_decisions.Player default is gone) and run_stream takes one player for the stream; the bootstrap builds each collection''s Player in _run_collection, a resume''s from its checkpoint, and each stream''s StreamPlayer in _run_stream. The player half of scripted_decisions - Player, Timed, the timing helpers and _apply - is bootstrap/decision_player.py with StreamPlayer; the scripts reader stays in qa_tools/common/scripted_decisions.py until REQ-GEN-386 moves it to scenarios/. Corrections are staged by ReplayClock.processing_arrival (correction_replay.for_instant); arrival_lifecycle imports nothing of correction_replay. pipeline run prints, on a synthetic asset, ''Scripted decisions are played only by `mothman pipeline bootstrap` - this run played none.'''
+    - 'THE PLAYER READS THE SCRIPTS THROUGH THE READER MODULE (the step-3 builder, after post-build-review #351''s lesson): decision_player calls reader.load, reader._due_at, reader._wall_clock_after and reader.answers_for through the module, so a test patching the reader reaches the player.'
+    - 'REQ-GEN-370 c3''s HARNESS PLAYS NOTHING NOW: its "present" variant still writes one playable scripted decision, and the batch pass - given no player - neither reads nor plays it (test_the_batch_pass_plays_no_scripted_decision); tests/test_bootstrap_plays_scripted_decisions.py shows the bootstrap''s replay of the same kind of corpus playing it, so the absence can fail.'
+    linked_tests:
+    - tests/test_bootstrap_plays_scripted_decisions.py
+    - tests/test_cli_pipeline.py
+    - tests/test_bootstrap_streams.py
+    - tests/test_scripted_decisions.py
+    - tests/test_synthetic_folder_unread.py
+    - tests/test_synthetic_folder_unread_quarterly.py
+    - tests/test_correction_replay.py
+    - tests/test_one_clock.py
+    - tests/test_bootstrap.py
+    implemented_by:
+    - qa_tools/tools/orchestrate.py::run_pipeline
+    - qa_tools/tools/orchestrate.py::run_stream
+    - qa_tools/tools/orchestrate.py::_begin
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - qa_tools/common/arrival_lifecycle.py::process_stream
+    - bootstrap/decision_player.py::Player
+    - bootstrap/decision_player.py::StreamPlayer
+    - bootstrap/bootstrap.py::_run_collection
+    - bootstrap/bootstrap.py::_run_stream
+    - bootstrap/replay_clock.py::ReplayClock
+    - bootstrap/correction_replay.py::for_instant
+    - cli/pipeline.py::run_command
+    evidence:
+    - '2026-11-15: tests/test_bootstrap_plays_scripted_decisions.py, green in the full run below. Seen failing first against a mutant restoring orchestrate._begin''s Player default: test_the_pipeline_builds_no_player and test_pipeline_run_records_no_decision_by_the_synthetic_person failed. tests/test_cli_pipeline.py''s dim-line test failed against a mutant dropping the line.'
+    - '2026-11-16, the full non-deployment suite on this tree (`-m ''not needs_deployment'' -n 3 -v`, scratchpad basetemp): 7470 passed, 1 failed, 0 skipped in 1985s - the one failure tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group, present on the base (post-build-review #340). The run before it, on the same code, also had tests/test_carried.py''s module fixture erroring (4 errors) on a 2026-Q1 inherit left in its worker database by an earlier module; it passed in this run, alone and after its likeliest neighbours, so it is order-dependent and reported open rather than waived.'
+    - '2026-11-16, real bootstraps from empty into scratch databases (marked test, dropped after): daily 791s, quarterly 3402s, both exit 0 with no target disagreement; 19 and 40 scripted decisions played; no decision or run recorded on 2026-11-14 or later (the replay clock stamped every record with the replay''s own time). Both shared the sandbox with the test suite, so neither is a timing for the 5 percent NFR.'
     open_questions: []
-    signed_off:
-      by: Keith
-      date: '2026-11-14'
   - id: REQ-TEST-384
     title: An imports gate in mothman check and the validate-config workflow fails any import, or any load by path, across a forbidden edge between asset_model/, the real pipeline, the generator, scenarios/, the bootstrap and cli/, and any file in no side, with a shrink-only allowlist whose every entry names the requirement that removes it
     date_written: '2026-11-02'
@@ -49689,6 +49824,9 @@ requirements:
     story: As whoever would take this to a real deployment, I want to leave the generator and the bootstrap out entirely and meet nothing that mentions them, so that what runs on real supplies is only the pipeline and its configuration, and its first-time user is never offered something that cannot work.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-11-14'
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31); extends REQ-GEN-370 criterion 8 from configuration to code. Scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with CLI A-D, Dash C-D, the CLI and dashboard reviews'' surface lists and the architect''s B5. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - WHERE the generator, synthetic_data_generator, scenarios/ and the bootstrap package cannot be imported and the selected asset has no synthetic/ folder, THE SYSTEM SHALL stage, check, gate, promote, re-check and record that asset's real supplies, build and publish its dashboard, and pass every `mothman check --no-pytest` gate that applies, criterion 8's three reporting as not applicable (B5).
@@ -49738,16 +49876,17 @@ requirements:
     - scenarios/ IS PART OF WHAT A REAL DEPLOYMENT LEAVES OUT (SPLIT D1, SETTLED by Keith 2026-11-03).
     - 'EXIT 1, NOT 2 (CLI review finding 11): a refusal is a ClickException like every other by design; 2 is Click''s usage error.'
     - 'BOTH OLD SCENARIO LINKS LAND ON THE NOT-FOUND PAGE (v6 Q3, SETTLED by Keith 2026-11-14): ?panel=scenarios and ?scenario= each land on the plain not-found page, even when the rest of the link is a real page. REJECTED dropping ?scenario= silently (the scoper''s recommendation), and dropping both.'
+    - 'CRITERION 4 BUILT EARLY (2026-11-15, step 3 of #134, PROVISIONAL that it lands ahead of this requirement): pipeline run generates nothing, compares no target and confirms no correction, its help says nothing of synthetic data, manifests, regeneration or targets (tests/test_cli_pipeline.py TestARunIsTheRealPath), because REQ-GEN-381 criterion 5 needs it. The rest of this requirement is untouched; its status is left not_started for Keith to say how a requirement with one criterion built ahead is recorded.'
     open_questions: []
-    signed_off:
-      by: Keith
-      date: '2026-11-14'
   - id: REQ-GEN-386
     title: The generator side - generator/, synthetic_data_generator/ and each asset's providers - imports from outside itself only asset_model/ and scenarios/, which holds the register parser, the placements reader, the map vocabulary and the scripted_decisions.yaml reader; the generator keeps the map writer and offers the bootstrap and cli/ one public module
     date_written: '2026-11-02'
     story: As whoever maintains the generator, I want it to depend only on the shared reading code and the shared scenario readers, so that it can change, or be left out, without touching the pipeline or the bootstrap.
     moscow: should
     status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-11-14'
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31; ''the generator''s imports narrowed to the shared domain model''); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with B3 (all four scenario readers into scenarios/), QB and the delivery writer found in the code. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL let the generator side - generator/, synthetic_data_generator/ and each asset's synthetic/collections/ providers - import from outside itself only asset_model/, scenarios/ (criterion 4), the standard library and declared third-party dependencies (Q1, SETTLED by Keith 2026-11-02); inside the side, a provider may import generator/ and synthetic_data_generator/, and synthetic_data_generator/ may import generator/.
@@ -49785,10 +49924,8 @@ requirements:
     - 'THE RULE IS ABOUT THE SIDE''S BOUNDARY, NOT EACH FILE (delivery-scoper, v4): REJECTED moving the helpers providers use into asset_model/, which would put synthetic machinery into code a real deployment ships, and REJECTED a narrow provider-facing generator API for now.'
     - THE ENTRY POINT OFFERS SEVEN THINGS, NOT TWO (delivery-scoper, v4).
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5''s criterion 9 (''no byte any collection generates changes'') and the BEHAVIOUR-PRESERVING NFR are gone; the suite is the proof.'
+    - 'WHAT LANDED EARLY (2026-11-15, step 3 of #134, PROVISIONAL): scenarios/ exists, holding only promotion_lag.py (criterion 4''s lag half, for REQ-PIPE-382 criterion 3), with criterion 10''s lists and layout docs for it; and generator/public.py (criterion 3''s module, for REQ-GEN-381 criterion 3), which the bootstrap now reaches the generator through, importing nothing else of it and nothing of cli/. The register parser, placements reader, map vocabulary and scripted_decisions.yaml reader are not moved; status left not_started for Keith, as REQ-PIPE-385''s.'
     open_questions: []
-    signed_off:
-      by: Keith
-      date: '2026-11-14'
   - id: REQ-PIPE-376
     title: 'The shared reading code''s names say what they mean as it moves into asset_model/: the two claim_window and two _calendar_periods functions renamed apart, every name used outside its module public, fall_hold with its one caller, two dead functions removed with their register claims, and a table two datasets share refused'
     date_written: '2026-11-03'
@@ -50148,7 +50285,7 @@ requirements:
     - 'asset_model/statuses.py::status_words'
     - 'qa_tools/common/dataset_status.py::worst_of'
     - 'qa_tools/common/rechecking.py::is_worse'
-    - 'qa_tools/common/target_agreement.py::responsible'
+    - 'bootstrap/target_agreement.py::responsible'
     - 'qa_tools/common/validate_imports.py::status_rankings'
     evidence:
     - '2026-11-15: the order and words in asset_model/statuses.py; dataset_status, rechecking, target_agreement and the Linkage Products provider read them. tests/test_status_order_readers.py 39 passed, driving each reader over every pair of verdicts against the old {green: 0, amber: 1, red: 2}. The ranking rule, run over the three copies as they stood at 6cc3eb55, reports each (rechecking.py:117, target_agreement.py:25, linkage_products.py:345), and finds nothing in the tree now; its fixture tests are in tests/test_validate_imports.py. The page''s copy is untouched; status-cases.json unchanged.'
