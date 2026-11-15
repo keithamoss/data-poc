@@ -153,6 +153,12 @@ releases:
               Within one asset, a collection id declared twice, or one table
               declared by two datasets of the same collection, used to pass
               the checks. Both now fail, naming the two entries.
+          - headline: README quickstart runs again
+            components: ["Docs & process"]
+            description: >
+              The README's first commands now run the pipeline once for each
+              asset, naming it with MOTHMAN_ASSET. As written they stopped,
+              because every command now needs to be told which asset it is for.
       - category: Improved
         items:
           - headline: Fewer, truer commands
