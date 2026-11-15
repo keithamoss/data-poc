@@ -1227,8 +1227,9 @@ Rough layout:
     ```
     sudo pg_ctlcluster 16 main start
     sudo -u postgres psql -c "CREATE ROLE \"user\" LOGIN SUPERUSER CREATEDB PASSWORD 'password';"
-    sudo -u postgres psql -c "CREATE DATABASE supply OWNER \"user\";"
-    export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+    sudo -u postgres psql -c "CREATE DATABASE supply_quarterly OWNER \"user\";"
+    sudo -u postgres psql -c "CREATE DATABASE supply_daily OWNER \"user\";"
+    export MOTHMAN_PG="postgresql://user:password@localhost:5432"
     export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
     export MOTHMAN_ENVIRONMENT="sandbox"
     ```

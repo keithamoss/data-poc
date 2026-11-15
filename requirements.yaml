@@ -38247,6 +38247,7 @@ requirements:
       - "CRITERION 3 AMENDED WITH KEITH (2026-10-18): a new collection also edits contract/calendar.yaml (a dataset with no calendar entry is refused outright) and contract/presentation.yaml (REQ-DASH-244 put every collection's words there), so both may differ too, by the collection's own entries inserted whole, as data-asset.yaml may. Found building the fake Widget Register; criterion 10 already allowed the calendar edit for Emergency Department."
     open_questions: []
     evidence:
+      - "2026-11-15 (post-build-review #333): the fake Widget Register moved to the quarterly asset's layout - tests/fake_collection_files/assets/quarterly/ (widget-agency/, dbt/models/widget-register/, collections/, synthetic/collections/), check ids quarterly., inserts into assets/quarterly/{data-asset,calendar,presentation}.yaml. tests/test_a_collection_is_a_small_adapter.py --run-on-demand: 1 failed, 10 errors before; 12 passed after (39s, bootstrap 18.5s, qa 8.2s), commit 9278abf4."
       - "2026-10-19 night, CRITERION 10 BY AUDIT (Keith's choice): every file the Emergency Department work added is in an allowed place - contract/department-of-health/ (its contract, check files and their retired siblings), dbt_project/models/emergency-department/ (schema.yml, sources.yml, stg_ed_presentations.sql), qa_tools/collections/emergency_department.py and generator/collections/emergency_department.py - plus its own entries in contract/data-asset.yaml, contract/calendar.yaml and contract/presentation.yaml (criterion 3 as amended 2026-10-18 allows the last). ONE EXCEPTION, flagged for Keith: one line of shared code, pipeline/dashboard_check_labels.py's MEASURES gained 'soda:invalid_count': 'Invalid values' (3e50868) - a label for a Soda check type no collection had used before. The scenario configuration naming ED (contract/scripted_decisions.yaml, generator/scenario_injection.py) belongs to REQ-GEN-205 and REQ-GEN-237, not to the collection. It generates, bootstraps, records all four tools' results and renders its page: the 2026-10-19 bootstrap and tests/test_emergency_department.py."
       - "2026-10-18, CRITERIA 7, 8 AND 9: criterion 7 as a SERIES of captures, each pair compared and evidenced on its own requirement - self-check (before REQ-PIPE-240) -> after-240 -> after-241 -> after-242 -> after-243 -> after-246 -> after-245 -> after-244 -> after-252 -> after-247a -> after-247b -> after-248 - with no difference outside the named ones (the last pair is on REQ-PIPE-248). Criterion 8: REQ-PIPE-240's ALLOWLIST is {} since 7ef2684 and the collections gate reports '0 file(s) still wait'. Criterion 9: built test-first in 578b2d5 (tests/test_collections_registry.py, the temporary-pointer tests)."
       - "2026-10-18, CRITERIA 1 TO 4 AND 6: tests/test_a_collection_is_a_small_adapter.py (on_demand, 12 tests, 12 passed on commit 172adba) copies every tracked file, adds the Widget Register from tests/fake_collection_files/ (its contract and check files under contract/widget-agency/, dbt models under dbt_project/models/widget-register/, a QA adapter and a generator provider), asserts the copy differs by additions only, bootstraps it into its own scratch database (17s), runs `mothman wreg qa --file widgets.csv --commit` (9.3s), rebuilds results, builds and embeds the dashboard, and compares every rendered status against its recorded verdict in a real browser. The collections and providers gates pass in the copy, and the repository's own data/ and reports/ are unchanged afterwards."
@@ -38255,8 +38256,8 @@ requirements:
     linked_tests:
       - tests/test_a_collection_is_a_small_adapter.py
       - tests/fake_collection.py
-      - tests/fake_collection_files/qa_tools/collections/widget_register.py
-      - tests/fake_collection_files/generator/collections/widget_register.py
+      - tests/fake_collection_files/assets/quarterly/collections/widget_register.py
+      - tests/fake_collection_files/assets/quarterly/synthetic/collections/widget_register.py
       - tests/tree_copy.py
       - tests/test_collections_registry.py
     implemented_by:
@@ -47666,6 +47667,7 @@ requirements:
     - tests/test_collections_registry.py::TestTheLiteralGate::test_the_shared_collections_trees_are_no_longer_exempt
     - tests/test_github_links.py::test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository
     implemented_by:
+    - cli/dashboard.py::validate_layout_command
     - qa_tools/common/assets.py::_Assets::names
     - qa_tools/common/assets.py::selected
     - qa_tools/common/assets.py::data_dir
@@ -48126,7 +48128,7 @@ requirements:
     - THE SYSTEM SHALL mark, in the same change, each asset's sandbox database in the session-start hook, each asset's CI database in test.yml, each asset's dev-container database in .devcontainer/post-create.sh, and each test worker's database for the asset its fixture selects.
     - THE SYSTEM SHALL NOT open connections to two assets' databases from one process, in anything that ships; a step that needs both - CI's two bootstraps - SHALL run as one process per asset, each with its own MOTHMAN_ASSET and MOTHMAN_SUPPLY_DSN, and a process spawned for a collection SHALL be handed the asset as well as the collection id (REQ-PIPE-369 criterion 4).
     - WHERE the process is the test suite, THE SYSTEM SHALL exempt it from criterion 5, and SHALL have each individual test open only one asset's database; a process a test spawns SHALL NOT inherit the exemption.
-    - THE SYSTEM SHALL name each asset's database on the sandbox's, CI's and the dev container's one local server supply_<data_asset_id> (SETTLED by Keith 2026-11-01), so that the deployment fixture finds each asset's database by that name; nothing that ships SHALL rely on the name.
+    - "THE SYSTEM SHALL name each asset's database on the sandbox's, CI's and the dev container's one local server supply_<data_asset_id> (SETTLED by Keith 2026-11-01), and WHEN MOTHMAN_SUPPLY_DSN is unset SHALL open the selected asset's database by that name on the server MOTHMAN_PG names (a postgresql:// URL with no database), a set MOTHMAN_SUPPLY_DSN naming its database outright, and with neither set SHALL refuse, naming both (Keith, 2026-11-15: the session hook and the dev container export MOTHMAN_PG and no MOTHMAN_SUPPLY_DSN)."
     - THE SYSTEM SHALL have a test, seen failing first, that points a checkout configured for each asset at the other asset's marked database and asserts the refusal on every route REQ-PIPE-107 criterion 10 names - mothman, a test worker's database, and the connection details handed to dbt, Soda Core and datacontract-cli - with the database left exactly as it was found.
     non_functional_requirements:
     - 'SECURITY: the guard is what makes one shared repository safe for two separately managed assets (#55); it must hold on every route, so criterion 8 tests each.'
@@ -48139,6 +48141,11 @@ requirements:
     - REQ-PIPE-107
     - REQ-QAC-344
     linked_tests:
+    - tests/test_supply_db.py::TestWithNoDsnACommandFindsItsAssetsDatabase
+    - tests/test_supply_db.py::TestALostDsnIsRefusedByAnotherEnvironmentsDatabase
+    - tests/test_deployment_dsn.py
+    - tests/test_devcontainer.py
+    - tests/test_dotenv_example.py
     - tests/test_db_identity.py::TestEachAssetIsRefusedTheOthersDatabase
     - tests/test_db_identity.py::TestMarking
     - tests/test_db_identity.py::TestARemarkReachesPooledConnections
@@ -48146,6 +48153,11 @@ requirements:
     - tests/test_assets.py::TestOneAssetPerProcess
     - tests/test_assets.py::TestTheConnectionGuard
     implemented_by:
+    - qa_tools/common/supply_db.py::supply_db_dsn
+    - qa_tools/common/supply_db.py::on_server
+    - qa_tools/common/supply_db.py::asset_database
+    - qa_tools/common/checkpoints.py::save
+    - .devcontainer/create-asset-databases.sh
     - qa_tools/common/db_identity.py::check
     - qa_tools/common/db_identity.py::expected
     - qa_tools/common/db_identity.py::mark
@@ -48163,6 +48175,9 @@ requirements:
       TestARemarkReachesPooledConnections seen failing first. No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here,
       not re-run.'
     decisions:
+    - "THE SERVER FOR A DSN-LESS COMMAND IS MOTHMAN_PG (Keith, 2026-11-15): CI's existing name, a postgresql:// URL naming no database; with MOTHMAN_SUPPLY_DSN unset a command opens <MOTHMAN_PG>/supply_<data_asset_id>, with neither set it refuses naming both, and a MOTHMAN_PG naming a database is refused (it would be a default database by another name). The session hook and the dev container export MOTHMAN_PG and no MOTHMAN_SUPPLY_DSN. REJECTED libpq's PG* variables (the follow-ups builder's provisional choice in 9278abf4), per-asset DSNs set by hand, and reverting to refuse-when-unset."
+    - "THE DEV CONTAINER'S DATABASES BY A COMPOSE INIT SCRIPT (Keith, 2026-11-15): .devcontainer/create-asset-databases.sh, assets/ mounted read-only, each id held to the asset-name pattern before it reaches SQL. REJECTED a mothman env create-database command, and psql in post-create.sh."
+    - "A CHECKPOINT CHECKS ITS SOURCE'S IDENTITY (post-build-review #334 M2): checkpoints.save() copies and prunes through an admin connection that checks nothing, so it first opens a checked read-only connection to the source - otherwise a process that lost its DSN could copy, and prune the checkpoints of, another environment's supply_<asset>."
     - 'TWO ASSETS NEED TWO data_asset_ids FOR THE GUARD TO WORK AT ALL (delivery-scoper, from qa_tools/common/db_identity.py): REQ-PIPE-107 compares data_asset_id and environment.'
     - ONE PROCESS PER ASSET FOR EVERYTHING THAT SHIPS; PYTEST EXEMPT, EACH TEST ONE ASSET (Keith, 2026-10-31, architect Q2 (a)). CI keeps one deployment job. REJECTED (b), the deployment half run once per asset. REJECTED one bootstrap process holding both DSNs, which puts both assets' credentials in one process.
     - 'THE REFUSAL NAMES IDS FROM THE DATABASE, NOT ANOTHER FOLDER (Keith, architect Q3): v1''s criterion naming the other asset''s folder needed a cross-asset read; REQ-PIPE-107''s existing found-and-expected message needs none.'
@@ -48175,8 +48190,8 @@ requirements:
     unmet_criteria:
     - criterion: 'Criterion 4''s dev-container half (and criterion 7''s dev-container database): .devcontainer/post-create.sh marks each asset''s supply_<asset>, but nothing creates those databases - docker-compose
         makes only `supply` - so on a fresh dev container each mark fails with its hint.'
-      why: Keith decided 2026-11-15 (docs/drafts/decisions-2026-11-01.md, split T1's questions) that a compose init script creates one supply_<asset> per asset folder; it is not built yet.
-      owner: the split follow-ups builder (the docker-compose init script mounting assets/ read-only and creating supply_<asset> per folder)
+      why: "BUILT 2026-11-15 (merge a742a5c7) as .devcontainer/create-asset-databases.sh with assets/ mounted read-only, Keiths compose-init-script choice, and tested without docker (tests/test_devcontainer.py: the mount, the script lists exactly the asset folders, a bad id fails) - but NEVER RUN: this sandbox has no docker daemon, so the CREATE DATABASE, the healthcheck and post-create.sh have not executed anywhere."
+      owner: whoever next opens the dev container (one run of the compose init and post-create.sh clears this)
       blocked_by:
         unowned: true
     open_questions: []
@@ -50023,7 +50038,6 @@ requirements:
     implemented_by:
     - tests/equiv_support.py::snapshot
     - tests/equiv_support.py::differences
-    - tests/equiv_support.py::summary
     - tests/equiv_support.py::run_into_fresh_database
     - cli/debug.py::debug_group
     - tests/conftest.py::pytest_collection_modifyitems
@@ -50033,6 +50047,7 @@ requirements:
     - 'CRITERION 5, the depth-1 clone: commit 83b1f16 cloned with --depth 1, 25 git-touching test modules run with -m "not needs_deployment" - 598 passed, 0 skipped - so the two fetch-depth: 0 lines went with nothing rewritten. critical.yml and validate-config.yml keep their own fetch-depth: 0, which the criterion does not name.'
     - 'CRITERION 7, THE REGISTER CLAIMS NAMED FOR KEITH (built-requirement claim edits): REQ-PIPE-248 lost tests/test_equivalence.py and qa_tools/common/equivalence.py::compare (and its criterion 8 is retired); REQ-QAC-247 lost tests/test_equivalence.py; REQ-PIPE-341 lost tests/test_sample_keys_equivalence.py; the retired REQ-TEST-239 lost its ten deleted tests and nine deleted symbols. After Keith''s 2026-11-15 decision: REQ-TEST-116 and REQ-TEST-159 lost tests/test_bootstrap_equivalence.py, and REQ-PIPE-262 lost its two tests in that file (its criteria 13 and 14, which those tests evidenced and 14 of which names the file, are not retired - for Keith). Evidence prose is unchanged.'
     decisions:
+    - "summary() MOVED THEN DELETED (2026-11-15 follow-up, 9278abf4): c3 moved it into tests/equiv_support.py with snapshot and differences, but neither kept test calls it, so it went as dead code; run_into_database's resume path (ensure_schema=False, REQ-TEST-159) went too, folded into run_into_fresh_database, the only caller left."
     - 'TWO KEPT TESTS, NOT FOUR (Keith, 2026-11-15): tests/test_bootstrap_equivalence.py and test_checkpoints.py''s TestAResumeRecordsWhatAFullReplayDoes are retired (criterion 3 as reworded), so the title, criterion 4 and the RELIABILITY NFR say two; the FOUR TESTS STAY decision below is history. With them REQ-TEST-116 c4, REQ-TEST-159 c5 and REQ-PIPE-262 c13 and c14 are retired, replaced by this requirement.'
     - 'DELETE THE EQUIVALENCE COMPARE EVERYWHERE (QD, Keith 2026-11-14, dictated): ''Just delete the equivalence thing, I told you I do not care. Synthetic [can] be removed. We have tests approved and we don''t need to assure that [the] demo hasn''t moved.'' The same stance as plans/supply-model.md''s ''I don''t care. This is all just fake data''. REJECTED (the architect''s QD options) a capture per build group, per requirement, or a first and a last.'
     - 'ITS OWN SMALL REQUIREMENT, FIRST IN THE BUILD (delivery-scoper, v6): Keith''s rule is small, self-contained requirements, and this deletion touches CLI, product code, five test files, conftest and a workflow, none of it part of any other requirement''s subject. It lands before the imports gate so the gate''s first allowlist does not list edges about to vanish. It could fold into REQ-TEST-384 if Keith prefers one fewer id.'
