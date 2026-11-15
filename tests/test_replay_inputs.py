@@ -51,6 +51,10 @@ class TestOneInputList:
                                   "pyproject.toml", "uv.lock", ".github/workflows/test.yml",
                                   "assets/environments.yaml"}
         assert set(ri.inputs("daily")) == set(ri.INPUTS) | {"assets/daily/**"}
+        assert set(ri.replay_patterns("daily")) == (
+            set(ri.REPLAY_INPUTS) | {"assets/daily/**", "!assets/daily/synthetic/collections/**"})
+        assert set(ri.REPLAY_INPUTS) == set(ri.INPUTS) - {"generator/**",
+                                                           "synthetic_data_generator/**"}
 
     def test_a_replay_compares_it_less_the_generators(self):
         files = ri.input_files(ri.replay_patterns())

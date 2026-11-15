@@ -188,6 +188,13 @@ releases:
               A file or a folder with no data-asset.yaml at the top of
               assets/, or a collection's own file left in the shared code, now
               fails mothman check, named, instead of being quietly ignored.
+          - headline: Checkpoints and CI caches per asset
+            components: ["Testing & dev tooling"]
+            description: >
+              A checkpoint list now shows only your asset's checkpoints and
+              resumes, and never deletes another asset's. In the full CI run,
+              each asset caches its own bootstrap, so a daily-only change
+              rebuilds only daily's, and both bootstraps run side by side.
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file

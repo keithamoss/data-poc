@@ -60,6 +60,9 @@ ASSET_FOLDER = "assets/{asset}/**"
 #: split, the asset's own providers under assets/<asset>/synthetic/collections/.
 GENERATORS = ("generator/**", "synthetic_data_generator/**")
 PROVIDERS = "assets/{asset}/synthetic/collections/**"
+#: The shared half of it; replay_patterns() adds the asset's own folder, less
+#: its providers.
+REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS)
 
 #: Bumped when what the key covers changes shape, so an old cache never
 #: matches a new meaning (v3: assets/ and dbt_shared/ since the split; v4: one
@@ -87,8 +90,8 @@ def replay_patterns(asset: str | None = None) -> tuple[str, ...]:
     """What a replay of `asset` compares: its inputs less the generators and
     its providers (A43)."""
     asset = _asset(asset)
-    return (tuple(p for p in inputs(asset) if p not in GENERATORS)
-            + ("!" + PROVIDERS.format(asset=asset),))
+    return REPLAY_INPUTS + (ASSET_FOLDER.format(asset=asset),
+                            "!" + PROVIDERS.format(asset=asset))
 
 
 def _pathspec(pattern: str) -> str:
