@@ -45910,13 +45910,9 @@ requirements:
     evidence:
     - "2026-10-31 Perth, off-batch @ 08f6985 (lp-fixes and the dashboard fixes merged): a from-empty sequential bootstrap of a scratch database passed its target comparison, every targeted supply read as built - Linkage Products 55 runs, 536 results (486 pass, 16 warn, 34 fail)."
     - "2026-10-30: tests/test_linkage_check_sql.py runs the real check file's queries against text and numeric identifiers (seen failing first on 'btrim(bigint)'); TestTheQueriesThemselvesAgreeWithTheMapping seen failing first on the critic's three edits."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [1]): MET - all three failing referential results on the 2026-11-03 history record their rows as dataset code and identifier values, e.g. [[\"DOC_CLIENTS\",\"CPS-0837638049\",null]]; the null id_1 is the real staged row."
     unmet_criteria:
     - {"criterion": "Criterion 3, in part - the per-code identifier count implied inside the own-row queries.", "why": "The gate now checks codes in query text and valid-values lists, which column each id_j is compared with and both-sides casts; the id_counts attribute beside the queries is checked, the count inside them is not.", "owner": "not scheduled", "blocked_by": {"unowned": true}}
-    - criterion: Criterion 6, the failing-rows half - the referential check records its failing rows as dataset code and identifier values.
-      why: All three failing linkage referential results on the bootstrap recorded failing_sample_keys as an empty list (post-build-review #291). REQ-PIPE-341 is BUILT (2026-11-01) - the composite key, the amended queries and a real-Soda proof over the committed check file (tests/test_sample_keys_composite.py) - and this entry is removed by its criterion 7's before-and-after compare, written and waiting on a from-empty bootstrap.
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
   - id: REQ-GEN-334
     title: The Linkage Products provider writes, for every quarter, a linkage delivery on the quarter's own round, received after that quarter's Emergency Department promotion takes effect in an ordinary quarter and within its due time and grace, built from the last source supply received before it
     date_written: '2026-10-25'
@@ -46518,12 +46514,7 @@ requirements:
     - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
     - 'CRITERIA 7 AND 13 COMPLETED BY REQ-GEN-298 (2026-11-01): the ordinary severities are drawn from the geocoding stream''s own seed and applied through REQ-GEN-298''s presets, and every amber or red planned verdict was confirmed by the generation-time trial in its slot''s period - 43 supplies of a whole generated history, all agreeing (REQ-GEN-298''s evidence).'
     - '2026-11-02 Perth, worktree bans (branch bans, from bmove''s move), CRITERION 7 AS AMENDED (A2): tests/test_geocoding_faults.py 44 passed, the six new TestDriftIsPlannedFromWhatTheDriftCheckReads unit tests seen failing first (no drift_verdict). BYTE-IDENTITY, generating the whole quarterly history into private scratch folders (generator.output.generated_into) from a clean archive of fd263d7 and of the A2 commit: diff -r reports no difference at all - 493 delivery files, 493 receipts, the bookkeeping and scenario_placements.json - geocoding included. THE GENERATION-TIME TRIAL over that whole history, against a scratch database (bans_a2_trial, never supply): 43 supplies tried in their slots'' periods, all agreeing, 119s on 4 workers.'
-    unmet_criteria:
-    - criterion: Criterion 7's confirmation after replay - REQ-GEN-186 criterion 3's comparison of every recorded geocoding target, green included, with the recorded verdicts.
-      why: The targets are recorded (generator/targets.py, tested); the comparison reads a replayed database.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [3]): MET - the bootstrap's target comparison ran over every geocoding target, greens included, and found zero disagreements; again on the 2026-11-14 regeneration (post-build-review #322)."
   - id: REQ-PIPE-296
     title: The geocoding datasets run end to end through Linkage Products' existing QA adapter and its dbt folder, their delivery its own package in the quarterly bootstrap stream, the bootstrap's cost measured before and after
     date_written: '2026-10-25'
@@ -46585,32 +46576,12 @@ requirements:
     - 'ADAPTER BUDGET (criterion 1): linkage-products adapter 23 lines of logic against REQ-TEST-249''s 150 (validate_collections.line_report).'
     - 'SEEN FAILING FIRST: a Client Register geocoding run recorded ED Presentations'' match_level counts, because value_counts is keyed by column and both geocoding tables declare match_level - red before the run''s own table was counted last, green after (tests/test_dataset_stats.py).'
     - 'EVERY CONSUMER OF THE KEY (NFR 2): the geocoding tables'' failing-sample key is [id_1, census_year], read by soda_common.failing_sample_keys, dbt_common.failing_sample_keys_direct (the set-member tests'' audit rows carry id_1 and census_year), datacontract_common.failing_sample_keys and sample_keys.recorded; every Soda failed-rows query on a geocoding table selects id_1 and census_year.'
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [4]): MET - geocoding deliveries filed (geo-cp-clients early 43, late 2; geo-ed-presentations early 50, late 5), checked with all four tools and gated as their own package (gate_application 66 apart from linkage's 65). datacontract-cli runs on every geocoding run and is asked nothing ({\"asked\": []}), as Linkage Products' contract declares no quality blocks: Keith, 2026-11-14, 'run' is enough."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [5]): MET - 489 arrival runs, 100 of them geocoding, replayed as one receipt-ordered sequence; the only 3 out of order are Child Protection files inside one delivery; every arrival run has a receipt."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [6]): MET - 2015-Q2/Q3 deliveries carrying geo-ed-presentations alone file and check it while geo-cp-clients' slot stays unfilled; 2026-Q1's REG_20260201 carries geo-cp-clients alone, filed, checked and promoted, geo-ed-presentations 2026-Q1 unfilled."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [7]): MET - the built Linkage Products dashboard data carries geo-cp-clients and geo-ed-presentations with the same keys as linkage-keys."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [8]): the AFTER is recorded and the BEFORE half retired (Keith, 2026-11-14: nobody needs the history; the budget gap goes to the speed batch, REQ-PIPE-403 and REQ-PIPE-250). Quarterly from empty: 6666s on the 2026-11-03 history (stream 6242s; 105 geocoding arrival runs, 5 knock-ons), and 3133s on the 2026-11-14 regeneration at 2016e094; daily 681s. Over the 720s budget, not called met."
     unmet_criteria:
-    - criterion: Criterion 3 - a geocoding delivery filed, staged, checked with all four tools, recorded and gated as its own package.
-      why: Needs the quarterly stream replayed.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 4 - the bootstrap replaying the geocoding deliveries in receipt order with Child Protection, Emergency Department and the linkage deliveries.
-      why: Needs a from-empty bootstrap.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 5 - a geocoding delivery omitting one dataset's file leaves that slot unfilled, the other filed and checked.
-      why: The generated history has such quarters (2015-Q2 to 2016-Q1 carry geo_ed_presentations alone); their filing is read from a replayed database.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 6 - each geocoding dataset shown on the dashboard like every other dataset.
-      why: Needs a dashboard built from recorded results.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 7 - the from-empty bootstrap measured before and after, by collection and stream, recorded here and in CLAUDE.md's running log.
-      why: Needs two from-empty bootstraps.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
     - criterion: Criterion 8 - CI's deployment half run against a bootstrap holding the geocoding datasets, its duration recorded against REQ-TEST-260's allowance.
       why: The one CI run at the end of the build run.
       owner: the end-of-run bootstrap (2026-11-01 build run)
@@ -46715,12 +46686,7 @@ requirements:
     - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_checks.py (real dbt-core, Soda Core and Evidently in this worker''s own database), test_geocoding_gates.py, test_check_measures.py, test_check_bands.py, test_validate_soda.py, test_distribution.py, test_run_evidently_cp.py; the soda, columns and collections gates green.'
     - 'PROVEN BY EXPERIMENT (criterion 3): two runs of 2017-Q2 and 2017-Q3 over the same two records read [2011] and [2011, 2016] from their own relation - 0 then 2 missing years - with identical node checksums in both manifests, so one parse served both and nothing about the set is in the project or its vars. (criterion 4): with no relation, the selector source:raw.list_setting_members+ leaves all three tests out and the build runs clean. (criteria 5 to 7): 3 missing, 1 duplicated and 2 unexpected on a hand-built supply. (criterion 12): an empty supply passes all three year checks, and the share check reads 0.0, pass. (criterion 11): frames whose unplaced share rises from 2 to 51 percent drift above 0.25 unexcluded and below 0.10 with ''not geocoded'' excluded from both sides.'
     - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
-    unmet_criteria:
-    - criterion: Every check here recorded for a replayed geocoding supply - status, samples by id_1 and census_year, and the set it was judged against.
-      why: Needs the quarterly stream replayed.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [10]): MET - all 300 year-check results on a replayed geocoding supply carry member_set, member_set_version and member_set_added, with samples by id_1 and census_year."
   - id: REQ-GEN-298
     title: The geocoding history carries each fault on purpose - missing, duplicate and unexpected census years, an amber and a red not-geocoded share, and REQ-QAC-340's five cross-collection routes - in ordinary supplies and in one named scenario for each, every drafted injection confirmed by a real-tool trial
     date_written: '2026-10-25'
@@ -46860,6 +46826,7 @@ requirements:
     - tests/test_geocoding_trial.py::TestATrialSpeaksOnlyForItsOwnCollectionsChecks
     - tests/test_geocoding_trial.py::TestAnEmptySupplysDriftIsNotEvaluated
     - 'tests/test_geocoding_faults.py::TestDriftIsPlannedFromWhatTheDriftCheckReads'
+    - tests/test_geocoding_scenarios_recorded.py::test_no_named_geocoding_scenario_is_judged_across_a_reference_gap
     evidence:
     - '2026-11-01/02 Perth overnight, worktree bgeo from 39393c3, no bootstrap and no full gate (Keith''s build-run terms).'
     - 'BYTE-IDENTITY, by generating every collection''s whole history into private scratch folders at 39393c3 and at this tree (generator.output.generated_into): all 514 non-geocoding delivery files and their 514 receipts byte-identical; the birth-registrations, cp-clients, ed-presentations and linkage-keys bookkeeping equal; all 79 existing scenario placements equal. Differences are geocoding only: 38 geocoding files changed, 4 new geocoding resupply deliveries, 74 geocoding receipts (their contents or their sequence numbers, shifted by the resupplies), the two geocoding bookkeeping keys (43 -> 45 and 53 -> 55 entries) and 13 new placements (TS-102 to TS-111, TS-93c, TS-100c, TS-101b). 379s to generate at base, 424s after, on a shared 4-core sandbox.'
@@ -46868,27 +46835,10 @@ requirements:
     - 'TESTS on the final code: tests/test_geocoding_faults.py, test_geocoding_trial.py, test_geocoding_generator.py, test_target_agreement.py, test_unrunnable.py and test_generator_providers.py - 170 passed, 1 skipped (test_target_agreement''s ''this checkout has no generated history''), 1 failed; the failure was a test of this change asserting too narrow a set, corrected, and its class re-run: 2 passed. Earlier, on the tree before the drift rule, 29 modules (the generator, scenario, geocoding, trial, evidently, overlay and registry modules) gave 766 passed and 16 failed: 3 of them this change''s tests, since corrected and re-run above, and 13 failing identically at 39393c3 for want of a generated history or a bootstrapped database (TestAScriptedDecisionsReCheckIsRun x2, TestThePlantedPairsAreSettled, TestTheEarlyEmergencyDepartmentSupplies x5, TestOnlyThePlantedAmbersWaitUnderHold, test_the_committed_map_is_not_stale, TestReadingTheRealCommittedHistory x3). ruff clean.'
     - 'SEEN FAILING FIRST at 39393c3: 26 of the 29 new trial, overlay, rule, target and fault tests (the 3 that pass there guard behaviour that must not change); and each of the two trial-found defects'' tests - Child Protection checks in a Linkage Products trial, and Evidently on an empty frame (''current_data must contain at least one column'') - failed before its fix.'
     - '`mothman lp generate-synthetic-data --help` offers --skip-target-trial (REQ-PIPE-296 criterion 9).'
-    unmet_criteria:
-    - criterion: 'Criterion 15 (2)''s second half - the trial of TS-100c''s quarter agrees with the results the replay records for the same supply.'
-      why: 'The trial''s half is tested (tests/test_geocoding_trial.py::TestARealTrialInItsPeriod); the replay''s results come from a bootstrapped database.'
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 8''s ''what it shows'' - TS-93c, TS-100c and TS-101b recorded could-not-run, held back, and TS-100c and TS-101b cleared by the knock-on.'
-      why: 'Named and tried at generation; what the replay records for them needs a from-empty bootstrap.'
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 13''s measurement reported with REQ-PIPE-296''s - the trials'' wall clock in a from-empty quarterly bootstrap against REQ-PIPE-250''s budget.'
-      why: 'The trials report their own wall clock (this run''s evidence, on a shared sandbox); the bootstrap figure is the end-of-run bootstrap''s.'
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: 'Criteria 3 and 4 on the dashboard - each scenario''s check reading Warn or Fail for its own reason, and TS-111''s Client Register carrying the Warn tag from the geocoding promotion.'
-      why: 'Needs a dashboard built from a replayed history (REQ-DASH-299 criterion 15 proves the pages).'
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [11]): MET - the trial of TS-100c's quarter agrees with the results the replay records for the same supply."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [12]): MET - TS-93c, TS-100c and TS-101b recorded could-not-run and held back; TS-100c and TS-101b cleared by the knock-on."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [13]): the AFTER is recorded and the before half retired (Keith, 2026-11-14): 'Tried 43 supplies in their slots' periods in 53s on 4 worker(s)' inside the 6666s quarterly bootstrap."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [14]) found TS-107 and TS-111 each also reading drift Fail across a reference gap; moved (post-build-review #322, Keith 2026-11-14) to 2021-Q2 and 2024-Q4. On the 2026-11-14 regeneration tests/test_geocoding_scenarios_recorded.py (each named geocoding scenario judged across no gap), tests/test_target_agreement.py and tests/test_dashboard_e2e.py::TestTheGeocodingPages (TS-111's Warn tag on the Client Register) pass: MET."
   - id: REQ-DASH-299
     title: 'The dashboard names the geocoding checks by what they find, heads every check''s examples ''Examples: <what it measures> (key only)'', shows a failing sample as record and year, shows the census years in force and the dataset geocoded in the page''s strip, and keeps a left-out cross-collection check in its group'
     date_written: '2026-10-25'
@@ -47070,17 +47020,8 @@ requirements:
     - 'A DEFECT OF THE BUILD, CAUGHT BY THE FULL VITEST RUN BEFORE ANY PUSH: a second top-level shortDay() for the tile''s date silently replaced the page''s own (function declarations, last wins), so the weekly trend''s accessible name printed raw Date strings. Removed; the tile uses the existing shortDay. Every name this build added was then checked unique in the template.'
     - '2026-11-02 Perth, worktree bans, CRITERION 8 AND DECISION 36 AS CHANGED (B11): tests-js/geocoding-display.test.js and tests-js/sample-keys-compare.test.js, 25 passed - a null middle part, a leading null part and a null beside an empty one read ''—'', a null key, [null] and [null, null] read ''(no value)'', and a set-member line''s record reads ''C-1 / — / x''; the three null-part tests seen failing first (''CP / (no value) / x'').'
     - '2026-11-03 Perth, worktree bq14 (morning report 12 Q2): criterion 15 (7) and its test removed; nothing else changed. 2026-11-03 Perth, worktree bq14, code at 7da190ca: every test module naming the changed code (55 modules, tests/test_dashboard_e2e.py aside) plus tests/test_arrivals.py, 1985 passed, 14 failed, 5 skipped; each of the 14 fails identically at 72776772 in a clean worktree (no scenario placements file in this sandbox, and a NotInteractive and an unpacking error recorded in post-build-review #313), so none is this change''s. npm test 1146 passed.'
-    unmet_criteria:
-    - criterion: 'Criterion 15, every one of its eleven remaining browser proofs (its (7) was removed 2026-11-03; with criteria 1''s on-page order, 6 and 7 on a real scenario supply, 9''s three versions, 10''s link, 11''s value bars and 12''s two breaks on the built page).'
-      why: 'Written as tests/test_dashboard_e2e.py::TestTheGeocodingPages, with criterion 14''s updates to TestNotInTheAgreementOnThePage and TestChecksThatReadAnotherCollection::test_the_not_supplied_quarter_reads_not_supplied_by_decision, and not run: the warehouse is empty, and the dashboard is built from a bootstrapped database (Keith''s terms for the build run).'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
-    - criterion: 'NFR 6, the render budget - page size and tests/test_dashboard_e2e.py''s duration before and after.'
-      why: 'Both are measured on a built dashboard, which needs the bootstrapped database.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [15]): MET - all eleven browser proofs passed on 5ff97f93 against the bootstrapped databases."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [16]): the AFTER is recorded and the before half retired (Keith, 2026-11-14): the built page 1,175,176 bytes (2026-11-03), tests/test_dashboard_e2e.py 1812.67s for 437 tests run alone on 5ff97f93."
   - id: REQ-QAC-300
     title: The census years every geocoding dataset owes are declared once for the collection as an effective-dated, frozen-past entry of a generic container of list-valued settings, by the existing setting mechanism - 2011 alone from 2013, 2016 added from 2017-Q3, 2021 from 2022-Q3 and 2026 from 2027-Q3 - and each supply is judged against the set in force on its period's round date
     date_written: '2026-10-25'
@@ -47175,12 +47116,7 @@ requirements:
     - 'SEEN FAILING FIRST (criterion 12): timeline() given replacement_setting''s key, and census_years declared on the collection alone resolving on a date, both failed against today''s code (timeline took no key; there was no date resolver), and pass after.'
     - 'LANDINGS (criterion 10), through contract/calendar.yaml and the one resolution, for both geocoding datasets: 2017-Q2 (round 2017-05-01) [2011], 2017-Q3 (2017-08-01) [2011, 2016], 2022-Q2 [2011, 2016], 2022-Q3 [2011, 2016, 2021], 2027-Q2 [2011, 2016, 2021], 2027-Q3 all four.'
     - NO BOOTSTRAP AND NO FULL GATE in this run (Keith's build-run terms).
-    unmet_criteria:
-    - criterion: Criterion 9 end to end - a year check's recorded result carrying member_set_version, member_set and member_set_added.
-      why: The fields are written from the run's own declared-set relation (run_dbt._set_judged_against, tested against a real relation in tests/test_geocoding_gates.py), but no recorded result exists until a bootstrap replays a geocoding supply; read back from qa.check_result there.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [17]): MET - every replayed year-check result carries member_set_version, member_set and member_set_added."
   - id: REQ-QAC-340
     title: Each geocoding dataset is checked against its source supply for the period - an orphan check and a coverage check, amber below 100 percent and red below 98, that fails when source records have no geocoding row at all - on Linkage Keys' referential and coverage pattern, generic, its verdicts counting against the source supply as linkage's do
     date_written: '2026-10-25'
@@ -47244,26 +47180,15 @@ requirements:
     - tests/test_geocoding_declarations.py::TestCriterionFiveEachRuleReadsItsOwnBlock
     - tests/test_linked_datasets.py::test_the_real_configuration_passes
     - tests/test_thirty_linked_datasets.py::TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
+    - tests/test_geocoding_not_supplied_scope.py::test_a_marked_source_leaves_its_geocoding_checks_out_of_scope
+    - tests/test_geocoding_not_supplied_scope.py::test_without_the_mark_they_stay_in_scope
     evidence:
     - '2026-11-01 Perth, worktree bgeo, branch bgeo from 60575ac. Green on this tree: tests/test_geocoding_checks.py, test_geocoding_declarations.py, test_linked_datasets.py, test_linkage_check_sql.py; the collections gate (REQ-QAC-333 criteria 3 and 8, scoped per check block) green with both pairs present.'
     - 'PROVEN ON REAL SODA: integer source identifiers matched text ones, both cast; one of two records missing reads coverage 50.0, red; 99 of 100 covered warns and 97 of 100 fails (bands 100 and 98); an empty geocoding supply against two source records reads coverage 0.0, red, and its orphan check passes (criterion 4).'
     - THE THIRTY-DATASET FIXTURE (criterion 11) installs into a copy with two fake geocoding datasets, of two and three identifier columns, each with its pair in its own block, and changes no product file (changed_product_files empty), its linked-datasets gate passing in the copy; the on-demand replay itself was not run.
-    unmet_criteria:
-    - criterion: Criteria 5 to 8 - each evaluated result counted toward both supplies, a not-evaluated one toward the geocoding supply only, the promoted source supply shown red or amber from the geocoding supply's promotion, and the knock-on and out-of-scope rules - for recorded geocoding results.
-      why: REQ-PIPE-331, REQ-PIPE-332 and REQ-DASH-337's generic machinery, unchanged; shown for these checks only by a replayed history.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 9 - the checks shown on the source's page, the geocoding page and the agency page.
-      why: Needs a dashboard built from recorded results.
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 11 - REQ-TEST-339's thirty-dataset test with the fake geocoding datasets checked end to end.
-      why: 'Written as tests/test_thirty_linked_datasets.py::TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource (on demand) and not run: it generates and replays a stream into a scratch database.'
-      owner: the end-of-run bootstrap (2026-11-01 build run)
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [18]): criteria 5-7 and 8's knock-on MET in the recorded history (a Warn colouring its source; not-evaluated colouring only the geocoding supply; amber from the promotion's instant; 5 knock-on re-checks). 8's out-of-scope half, which the history never holds, is proven by tests/test_geocoding_not_supplied_scope.py (Keith, 2026-11-14: a test, not a scenario): a source marked not supplied leaves both geocoding checks of cp_clients out with not_supplied_by_decision, and without the mark they stay in scope."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [19]): MET - the checks show on the source's page, the geocoding page and the agency page."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [20]) and post-build-review #324: after the fixture was brought to the asset layout, tests/test_thirty_linked_datasets.py --run-on-demand 27 passed (2026-11-15), TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource among them: MET."
   - id: REQ-PIPE-341
     title: A failing-row sample may name a row by several columns - each table's sample key an ordered list - so a sample can say which record and which census year, and Linkage Keys' referential sample, recorded empty today, names its dataset and identifiers
     date_written: '2026-10-31'
@@ -47383,17 +47308,9 @@ requirements:
     - '2026-11-01 Perth, worktree b341: tests/test_sample_keys_composite.py, test_sample_keys_deterministic.py, test_common_helpers.py, test_collections_registry.py, test_validate_soda.py, test_check_fingerprint.py, test_linkage_check_sql.py, test_linked_datasets.py, test_qa_results_reader.py, test_build_from_the_record.py, test_check_lifecycle.py, test_validate_check_lifecycle.py, the six test_run_{soda,dbt,datacontract}_{bdm,cp}.py, test_soda_scoped.py and test_linkage_scenarios.py green; vitest sample-keys-compare, sample-fine-print, tool-verdict-status and dashboard-loads green. No bootstrap, no full suite (Keith''s terms for the build run).'
     - 'SEEN FAILING FIRST: the new sampler, adapter, gate, build and page tests before each change; the real-Soda Linkage Keys test against the pre-build check file raised SampleNotRecordable on ''Expected identifiers present'' (dataset and linkage_key selected, id_1 and id_2 missing) - the #291 shape, now loud. The real files'' gate found exactly five: the four Linkage Keys queries criterion 5 names, and Birth Registrations'' freshness check, which now declares names_no_row.'
     - 'EVERY CONSUMER, BY GREP for failing_sample_key over qa_tools, pipeline, dashboard, cli and generator (NFR 1): soda_common.failing_sample_keys, dbt_common.failing_sample_keys_direct and failing_sample_keys_via_values, datacontract_common.failing_sample_keys, run_soda/run_dbt/run_datacontract.evaluate, sample_keys, pipeline/build_dashboard_data (slot and history entry), and the template''s sample block, compare block and pills. The writer, the reader and results_history carry it through qa.check_result.extra untouched, which test_qa_results_reader proves for the new shape.'
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [22]): MET - the page asserted in a real browser."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [23]) and post-build-review #324: tests/test_thirty_linked_datasets.py --run-on-demand 27 passed (2026-11-15), TestEveryLinkageResultNamesItsRowsByTheWholeKey among them: MET."
     unmet_criteria:
-    - criterion: 'NFR 1, the page asserted in a real browser.'
-      why: 'Written as tests/test_dashboard_e2e.py::TestASeveralColumnSampleOnTheRealPage and not run: it builds the dashboard from a bootstrapped database.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 8 at scale - the on-demand thirty-linked run records every linkage result under the whole key.'
-      why: 'Written as tests/test_thirty_linked_datasets.py::TestEveryLinkageResultNamesItsRowsByTheWholeKey and not run: the module is on demand and needs a full copy run.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
     - criterion: 'Criterion 3, the geocoding half - each geocoding table''s key as id_1 to id_N and census_year.'
       why: 'No geocoding table exists yet; the list shape takes such a key unchanged.'
       owner: REQ-PIPE-296, which adds the geocoding tables
@@ -47566,27 +47483,10 @@ requirements:
     - 'Criterion 19 (D8e) SEEN FAILING FIRST: tests-js/unit-trend-not-evaluated.test.js failed 3 of 4 with the fix''s two lines taken out (a red share of 0 drawn at the not-evaluated run) and passes 4 of 4 with them. Criterion 18 (D8d): tests-js/trend-axis-labels.test.js passes 3 of 3; with only a data-x-label added to the pre-fix template its check-trend case fails (the long dates overprint) while its unit-trend case passes, which located the defect in the check trend.'
     - 'Criterion 13: SCENARIOS.md regenerated by `mothman scenarios map` from placements rebuilt out of the committed map''s own data block; 79 placements, every scenario''s coordinates identical before and after, and `mothman scenarios map --check` read it current. No colour word is left in any field of the 126 parsed register entries; the 41 left in SCENARIOS.md are stored built_to values in its machine data block, which the page does not render.'
     - 'Python on f22855b: tests/test_status_parity.py''s words class, tests/test_cross_table_grid.py and tests/test_scenario_map.py are in the 1035-passed run of 33 touched and neighbouring modules (the five failures in it, a worker database that did not exist, passed alone, 11 of 11).'
-    unmet_criteria:
-    - criterion: 'Criterion 4, in the built page - no colour word for a status in any text a person reads; proven by REQ-TEST-361''s real-browser guard over the built dashboard.'
-      why: 'The guard needs a dashboard built from a bootstrapped history; this build ran with an empty warehouse (Keith''s run terms, 2026-11-01), so it is written and not yet run.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 14, in the built page - recorded text rendered inside its marked element, on pages carrying real recorded reasons and check changelog entries.'
-      why: 'The marks are covered by tests-js/pass-warn-fail.test.js; the proof on real recorded text needs the built dashboard.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 15, in the built page - colours, classes, data attributes and the grid''s words unchanged, with TestStatusMatchesEachToolsOwnVerdict passing unchanged.'
-      why: 'A real-browser proof over the built dashboard; waits on the bootstrap.'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 16, the e2e half and the NFR''s scripted checklist - tests/test_dashboard_e2e.py''s changed assertions re-run and seen to pass, and the per-phrase before/after counts over the built dashboard''s visible text.'
-      why: 'Both need the built dashboard; the Python and Vitest assertions are re-run and pass (evidence).'
-      owner: 'the end-of-run bootstrap (2026-11-01 build run)'
-      blocked_by:
-        unowned: true
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [24]): MET - REQ-TEST-361's guard finds no colour word for a status in the built page's text."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [25]): MET on Keith's reading (2026-11-14): the JS tests (tests-js/pass-warn-fail, rechecks, withdrawal) assert recorded text inside its mark; no browser test added."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [26]): MET - TestStatusMatchesEachToolsOwnVerdict passed unchanged (and its daily twin); no colour token changed; status attributes unchanged."
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [27]): the e2e half MET (436 of 437 on 5ff97f93, the one failure the load-sensitive first-view budget); the scripted checklist half retired (Keith, 2026-11-14: the e2e half and the colour-word guard are enough)."
   - id: REQ-TEST-360
     title: The terminal and the GitHub Issue text word every status Pass, Warn or Fail (or passing, warning, failing) through one Python statusWords, with code that read worded text moved onto status values, and colour styles, exit codes, option values and stored values unchanged
     date_written: '2026-10-31'
@@ -48995,6 +48895,7 @@ requirements:
     - '2026-11-02, tree 12c567b2: criterion 3 by real experiment - marking test_status_parity.py::TestTheRealRecordedHistoryStillPasses critical made `pytest --collect-only` exit 4, naming its three tests "(needs a deployment)"; reverted.'
     - '2026-11-02, tree 12c567b2: the workflow-reading tests - tests/test_ci_on_demand.py, test_ci_bootstrap_cache.py, test_ci_usage.py, test_devcontainer.py, test_db_identity.py, test_publish.py''s TestNeitherHalfOfCIQuietlyStopsCovering, TestACriticalTestCIcannotRunFailsCollection and TestTheWorkflowCarriesEveryVariableThePipelineNeeds, and the workflow tests of test_no_calendar.py, test_validate_provisional.py and test_replay_inputs.py - 74 passed; tests/test_cli_check.py 34 passed. Both workflows parse with yaml.safe_load and pass `yamllint --strict`.'
     - '2026-11-03 (Perth), tree 79d75153 (bfol): tests/test_pytestmark_is_never_rebound.py passed within the touched modules'' 113 passed; on the earlier tree a7b0f020 its module-wide test FAILED on a copy of tests/test_check_lifecycle.py with `pytestmark = pytest.mark.asset(''quarterly'')` appended (line 709 named), the copy then removed. Critical set on that tree: daily 106 passed; quarterly 788 passed, 1 failed - tests/test_plans_index.py, the index stale from the commit''s own plans edit, regenerated in the next commit.'
+    - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [30]): MET on Keith's reading (2026-11-14): the chunked full suite with combined coverage plus `mothman check --no-pytest` stands in for one whole `mothman check`, which outlasts the 2-hour background-job limit here - a35066ff: 7727 tests, 0 failed, 1 skipped (post-build-review #175), coverage 94% against 92%."
     decisions:
     - 'Keith 2026-11-02: the push CI set is a HAND-PICKED `critical` mark. Rejected: a measured `slow` mark (selects by cost rather than by what a test guards), and selecting whole module kinds.'
     - 'Keith 2026-11-02: the delivery-scoper proposes the list against stated criteria with measured timings, and Keith signs the list off before it reaches CI.'
@@ -49028,11 +48929,6 @@ requirements:
         unowned: true
     - criterion: 'Criterion 8 on GitHub - a push starts no test.yml run, and a hand-started one still runs both halves and the coverage combine.'
       why: 'Only GitHub can show which workflows a push started.'
-      owner: 'the first push after the build run'
-      blocked_by:
-        unowned: true
-    - criterion: 'Criterion 9''s floor on a full local gate - `mothman check` run whole with coverage enforced and its result line printed.'
-      why: 'The full gate needs a bootstrapped deployment and about 25 minutes, and this build ran beside other builders without one; the gate''s coverage arguments and result line are covered by tests/test_cli_check.py (evidence).'
       owner: 'the first push after the build run'
       blocked_by:
         unowned: true
