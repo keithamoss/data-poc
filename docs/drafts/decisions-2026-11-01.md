@@ -723,3 +723,7 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **TV amendments APPROVED AS WORDED (Keith, 2026-11-14):** REQ-PIPE-279 c6 (via REQ-PIPE-410), REQ-DASH-272 c21 (via REQ-PIPE-417), REQ-TEST-150 c7 (via REQ-TEST-416), each appended when its requirement is built.
 
 **TIMING-ATTEMPTS v2 STATUS:** every question answered; TV1/TV2 to apply to the draft; then sign-off.
+
+## Build order for the three signed batches (Keith, 2026-11-15)
+
+- **ORDER: #134's core, then speed, then timing** (option a). First #134's independent pieces (REQ-TEST-393, 395, 396 clean-up; the REQ-TEST-384 imports and REQ-TEST-388 dbt-packages gates) and speed's independent REQ-PIPE-401 defect fix; then #134's core (REQ-PIPE-380 asset_model/ with 376 and 390; REQ-PIPE-383, 382, 381 the clock and bootstrap); then the speed batch (397-408, 430-432, in the architect's order); then timing (409-418); then the rest of #134 (386, 391, 385, 379, 377, 378, 387, 389) with REQ-GEN-392's regeneration last. REJECTED #134 whole first, and speed's independent parts first.
