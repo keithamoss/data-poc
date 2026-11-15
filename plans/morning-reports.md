@@ -3594,4 +3594,8 @@ one or more component tags, and a date.
       guard plus a test baseline, the six modules reworked; the whole
       REQ-DOCS-358 wording approved, batch 3 and the docs edits unread (a
       critic checks them against the code).
+    - **SCOPE WIDENED (Keith, ~21:20)**: after #134 steps 2-3, the speed batch,
+      then timing, then REQ-GEN-392, then REQ-GEN-206, as far as the night
+      allows. Resets of supply_quarterly/supply_daily from empty approved for
+      tonight, as often as 392 and 206 need. Keith nudged to stop at 21:18.
 
