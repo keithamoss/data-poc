@@ -15,7 +15,9 @@ comment, so a test does not take its expectation from the code it tests:
 - Birth Registrations' place_of_birth_facility nulls at 1,900 rows: dbt
   warns > 300 and fails > 600, Soda warns > 15% (286 rows) and fails > 35%,
   the contract fails >= 35% (665). Amber is 286..600; the first failure is
-  601 (dbt). Warn = (286 + 600) // 2 = 443; Fail = 601 + 315 = 916.
+  601 (dbt). Warn = (286 + 600) // 2 = 443. A Fail preset first breaks five
+  twin pairs, so it sizes at 1,895 rows: Soda warns from 285 (15.04%), amber
+  is 285..600, and Fail = 601 + 316 = 917.
 - Child Protection's client postcodes at 500 rows: dbt warns > 0 and fails
   > 15, Soda fails > 3% (16 rows), the contract fails >= 3% (15). Amber is
   1..14; the first failure is 15. Warn = 7; Fail = 15 + 14 = 29.
@@ -218,7 +220,7 @@ class TestBirthRegistrations:
         for key, n in counts.items():
             rule = _rule("birth-registrations", key)
             assert _fails(rule, n, len(out)), f"{key}: {n} faulty rows do not fail it"
-        assert counts["place_of_birth_facility.completeness"] == 916
+        assert counts["place_of_birth_facility.completeness"] == 917
 
     def test_a_single_tier_rule_gets_five_rows_from_a_fail_preset(self):
         counts = _bdm_counts(dirty.apply_birth_registrations_presets(
@@ -243,14 +245,14 @@ class TestBirthRegistrations:
 
     def test_the_drop_against_the_previous_supply_is_derived_from_its_band(self):
         """Evidently's row drop warns > 0.1 and fails > 0.25 against the
-        previous supply: Warn sits at the middle, 0.175; Fail at 0.25 plus
-        the band's width, 0.40 - of 2,000 previous rows, 350 and 800."""
+        previous supply. Of 2,000 previous rows, 201..500 removed warns and
+        501 fails: Warn removes the middle, 350; Fail removes 501 + 300."""
         df = _bdm_frame(1900)
         amber = dirty.apply_birth_registrations_presets(df, "amber", seed=1, previous_row_count=2000)
         red = dirty.apply_birth_registrations_presets(df, "red", seed=1, previous_row_count=2000)
         assert len(amber) == 2000 - 350
         # the sibling fault drops five more rows after the cut
-        assert len(red) == 2000 - 800 - 5
+        assert len(red) == 2000 - 801 - 5
 
     def test_the_same_seed_gives_the_same_bytes(self):
         a = dirty.apply_birth_registrations_presets(_bdm_frame(), "red", seed=9).to_csv(index=False)

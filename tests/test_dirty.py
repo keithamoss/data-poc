@@ -321,7 +321,7 @@ def test_break_multiple_birth_siblings_drops_the_expected_number_of_pairs():
         })
     df = pd.DataFrame(rows)
 
-    out = dirty.break_multiple_birth_siblings(df, severity="red", seed=1)  # rate=0.5
+    out = dirty.break_multiple_birth_siblings(df, 0.5, seed=1)
     expected_broken = int(n_pairs * 0.5)
     assert len(df) - len(out) == expected_broken
 
@@ -354,11 +354,11 @@ def test_inject_drift_batch_never_affects_rows_before_onset():
 
 
 # --- dataset-specific presets -----------------------------------------------
-# These compose the core injectors above at calibrated rates per severity -
-# tested here for the property that actually matters at this level (red is
-# measurably worse than amber, and previous_row_count truncation lands
-# exactly on its computed target), not by re-deriving every rate dirty.py's
-# own extensive inline comments already document.
+# Each preset's faults are sized from the bands of the checks they aim at
+# (REQ-GEN-392) - the sizes themselves, the truncation against the previous
+# supply among them, are tests/test_fault_sizing.py's. Here only the property
+# that matters at this level: red is measurably worse than amber, and each
+# fault touches only what it should.
 
 def _clean_bdm_df(n: int = 4000) -> pd.DataFrame:
     df = _base_df(n)
@@ -389,25 +389,6 @@ def test_birth_registrations_preset_red_is_worse_than_amber():
     amber_invalid_sex = (~amber["sex"].isin(["M", "F"])).sum()
     red_invalid_sex = (~red["sex"].isin(["M", "F"])).sum()
     assert red_invalid_sex > amber_invalid_sex
-
-
-@pytest.mark.asset("daily")
-def test_birth_registrations_preset_truncates_to_exact_band_target():
-    # No multi-birth pairs here (unlike _clean_bdm_df) - isolates
-    # truncation as the ONLY row-count-changing step in the preset.
-    # break_multiple_birth_siblings also drops rows when real twin pairs
-    # exist (see test_birth_registrations_preset_red_is_worse_than_amber),
-    # so with pairs present the final count is the truncation target minus
-    # however many more pairs it breaks - not testable as an exact number
-    # without re-deriving that step's own randomness here too.
-    df = _base_df()
-    df["is_multiple_birth"] = False
-    df["registering_parent_1_name"] = [f"Parent {i}" for i in range(len(df))]
-
-    amber = dirty.apply_birth_registrations_presets(df, severity="amber", seed=1, previous_row_count=4000)
-    red = dirty.apply_birth_registrations_presets(df, severity="red", seed=1, previous_row_count=4000)
-    assert len(amber) == int(4000 * (1 - 0.18))
-    assert len(red) == int(4000 * (1 - 0.35))
 
 
 def _cp_clients_df(n: int = 2000) -> pd.DataFrame:
@@ -487,7 +468,9 @@ def test_cp_placements_preset_reassigns_only_to_non_approved_carers():
     non_approved = {"CARER-PENDING", "CARER-SUSPENDED"}
     amber_reassigned = amber["carer_id"].isin(non_approved).sum()
     red_reassigned = red["carer_id"].isin(non_approved).sum()
-    assert red_reassigned > amber_reassigned > 0
+    # REQ-GEN-392: the carer-approval rule is single-tier, so a Warn plants
+    # nothing on it and a Fail exactly five.
+    assert (red_reassigned, amber_reassigned) == (5, 0)
     # a still-real (business-rule-violating) carer_id, or nulled, or a
     # genuine dangling value - never anything else
     carer_ids = set(carers_df["carer_id"])
