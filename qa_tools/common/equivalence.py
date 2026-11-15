@@ -464,16 +464,18 @@ def tree_assets(tree: Path) -> list[str]:
     """The assets a captured tree holds (REQ-TEST-357 criterion 2): one per
     folder under its assets/, each holding a data-asset.yaml.
 
-    A TREE FROM BEFORE THE SPLIT IS REFUSED. It was read through the move map
-    (REQ-TEST-366), which said where data-asset.yaml used to be; the map was
-    deleted in the push after the move (criterion 3), and with criterion 2 of
-    REQ-TEST-357 retired nothing compares across the split any more."""
+    A TREE FROM BEFORE THE SPLIT CANNOT BE CAPTURED, and the capture fails at
+    its 'assets' stage. It was read through the move map (REQ-TEST-366), which
+    said where data-asset.yaml used to be; the map was deleted in the push
+    after the move (criterion 3), and with criterion 2 of REQ-TEST-357 retired
+    nothing compares across the split any more."""
     root = tree / "assets"
     found = sorted(p.name for p in root.iterdir()
                    if p.is_dir() and (p / "data-asset.yaml").is_file()) if root.is_dir() else []
     if not found:
-        raise Refused(f"the tree at {tree} holds no asset folder (assets/<asset>/data-asset.yaml) "
-                      f"- a commit from before the asset split cannot be captured.")
+        raise ValueError(f"the tree at {tree} holds no asset folder "
+                         f"(assets/<asset>/data-asset.yaml) - a commit from before the asset "
+                         f"split cannot be captured.")
     return found
 
 
@@ -834,6 +836,7 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
         work.mkdir(parents=True)
         subprocess.run(["git", "worktree", "add", "--detach", "-q", str(tree), commit],
                        cwd=ROOT, check=True, capture_output=True)
+        stage = "assets"
         names = tree_assets(tree)
         baseline["assets"] = names
         per_asset: dict = {}
@@ -863,7 +866,13 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
                 conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
                 conn.execute(f'CREATE DATABASE "{dbname}"')
             stage = named("mark")
-            run(stage, "env", "mark", "--confirm", env_id)
+            # THE TREE'S OWN FORM: since REQ-PIPE-343 criterion 1 the mark
+            # types both ids, <data asset>/<environment>; a tree from before
+            # takes the environment alone. Read from the tree's own command,
+            # whose option names the form it takes.
+            command = tree / "cli" / "env.py"
+            both = command.is_file() and "DATA_ASSET/ENVIRONMENT" in command.read_text()
+            run(stage, "env", "mark", "--confirm", f"{asset}/{env_id}" if both else env_id)
             # THE TREE'S OWN dbt PACKAGES, in its own layout's project - the
             # asset's dbt/ after the split, dbt_project/ before (REQ-QAC-368) -
             # by dbt itself, so a tree older than `mothman env dbt-deps` works.

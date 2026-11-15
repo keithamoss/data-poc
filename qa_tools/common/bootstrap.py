@@ -220,7 +220,8 @@ def bootstrap(collection: str = "all", force: bool = False,
             reason=f"this database already holds {before} staged table(s), and a checkpoint "
                    "is taken during a bootstrap from an empty database - nothing was run. "
                    "Create an empty database, point MOTHMAN_SUPPLY_DSN at it, run `mothman "
-                   "env mark --confirm sandbox`, then run this bootstrap again")
+                   "env mark` (it asks you to type <data asset>/<environment>), then run "
+                   "this bootstrap again")
 
     if before and not force:
         return BootstrapResult(

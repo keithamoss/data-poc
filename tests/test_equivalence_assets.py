@@ -61,7 +61,7 @@ class TestTheTreesAssets:
         # The move map that read the old layout is gone (REQ-TEST-366 c3).
         (tmp_path / "contract").mkdir()
         (tmp_path / "contract" / "data-asset.yaml").write_text("data_asset_id: data-asset-1\n")
-        with pytest.raises(eq.Refused, match="no asset folder"):
+        with pytest.raises(ValueError, match="no asset folder"):
             eq.tree_assets(tmp_path)
 
     @pytest.mark.asset("daily")

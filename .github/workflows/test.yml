@@ -250,7 +250,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
@@ -374,7 +374,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
@@ -500,7 +500,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.

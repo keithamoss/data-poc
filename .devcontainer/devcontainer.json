@@ -14,8 +14,11 @@
     "MOTHMAN_SUPPLY_DSN": "postgresql://user:password@db:5432/supply",
     "MOTHMAN_TEST_DSN": "postgresql://user:password@db:5432/postgres",
     "MOTHMAN_ENVIRONMENT": "local",
-    // Which data asset, with no default (REQ-PIPE-363 criterion 1).
-    "MOTHMAN_ASSET": "data-asset-1",
+    // NO MOTHMAN_ASSET: which data asset a command acts for is chosen each
+    // time, with no default (REQ-PIPE-363 criterion 1). It said
+    // data-asset-1 until 2026-11-15, which names no asset folder since the
+    // split, so every command refused. post-create.sh marks each asset's
+    // own database, supply_<asset>, on this server (REQ-PIPE-343).
     // The pre-installed Chromium, same as this project's cloud sessions
     // use - the pinned playwright package expects a newer build than
     // the image ships, so it is pointed at the one that is there.

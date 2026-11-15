@@ -21,9 +21,10 @@ from qa_tools.common import equivalence as eq
 #: A well-formed definition fingerprint (REQ-QAC-176) for a hand-inserted result.
 ANY_FINGERPRINT = "v1:" + "0" * 64
 
-#: A real commit from before `mothman env mark` existed (cli/env.py arrived
-#: in 0d071d6), so its "mark" stage fails for real.
-BEFORE_ENV_MARK = "58791fc"
+#: A real commit from before the asset split (and before `mothman env mark`), so
+#: its "assets" stage fails for real: a pre-split tree cannot be captured since
+#: the move map went (REQ-TEST-366 criterion 3).
+BEFORE_THE_SPLIT = "58791fc"
 
 _runner = CliRunner()
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -214,14 +215,14 @@ class TestCaptureRefuses:
 
 def test_a_failed_capture_names_its_stage_and_leaves_nothing(baselines, tmp_path,
                                                              harness_free):
-    """Criteria 12 and 14, for real: a commit from before `env mark` fails at
-    the mark stage, and then no baseline, no worktree and no database remain."""
+    """Criteria 12 and 14, for real: a commit from before the split fails at
+    the assets stage, and then no baseline, no worktree and no database remain."""
     import psycopg
 
     result = _runner.invoke(cli, ["debug", "equivalence", "capture", "--ref",
-                                  BEFORE_ENV_MARK, "--label", "pytest-fails"])
+                                  BEFORE_THE_SPLIT, "--label", "pytest-fails"])
     assert result.exit_code != 0
-    assert "stage 'mark'" in _words(result)
+    assert "stage 'assets'" in _words(result)
     assert not list(tmp_path.glob("pytest-fails*"))
     worktrees = subprocess.run(["git", "worktree", "list"], capture_output=True, text=True,
                                cwd=eq.ROOT).stdout
@@ -240,11 +241,11 @@ def test_a_killed_captures_leftovers_go_with_the_next_capture(baselines, harness
     both before it starts."""
     left = eq.work_dir()
     subprocess.run(["git", "worktree", "add", "--detach", "-q", str(left / "tree"),
-                    BEFORE_ENV_MARK], cwd=eq.ROOT, check=True, capture_output=True)
+                    BEFORE_THE_SPLIT], cwd=eq.ROOT, check=True, capture_output=True)
     try:
         result = _runner.invoke(cli, ["debug", "equivalence", "capture", "--ref",
-                                      BEFORE_ENV_MARK, "--label", "pytest-killed"])
-        assert "stage 'mark'" in _words(result)
+                                      BEFORE_THE_SPLIT, "--label", "pytest-killed"])
+        assert "stage 'assets'" in _words(result)
         worktrees = subprocess.run(["git", "worktree", "list"], capture_output=True,
                                    text=True, cwd=eq.ROOT).stdout
         assert str(left) not in worktrees
@@ -264,7 +265,7 @@ def test_a_second_capture_while_one_runs_is_refused(baselines, harness_free):
     held = eq._one_capture_at_a_time()
     try:
         result = _runner.invoke(cli, ["debug", "equivalence", "capture", "--ref",
-                                      BEFORE_ENV_MARK, "--label", "pytest-second"])
+                                      BEFORE_THE_SPLIT, "--label", "pytest-second"])
         assert result.exit_code != 0
         assert "another equivalence capture is running" in _words(result)
     finally:
