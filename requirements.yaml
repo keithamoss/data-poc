@@ -47908,6 +47908,22 @@ requirements:
     - REQ-PIPE-369
     - REQ-GEN-246
     - REQ-PIPE-363
+    retired_criteria:
+      - criterion: 4
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-GEN-392]
+        reason: "superseded by REQ-GEN-392, which derives the presets where they are in generator/dirty.py; the move to providers is dropped"
+      - criterion: 6
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-GEN-392]
+        reason: "population keeps its own literal rates and dirties both assets in one process (QC, 2026-11-14)"
+      - criterion: 8
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-PIPE-385]
+        reason: "an asset with no synthetic/ folder is REQ-PIPE-385's"
     decisions:
     - 'SYNTHETIC CONFIGURATION GETS ITS OWN HOME INSIDE EACH ASSET (Keith, 2026-10-31, #134 (a), then sign-off Q4c): synthetic/<asset>/ folded into assets/<asset>/synthetic/. The code separation of the generator and the bootstrap follows as its own batch (#134''s code half, queued behind the split).'
     - 'daily_batch AND THE PRESETS FOLD INTO THEIR PROVIDERS - Q5 CLOSED (Keith, 2026-10-31, v3 Q5 (a), built as the architect showed it can be, v3 BLOCKING 3): providers are one file each and loaded by path, and a provider may import nothing under assets/, so daily_batch.py cannot sit beside civil_registration.py as a second module. REJECTED leaving daily_batch.py and the per-collection presets in shared code.'
@@ -48335,7 +48351,7 @@ requirements:
     - THE SYSTEM SHALL key each asset's cached bootstrap with REQ-PIPE-365 criterion 3's cache key, and SHALL cache that asset's data/<asset>/ paths beside its dump, so that a change to one asset's configuration restores the other asset's cache.
     - THE SYSTEM SHALL bootstrap or restore both assets' databases in the one test-deployment job, side by side, each as its own process with its own MOTHMAN_ASSET and DSN, and SHALL NOT add a second deployment job.
     - THE SYSTEM SHALL run `mothman dashboard rebuild-results` and `mothman dashboard build-data` once per asset in that job (test.yml lines 508-511 today), each with its own MOTHMAN_ASSET.
-    - THE SYSTEM SHALL run the deployment half's tests in one pytest session against both assets' databases, each test opening only its own asset's (REQ-PIPE-343 criterion 6), and the fast half's configuration tests against every asset folder.
+    - THE SYSTEM SHALL run the deployment half's tests in one pytest session PER ASSET (--only-asset), each against that asset's own database (REQ-PIPE-343 criterion 6), and the fast half's configuration tests against every asset folder.
     - THE SYSTEM SHALL say in the job log, per asset, whether its database was restored or rebuilt and from which key (REQ-TEST-117 criterion 4).
     - THE SYSTEM SHALL keep the fast half's skip count at zero with both assets present.
     - WHEN this requirement is built, THE SYSTEM SHALL record in evidence, from `mothman github ci-usage`, the billable minutes of a cache-hit run and of a cache-miss run before and after the split, and SHALL record the requirement as not met where the cache-hit run after bills more than 10 percent above the cache-hit run before (about 39 minutes today).
@@ -48631,6 +48647,11 @@ requirements:
         by: Keith
         replaced_by: [REQ-TEST-393]
         reason: "Retired by Keith, 2026-11-14 with REQ-TEST-239: the synthetic demo history may move whenever a change needs it, and the test suite is the proof that a refactor is sound."
+      - criterion: 4
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-TEST-393]
+        reason: "Retired by Keith, 2026-11-15: the suite is the proof and the synthetic history may move."
     acceptance_criteria:
     - THE SYSTEM SHALL regenerate each asset's history from empty after the split rather than migrate today's single database, which `mothman env reset-synthetic` then clears (REQ-PIPE-089 criterion 25's precedent).
     - THE SYSTEM SHALL extend `mothman debug equivalence capture` so that a commit with asset folders is captured as one baseline per asset, and `compare` SHALL compare the union of a post-split commit's baselines with a pre-split commit's single baseline, collection by collection, normalising the data_asset_id segment REQ-QAC-344 renames and the database identity row, and the delivery names and receipt sequences criterion 3 lists.
