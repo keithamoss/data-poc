@@ -1209,11 +1209,18 @@ def revert(cal_doc: dict, asset_doc: dict,
             # A CALENDAR NAME REVERTS TO BEING ON THE BASELINE (REQ-PIPE-345):
             # nothing names a calendar, so a dataset that was on one is on the
             # asset's baseline, and only a no-calendar declaration is written.
+            text = "" if old is None else str(old)
+            baseline = next((str((c or {}).get("name")) for c in cal.get("calendars") or []), None)
+            is_none = text.startswith("no calendar (") and text.endswith(")")
+            if old is not None and not is_none and text != baseline:
+                raise ValueError(
+                    f"{key!r} was on calendar {text!r}, which is not this asset's baseline "
+                    f"{baseline!r} - nothing names a calendar (REQ-PIPE-345), so the "
+                    f"agreement before this correction cannot be rebuilt")
             e = entry(p[1])
             e.pop("calendar", None)
             e.pop("no_calendar", None)
-            text = "" if old is None else str(old)
-            if text.startswith("no calendar (") and text.endswith(")"):
+            if is_none:
                 e["no_calendar"] = text[len("no calendar ("):-1]
         elif len(p) == 3 and p[:2] == ["timezone", "version"]:
             tz = asset.setdefault("timezone", {})

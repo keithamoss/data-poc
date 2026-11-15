@@ -383,8 +383,8 @@ def _baseline_key(loc: list[str]) -> bool:
     dataset of calendar.yaml."""
     if len(loc) == 3 and loc[0] in ("collections", "datasets") and loc[1].isdigit():
         return loc[2] == "calendar" or (loc[0] == "datasets" and loc[2] == "dates")
-    if loc[:1] == ["hierarchy"] and loc and loc[-1] == "calendar":
-        return loc[-3] in ("collections", "datasets") if len(loc) >= 3 else False
+    if loc[:1] == ["hierarchy"] and len(loc) >= 3 and loc[-3] in ("collections", "datasets"):
+        return loc[-1] == "calendar" or (loc[-3] == "datasets" and loc[-1] == "dates")
     return False
 
 
@@ -446,6 +446,12 @@ def _baseline_errors(raw: dict, cal_raw: dict, src: Source) -> list[ConfigError]
                         f"{src.name}; nothing names a calendar - every dataset is on the "
                         f"asset's baseline, declared in {cal_file}.",
                         f"Remove `calendar:`: {BASELINE_RULE}."))
+                if item.startswith("dataset ") and "dates" in entry:
+                    out.append(ConfigError(
+                        src.name, item,
+                        f"asset {asset!r}: {item} states authored dates of its own (`dates:`) "
+                        f"in {src.name}; a dataset has only its asset's baseline periods.",
+                        f"Remove `dates:`: {BASELINE_RULE}."))
     return out
 
 
@@ -713,22 +719,18 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
         if any((v or {}).get("cadence") for v in versions):
             continue  # a rule generates a period every day; it cannot be empty
 
-        own = dataset.get("dates")
-        if own:
-            periods = {(e or {}).get("period") for e in own}
-        else:
-            months = dataset.get("delivery_months")
-            wanted = {n for n in (_month_number(m) for m in (months or [])) if n}
-            periods = set()
-            for version in versions:
-                for entry in ((version or {}).get("dates") or []):
-                    entry = entry or {}
-                    try:
-                        when = date.fromisoformat(str(entry.get("date")))
-                    except (TypeError, ValueError):
-                        continue
-                    if not months or when.month in wanted:
-                        periods.add(entry.get("period"))
+        months = dataset.get("delivery_months")
+        wanted = {n for n in (_month_number(m) for m in (months or [])) if n}
+        periods = set()
+        for version in versions:
+            for entry in ((version or {}).get("dates") or []):
+                entry = entry or {}
+                try:
+                    when = date.fromisoformat(str(entry.get("date")))
+                except (TypeError, ValueError):
+                    continue
+                if not months or when.month in wanted:
+                    periods.add(entry.get("period"))
 
         excluded = {(e or {}).get("period") for e in (dataset.get("not_expected") or [])}
         remaining = {p for p in periods if p and p not in excluded}
@@ -1119,8 +1121,10 @@ def _merged_view(raw: dict, cal_raw: dict) -> dict:
     base = baseline_name(cal_raw)
     for dataset, _collection in _walk_datasets(merged):
         entry = by_dataset.get((dataset or {}).get("id"), {})
-        # A `calendar:` written in the hierarchy is not read either.
+        # A `calendar:` or `dates:` written in the hierarchy is not read either
+        # (REQ-PIPE-345): _baseline_errors refuses both by name.
         dataset.pop("calendar", None)
+        dataset.pop("dates", None)
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             dataset[schedule.NO_CALENDAR_KEY] = entry[schedule.NO_CALENDAR_KEY]
         elif base:

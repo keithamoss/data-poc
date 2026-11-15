@@ -4,10 +4,11 @@ against a real database, each test minting its own period."""
 from __future__ import annotations
 
 import copy
-import uuid
 from datetime import date
 
 import pytest
+
+import baseline_periods
 import yaml
 
 import test_supersession as _base
@@ -183,7 +184,7 @@ class TestTheGate:
             self, conn, period, monkeypatch):
         _setting(monkeypatch, "green")
         a = _promoted(conn, period)
-        later = f"2099-L{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("L", 6)
         substitution.substitute(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
                                 logical_table=TABLE, period=later, stands_on=period,
                                 supply=a, actor=REAL_PERSON, reason="late", effective_at=WHEN)
@@ -198,7 +199,7 @@ class TestTheGate:
     def test_a_substituted_slot_is_never_replaced(self, conn, period, monkeypatch):
         _setting(monkeypatch, "green")
         a = _promoted(conn, period)
-        later = f"2099-L{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("L", 6)
         substitution.substitute(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
                                 logical_table=TABLE, period=later, stands_on=period,
                                 supply=a, actor=REAL_PERSON, reason="late", effective_at=WHEN)

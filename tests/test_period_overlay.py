@@ -12,6 +12,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import filing, period_overlay, period_schema, qa_store, supply_db
 
 TABLES = ["cp_clients", "cp_placements"]
@@ -37,7 +39,7 @@ def conn(supply_dsn):
 @pytest.fixture
 def world(conn):
     """Helpers to stage, file and promote, in one unique period."""
-    period = f"2099-q{uuid.uuid4().hex[:6]}"
+    period = baseline_periods.made_up("q", 6)
     made: list[str] = []
     runs: list[str] = []
 

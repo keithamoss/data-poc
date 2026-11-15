@@ -13,6 +13,8 @@ import uuid
 from datetime import date
 
 import pytest
+
+import baseline_periods
 import yaml
 
 from qa_tools.common import (amber_setting, decision_log as dl, filing_decisions as fd,
@@ -196,7 +198,7 @@ def _staged(conn, table="cp_carers"):
 
 
 def _period():
-    return f"2099-A{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("A", 6)
 
 
 def _promote(conn, setting, period):

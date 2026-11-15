@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import period_schema, promotion, qa_store, supply_db
 
@@ -79,7 +81,7 @@ class TestRunningItTwiceIsSafe:
 
     def test_the_second_pass_promotes_nothing_new(self, conn):
         dataset = f"cp-{uuid.uuid4().hex[:12]}"
-        period = f"2099-P{uuid.uuid4().hex[:6]}"
+        period = baseline_periods.made_up("P", 6)
         table = a_staged_table(conn, "clients")
         work = [dict(dataset_id=dataset, supply=table, physical_tables=[table])]
 
@@ -98,7 +100,7 @@ class TestRunningItTwiceIsSafe:
 
     def test_and_the_tables_are_not_moved_twice(self, conn):
         dataset = f"cp-{uuid.uuid4().hex[:12]}"
-        period = f"2099-P{uuid.uuid4().hex[:6]}"
+        period = baseline_periods.made_up("P", 6)
         table = a_staged_table(conn, "clients")
         work = [dict(dataset_id=dataset, supply=table, physical_tables=[table])]
         for _ in range(2):

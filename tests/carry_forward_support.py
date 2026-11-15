@@ -17,6 +17,8 @@ from datetime import date
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import hierarchy, promotion, qa_store, schedule, supply_db
 
@@ -54,6 +56,7 @@ def world(monkeypatch) -> World:
     tag = uuid.uuid4().hex[:6]
     w = World(q2=f"2099-{tag}-Q2", q3=f"2099-{tag}-Q3", q4=f"2099-{tag}-Q4")
     order = {w.q2: date(2099, 4, 1), w.q3: date(2099, 7, 1), w.q4: date(2099, 10, 1)}
+    baseline_periods.declare(*order, dates=order)
     real_not_expected, real_date_of = schedule.not_expected_periods, schedule.date_of
     monkeypatch.setattr(
         schedule, "not_expected_periods",

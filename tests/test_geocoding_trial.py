@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import json
 import random
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+
+import baseline_periods
 
 from qa_tools.common import period_overlay, period_schema, qa_store, supply_db, trial
 
@@ -44,7 +45,7 @@ def world(conn):
     and helpers to give a trial its own staged copies."""
     from qa_tools.common import period_tables
 
-    period = f"2099-q{uuid.uuid4().hex[:6]}"
+    period = baseline_periods.made_up("q", 6)
     made, trials = [], []
     real = f"{SOURCE}__{_key()}"
     conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{real}" (v int)')

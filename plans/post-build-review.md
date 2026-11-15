@@ -14923,3 +14923,41 @@ twice. It deliberately did not re-find the `TypeError`.
      entry. Confirmed by parsing the copy's file. Its tests pass, so whatever
      reads the words tolerates the gap there; #333's fixture now inserts at the
      end of `collections:` instead, and the same change would fix this one.
+
+340. **[done, 2026-11-15]** **[Pipeline & publishing]** **[QA checks & contract]** **The critic on REQ-PIPE-345 (split T2, da5bd1d4): c5, two loose ends, and one design point.**
+     The critic confirmed every live criterion but c5 met, period output
+     byte-identical to the base for every dataset of both assets, every
+     deleted test one of retired behaviour, and test_distribution_groups'
+     failure present on the base too (not this change). Its findings, verified
+     against the code before acting:
+     - **c5, built as Keith's option (a), 2026-11-15**: `ensure_period_schema`,
+       the one place a period schema is created, refuses a period its asset's
+       baseline does not name - naming the period, the asset and the baseline -
+       before anything reaches the database (`schedule.on_baseline`). The
+       suite's made-up periods (`2099-A<tag>`, uuid-suffixed and the rest) are
+       declared on a TEST BASELINE: `tests/baseline_periods.py` gives a copy of
+       the asset folder's calendar.yaml a version from 2100-01-01 whose authored
+       dates are those periods (`made_up()` mints and declares one; the
+       `test_baseline` fixture declares named ones). No conftest exemption. Test
+       first: `tests/test_baseline_calendar.py::TestNoSchemaForAPeriodOffTheBaseline`
+       reached `CREATE SCHEMA period_2023_m03` against the old code.
+     - **Defect (LOW): the gate's expects-nothing check still read a dataset's
+       own `dates:`, and the merged view kept a hierarchy `dates:`**, which got
+       only the generic unknown-key error. Fixed: the read is gone, the merged
+       view drops it, and a hierarchy `dates:` gets criterion 3's named refusal.
+       Test first: `TestAHierarchyDatesIsRefusedByName`, both failed before.
+     - **Defect (LOW): `agreement_freeze.revert` dropped a membership whose old
+       value named a calendar other than the baseline**, leaving the dataset
+       silently on the baseline. It now raises ValueError naming the calendar.
+       Test first: `tests/test_correction_revert.py::test_reverting_a_membership_to_another_calendar_is_refused_not_dropped`
+       did not raise before.
+     - **Finding 5, the gate's early stop with two calendars: LEFT AS DESIGNED.**
+       With a second calendar the gate reports the baseline refusals and the
+       calendar-integrity checks and stops, because every later check reads
+       periods off the one baseline and would otherwise judge against a guessed
+       one. Recorded in REQ-PIPE-345's decisions.
+     - **Register**: four entries in REQ-PIPE-049, 110, 322 and QAC-330 named a
+       function and two tests this change deleted; removed, with the
+       coordinator's go-ahead. The criteria this retires elsewhere are left
+       for the docs pass.
+     - **Ran**: see the commit message for this change's runs.

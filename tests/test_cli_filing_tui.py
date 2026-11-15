@@ -11,6 +11,8 @@ cached answer, and it calls no GitHub.
 from __future__ import annotations
 
 import pytest
+
+import baseline_periods
 from click.testing import CliRunner
 
 from cli import filing_tui
@@ -351,12 +353,11 @@ class TestTheCommandReallyWritesTheLog:
     def period(self, monkeypatch):
         """A period of this test's own, so it cannot collide with another
         test's decisions in an append-only log."""
-        import uuid
         from datetime import date
 
         from qa_tools.common import inheritance, schedule
 
-        name = f"2099-C{uuid.uuid4().hex[:6]}"
+        name = baseline_periods.made_up("C", 6)
         for mod in (schedule, inheritance.schedule):
             monkeypatch.setattr(mod, "date_of",
                                  lambda n, ds, _n=name: date(2099, 1, 1) if n == _n

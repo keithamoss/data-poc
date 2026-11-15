@@ -244,3 +244,91 @@ class TestSharedCodeNamesNoCalendar:
         assert before
         _renamed_baseline(tmp_path, "every-quarter")
         assert [(p.period.name, p.round.name) for p in cp.drawn_grown_periods()] == before
+
+
+class _Recorder:
+    """A connection that records what it is asked to run and runs nothing."""
+
+    def __init__(self):
+        self.sql: list[str] = []
+
+    def execute(self, sql, *args, **kwargs):
+        self.sql.append(str(sql))
+        raise AssertionError(f"nothing should reach the database: {sql}")
+
+
+class TestNoSchemaForAPeriodOffTheBaseline:
+    """Criterion 5 (Keith's option (a), 2026-11-15): one period schema per
+    baseline period, and none for a period the asset's baseline does not
+    name - refused before anything reaches the database."""
+
+    def test_a_period_the_baseline_does_not_name_creates_no_schema(self):
+        from qa_tools.common import period_schema
+
+        conn = _Recorder()
+        with pytest.raises(period_schema.PeriodSchemaError) as refused:
+            period_schema.ensure_period_schema(conn, "2023-M03")
+        assert conn.sql == []
+        text = str(refused.value)
+        assert "'2023-M03'" in text and "asset 'quarterly'" in text and "'quarterly'" in text \
+            and "baseline" in text, text
+
+    def test_every_baseline_period_names_its_own_schema(self):
+        from qa_tools.common import period_schema
+
+        periods = schedule.periods_for_calendar(schedule.baseline().name)
+        assert periods
+        assert all(schedule.on_baseline(p.name) for p in periods)
+        names = [period_schema.period_schema(p.name) for p in periods]
+        assert len(set(names)) == len(names)
+
+    @pytest.mark.asset("daily")
+    def test_a_day_before_the_daily_baseline_begins_creates_no_schema(self):
+        from datetime import date
+
+        from qa_tools.common import period_schema
+
+        first = schedule.baseline().versions[0].effective_from
+        before = date.fromordinal(first.toordinal() - 1).isoformat()
+        assert schedule.on_baseline(first.isoformat())
+        assert not schedule.on_baseline(before)
+        assert not schedule.on_baseline("2023-Q1")
+        conn = _Recorder()
+        with pytest.raises(period_schema.PeriodSchemaError, match="baseline"):
+            period_schema.ensure_period_schema(conn, before)
+        assert conn.sql == []
+
+    def test_a_period_declared_on_a_test_baseline_is_on_it(self, test_baseline):
+        """The suite's made-up periods are declared on a test baseline - a
+        real calendar.yaml in a copy of the asset folder - never exempted."""
+        assert not schedule.on_baseline("2099-Zprobe")
+        test_baseline("2099-Zprobe", "2099-Zprobe2")
+        assert schedule.on_baseline("2099-Zprobe") and schedule.on_baseline("2099-Zprobe2")
+        assert schedule.on_baseline("2023-Q1"), "the real periods stay on it"
+
+
+class TestAHierarchyDatesIsRefusedByName:
+    """post-build-review #340: a hierarchy `dates:` got only the generic
+    schema error, and the gate's merged view still carried it into the
+    expects-nothing check."""
+
+    def test_it_gets_criterion_3s_refusal_and_nothing_reads_it(self, broken, tmp_path):
+        folder = tmp_path / "quarterly"
+        broken(lambda doc: None)
+        path = folder / "data-asset.yaml"
+        doc = yaml.safe_load(path.read_text())
+        dataset = doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"][0]
+        dataset["dates"] = [{"period": "2099-own", "date": "2099-03-01"}]
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        errors = validate(Source(path, folder))
+        text = "\n".join(f"{e.file}: {e.scope} {e.problem}" for e in errors)
+        found = _refusals(errors, "asset 'quarterly'", f"dataset {dataset['id']!r}", "dates")
+        assert found and all(e.file == "data-asset.yaml" for e in found), text
+        assert not [e for e in errors if "not a key" in e.problem], text
+
+    def test_the_merged_view_drops_it_so_the_expects_nothing_check_cannot_read_it(self):
+        raw = {"hierarchy": {"agencies": [{"collections": [{"id": "c", "datasets": [
+            {"id": "d", "dates": [{"period": "x", "date": "2099-01-01"}], "calendar": "q"}]}]}]}}
+        merged = validate_schedule._merged_view(raw, {"calendars": [{"name": "q"}]})
+        ds = merged["hierarchy"]["agencies"][0]["collections"][0]["datasets"][0]
+        assert "dates" not in ds and ds["calendar"] == "q"

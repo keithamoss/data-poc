@@ -14,6 +14,8 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+
+import baseline_periods
 from click.testing import CliRunner
 
 import attempt_support
@@ -62,7 +64,7 @@ def judged(conn, supply, fingerprint, *, check=CHECK, status="pass"):
 
 
 def filed(conn, period=None, fingerprint=STALE, **kw):
-    period = period or f"2099-S{uuid.uuid4().hex[:6]}"
+    period = period or baseline_periods.made_up("S", 6)
     supply, _ = _filed(conn, period, WHEN)
     judged(conn, supply, fingerprint, **kw)
     return supply, period

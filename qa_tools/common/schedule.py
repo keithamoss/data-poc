@@ -393,6 +393,27 @@ def baseline(agreement=None) -> Calendar | None:
     return next(iter(loaded.values()), None)
 
 
+def on_baseline(period_name: str, agreement=None) -> bool:
+    """Whether the asset's baseline names this period (REQ-PIPE-345
+    criterion 5) - asked before a period schema is created.
+
+    An authored baseline names exactly its authored periods in force. A
+    cadence rule names each day of a cadence-rule version's window by its
+    ISO date, from its first version's effective_from and never before."""
+    base = baseline(agreement)
+    if base is None or not period_name:
+        return False
+    if any(p.name == period_name for p in _calendar_periods(base)):
+        return True
+    try:
+        day = date.fromisoformat(period_name)
+    except ValueError:
+        return False
+    if day.isoformat() != period_name or day < base.versions[0].effective_from:
+        return False
+    return _version_in_force(base, day).is_cadence_rule
+
+
 def calendar(name: str, agreement=None) -> Calendar:
     loaded = _load(agreement)
     try:

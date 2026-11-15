@@ -18,6 +18,8 @@ from datetime import date, datetime, timezone
 
 import pytest
 
+import baseline_periods
+
 import filing_support
 import attempt_support
 from qa_tools.common import (assignment, decision_log as dl, filing, filing_decisions as fd,
@@ -54,6 +56,7 @@ def periods(monkeypatch):
     tag = uuid.uuid4().hex[:6]
     names = (f"2099-P{tag}", f"2099-Q{tag}")
     order = {names[0]: date(2099, 1, 1), names[1]: date(2099, 4, 1)}
+    baseline_periods.declare(*names, dates=order)
     for mod in (schedule, inheritance.schedule):
         monkeypatch.setattr(mod, "date_of", lambda name, ds: order.get(name))
     return names

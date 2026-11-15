@@ -20,6 +20,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import (hierarchy, inheritance, period_schema, promotion,
                              qa_store, schedule, supply_db)
@@ -44,7 +46,9 @@ def annual():
 @pytest.fixture
 def periods():
     tag = uuid.uuid4().hex[:6]
-    return (f"2099-A{tag}", f"2099-B{tag}")
+    names = (f"2099-A{tag}", f"2099-B{tag}")
+    baseline_periods.declare(*names)
+    return names
 
 
 @pytest.fixture

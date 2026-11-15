@@ -22,6 +22,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import promotion, qa_store, supply_db
 
@@ -43,7 +45,7 @@ def dataset():
 
 @pytest.fixture
 def period():
-    return f"2099-N{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("N", 6)
 
 
 def a_staged_table(conn, arrival_key: str) -> str:
