@@ -3631,4 +3631,40 @@ one or more component tags, and a date.
       CLAUDE.md edits need your approval. It is in
       `docs/drafts/claude-md-asset-model-row.md`, so c19 is unmet until you
       approve the wording. Step 2's review entries were renumbered #352-#353.
+    - **SPEED BATCH A, AND TWO MERGE DEFECTS (~02:50 Perth)**: the full chunked
+      suite on 06a850d7 (step 2 merged) ran 8008 tests: 1 failed, 1 skipped
+      (#175's), coverage 95%. The failure was a test-helper defect that the new
+      chunk mix exposed. `free_day` could pick a day beside a period another
+      test had opened; it was fixed test-first (#354). The speed builder also
+      found a step 2 merge slip of mine: REQ-PIPE-049's `implemented_by` still
+      named `qa_tools/common/schedule.py`. That is fixed. REQ-PIPE-432 (dbt on
+      `DBT_THREADS = 2`, sorted run_results) and REQ-PIPE-431 (datacontract-cli
+      in a long-lived worker, the shared `tool_worker.py`, three lanes) are
+      built. Their critic found no blocker. Its three defects are fixed
+      test-first (#370-#372): Ctrl-C was recorded as a tool crash; a worker
+      that could not be launched skipped criterion 6's wording; an exception
+      that would not unpickle. All are merged as 31e5ef21. On that tree the 19
+      affected modules gave 472 passed, ruff was clean, and `mothman check
+      --no-pytest` passed. Not pushed: the full gate ran on 06a850d7, not on
+      this tree. The `MOTHMAN_DBT_WORKER_KEY` variable is now
+      `MOTHMAN_TOOL_WORKER_KEY`.
+      **FOR KEITH (Q13.4)**, from the speed-A critic:
+      (a) REQ-PIPE-431 c6's required wording says "the supply's data was not
+      the cause". The code cannot know that: an out-of-memory kill on a large
+      table would make it false. Softer wording would be "most likely not the
+      data; if a re-run fails the same way, ...".
+      (b) `DBT_THREADS = 2` against "1 to the core count": a 1-core machine
+      refuses every dbt step, and `os.cpu_count()` ignores cgroup limits. This
+      matters if the AWS MVP runs on one vCPU.
+      (c) REQ-PIPE-432 c4 is met as "three options measured, nothing to cut".
+      Does that satisfy its SHALL?
+      (d) PROVISIONAL: the progress bar still announces datacontract-cli before
+      Soda, so it can read 2/4 while dbt and datacontract-cli are still
+      running. The comments now say so.
+    - **DISK (~00:50 and ~02:40 Perth)**: the session's disk allowance filled
+      twice. The first time it broke four suite chunks, which were re-run.
+      Freed by deleting idle scratch temp folders (one of them a builder's
+      mutation folders, which it was told to re-create) and eleven clean,
+      merged agent worktrees. A full pytest basetemp is 5-10GB, so each one is
+      now deleted when its run ends.
 
