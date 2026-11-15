@@ -130,6 +130,25 @@ def validate_soda_command() -> None:
         raise click.ClickException("Soda check validation failed - see output above.")
 
 
+@dashboard_group.command("validate-imports")
+def validate_imports_command() -> None:
+    """Gate: no import, or load by path, across a forbidden edge between the
+    shared reading code, the real pipeline, the generator, scenarios, the
+    bootstrap and the CLI, outside imports-allowlist.yaml (REQ-TEST-384)."""
+    from qa_tools.common.validate_imports import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("imports validation failed - see output above.")
+
+
+@dashboard_group.command("validate-dbt-packages")
+def validate_dbt_packages_command() -> None:
+    """Gate: every asset's dbt project declares the same dbt packages and
+    versions - packages.yml and package-lock.yml, compared parsed (REQ-TEST-388)."""
+    from qa_tools.common.validate_dbt_packages import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("dbt packages validation failed - see output above.")
+
+
 @dashboard_group.command("validate-hierarchy")
 def validate_hierarchy_command() -> None:
     """Gate: every dataset contract agrees with the one hierarchy (REQ-QAC-039)."""

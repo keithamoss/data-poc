@@ -17,7 +17,9 @@ cache from functools - by any spelling of the import: `functools.lru_cache`,
 `*`, an alias of either by import or by assignment (`memo =
 functools.lru_cache`), or a wrap by assignment, plain, annotated or onto an
 attribute - that is not on ALLOWLIST below. It reads only committed
-source, with `ast`, so it needs no database and no import of what it scans.
+source, with `ast` through the one walker every source-reading gate shares
+(qa_tools/common/syntax_walk.py, REQ-TEST-384 criterion 9), so it needs no
+database and no import of what it scans.
 An allowlist entry that names no cache fails too, so the list cannot outlive
 what it excuses.
 
@@ -39,6 +41,8 @@ import ast
 import fnmatch
 import sys
 from pathlib import Path
+
+from qa_tools.common import syntax_walk
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -161,7 +165,10 @@ def caches_in(path: Path) -> list[tuple[str, int]]:
     """(function name, line) for every cached function in one file -
     decorated, or wrapped by assignment (`f = functools.cache(g)`, annotated
     or onto an attribute)."""
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return _caches_in(syntax_walk.parse(path))
+
+
+def _caches_in(tree: ast.AST) -> list[tuple[str, int]]:
     modules, direct = _names(tree)
     found = []
     for node in ast.walk(tree):
@@ -192,7 +199,10 @@ def _calls_a_reader(node: ast.AST) -> bool:
 def import_time_reads(path: Path) -> list[int]:
     """The line of each top-level statement in one file that builds a value
     from configuration as the module is imported."""
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return _import_time_reads(syntax_walk.parse(path))
+
+
+def _import_time_reads(tree: ast.Module) -> list[int]:
     return [node.lineno for node in tree.body
             if not isinstance(node, (ast.Import, ast.ImportFrom)) and not _is_main(node)
             and _calls_a_reader(node)]
@@ -207,23 +217,15 @@ def _is_main(node: ast.AST) -> bool:
 
 
 def scan_import_time(root: Path = ROOT) -> list[tuple[str, int]]:
-    out = []
-    for top in SCANNED:
-        for path in sorted((Path(root) / top).rglob("*.py")):
-            rel = path.relative_to(root).as_posix()
-            out.extend((rel, line) for line in import_time_reads(path))
-    return out
+    return [(rel, line) for rel, tree in syntax_walk.files(root, SCANNED)
+            for line in _import_time_reads(tree)]
 
 
 def scan(root: Path = ROOT) -> list[tuple[str, str, int]]:
     """(file relative to root, function, line) for every cache under the
     scanned trees."""
-    out = []
-    for top in SCANNED:
-        for path in sorted((Path(root) / top).rglob("*.py")):
-            rel = path.relative_to(root).as_posix()
-            out.extend((rel, name, line) for name, line in caches_in(path))
-    return out
+    return [(rel, name, line) for rel, tree in syntax_walk.files(root, SCANNED)
+            for name, line in _caches_in(tree)]
 
 
 def _allowed(rel: str, name: str, allowlist) -> bool:
