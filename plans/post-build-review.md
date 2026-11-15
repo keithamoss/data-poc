@@ -14939,6 +14939,16 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `tests/test_provider_imports.py::TestTheGateReportsIt::test_a_provider_that_cannot_be_imported_is_a_finding_not_a_traceback`
        failed first (`ModuleNotFoundError: No module named
        'no_such_module_anywhere_st4'` raised out of `problems()`), then passed.
+     - **Only half fixed, found by the post-build critic on 0d07a178**: the
+       first fix caught `ImportError` alone, so a provider raising anything
+       else while it was imported - a `ValueError`, a `NameError`, a
+       `SyntaxError` - still came out of the gate as a traceback. Now any
+       exception at import is a finding naming the file, with the error's type
+       (`<path> cannot be imported: ValueError: ...`), and a file that does not
+       parse is named once (`cannot be read: SyntaxError: ...`), not twice.
+       `test_any_exception_at_import_is_a_finding_not_a_traceback` (ValueError,
+       NameError, SyntaxError, RuntimeError) failed first, all four, then
+       passed; the module 48 passed.
 
 337. **[done, 2026-11-15]** **[QA checks & contract]** **The check-definition fingerprint read the asset's synthetic/ folder.**
      Found by REQ-GEN-370 criterion 3's new test (split T4), an audit hook over a
@@ -14959,3 +14969,55 @@ twice. It deliberately did not re-find the `TypeError`.
        `tests/test_synthetic_folder_unread.py` failed first on the present
        variant (75 reads under `synthetic/`, the `os.scandir` and `open` calls
        from `sources_fingerprint`), then 5 passed.
+
+338. **[done, 2026-11-15]** **[Testing & dev tooling]** **REQ-GEN-370 c3's test missed two kinds of read and excused too widely.**
+     From the post-build critic on 0d07a178. The audit hook in the c3 test saw
+     only opens and listings in its own process: a child process handed a path
+     under `synthetic/` (dbt runs as one, `qa_tools/common/dbt_worker.py`), a
+     listing by file descriptor and a child started in `synthetic/` all went
+     unseen; it excused a scripted-decisions read made by any
+     `Player.__init__` on the stack; and it ran on the daily asset only, with
+     an empty decisions file, so the Player's playing path never ran under
+     watch.
+     - **Fix** (test first): the harness moved to
+       `tests/synthetic_unread_support.py`. The hook now checks every
+       `subprocess.Popen`'s executable, arguments (a path inside one too) and
+       working directory, resolves a descriptor through `/proc/self/fd`, and
+       counts a relative path with a `synthetic` component as a read (one
+       opened against a directory descriptor cannot be resolved, but getting
+       the descriptor opens the folder, which is seen). The excuse holds only
+       for a Player built by `orchestrate._begin`. The "present" variant holds
+       one real scripted decision (reject the first supply an hour after it
+       arrived), recorded as played; and an Emergency Department module
+       (`tests/test_synthetic_folder_unread_quarterly.py`, about 55s) runs the
+       quarterly asset beside the daily one.
+     - **Narrowed, not fixed**: an `os.stat`/`exists()` check raises no audit
+       event, a C extension's own file opens are not seen, and a child process
+       reading a path it was not handed is not seen. Recorded as a decision on
+       REQ-GEN-370 and in the harness's docstring, which no longer says no
+       reader can route round it.
+     - **Ran**: `tests/test_synthetic_unread_hook.py` against the old hook -
+       5 failed (the three child-process cases, the descriptor listing, the
+       Player built outside the batch pass), 4 passed; against the new hook 9
+       passed. The daily module 6 passed (49s), the quarterly 6 passed (54s).
+
+339. **[done, 2026-11-15]** **[Data generation]** **Ways round the provider-import rule (REQ-GEN-370 c5).**
+     From the post-build critic on 0d07a178: the rule refused `assets.load` on
+     a name and `importlib`, but none of these: `from qa_tools.common.assets
+     import load`, the dotted `qa_tools.common.assets.load(...)`,
+     `getattr(assets, "load")`, `runpy`, `exec` of a read file, `sys.modules`,
+     `pkgutil.resolve_name`, and `generator.collections.provider_module(...)`,
+     which hands back another provider's whole module. It also refused
+     `importlib.resources` and `importlib.metadata`, which load nothing and
+     which c5 allows as standard library.
+     - **Fix** (test first): each is refused - the loader modules (importlib
+       but its resources and metadata, runpy, pkgutil), `sys.modules`, the
+       builtins `__import__`, `exec`, `eval` and `compile`, the resolver's
+       load and module_file however reached, and `provider_module` called or
+       imported. A lookup by dataset id through the registry stays allowed
+       (`for_dataset`, Keith 2026-11-15).
+     - **Ran**: the 14 new refusal cases and 6 importlib-allowed cases in
+       `tests/test_provider_imports.py` failed first (20 of them; `from
+       importlib import import_module` and `import importlib.util` were already
+       refused), then the module 48 passed; `[quarterly]` and `[daily]
+       providers OK` on the real providers.

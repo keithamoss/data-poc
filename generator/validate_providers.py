@@ -71,36 +71,80 @@ def _reaches_another_module(name: str, adapters: set[str],
 
 
 #: The resolver's loads by path - called on the resolver module however it is
-#: named locally, so json.load and a provider's own helpers stay allowed.
+#: named or reached (an alias, its dotted name, getattr), so json.load and a
+#: provider's own helpers stay allowed.
 _PATH_LOADS = frozenset({"load", "module_file"})
+_RESOLVER = "qa_tools.common.assets"
+#: Standard-library modules whose purpose is loading or running code by path
+#: or by name (the critic's routes round the gate, 2026-11-15).
+_LOADER_MODULES = frozenset({"importlib", "runpy", "pkgutil"})
+#: importlib's parts that load no module - standard library c5 allows.
+_IMPORTLIB_ALLOWED = frozenset({"resources", "metadata"})
+#: Builtins that run code given as text, or import by name.
+_RUNNERS = frozenset({"__import__", "exec", "eval", "compile"})
+#: What hands back another provider's whole module. Keith, 2026-11-15: the
+#: registry is allowed for looking a provider up by dataset id
+#: (for_dataset), not for this.
+_WHOLE_MODULE = "provider_module"
+
+
+def _dotted(node) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        head = _dotted(node.value)
+        return None if head is None else f"{head}.{node.attr}"
+    return None
 
 
 def _resolver_names(tree: ast.AST) -> set[str]:
-    """The local names a provider binds the resolver module
-    (qa_tools.common.assets) to."""
-    names = {"assets"}
+    """The local and dotted names a provider reaches the resolver module
+    (qa_tools.common.assets) by."""
+    names = {"assets", _RESOLVER}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module == "qa_tools.common":
             names |= {a.asname or a.name for a in node.names if a.name == "assets"}
         elif isinstance(node, ast.Import):
-            names |= {a.asname for a in node.names
-                      if a.name == "qa_tools.common.assets" and a.asname}
+            names |= {a.asname for a in node.names if a.name == _RESOLVER and a.asname}
     return names
 
 
+def _imports_a_loader(name: str) -> bool:
+    parts = name.split(".")
+    if parts[0] not in _LOADER_MODULES:
+        return False
+    return not (parts[0] == "importlib" and len(parts) > 1 and parts[1] in _IMPORTLIB_ALLOWED)
+
+
 def _loads_by_path_or_name(node, resolver: set[str]) -> bool:
-    """Whether a node imports importlib, calls __import__, or calls the
-    resolver's load by path."""
+    """Whether a node reaches a module by path or by name: a loader module
+    imported (importlib but its resources and metadata, runpy, pkgutil),
+    sys.modules, a code-running builtin, the resolver's load by path however
+    reached, or the registry's provider_module."""
     if isinstance(node, ast.Import):
-        return any(a.name.split(".")[0] == "importlib" for a in node.names)
+        return any(_imports_a_loader(a.name) for a in node.names)
     if isinstance(node, ast.ImportFrom):
-        return node.level == 0 and (node.module or "").split(".")[0] == "importlib"
+        if node.level or not node.module:
+            return False
+        if node.module == "importlib":
+            return any(a.name not in _IMPORTLIB_ALLOWED for a in node.names)
+        if _imports_a_loader(node.module):
+            return True
+        names = {a.name for a in node.names}
+        return ((node.module == "sys" and "modules" in names)
+                or (node.module == _RESOLVER and bool(names & _PATH_LOADS))
+                or (node.module == "generator.collections" and _WHOLE_MODULE in names))
+    if isinstance(node, ast.Attribute):
+        return node.attr == _WHOLE_MODULE or _dotted(node) == "sys.modules"
     if isinstance(node, ast.Call):
         func = node.func
         if isinstance(func, ast.Name):
-            return func.id == "__import__"
+            if func.id in _RUNNERS:
+                return True
+            return (func.id == "getattr" and bool(node.args)
+                    and _dotted(node.args[0]) in resolver)
         return (isinstance(func, ast.Attribute) and func.attr in _PATH_LOADS
-                and isinstance(func.value, ast.Name) and func.value.id in resolver)
+                and _dotted(func.value) in resolver)
     return False
 
 
@@ -114,12 +158,13 @@ def provider_import_problems(package: Path | None = None) -> list[str]:
     TYPE_CHECKING alike, so a provider that would fail to import is still
     read.
 
-    A LOOKUP THROUGH THE SHARED REGISTRY IS NOT REFUSED (PROVISIONAL,
-    REQ-GEN-370's decisions): generator.collections.for_dataset is how
-    Linkage Products reads the collections it declares in depends_on
-    (REQ-GEN-334 criterion 6, held in order by order_problems below), and
-    reaching an adapter through qa_tools.collections needs an import the
-    imports gate refuses (REQ-TEST-384)."""
+    A LOOKUP BY DATASET ID THROUGH THE SHARED REGISTRY IS ALLOWED (Keith,
+    2026-11-15): generator.collections.for_dataset is how Linkage Products
+    reads the collections it declares in depends_on (REQ-GEN-334 criterion 6,
+    held in order by order_problems below); provider_module, which hands
+    back another provider's whole module, is refused. Reaching an adapter
+    through qa_tools.collections needs an import the imports gate refuses
+    (REQ-TEST-384)."""
     from qa_tools.common import assets
 
     package = Path(package) if package is not None else assets.selected().providers
@@ -132,7 +177,7 @@ def provider_import_problems(package: Path | None = None) -> list[str]:
         try:
             tree = ast.parse(text)
         except SyntaxError as exc:
-            problems.append(f"{_shown(path)} cannot be read: {exc}")
+            problems.append(f"{_shown(path)} cannot be read: SyntaxError: {exc}")
             continue
         resolver = _resolver_names(tree)
         for node in ast.walk(tree):
@@ -140,7 +185,8 @@ def provider_import_problems(package: Path | None = None) -> list[str]:
                 problems.append(
                     f"{_shown(path)}: `{ast.get_source_segment(text, node)}` - a provider "
                     f"loads no module by path or by name: no load through the resolver, no "
-                    f"importlib, no __import__ (REQ-GEN-370 criterion 5)")
+                    f"provider_module, no importlib, runpy, pkgutil or sys.modules, no "
+                    f"__import__, exec, eval or compile (REQ-GEN-370 criterion 5)")
                 continue
             if isinstance(node, ast.ImportFrom) and node.level > 0:
                 reaches = True
@@ -231,8 +277,8 @@ def orphan_problems(package: Path | None = None) -> list[str]:
             if p.stem not in ("__init__", "base") and p.stem not in declared]
 
 
-def _unimportable() -> list[tuple[str, ImportError]]:
-    """(path shown, error) for each declared collection's provider that
+def _unimportable() -> list[tuple[str, str]]:
+    """(path shown, the error and its type) for each declared collection's provider that
     cannot be imported (post-build-review #336: it used to raise out of the
     gate as a traceback)."""
     from generator import collections
@@ -245,8 +291,9 @@ def _unimportable() -> list[tuple[str, ImportError]]:
             collections.provider(coll.id)
         except collections.NoProviderError:
             continue
-        except ImportError as exc:
-            out.append((_shown(assets.selected().providers / f"{coll.module_name}.py"), exc))
+        except Exception as exc:  # noqa: BLE001 - anything raised at import is a finding
+            out.append((_shown(assets.selected().providers / f"{coll.module_name}.py"),
+                        f"{type(exc).__name__}: {exc}"))
     return out
 
 
@@ -260,7 +307,7 @@ def problems() -> list[str]:
         # loads every provider. A provider whose forbidden import is already
         # named is not named twice - that import is most often why.
         return imports + [f"{where} cannot be imported: {exc}" for where, exc in broken
-                          if not any(p.startswith(f"{where}:") for p in imports)
+                          if not any(p.startswith(where) for p in imports)
                           ] + orphan_problems()
     found = collections.providers()
     out = imports + collections.seed_range_problems(found) + collections.order_problems(found)

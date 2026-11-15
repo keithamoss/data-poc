@@ -131,6 +131,32 @@ class TestTheRule:
         ("from importlib import util as _u", "from importlib import util as _u"),
         ("def _p():\n    return __import__('mothman_provider_quarterly_child_protection')",
          "__import__("),
+        # THE CRITIC'S ROUTES ROUND THE GATE (2026-11-15), each one refused.
+        ("from qa_tools.common.assets import load as L",
+         "from qa_tools.common.assets import load as L"),
+        ("import qa_tools.common.assets\n"
+         "def _p():\n    return qa_tools.common.assets.load('provider', 'child_protection')",
+         "qa_tools.common.assets.load('provider', 'child_protection')"),
+        ("from qa_tools.common import assets\n"
+         "def _p():\n    return getattr(assets, 'load')('provider', 'child_protection')",
+         "getattr(assets, 'load')"),
+        ("import runpy", "import runpy"),
+        ("from runpy import run_path", "from runpy import run_path"),
+        ("def _p(path):\n    exec(open(path).read())", "exec("),
+        ("def _p(text):\n    return eval(text)", "eval("),
+        ("def _p(text):\n    return compile(text, 'x', 'exec')", "compile("),
+        ("import sys\ndef _p():\n    return sys.modules['mothman_provider_quarterly_child_protection']",
+         "sys.modules"),
+        ("from sys import modules", "from sys import modules"),
+        ("import pkgutil", "import pkgutil"),
+        ("from pkgutil import resolve_name", "from pkgutil import resolve_name"),
+        ("from importlib import import_module", "from importlib import import_module"),
+        ("import importlib.util", "import importlib.util"),
+        ("def _p():\n    from generator import collections\n"
+         "    return collections.provider_module('child-protection')",
+         "collections.provider_module"),
+        ("from generator.collections import provider_module",
+         "from generator.collections import provider_module"),
     ])
     def test_a_load_by_path_or_by_name_fails(self, providers_root, line, needle):
         _add(providers_root, line)
@@ -143,12 +169,27 @@ class TestTheRule:
              "import json\nimport re\nfrom generator.collections.base import Job\n"
              "from generator import targeting as _t\nfrom qa_tools.common import hierarchy\n"
              "from qa_tools.collections.base import CollectionAdapter\n"
+             "import re as _re\n_x = _re.compile('a')\n"
              "def _read(f):\n    return json.load(f)")
         assert _gate().provider_import_problems() == []
 
+    @pytest.mark.parametrize("line", [
+        "import importlib.resources",
+        "import importlib.metadata",
+        "from importlib import resources",
+        "from importlib import metadata as _md",
+        "from importlib.resources import files",
+        "from importlib.metadata import version",
+    ])
+    def test_importlib_resources_and_metadata_pass(self, providers_root, line):
+        """Standard library that loads no module - c5 allows it."""
+        _add(providers_root, line)
+        assert _gate().provider_import_problems() == []
+
     def test_a_lookup_through_the_shared_registry_passes(self, providers_root):
-        """PROVISIONAL (REQ-GEN-370's decisions): Linkage Products reads the
-        collections it declares in depends_on through the registry."""
+        """Keith, 2026-11-15: a provider may look another up by dataset id
+        through generator.collections, as Linkage Products reads the
+        collections it declares in depends_on."""
         _add(providers_root, "def _dep():\n    from generator import collections\n"
                              "    return collections.for_dataset('cp-clients')")
         assert _gate().provider_import_problems() == []
@@ -175,6 +216,20 @@ class TestTheGateReportsIt:
         _add(providers_root, "import no_such_module_anywhere_st4")
         problems = _gate().problems()
         assert any(EDITED in p and "no_such_module_anywhere_st4" in p for p in problems), problems
+
+    @pytest.mark.parametrize("line, needle", [
+        ("raise ValueError('boom st4')", "boom st4"),
+        ("_x = undefined_name_st4", "undefined_name_st4"),
+        ("def broken(:\n    pass", "SyntaxError"),
+        ("raise RuntimeError('rt st4')", "rt st4"),
+    ])
+    def test_any_exception_at_import_is_a_finding_not_a_traceback(self, providers_root,
+                                                                    line, needle):
+        """post-build-review #336, the critic's half: not only ImportError -
+        whatever a provider raises while it is imported is named with it."""
+        _add(providers_root, line)
+        problems = _gate().problems()
+        assert any(EDITED in p and needle in p for p in problems), problems
 
 
 #: The data asset this module's tests act for, unless a test says otherwise
