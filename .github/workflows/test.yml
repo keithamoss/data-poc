@@ -439,7 +439,13 @@ jobs:
         id: key
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
-            echo "${asset}=$(MOTHMAN_ASSET="$asset" uv run mothman pipeline cache-key)" >> "$GITHUB_OUTPUT"
+            # INTO A VARIABLE FIRST (post-build-review #349): inside the echo, a
+            # failing cache-key would write an empty key and the step pass.
+            key=$(MOTHMAN_ASSET="$asset" uv run mothman pipeline cache-key) || {
+              echo "::error::mothman pipeline cache-key failed for asset ${asset}"
+              exit 1
+            }
+            echo "${asset}=${key}" >> "$GITHUB_OUTPUT"
           done
 
       - name: Restore the quarterly bootstrap, if these inputs made one

@@ -394,6 +394,112 @@ class TestEachAssetSeesOnlyItsOwn:
             as_daily("quarterly")
 
 
+
+def _legacy_copy(scratch_source: str, name: str) -> None:
+    """A copy named as one made before the asset split was."""
+    source = psycopg.conninfo.conninfo_to_dict(scratch_source)["dbname"]
+    with checkpoints._admin(scratch_source) as admin:
+        checkpoints._copy(admin, source, name)
+
+
+def _drop(scratch_source: str, name: str) -> None:
+    with checkpoints._admin(scratch_source) as admin:
+        admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+class TestCopiesMadeBeforeTheSplit:
+    """post-build-review #347: a checkpoint or resume named before the split,
+    <prefix><short>_<NNN>_<stamp>, belongs to no asset - listed apart,
+    deletable by name, never pruned, and never taken for an asset's own."""
+
+    OLD = f"{checkpoints.PREFIX}cp_005_20200101000000"
+    OLD_RESUME = f"{checkpoints.RESUME_PREFIX}cp_005_20200101000001"
+
+    @pytest.fixture
+    def old(self, scratch_source):
+        for name in (self.OLD, self.OLD_RESUME):
+            _legacy_copy(scratch_source, name)
+        yield
+        for name in (self.OLD, self.OLD_RESUME):
+            _drop(scratch_source, name)
+
+    def test_they_are_listed_apart_and_as_no_assets(self, scratch_source, old):
+        assert {self.OLD, self.OLD_RESUME} <= set(checkpoints.legacy(scratch_source))
+        assert self.OLD not in [c.name for c in checkpoints.listed(scratch_source)]
+        assert self.OLD_RESUME not in [c.name for c in checkpoints.resumes(scratch_source)]
+
+    def test_the_list_command_shows_them_in_their_own_section(self, scratch_source, old):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        env = dict(os.environ, MOTHMAN_ASSET="quarterly", MOTHMAN_SUPPLY_DSN=scratch_source,
+                   MOTHMAN_ENVIRONMENT="test")
+        out = subprocess.run([sys.executable, "-m", "cli.app", "pipeline", "checkpoint", "list"],
+                             cwd=Path(__file__).resolve().parent.parent, env=env,
+                             capture_output=True, text=True, timeout=300)
+        assert out.returncode == 0, out.stdout + out.stderr
+        section = out.stdout.split("Made before the asset split", 1)
+        assert len(section) == 2, out.stdout
+        assert self.OLD in section[1] and self.OLD_RESUME in section[1]
+
+    def test_either_can_be_deleted_by_name(self, scratch_source, old):
+        checkpoints.delete(self.OLD, scratch_source)
+        checkpoints.delete(self.OLD_RESUME, scratch_source)
+        assert not {self.OLD, self.OLD_RESUME} & set(checkpoints.legacy(scratch_source))
+
+    def test_a_prune_leaves_them(self, scratch_source, old, monkeypatch):
+        import time
+
+        monkeypatch.setenv(checkpoints.KEEP_ENV, "1")
+        for before in (2, 3):
+            checkpoints.save("child-protection", before, recorded=_recorded(),
+                             pending_scripts=[], dsn=scratch_source)
+            time.sleep(1.1)
+        assert self.OLD in checkpoints.legacy(scratch_source)
+
+    def test_an_asset_named_like_a_collection_short_never_takes_them(
+            self, scratch_source, old, monkeypatch):
+        """An asset "cp" would have matched mothman_ckpt_cp_... by prefix.
+        SCOPED: the fixtures' tidy-up must list as the real asset again."""
+        with monkeypatch.context() as m:
+            m.setattr(checkpoints, "_asset", lambda: "cp")
+            assert self.OLD not in [c.name for c in checkpoints.listed(scratch_source)]
+            assert self.OLD_RESUME not in [c.name for c in checkpoints.resumes(scratch_source)]
+
+
+class TestANameTooLongIsRefusedUpFront:
+    """post-build-review #346: a checkpoint or resume whose database name
+    would pass PostgreSQL's 63 characters is refused before any replay or
+    regeneration, not at the copy minutes later."""
+
+    LONG = "a" + "-b" * 22  # a valid asset name, 45 characters
+
+    def test_a_bootstrap_taking_one_is_refused_before_regenerating(self, monkeypatch):
+        def refuse(*_a, **_k):
+            raise AssertionError("arrivals were regenerated before the refusal")
+        monkeypatch.setattr(checkpoints, "arrivals_of", refuse)
+        monkeypatch.setattr(checkpoints, "_asset", lambda: self.LONG)
+        got = bootstrap.bootstrap(collection="cp", checkpoint_before=5)
+        assert got.refused and "63" in got.reason, got.reason
+
+    def test_a_resume_is_refused_before_it_compares_anything(self, scratch_source, monkeypatch):
+        cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
+                              dsn=scratch_source)
+
+        def refuse(*_a, **_k):
+            raise AssertionError("the resume compared inputs before the refusal")
+        # SCOPED, so scratch_source's tidy-up lists - and drops - the
+        # checkpoint as the real asset (an unscoped patch outlived it and
+        # left the copy on the server).
+        with monkeypatch.context() as m:
+            m.setattr(checkpoints, "find", lambda name, dsn=None: cp)
+            m.setattr(replay_inputs, "first_affected", refuse)
+            m.setattr(checkpoints, "_asset", lambda: self.LONG)
+            got = bootstrap.resume(cp.name)
+        assert got.refused and "63" in got.reason, got.reason
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")

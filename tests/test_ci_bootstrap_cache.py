@@ -79,6 +79,35 @@ class TestTheKey:
         assert 'MOTHMAN_ASSET="$asset" uv run mothman pipeline cache-key' in run
         assert '"${asset}=' in run and "GITHUB_OUTPUT" in run
 
+    def test_the_step_runs_as_the_workflow_would_and_a_failed_key_fails_it(self, tmp_path):
+        """post-build-review #349: the step's own shell, with `uv` stood in
+        for - each asset's key lands in the step output, and a cache-key
+        failing for one asset fails the step naming it, rather than writing
+        an empty key."""
+        import subprocess
+
+        run = _named("Key each asset's bootstrap cache")["run"]
+        stub = tmp_path / "uv"
+        stub.write_text('#!/usr/bin/env bash\n'
+                        '[ "$MOTHMAN_ASSET" = "$FAIL" ] && exit 2\n'
+                        'echo "key-of-$MOTHMAN_ASSET"\n')
+        stub.chmod(0o755)
+
+        def step(fail: str):
+            out = tmp_path / f"out-{fail or 'none'}"
+            out.write_text("")
+            got = subprocess.run(
+                ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", run], cwd=ROOT,
+                env={"PATH": f"{tmp_path}:/usr/bin:/bin", "GITHUB_OUTPUT": str(out),
+                     "FAIL": fail}, capture_output=True, text=True, timeout=60)
+            return got, out.read_text().split()
+        ok, written = step("")
+        assert ok.returncode == 0, ok.stdout + ok.stderr
+        assert written == [f"{a}=key-of-{a}" for a in _assets()]
+        bad, _ = step("quarterly")
+        assert bad.returncode == 1, bad.stdout + bad.stderr
+        assert "cache-key failed for asset quarterly" in bad.stdout
+
     def test_no_other_cli_file_is_in_it(self):
         from qa_tools.common import replay_inputs
 

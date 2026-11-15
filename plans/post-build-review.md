@@ -14923,3 +14923,74 @@ twice. It deliberately did not re-find the `TypeError`.
      entry. Confirmed by parsing the copy's file. Its tests pass, so whatever
      reads the words tolerates the gap there; #333's fixture now inserts at the
      end of `collections:` instead, and the same change would fix this one.
+
+345. **[done, 2026-11-15]** **[Testing & dev tooling]** **REQ-PIPE-365 c5's "failed bootstrap" wrote nothing.**
+     The critic on split T3's 3aa2d022 (isolation held; no high-severity
+     finding). `tests/test_one_asset_beside_another.py`'s failed bootstrap was
+     refused for its arrival number before any work, so it showed nothing
+     about a bootstrap that dies with its own files half-written, and no
+     checkpoint was taken or deleted beside the other asset's folders.
+     - **Fix** (test coverage, not a defect): each direction now runs a REAL
+       bootstrap with `--checkpoint-before` that fails partway - the test's
+       launcher (`python -c ...`, a few lines in the test) wraps
+       `checkpoints.save` so it raises once the copy is made, after the
+       bootstrap has generated its deliveries, run the real tools over the
+       arrivals before the checkpoint (dbt in `data/<asset>/dbt_scratch/`) and
+       copied the database. Then `checkpoint list` and `checkpoint delete` of
+       that checkpoint. The other asset's folders are compared byte for byte
+       after every step, both directions. No product code exists only for
+       the test. The copy now carries each asset's installed dbt packages.
+     - **Not done**: a resume - it replays the rest of the collection's
+       history, many minutes; said so in the test and the evidence.
+     - **Ran**: the module, 2 passed (quarterly 266s, daily 72s).
+
+346. **[done, 2026-11-15]** **[Pipeline & publishing]** **A checkpoint name too long for PostgreSQL was refused only at the copy.**
+     The critic's M2. The 63-character check ran in `_named_for()`, at save
+     time - after the replay up to arrival N-1, minutes of work - and for a
+     resume only at the copy.
+     - **Fix** (defect, failing test first): `checkpoints.require_names_fit()`
+       measures both prefixes (the resume's is the longer) and runs when a
+       bootstrap with `--checkpoint-before` starts, before the arrivals are
+       regenerated, and when a resume starts, before anything is compared.
+       `TestANameTooLongIsRefusedUpFront` (2 tests) failed against 3aa2d022
+       (the regeneration and the comparison both ran) and passes now. No real
+       asset name is near the limit today; a 45-character one would be.
+
+347. **[done, 2026-11-15]** **[Pipeline & publishing]** **Old-named checkpoints were invisible, and an asset named like a collection short would have taken them.**
+     The critic's M3, resolving 3aa2d022's PROVISIONAL. A checkpoint or resume
+     made before the split (`mothman_ckpt_<short>_<NNN>_<stamp>`) was listed
+     for no asset and could not be deleted through mothman; and because the
+     asset filter was a prefix, an asset named `cp` would have listed
+     `mothman_ckpt_cp_...` as its own.
+     - **Fix** (defect, failing test first): names are matched by SHAPE - an
+       asset's own is `<prefix><asset>_<anything>_<NNN>_<stamp>`, an old one
+       has one segment fewer. `checkpoints.legacy()` lists the old ones, which
+       `checkpoint list` shows in a section of their own ("Made before the
+       asset split - belongs to no asset"); `checkpoint delete` accepts one by
+       name from either asset; the prune never sees them.
+       `TestCopiesMadeBeforeTheSplit` (5 tests) failed against 3aa2d022, the
+       asset-`cp` test among them, and passes now. REJECTED refusing an asset
+       name that equals a collection short, and matching against the known
+       shorts - both larger than the shape rule. REQ-PIPE-365's decisions
+       updated and the PROVISIONAL dropped.
+
+348. **[done, 2026-11-15]** **[Testing & dev tooling]** **A shared file under assets/ would be in no cache key.**
+     The critic's L1. Each asset's key holds `assets/environments.yaml` and
+     that asset's folder, so a new file at the top of `assets/` would move
+     neither key. No code here: split T1's layout gate
+     (`qa_tools/common/validate_layout.py` on wip/split-t1, `ASSETS_TOP_FILES
+     = ("environments.yaml",)`) already fails `mothman check` on any other file
+     there, read from that branch since it is not in T3's base. Recorded as
+     REQ-PIPE-365's guard, with the rule that a file added to
+     `ASSETS_TOP_FILES` goes into `replay_inputs.INPUTS` too.
+
+349. **[done, 2026-11-15]** **[Testing & dev tooling]** **A failing cache-key would have written an empty key and passed the step.**
+     The critic's L2. In test.yml's "Key each asset's bootstrap cache" step
+     the key was computed inside the `echo`, whose own success hid a failing
+     `mothman pipeline cache-key`.
+     - **Fix** (defect, failing test first): the key goes into a variable
+       first, and a failure fails the step naming the asset.
+       `test_the_step_runs_as_the_workflow_would_and_a_failed_key_fails_it`
+       runs the step's shell with `uv` stood in for; against 3aa2d022's
+       workflow it failed (exit 0 with the failing asset), and passes now.
+       Not run on a GitHub runner.

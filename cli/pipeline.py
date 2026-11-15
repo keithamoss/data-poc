@@ -509,7 +509,8 @@ def checkpoint_group() -> None:
 @checkpoint_group.command("list")
 def checkpoint_list_command() -> None:
     """This asset's checkpoints on this server, oldest first, then its
-    resumes' databases - never another asset's (REQ-PIPE-365)."""
+    resumes' databases - never another asset's (REQ-PIPE-365) - then any
+    made before the asset split, which belong to no asset."""
     from qa_tools.common import assets as _assets
     from qa_tools.common import checkpoints
 
@@ -536,6 +537,14 @@ def checkpoint_list_command() -> None:
         console.print("Resume databases (never removed automatically):")
         for r in made:
             console.print(f"  {r.name}")
+    # MADE BEFORE THE SPLIT (post-build-review #347): named for no asset, so
+    # shown apart from every asset's, never pruned, deletable by name.
+    old = checkpoints.legacy()
+    if old:
+        console.print("Made before the asset split - belongs to no asset (delete with "
+                      "`mothman pipeline checkpoint delete NAME`):")
+        for name in old:
+            console.print(f"  {name}")
 
 
 @checkpoint_group.command("arrivals")

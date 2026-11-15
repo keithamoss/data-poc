@@ -174,6 +174,10 @@ def bootstrap(collection: str = "all", force: bool = False,
                                    refused=True, reason=reads)
         try:
             checkpoints.require_synthetic()
+            # THE NAMES FIT, CHECKED FIRST (post-build-review #346): a name past
+            # PostgreSQL's limit would otherwise be refused at the copy, after
+            # the replay up to arrival N-1.
+            checkpoints.require_names_fit(collection, checkpoint_before)
             # N IS CHECKED BEFORE ANYTHING IS TOUCHED (post-build-review #133
             # B3): against a regeneration somewhere of its own, so a refusal
             # never follows a rewritten data/ tree.
@@ -651,6 +655,11 @@ def resume(name: str, sequential: bool = False,
     try:
         checkpoints.require_synthetic()
         cp = checkpoints.find(name)
+        if cp.collection_id:
+            from qa_tools import collections as _c
+
+            # THE RESUME'S NAME FITS, before anything is regenerated (#346).
+            checkpoints.require_names_fit(_c.by_id(cp.collection_id).short, cp.before)
     except checkpoints.CheckpointRefused as exc:
         return ResumeResult(replayed=False, refused=True, reason=str(exc))
 
