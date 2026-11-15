@@ -49772,7 +49772,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever runs or reads the mothman CLI, I want commands whose help describes retired designs, whose own example returns nothing, or which can quietly destroy a shared pin to be gone, so that every command listed is one that does what it says.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-14, COMMAND CLEAN-UP, from the read-only command audit (docs/drafts/command-audit-2026-11-14.md), recorded in docs/drafts/decisions-2026-11-01.md: the deletions go into #134 v6 beside scenarios bands and the equivalence commands. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL delete `mothman debug build-warehouses` (cli/debug.py from line 165), whose help describes a per-run DuckDB warehouse and a synthetic manifest that no longer exist and which duplicates `mothman supply load` (cli/supply.py lines 309-345, the same stage.build_all with a report of what changed); stage.build_all and tests/test_build_warehouses_rebuild.py, which tests it directly, stay.
@@ -49793,6 +49793,24 @@ requirements:
     - REQ-GEN-043
     - REQ-DASH-013
     - REQ-GEN-392
+    linked_tests:
+    - tests/test_cli_app.py::test_a_deleted_command_is_answered_as_any_unknown_command
+    - tests/test_cli_debug.py
+    - tests/test_cli_dashboard.py
+    - tests/test_cli_pipeline.py
+    - tests/test_snapshot_dashboard.py
+    - tests/test_build_warehouses_rebuild.py
+    implemented_by:
+    - cli/debug.py::debug_group
+    - cli/dashboard.py::dashboard_group
+    - cli/app.py::_MothmanGroup::resolve_command
+    - dashboard/snapshot_dashboard.py::prepare_deploy_site
+    - dashboard/snapshot_dashboard.py::take_snapshot
+    - qa_tools/tools/stage.py::build_all
+    - qa_tools/common/changelog.py::build_changelog
+    evidence:
+    - '2026-11-15 (Perth), worktree branch for b393: tests/test_cli_app.py, test_cli_debug.py, test_cli_dashboard.py, test_ci_on_demand.py, test_pinned_now.py, test_snapshot_dashboard.py, test_cli_pipeline.py, test_asset_time_semantics.py and test_cli_cp.py run together after the last code edit - 142 passed, 6 skipped (test_asset_time_semantics.py''s three per asset, skipping because this worktree has no built reports/, which only the deployment half has). Criterion 8''s test seen failing first: all five cases red on the tree before the deletions (each deleted name still resolved), green after. No full suite (the caller''s terms).'
+    - 'CRITERION 6, THE REGISTER CLAIMS NAMED FOR KEITH (built-requirement claim edits): REQ-GEN-043 loses implemented_by cli/debug.py::capture_arrival_golden_command. Re-grepped at build for the snapshot command under REQ-DASH-013, REQ-DASH-292 and REQ-PIPE-089: none of their linked_tests or implemented_by names the command or its three deleted tests - they name dashboard/snapshot_dashboard.py''s functions and tests/test_snapshot_dashboard.py, which stay - so nothing there changed. No requirement named build_warehouses_command, changelog_command, or the deleted test functions.'
     decisions:
     - 'DELETE FOUR, KEEP THE REST (COMMAND CLEAN-UP, SETTLED by Keith 2026-11-14): build-warehouses, changelog, the snapshot command and capture-arrival-golden go. KEPT, not chosen for deletion: sync-tickets, sync-leaderboard, snapshot-worktrees, cache-key, rebuild-results, build-data, embed, check-renders, population.'
     - 'INSIDE #134 v6, NOT A FIX BATCH NOW (Keith, 2026-11-14): beside scenarios bands (REQ-PIPE-385) and the equivalence commands (REQ-TEST-393). REJECTED a small fix batch now.'
@@ -49800,6 +49818,9 @@ requirements:
     - 'THE SNAPSHOT FUNCTIONS STAY (Keith, 2026-11-14: ''the dashboard snapshot COMMAND only''): publish and pipeline run call prepare_deploy_site and take_snapshot as Python functions (the audit).'
     - 'capture-arrival-golden IS ''LIKELY DESTRUCTIVE'' FROM READING THE CODE, NOT FROM RUNNING IT (the audit, 2026-11-14): its deletion needs no run to justify it, and nobody should run it to find out.'
     - 'NO DEFECT TEST FOR capture-arrival-golden (delivery-scoper): the command is deleted rather than fixed, so a regression test would guard nothing (CLAUDE.md''s test rule 2).'
+    - 'CRITERION 8 READ AS "THE SAME ANSWER AS ANY UNKNOWN NAME IN THAT GROUP" (builder, 2026-11-15): the asset''s collection commands beneath the message (cli/app.py) are what the TOP-LEVEL group answers; all five deleted names lived in subgroups (debug, dashboard), where any unknown name gets click''s own ''No such command''. The test compares a deleted name''s answer, word for word, with a name that never existed in the same group. REJECTED adding the asset listing to subgroups, which is new behaviour no criterion asked for.'
+    - 'THE GOLDEN''S RE-CAPTURE IS A WRITTEN PROCEDURE, NOT A NEW COMMAND (builder, criterion 3): tests/test_asset_time_semantics.py''s docstring says how, one asset at a time, replacing only that asset''s datasets'' entries. REJECTED a replacement command or test helper - the criterion asks for a procedure, and a new writer of a committed pin is the thing that was deleted.'
+    - 'README''s command summary also loses the retired github acceptance sync and gains snapshot-worktrees under debug and publish in the dashboard chain (criterion 5 named README lines 46-48).'
     open_questions: []
     signed_off:
       by: Keith
