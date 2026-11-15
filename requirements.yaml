@@ -47625,7 +47625,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever maintains the pipeline, I want everything for each data asset - its configuration, checks, dbt project, QA adapters and synthetic-only configuration - in one folder of its own inside this one repository, found by one resolver every reader goes through, so that the quarterly and daily assets can be configured separately - as two teams in two environments will - without a second copy of the code.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47654,6 +47654,40 @@ requirements:
     - REQ-QAC-368
     - REQ-PIPE-369
     - REQ-GEN-370
+    linked_tests:
+    - tests/test_assets.py::TestTheRealLayout
+    - tests/test_assets.py::TestTheFixture
+    - tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt
+    - tests/test_every_asset.py
+    - tests/test_state_paths_at_call_time.py
+    - tests/test_two_asset_gates.py::TestBothAssetsReuseEveryIdentifierAndPass
+    - tests/test_two_asset_gates.py::TestTheTopOfAssets
+    - tests/test_two_asset_gates.py::TestTheSharedTree
+    - tests/test_collections_registry.py::TestTheLiteralGate::test_the_shared_collections_trees_are_no_longer_exempt
+    - tests/test_github_links.py::test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository
+    implemented_by:
+    - qa_tools/common/assets.py::_Assets::names
+    - qa_tools/common/assets.py::selected
+    - qa_tools/common/assets.py::data_dir
+    - qa_tools/common/assets.py::reports_dir
+    - qa_tools/common/assets.py::folder_rel
+    - qa_tools/common/assets.py::folder_on_disk
+    - qa_tools/common/every_asset.py::declared
+    - qa_tools/common/validate_layout.py::assets_top_problems
+    - qa_tools/common/validate_layout.py::shared_tree_problems
+    - qa_tools/common/validate_collections.py::EXEMPT_DIRS
+    - assets/environments.yaml
+    - .github/CODEOWNERS
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: assets/ holds environments.yaml and the two asset folders only, each with data-asset.yaml, calendar.yaml, presentation.yaml,
+      people.yaml, file-checks.yaml, dbt/, collections/ and synthetic/ (c1, c2); quarterly holds child-protection-family-support and department-of-health, daily registry-services (c3); assets._Assets.names
+      lists the folder, and no asset name is held in product code (c5); the resolver answers state paths at call time (c6), the constants it replaced are gone from product code (grep); CODEOWNERS names /assets/*/
+      (c9); qa_tools/collections/ and generator/collections/ hold __init__.py and base.py only and dbt_shared/ macros/ and tests/generic/ only (c10).'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them) - `layout OK - only environments.yaml and asset folders at the top of assets/, and no collection''s file in the shared code tree.`'
+    - '2026-11-15, split T1 (branch wip/split-t1, merged 9dce1e9b), from its decisions: tests/test_two_asset_gates.py 26 passed, its refusals seen failing first (c4, c10); the move map deleted in c8531b7b (c2).
+      No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run. The earlier criteria''s proof is the move commit
+      de009e91 and its follow-ons recorded in decisions.'
     decisions:
     - 'ONE REPOSITORY, A CONFIGURATION FOLDER PER ASSET, FOR THE PoC (Keith, 2026-10-31, #55 option (a)). FLAGGED AS A FUTURE DECISION POINT, in his words ''once this needs to migrate out of PoC stage'': (b) a repository per asset, or (c) shared code and checks with each asset''s configuration injected at deploy time. Sample datasets, project extractions and ad hoc QA are not part of this decision.'
     - 'EVERYTHING FOR AN ASSET IN ONE FOLDER, assets/<asset>/ (Keith, 2026-10-31, sign-off Q4c, ''Yep''): data-asset.yaml, the agency folders, dbt/, collections/ and synthetic/, removable as one folder. contract/ is RENAMED assets/ because it now holds dbt and code too. SUPERSEDES the shape confirmed earlier the same day, contract/<asset>/ beside synthetic/<asset>/, and the question of where providers sit. REJECTED a separate synthetic/<asset>/ tree. Diagram: docs/drafts/repo-layout-after-split.svg, both assets naming a Cloudflare project.'
@@ -47681,13 +47715,14 @@ requirements:
     - 'CRITERION 8 AMENDED - TWO CONFIGURATION-ONLY READERS OF EVERY ASSET (Keith, 2026-11-03, wording approved as written; post-build-review #315 M1): the generator''s scenario check and the feedback validator read every asset''s data-asset.yaml through qa_tools/common/every_asset.declared(), configuration only, to tell another asset''s dataset or agency from a mistyped one (morning report 12 Q6 and Q8). The criterion said no reader running for a selected asset opens another asset''s folder, which those two readers do; it now names them as its one exception, so the criterion and the code agree. No database, data/ or reports/ of another asset is read.'
     - 'C2, C4 AND C10 BUILT (split T1, 2026-11-15, branch wip/split-t1): c2 - the move map is gone, so the top of assets/ holds environments.yaml alone, and the layout gate refuses anything else. c4 - tests/two_assets.py''s fixture repository puts one agency (registry-services) in both assets, each in its own folder, and each asset passes the collections, providers, linked-dataset and reads gates comparing nothing between them (tests/test_two_asset_gates.py::TestBothAssetsReuseEveryIdentifierAndPass). c10 - the new layout gate (`mothman check`''s `layout`, qa_tools/common/validate_layout.shared_tree_problems) fails, naming it, on any file in qa_tools/collections/ or generator/collections/ but __init__.py and base.py, any dbt_shared/ file outside macros/ and tests/generic/, one there defining no macro or generic test, and one naming a model through ref() (tests/test_two_asset_gates.py::TestTheSharedTree, each refusal seen failing first). validate_collections.EXEMPT_DIRS is A18''s - assets and aws - in place of the stale contract, qa_tools/collections and generator/collections (tests/test_collections_registry.py::TestTheLiteralGate::test_the_shared_collections_trees_are_no_longer_exempt).'
     - 'JUDGEMENT (split T1): ''shared base modules'' read strictly - __init__.py and base.py - so a shared helper module added to either tree needs the gate''s list widened by hand, which is a reviewed edit rather than a silent pass. And a dbt_shared/ macro may read a raw source (set_member_violations reads source(''raw'', ''list_setting_members''), shared by every collection); only ref() to a model is refused. EVERY CRITERION IS NOW MET; the status is left for the main session''s pass, and the linked tests and evidence named here go into linked_tests and evidence when it is flipped to built - the register refuses both on a requirement that is not built. The other seven criteria are met per docs/drafts/asset-split-status-2026-11-15.md.'
+    - 'STATUS PASS 2026-11-15 (split T0): every live criterion met at HEAD 8df9ddb5, flipped to built.'
     open_questions: []
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
     date_written: '2026-10-31'
     story: As whoever runs either asset, I want every command told which asset it is for, and to see only that asset's commands, so that a command can never quietly act for the other team's asset.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47715,6 +47750,27 @@ requirements:
     - REQ-PIPE-093
     - REQ-TEST-114
     - REQ-TEST-252
+    linked_tests:
+    - tests/test_cli_asset_selection.py
+    implemented_by:
+    - cli/app.py::_MothmanGroup::resolve_command
+    - cli/app.py::cli
+    - qa_tools/common/assets.py::_refusal
+    - qa_tools/common/assets.py::why_not_selected
+    - qa_tools/common/assets.py::selected_or_none
+    - cli/common.py::environment_statement
+    - cli/env.py::current_command
+    - cli/env.py::list_command
+    - tests/conftest.py::module_selects_its_asset
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: cli/app.py builds collection groups only for assets.selected_or_none() and none with no asset (c2); _MothmanGroup answers
+      an unknown command with "Commands for asset ''<asset>'':" (c3); the Collections panel says ''Set MOTHMAN_ASSET to one of: ...'' with no asset (c5); assets._refusal names the variable, the folders found
+      and that there is deliberately no default (c4, c6); environment_statement adds '' · Asset: <asset>'' and env current/list name it (c8); tests/conftest.py refuses a test module with no asset mark (c9).
+      tests/test_cli_asset_selection.py holds a test for each case c10 lists.'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them), run with MOTHMAN_ASSET unset (c5, PORTABILITY). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read
+      here, not re-run; the suite last passed whole in the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading agents'' worktrees,
+      since fixed (post-build-review #329). ''Seen failing first'' is the build''s record, not re-checked here.'
     decisions:
     - 'THE ASSET IS NAMED BY AN ENVIRONMENT VARIABLE, AS THE ENVIRONMENT IS (delivery-scoper, following REQ-PIPE-091''s decision for MOTHMAN_ENVIRONMENT, Keith 2026-10-04 option A). REJECTED a mandatory --asset flag, for the reason REQ-PIPE-091 rejected --env: a flag cannot move the DSN. REJECTED one DSN variable per asset, as REQ-PIPE-091 rejected one per environment; a machine working both assets switches two variables together, and REQ-PIPE-343''s guard catches a mismatched pair.'
     - 'THE WRONG ASSET''S COMMANDS SIMPLY DO NOT EXIST (Keith, 2026-10-31, architect Q3 (b)): ''mothman bdm'' under the quarterly asset gets ''No such command''. REJECTED (a), a repository-wide identifiers-only read so the refusal could name the right asset. This removes v1''s criterion naming the other asset.'
@@ -47728,13 +47784,14 @@ requirements:
     - 'PROVISIONAL (groundwork builder, 2026-11-01): bare `mothman` checks the asset before the terminal check, so a non-TTY session meets the missing variable rather than the ''needs a terminal'' refusal. Question for Keith: is that order right? SETTLED by Keith 2026-11-02 (morning report C4: yes, bare mothman checks the asset before the terminal), as recommended.'
     - 'PROVISIONAL (state-path sweep, after the groundwork critic, 2026-11-01): `mothman env tidy-test-databases` still connects with MOTHMAN_ASSET unset, reading criterion 6''s ''opens a connection'' as a connection to an asset''s database - the suite''s test databases belong to no asset (each test selects its own) and it reads MOTHMAN_TEST_DSN, never the supply database. `mothman pipeline checkpoint list` is refused, since a checkpoint is a copy of one asset''s supply database. Question for Keith: keep tidy-test-databases exempt, or refuse it too and have the suite''s own tidying set an asset? SETTLED by Keith 2026-11-02 (morning report C8: tidy-test-databases stays exempt), as recommended.'
     - 'SETTLED by Keith 2026-11-02 (morning report C11, CHANGED against the recommended suite default; was PROVISIONAL): every module names its asset. Each test module carries a module-level pytestmark = pytest.mark.asset("<asset>"), a test or class acting for the other asset carries its own, tests/conftest.py refuses a test with no mark by name, and there is no suite default. The CLI''s collection groups are rebuilt in place for the selected asset by a test helper (tests/asset_cli.py), since mothman builds them once at import. Stated in the suite, never ambient, per criterion 9.'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met at HEAD 8df9ddb5 (the audit''s verdict confirmed), flipped to built.'
     open_questions: []
   - id: REQ-PIPE-364
     title: mothman check runs every configuration gate once per asset folder, needing no asset and no database, keeps identifiers unique within each asset, and compares nothing across assets
     date_written: '2026-10-31'
     story: As whoever maintains both assets' configuration, I want one `mothman check` to validate every asset folder, each on its own terms, so that a change to either asset is checked before it is pushed without anyone having to select an asset first.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47755,6 +47812,28 @@ requirements:
     - REQ-PIPE-342
     - REQ-PIPE-363
     - REQ-QAC-344
+    linked_tests:
+    - tests/test_two_asset_gates.py
+    - tests/test_cli_check.py::TestEveryFailureNamesItsAsset
+    - tests/test_check_id.py::TestHierarchyAgreement
+    implemented_by:
+    - cli/check.py::_asset_passes
+    - cli/check.py::_named
+    - cli/check.py::_failed_in
+    - cli/check.py::_shown
+    - qa_tools/common/check_id.py::validate_hierarchy_agreement
+    - qa_tools/common/validate_collections.py::config_problems
+    - qa_tools/common/run_reads.py::declaration_problems
+    - qa_tools/common/validate_layout.py::assets_top_problems
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: cli/check.py runs every gate outside _REPOSITORY_WIDE once per asset folder with MOTHMAN_ASSET set for it and prefixes
+      each line of a pass with ''[<asset>] '' (c1); check_id.validate_hierarchy_agreement is the one asset-segment check (c2); the duplicate refusals of c3 and the reads/linked-dataset refusals of c4 read the
+      selected asset only; validate_layout.assets_top_problems refuses a stray file or a folder with no data-asset.yaml (c5).'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them); the log carries 172 ''[daily]''/''[quarterly]'' prefixed lines.'
+    - '2026-11-15, split T1, from its decisions: tests/test_two_asset_gates.py 26 passed, 13 seen failing against the tree before and the other 5 refusals seen failing by disabling each in turn; tests/test_cli_check.py::TestEveryFailureNamesItsAsset''s
+      five tests seen failing against the previous cli/check.py. No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here,
+      not re-run.'
     decisions:
     - 'NO CROSS-ASSET COMPARISON - Q4 CLOSED (Keith, 2026-10-31, sign-off Q4, Q4b and Q4c): dbt, adapters and providers live in each asset''s folder, so nothing per-collection is keyed by id alone in a shared place and no id can collide across assets. REJECTED v2''s (a), a repository gate comparing ids across folders, which was the one reader that opened every folder against ''nothing reads another asset''s configuration, not even its ids''; REJECTED v2''s (b), namespacing the shared code by asset. v2''s agency-consistency criterion goes with it, NOT NEEDED because each asset is its own deployment and shows its agencies only on its own dashboard; two Department of Health folders may differ and nothing compares them.'
     - 'UNIQUE WITHIN AN ASSET (delivery-scoper, v3): ids, shorts, run prefixes, table names and seed ranges must not repeat inside one asset, where they share a database, a command tree and a generator run; across assets they may.'
@@ -47764,6 +47843,7 @@ requirements:
     - 'C3 AND C4 (split T1): TWO DEFECTS fixed test-first (post-build-review #328) - a collection id declared twice in one asset passed the collections gate, and so did two datasets of ONE collection declaring one table; both are now refused naming both items, and the hierarchy''s duplicate-dataset refusal names both collections. The reads_tables refusal (run_reads.declaration_problems) now names the asset folder checked, as the linked-dataset refusal already did. Neither looks in another asset.'
     - 'C5 (split T1): the layout gate (qa_tools/common/validate_layout.assets_top_problems) refuses, naming it, a file other than environments.yaml at the top of assets/ and ANY folder there holding no data-asset.yaml - a hidden or underscored one included, since discovery (assets.names) passes those over silently, against REQ-PIPE-342''s ''picked up or refused, never silently ignored''. every_asset.declared() still passes such a folder over, as post-build-review #315 M2 settled; the gate is what names it.'
     - 'C6 (split T1): tests/test_two_asset_gates.py against tests/two_assets.py''s fixture repository - two copies of the daily asset, named one and two - covers each refusal of criteria 3 to 5 inside one asset with the other still passing, and both assets reusing every identifier, the collection id included, and passing. SEEN FAILING FIRST: 13 of its 26 tests failed against the tree before the change (the new refusals and the defects); the 5 guarding refusals that already existed (a shared short, run prefix or agency short, overlapping seed ranges, a linked dataset only the other asset holds) were seen failing by disabling each refusal in turn, then restored. Ran: tests/test_two_asset_gates.py 26 passed. EVERY CRITERION IS NOW MET; the status is left for the main session''s pass, and the linked tests and evidence named here go into linked_tests and evidence when it is flipped to built - the register refuses both on a requirement that is not built.'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met at HEAD 8df9ddb5, flipped to built.'
     open_questions: []
   - id: REQ-PIPE-365
     title: Each asset's generated state - deliveries, receipts, bookkeeping, scenario placements, results files, checkpoints and the replay cache key - lives under that asset's own name
@@ -47795,13 +47875,18 @@ requirements:
     - 'PROVIDERS STAY OUT OF THE REPLAY INPUTS (architect v3 SHOULD 5): REPLAY_INPUTS excludes generators, which are compared as deliveries; providers moved under assets/<asset>/synthetic/ would otherwise land in ''the asset''s whole folder'', and any provider edit would restart a resume. Amendment A43.'
     - 'THE LOOKUP COMES BEFORE THE MOVE (Keith, 2026-11-01): criterion 1''s call-time half is groundwork, built and passing on today''s layout, so the move changes where the resolver points, not every reader.'
     - 'PROVISIONAL (state-path sweep, 2026-11-01): two state paths criterion 1 does not list are per asset too, through the same resolver - dbt''s scratch (supply_db.scratch_dir(), data/<asset>/dbt_scratch/ after the move, keyed by the asset''s own DSN as now) and the ticket files the dashboard embeds (reports/<asset>/open_tickets.json and ticket_resolutions.json). Question for Keith: per asset for both, as built, or keep either repository-wide? SETTLED by Keith 2026-11-02 (morning report C9: per asset for both, dbt scratch and the ticket files), as recommended.'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5): met c1 (data/<asset>/ and reports/<asset>/ through the resolver, gitignored) and c4 (rebuild-results and build-data for the selected asset). UNMET
+      c2 - reset-synthetic is per asset, but checkpoints.listed() and resumes() list every mothman_ckpt_/mothman_resume_ database on the server, whatever asset they copy, so a command does not read only the
+      selected asset''s checkpoints, and there is no per-asset test; c3 - replay_inputs.INPUTS hashes assets/** (every asset) into ONE cache key, so it is not keyed on the selected asset (KEY_PREFIX bump and
+      the providers exclusion are done); c5 - no test runs a command for one asset beside the other''s populated data/ and reports/ and compares them byte for byte. Left not_started: two of five met. The split
+      plan''s T3 owns c3 and c5.'
     open_questions: []
   - id: REQ-QAC-368
     title: Each asset has a dbt project of its own under assets/<asset>/dbt/, taking the shared macros and generic tests from dbt_shared/ through its macro-paths and test-paths, and its packages are installed by `mothman env dbt-deps`
     date_written: '2026-10-31'
     story: As whoever maintains the checks, I want each asset's dbt models and tests to live with that asset's other checks, in a dbt project of its own, so that one asset's dbt run never compiles the other's models and a missing install is named rather than surfacing as a stray manifest error.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47827,6 +47912,32 @@ requirements:
     - REQ-QAC-241
     - REQ-PIPE-157
     - REQ-QAC-223
+    linked_tests:
+    - tests/test_dbt_packages_per_asset.py
+    - tests/test_validate_check_lifecycle.py::test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs
+    - tests/test_validate_check_lifecycle.py::test_a_macro_in_a_subfolder_is_still_covered
+    implemented_by:
+    - qa_tools/common/assets.py::dbt_project_ready
+    - qa_tools/common/dbt_common.py::packages_installed
+    - qa_tools/common/dbt_common.py::install_packages
+    - qa_tools/common/dbt_common.py::_project_fingerprint
+    - cli/env.py::dbt_deps_command
+    - qa_tools/collections/__init__.py::SHARED_DBT_DIRS
+    - qa_tools/common/validate_check_lifecycle.py::dbt_definitions
+    - assets/quarterly/dbt/dbt_project.yml
+    - assets/daily/dbt/dbt_project.yml
+    - .devcontainer/post-create.sh
+    - .claude/hooks/session-start.sh
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: each asset''s dbt project under assets/<asset>/dbt/ named mothman_<asset> (c1); macro-paths and test-paths read dbt_shared/,
+      which holds macros/ and tests/generic/ only (c2); `mothman env dbt-deps` per asset in .claude/hooks/session-start.sh, .devcontainer/post-create.sh, test.yml''s three jobs and critical.yml (c4); assets.dbt_project_ready
+      refuses by dbt_common.packages_installed (c6); .gitignore covers assets/*/dbt/{target,logs,dbt_packages}/ (c7).'
+    - '2026-11-15, c9''s changelog-gate half, CONFIRMED (the audit left it unconfirmed): the definition hash the lifecycle gate compares reads collections.SHARED_DBT_DIRS (dbt_shared/macros and dbt_shared/tests/generic)
+      and the selected asset''s project tests/ through validate_check_lifecycle.dbt_definitions, and tests/test_validate_check_lifecycle.py::test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs
+      edits dbt_shared/macros/matches_regex.sql with no changelog entry and asserts the file is named once with every check it backs.'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run; the suite last passed whole in
+      the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading agents'' worktrees, since fixed (post-build-review #329).'
     decisions:
     - 'dbt PER ASSET (Keith, 2026-10-31, sign-off Q4): the models and tests are per-dataset checks. REJECTED one shared dbt_project/ keyed only by collection id with a gate refusing a repeated id.'
     - 'ONE SHARED LOCAL PACKAGE, NOT A COPY (Keith, 2026-10-31, sign-off Q4c): dbt_shared/ holds the regex macro and generic tests. REJECTED copying the macro into each project, which two assets could let drift.'
@@ -47841,13 +47952,16 @@ requirements:
     - 'C13 BUILT (bfol follow-on, 2026-11-02; decision 8''s answer): both projects are named mothman_<asset> (dbt_project.yml''s name and its models: key), so every node''s unique_id reads test.mothman_<asset>.... once, as Keith accepted; nothing in the product reads a unique_id''s project segment (checks are found by their meta check_id), and the compiled SQL is unchanged (above). The one shared profile in qa_tools/dbt_profiles is renamed `mothman`, since birth_registrations named neither project any more - wording only, never part of a unique_id. REJECTED keeping the old name in either asset.'
     - 'CRITERION 6 AMENDED: ONE MEANING OF INSTALLED (SETTLED by Keith 2026-11-03, morning report 12 Q10): the pre-run guard, assets.dbt_project_ready(), decides by dbt_common.packages_installed - the package-lock rule `mothman env dbt-deps` uses (decision 5) - so a lock stale against packages.yml, or a package deleted since, is refused naming `mothman env dbt-deps`, as a missing folder was. REJECTED keeping criterion 6 as signed (a missing or empty dbt_packages/ only). Proven by tests/test_dbt_packages_per_asset.py::TestARunWithoutThemIsRefused::test_a_stale_lock_is_refused_as_dbt_deps_would_reinstall and ::test_a_package_deleted_since_is_refused, both seen failing first (the stale case reached dbt; the deleted case did not raise).'
     - 'TITLE REWORDED (Keith 2026-11-03, morning report 12 Q11, wording approved as written): it said the projects shared "one local dbt package" for the shared macros and generic tests, which C12 replaced with macro-paths and test-paths reading dbt_shared/ (post-build-review #312, #313 For Keith 3).'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met at HEAD 8df9ddb5, flipped to built. JUDGEMENT on c1''s ''retired/<collection-id>/schema-retired.yml for each of the asset''s collections'': the
+      quarterly project has no retired/ folder because no quarterly collection had a retired dbt file before the move (dbt_project/retired/ held civil-registration''s only, at de009e91^), so every file there
+      was moved; read as met. c9''s changelog-gate half confirmed (evidence).'
     open_questions: []
   - id: REQ-PIPE-369
     title: Each asset's QA adapters live under assets/<asset>/collections/ and are loaded by file path, never as a package, and a spawned process is handed the asset and the collection id
     date_written: '2026-10-31'
     story: As whoever maintains the pipeline, I want each collection's QA adapter to sit with its asset's checks and be found by path from the asset and the collection id, so that an asset folder is configuration a deployment could supply from outside this repository, and two assets' adapters can never shadow one another.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47870,6 +47984,30 @@ requirements:
     - REQ-PIPE-342
     - REQ-PIPE-240
     - REQ-PIPE-262
+    linked_tests:
+    - tests/test_assets.py::TestLoadingByPath
+    - tests/test_assets.py::TestTheBootstrapHandsItsStreamsTheAsset
+    - tests/test_adapter_imports.py::TestTheGate
+    - tests/test_cli_check.py::test_coverage_measures_the_asset_folders_wherever_it_is_measured
+    implemented_by:
+    - qa_tools/common/assets.py::load
+    - qa_tools/common/assets.py::module_name
+    - qa_tools/common/assets.py::module_file
+    - qa_tools/common/assets.py::adapter_file
+    - qa_tools/common/validate_collections.py::adapter_import_problems
+    - cli/check.py::COVERAGE_PACKAGES
+    - pyproject.toml
+    - .github/workflows/test.yml
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: no __init__.py anywhere under assets/; adapters load by path through assets.load (c1, c2); the adapter-import gate is
+      validate_collections.adapter_import_problems (c3); pyproject.toml''s coverage source names assets with include_namespace_packages = true and fail_under is still 92 (diffed against ac3a1376), test.yml''s
+      two --cov lines and cli/check.py''s COVERAGE_PACKAGES add assets (c6); the collections gate passes per asset (c7).'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them) - `[daily] collections OK` and `[quarterly] collections OK`.'
+    - '2026-11-15, split T1, from its decisions: coverage with --cov=assets over six modules - 1934 statements under assets/, every adapter and provider listed, 95% covered. THE FULL-SUITE COVERAGE FIGURE WITH
+      assets/ IN IT HAS NOT BEEN MEASURED: the last full suite (the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading agents'' worktrees,
+      since fixed (post-build-review #329)) predates the coverage change; c6 is read as met on the configuration and that subset. No pytest was run by this pass (it would create test databases); the tests named
+      are the T1 builder''s runs recorded in decisions, re-read here, not re-run.'
     decisions:
     - 'LOADED BY PATH, NEVER AS A PACKAGE (Keith, 2026-10-31): Keith first chose assets/ as a Python package, then switched on hearing that a package ties assets/ to this repository''s layout and would complicate #55''s injected configuration. REJECTED assets/ as a namespace package imported as assets.<asset>.collections.<module>; REJECTED putting each asset folder on sys.path, where two assets'' same-named modules would shadow each other. (v3''s further reason, that a third asset would need code naming it, was wrong - an import name can be built from the asset id - and is dropped; #55 is the reason.)'
     - 'THE ASSET CROSSES PROCESS BOUNDARIES, NOT JUST THE ID (architect v3 SHOULD 3): tests select the asset in-process by fixture, but bootstrap.py''s spawn context (line 765 today) starts a fresh interpreter that never sees that selection, and re-imports by module name what it unpickles, which a path-loaded module does not have. Criterion 4 hands over both ids. REJECTED passing the collection id alone, as v3 had it.'
@@ -47877,6 +48015,8 @@ requirements:
     - 'ONE TEST HELPER (delivery-scoper, v3): about ten test modules import an adapter or provider by package name today; they move onto one loader so the lookup is tested once.'
     - 'PROVISIONAL (groundwork builder, 2026-11-01; collision rule added after the groundwork critic): the asset segment of the module name takes hyphens as underscores, as the module segment does - mothman_adapter_data_asset_1_civil_registration, mothman_provider_data_asset_1_child_protection - so the name is a valid identifier. Since that mapping can make two modules one name (''a-b'' and ''a_b'', or asset ''x'' module ''y_z'' and asset ''x-y'' module ''z''), an asset folder''s name must be lowercase letters, digits and single hyphens (assets.NAME_PATTERN, refused when the folders are listed), and a load whose name is already held by a different asset''s module is refused (ModuleNameClash) rather than replacing it; the same module re-pointed at a new file still reloads. Question for Keith: confirm that reading of the settled ''mothman_adapter_<asset>_<module name>'', and the name rule with it. SETTLED by Keith 2026-11-02 (morning report C5: the module-name pattern and the clash refusal confirmed), as recommended.'
     - 'C6 BUILT (split T1, 2026-11-15, branch wip/split-t1): pyproject.toml''s coverage source names assets, with include_namespace_packages = true; test.yml''s two --cov lines and mothman check''s COVERAGE_PACKAGES add --cov=assets (tests/test_cli_check.py::test_coverage_measures_the_asset_folders_wherever_it_is_measured, seen failing first). MEASURED ON A SUBSET ONLY: tests/test_generator_providers.py, test_generate_runs.py, test_generate_cp_runs.py, test_collections_registry.py, test_assets.py and test_two_asset_gates.py with --cov=assets - 1934 statements under assets/, every adapter and provider listed, 95% covered: above the 92% floor, so they cannot pull the combined figure under it by their own share. The full-suite figure was NOT measured here (a shared machine); the main session''s full gate measures it. EVERY CRITERION IS NOW MET; the status is left for the main session''s pass, and the linked tests and evidence named here go into linked_tests and evidence when it is flipped to built - the register refuses both on a requirement that is not built. The other seven criteria are met per docs/drafts/asset-split-status-2026-11-15.md.'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met at HEAD 8df9ddb5, flipped to built. C6 is judged met on the configuration plus the T1 subset measurement; the next full gate''s coverage line is
+      its full-suite proof.'
     open_questions: []
   - id: REQ-GEN-370
     title: Each asset's synthetic-only configuration and generator providers live under assets/<asset>/synthetic/, read only by the generator, the bootstrap and the gates, and an asset with that folder removed still runs on real supplies
@@ -47932,6 +48072,11 @@ requirements:
     - 'SEED RANGES UNIQUE WITHIN AN ASSET (delivery-scoper, v3): providers of two assets never run in one generator process.'
     - 'WHAT LANDED (2026-11-02): providers under assets/<asset>/synthetic/collections/ and scripted_decisions.yaml and synthetic_inputs.yaml under assets/<asset>/synthetic/ (the move commit de009e91), read there through Asset.synthetic (fe2a8fd3). NOT YET DONE: criterion 4''s fold of daily_batch.py and the apply_*_presets into their providers, and criterion 6''s per-asset `mothman population` - synthetic_data_generator/agency_datasets.py also imports daily_batch, so the fold needs population to load the daily provider by path while it builds both assets'' tables, a design question for this requirement''s own build.'
     - 'ONE SCENARIO TABLE UNTIL EACH ASSET HOLDS ITS OWN (SETTLED by Keith 2026-11-02, the move critic''s decision 2; was PROVISIONAL): generator/scenario_injection.py INJECTIONS stays one repository-wide list, so generation, correction claims and `mothman scenarios validate` walk only the injections naming a dataset the selected asset declares (scenario_injection.this_assets_injections); another asset''s are passed over, and one naming a dataset in no asset is no longer refused - it WAITS for REQ-PIPE-354, and meanwhile a warning names each scenario dropped. Recorded as REQ-GEN-246''s unmet criterion 8. REJECTED reading both assets now, and dropping silently. (Earlier the same day, morning report C14: accepted until REQ-PIPE-352 criterion 3, as recommended; the move critic''s decision 2 then named REQ-PIPE-354 as what it waits for.)'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5; c4, c6 and c8 retired): met c2 (providers loaded by path, generator/collections/ holding the base only) and c7 (the providers gate per asset, seed
+      ranges within an asset - `[daily] providers OK`, `[quarterly] providers OK`). PARTLY c1 - providers, scripted_decisions.yaml and synthetic_inputs.yaml are under assets/<asset>/synthetic/, but eras.yaml
+      does not exist (REQ-GEN-371, a feature after #134). UNMET c3 - no test that staging, checks, the gate, promotion and the dashboard read nothing under synthetic/; c5 - no gate refuses a provider importing
+      another provider (the imports gate sides providers with the generator, so a provider-to-provider import is allowed, and only adapters have an import gate); c9 - of its live tests only the provider-by-path
+      one exists (tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_its_assets_folder). Left not_started.'
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged
@@ -47969,7 +48114,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever runs either asset, I want a command configured for one asset to refuse the other asset's database before it does anything, so that two teams sharing one repository can never write to each other's history by a mistyped variable.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47993,6 +48138,30 @@ requirements:
     - REQ-PIPE-363
     - REQ-PIPE-107
     - REQ-QAC-344
+    linked_tests:
+    - tests/test_db_identity.py::TestEachAssetIsRefusedTheOthersDatabase
+    - tests/test_db_identity.py::TestMarking
+    - tests/test_db_identity.py::TestARemarkReachesPooledConnections
+    - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn
+    - tests/test_assets.py::TestOneAssetPerProcess
+    - tests/test_assets.py::TestTheConnectionGuard
+    implemented_by:
+    - qa_tools/common/db_identity.py::check
+    - qa_tools/common/db_identity.py::expected
+    - qa_tools/common/db_identity.py::mark
+    - cli/env.py::mark_command
+    - qa_tools/common/assets.py::claim_for_connection
+    - qa_tools/common/assets.py::OneAssetPerProcess
+    - .claude/hooks/session-start.sh
+    - .devcontainer/post-create.sh
+    - .github/workflows/test.yml
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: `mothman env mark --confirm` takes DATA_ASSET/ENVIRONMENT (c1); db_identity.check compares the recorded data_asset_id
+      with assets.selected()''s and refuses naming both, no DSN (c2, c3); assets.claim_for_connection raises OneAssetPerProcess for a second asset, the suite exempt and a spawned process not (c5, c6); the session
+      hook, test.yml and critical.yml create and mark supply_<asset> per asset (c4, c7).'
+    - '2026-11-15, split T1, from its decisions: tests/test_db_identity.py 37 passed with tests/test_devcontainer.py, -n 2 and -n 0; TestMarking''s three new tests, TestEachAssetIsRefusedTheOthersDatabase and
+      TestARemarkReachesPooledConnections seen failing first. No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here,
+      not re-run.'
     decisions:
     - 'TWO ASSETS NEED TWO data_asset_ids FOR THE GUARD TO WORK AT ALL (delivery-scoper, from qa_tools/common/db_identity.py): REQ-PIPE-107 compares data_asset_id and environment.'
     - ONE PROCESS PER ASSET FOR EVERYTHING THAT SHIPS; PYTEST EXEMPT, EACH TEST ONE ASSET (Keith, 2026-10-31, architect Q2 (a)). CI keeps one deployment job. REJECTED (b), the deployment half run once per asset. REJECTED one bootstrap process holding both DSNs, which puts both assets' credentials in one process.
@@ -48001,13 +48170,22 @@ requirements:
     - 'C1 BUILT (split T1, 2026-11-15, branch wip/split-t1): `mothman env mark --confirm` takes <data asset>/<environment> (metavar DATA_ASSET/ENVIRONMENT) and at a terminal asks for both; the environment alone, or another asset''s id, marks nothing (tests/test_db_identity.py::TestMarking::test_the_data_asset_must_be_typed_too, ::test_another_assets_id_typed_marks_nothing, ::test_at_a_terminal_both_are_asked_for, seen failing first). One option in the form replacing an identity already asks for, rather than a second option. Every caller types both: the session hook, .devcontainer/post-create.sh, test.yml''s three mark steps, critical.yml, and the equivalence capture, which reads the captured tree''s own cli/env.py to give an older tree the environment alone.'
     - 'C4 BUILT AS WORDED (split T1): .devcontainer/post-create.sh marks each asset''s supply_<asset> on the server MOTHMAN_SUPPLY_DSN names, one process each, typing both ids; devcontainer.json''s MOTHMAN_ASSET=data-asset-1, which names no asset folder since the split, is removed (post-build-review #331). OPEN, FOR KEITH: nothing creates the dev container''s supply_<asset> databases - docker-compose makes only `supply` - so on a fresh dev container each mark fails with its hint until they exist.'
     - 'C8 BUILT (split T1): tests/test_db_identity.py::TestEachAssetIsRefusedTheOthersDatabase, both directions - the test worker''s own private database, marked by the suite for one asset with its whole qa schema, and a checkout configured for the other refused on every route: the database opened directly, dbt''s (dbt_common._dbt_env), Soda Core''s (supply_db.soda_config_yaml) and datacontract-cli''s (datacontract_common.run_against_warehouse) connection details, and a mothman command (`supply tidy --yes`); each refusal names both ids and no part of the DSN, and the database - a planted leftover run schema the command would drop included - is left exactly as found. It found a DEFECT (post-build-review #330): a connection pooled before a database was re-marked for another asset was handed out unchecked; db_identity.mark now releases the idle pool, proven by tests/test_db_identity.py::TestARemarkReachesPooledConnections, seen failing first. Ran: tests/test_db_identity.py 37 passed with tests/test_devcontainer.py, -n 2 and -n 0. Every criterion is met but c4''s databases, above; status left for the main session.'
+    - 'STATUS PASS 2026-11-15 (split T0): met c1-c3 and c5-c8, flipped to built with c4 unmet - nothing creates the dev container''s supply_<asset> databases yet (Keith''s 2026-11-15 answer: a compose init
+      script), so post-create.sh''s marks fail on a fresh dev container. c7''s dev-container name is right in post-create.sh and waits on the same fix.'
+    unmet_criteria:
+    - criterion: 'Criterion 4''s dev-container half (and criterion 7''s dev-container database): .devcontainer/post-create.sh marks each asset''s supply_<asset>, but nothing creates those databases - docker-compose
+        makes only `supply` - so on a fresh dev container each mark fails with its hint.'
+      why: Keith decided 2026-11-15 (docs/drafts/decisions-2026-11-01.md, split T1's questions) that a compose init script creates one supply_<asset> per asset folder; it is not built yet.
+      owner: the split follow-ups builder (the docker-compose init script mounting assets/ read-only and creating supply_<asset> per folder)
+      blocked_by:
+        unowned: true
     open_questions: []
   - id: REQ-QAC-344
     title: Both assets' check ids carry their own meaningful data_asset_id - quarterly and daily - renamed once under a narrow, signed exception whose transform lives for the one push that carries the move
     date_written: '2026-10-31'
     story: As whoever maintains the checks, I want every check id to name the asset it belongs to by a meaningful name, so that two assets sharing one repository never have two checks with one id, and an id says which asset it is from at a glance.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48028,6 +48206,22 @@ requirements:
     - REQ-PIPE-342
     - REQ-QAC-039
     - REQ-TEST-366
+    linked_tests:
+    - tests/test_check_id.py::TestHierarchyAgreement::test_the_former_data_asset_id_is_refused
+    - tests/test_validate_check_lifecycle.py
+    implemented_by:
+    - qa_tools/common/check_id.py::validate_hierarchy_agreement
+    - qa_tools/common/check_lifecycle.py::find_disappeared_check_ids
+    - assets/quarterly/data-asset.yaml
+    - assets/daily/data-asset.yaml
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: data_asset_id is ''quarterly'' and ''daily'' (c1); no file under assets/ holds a ''data-asset-1.'' check id (grep) (c2);
+      migrate_moved_check_id, qa_tools/common/moved_paths.py and assets/moved-paths.yaml are gone (deleted in c8531b7b) and nothing outside plans/, docs/ and requirements.yaml names them (c5, c6); check_id.validate_hierarchy_agreement
+      refuses the former id, tests/test_check_id.py::TestHierarchyAgreement::test_the_former_data_asset_id_is_refused (c6).'
+    - '2026-11-15: c3''s 378/378 config_hash comparison and c7''s tests (tests/test_moved_paths.py::TestTheRenameIsExcusedAndNothingElse, four tests, added 9bdf10dc, deleted c8531b7b) are from the move push''s
+      record in decisions, not re-run here - the transform they test no longer exists. c8: Keith''s approval of the rename recorded in decisions, 2026-11-15.'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run.'
     decisions:
     - 'MEANINGFUL IDS FOR BOTH ASSETS (Keith, 2026-10-31, draft Q2 (b)): every check id in both assets changes. REJECTED (a), keeping data-asset-1 for the quarterly asset and renaming only Birth Registrations to data-asset-2. Keeping data-asset-1 for both was never offered: the guard (REQ-PIPE-343) could not tell the databases apart.'
     - 'THE SEGMENT STAYS (delivery-scoper, from check_id.py and Keith 2026-09-22): this is exactly the case it was kept for - ''the cost of that only appears when a second asset arrives''.'
@@ -48039,13 +48233,16 @@ requirements:
     - 'NOT YET DONE: criterion 6 (the transform deleted with the map in the next push) and criterion 8 (the exception recorded as approved by Keith in the change that applies it) - the second needs Keith''s own approval statement, so the move commit carries none. Two comments still say data-asset-1 (data-asset.yaml''s header and people.yaml''s example), left for the docs stream since the move commit changes no comment.'
     - 'THE CHECK-ID RENAME (data-asset-1.* to quarterly.*/daily.*) APPROVED by Keith 2026-11-15 as one narrow exception licensing this rename only (c8); check ids otherwise never change.'
     - 'C6 AND C8 BUILT (split T1, 2026-11-15, branch wip/split-t1): migrate_moved_check_id deleted from qa_tools/common/check_lifecycle.py with the move map it read (REQ-TEST-366 criterion 3); find_disappeared_check_ids, find_undocumented_changes and validate take no `moved` argument, and validate_check_lifecycle''s _moved_ids is gone. From then on the asset-segment check refuses the former id in any file: check_id.validate_hierarchy_agreement, run per asset by the lifecycle gate''s _check_id_errors - proven by tests/test_check_id.py::TestHierarchyAgreement::test_the_former_data_asset_id_is_refused (a real daily check''s id with data-asset-1 put back). Criterion 7''s tests (tests/test_moved_paths.py::TestTheRenameIsExcusedAndNothingElse) went with the transform, per CLAUDE.md test rule 2. Criterion 8 is the approval recorded above. Ran: tests/test_check_id.py, tests/test_validate_check_lifecycle.py, tests/test_check_lifecycle.py, green. EVERY CRITERION IS NOW MET; the status is left for the main session''s pass, and the linked tests and evidence named here go into linked_tests and evidence when it is flipped to built - the register refuses both on a requirement that is not built.'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met, flipped to built. JUDGEMENT on c7: MET BY HISTORY AND BY THE DELETION. Its tests existed and passed for the push carrying the move (9bdf10dc to
+      c8531b7b) and were deleted with the transform because c6 requires the transform deleted, and CLAUDE.md test rule 2 removes a test with the behaviour it covers; a criterion asking for tests of code another
+      criterion orders deleted cannot be held open by that deletion. linked_tests therefore names the refusal that replaced the transform, not the deleted tests.'
     open_questions: []
   - id: REQ-TEST-366
     title: One committed move map, from each old path to its new one, is followed by every read of a base commit in the push that carries the move, and is deleted with its readers in the next push
     date_written: '2026-10-31'
     story: As Keith, I want the freeze and lifecycle gates to see a moved file as the same file, so that the move commit cannot carry a frozen or check change through unseen just because the file has a new path.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48066,6 +48263,22 @@ requirements:
     - 'CONFIGURATION, NOT STATE: the map is authored and reviewed with the move.'
     dependencies:
     - REQ-PIPE-342
+    linked_tests:
+    - tests/test_two_asset_gates.py::TestTheTopOfAssets
+    - tests/test_check_id.py::TestHierarchyAgreement::test_the_former_data_asset_id_is_refused
+    implemented_by:
+    - qa_tools/common/validate_layout.py::assets_top_problems
+    - qa_tools/common/validate_check_lifecycle.py::_old_file_content
+    - qa_tools/common/validate_schedule.py::_content_at
+    evidence:
+    - '2026-11-15 (Perth), c4''s one-off check RE-RUN by the split T0 status pass at HEAD 8df9ddb5: `git ls-files assets/moved-paths.yaml qa_tools/common/moved_paths.py` lists nothing; `git grep -nE ''moved_paths|moved-paths\.yaml|migrate_moved_check_id|id_rename|MoveMap''
+      -- . '':!plans'' '':!docs'' '':!requirements.yaml''` finds only tests/test_two_asset_gates.py:182-184, the old name used as the example stray file the layout gate refuses; and the branch''s upstream origin/claude/qac-024-explanations-qx8hx8
+      (c845f593), the diff base of the next push, holds assets/ (`git cat-file -e c845f593:assets`). No test asserts the absence. The T1 builder ran the same check on 73cea842 (decisions).'
+    - '2026-11-15: c1, c2 and c5 to c8 are the move push''s (4ff1be88, 9bdf10dc, de009e91), recorded in decisions with the 13-of-19 seen-failing figure and the through-the-map gate run of 2026-11-02; their
+      code and tests were deleted in c8531b7b as c3 orders, so they are not re-run here. No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded
+      in decisions, re-read here, not re-run.'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them) - `layout OK - only environments.yaml and asset folders at the top of assets/`.'
     decisions:
     - 'ONE MAP FOR EVERY BASE-COMMIT READ (architect BLOCKING 2): v1 fixed only the agreement-freeze and check-lifecycle gates; six readers lose the old file after the move. REJECTED a per-reader fix, which is six chances to miss one.'
     - 'DELETED IN THE NEXT PUSH, NOT LEFT INERT (Keith, 2026-10-31: ''I don''t want moved paths hanging around''): every gate compares a push with its own base (MOTHMAN_DIFF_BASE = github.event.before) and _version_added_on walks only base..HEAD, so the map fires only for the push that carries the move; the next push deletes it with the code that reads it. REJECTED leaving it inert at the top of assets/, and REJECTED deriving the moves from git''s rename detection, which cannot see a divided file and would leave a path rule in code.'
@@ -48079,6 +48292,9 @@ requirements:
     - 'C3 AND C4 BUILT (split T1, 2026-11-15, branch wip/split-t1): deleted assets/moved-paths.yaml, qa_tools/common/moved_paths.py and every line reading them - validate_check_lifecycle._old_file_content and _files_in, validate_schedule._content_at and _version_added_on, agreement_freeze._base_owners and equivalence.tree_assets - with REQ-QAC-344''s id transform and tests/test_moved_paths.py (criterion 8''s tests). The map is dropped from what the top of assets/ allows: the layout gate (qa_tools/common/validate_layout.assets_top_problems, REQ-PIPE-364 criterion 5) allows environments.yaml alone. The criteria''s own wording still names the map for the move''s push, which is history now; rewording signed text is Keith''s.'
     - 'THE ONE-OFF CHECK (criterion 4), run 2026-11-15 on 73cea842: assets/moved-paths.yaml and qa_tools/common/moved_paths.py are absent; `git grep -E ''moved_paths|moved-paths\.yaml|migrate_moved_check_id|id_rename|MoveMap''` outside plans/, docs/ and requirements.yaml finds only tests/test_two_asset_gates.py''s use of the old name as an example stray file the layout gate refuses; and `git cat-file -e 6bd26215:assets` succeeds - the diff base this work branched from holds assets/. No test asserts the absence. THE PUSH CARRYING THIS TO A claude/ BRANCH RE-RUNS IT, since its diff base is that branch''s head.'
     - 'A CONSEQUENCE (split T1): an equivalence capture of a commit from before the split now fails at its ''assets'' stage (equivalence.tree_assets), since the map was what found that tree''s contract/data-asset.yaml; nothing compares across the split since REQ-TEST-357 criterion 2 was retired. tests/test_equivalence.py''s two failed-capture tests use that commit (renamed BEFORE_THE_SPLIT) and now fail at ''assets'' rather than ''mark'', so no database is made before the failure and their no-database-left assertion is weaker. EVERY CRITERION IS NOW MET; the status is left for the main session''s pass, and the linked tests and evidence named here go into linked_tests and evidence when it is flipped to built - the register refuses both on a requirement that is not built.'
+    - 'STATUS PASS 2026-11-15 (split T0): every criterion met, flipped to built. TWO JUDGEMENTS, FOR KEITH TO OVERRULE: c3 is met in SUBSTANCE but LATE - the map, its readers and the transform were deleted
+      in c8531b7b, not ''in the push after the one carrying the move'' (CI pushes such as f6bc05bf, 741a1d87 and 9ea7e138 came between); nothing can now make that push the one, so it is recorded rather than
+      held open. And c8''s tests were deleted by c3 itself (CLAUDE.md test rule 2), so c8 is met by history: they were seen failing first and passed for the push they guarded.'
     open_questions: []
   - id: REQ-PIPE-345
     title: Each data asset declares one baseline calendar; no collection or dataset names a calendar or dates of its own, and a gate refuses anything faster than the baseline
@@ -48118,6 +48334,10 @@ requirements:
     - 'AN ASSET WITH NO CALENDAR STAYS POSSIBLE (delivery-scoper, from CLAUDE.md''s project-extraction shape): ''at most one'', with REQ-PIPE-110 criterion 36''s empty list kept.'
     - 'THE calendar_differs RULE BECOMES UNREACHABLE (delivery-scoper): with every calendared dataset of an asset on one baseline, REQ-PIPE-331 criterion 2''s not-applicable branch and REQ-QAC-330 criterion 6''s calendar clause can never fire. Amendments A13 and A14 retire them and their tests.'
     - 'SHARED CODE NAMING A CALENDAR (architect SHOULD): criterion 6. After the split the calendar names happen to match the asset ids, which is exactly why a name test in shared code must go - it would read as working.'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5): met c8 (tests/test_calendar_move_pin.py, pin unchanged since before the split). IN EFFECT ONLY c1 and c4 - each asset happens to hold one calendar,
+      but no rule refuses a second, and participation is the pre-split mechanism. NOT CONFIRMED c5. UNMET c2 and c3 - collections still declare `calendar:` (assets/daily/calendar.yaml:157; assets/quarterly/calendar.yaml:266,
+      310, 351) and nothing refuses it; c6 - generator/scenario_injection.py:1419 still tests `== "daily"` and assets/quarterly/synthetic/collections/child_protection.py:736 and 738 ask for ''quarterly'' by
+      name; c7 - no gate test. Left not_started; the split plan''s T2 owns it.'
     open_questions: []
   - id: REQ-PIPE-346
     title: A dataset owes a subset of its baseline's periods, named in the baseline's own terms - delivery months on an authored calendar, weekdays on a daily one
@@ -48301,7 +48521,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever runs the pipeline, I want each asset bootstrapped into its own database, separately, so that each holds only its own asset's history and a change to one asset never costs a rebuild of the other.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48326,6 +48546,25 @@ requirements:
     - REQ-PIPE-262
     - REQ-PIPE-250
     - REQ-GEN-045
+    linked_tests:
+    - tests/test_scenario_map.py::TestEachAssetHasItsOwnMap
+    - tests/test_assets.py::TestTheBootstrapHandsItsStreamsTheAsset
+    - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn::test_the_sandbox_hook
+    - tests/test_db_identity.py::TestEachAssetIsRefusedTheOthersDatabase
+    implemented_by:
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/common/bootstrap.py::streams
+    - qa_tools/common/scenario_map.py::map_path
+    - qa_tools/common/scenario_map.py::write_map
+    - generator/scenario_injection.py::mixed_asset_problems
+    - .claude/hooks/session-start.sh
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: the bootstrap runs the selected asset''s collections into its database, refused by the identity guard elsewhere (c1);
+      bootstrap.streams still groups by shared calendar (A12 unapplied), and each asset holds one calendar today, so each asset replays as one stream - met in effect, the one-baseline rule itself being REQ-PIPE-345''s
+      (c2); scenario_map.map_path answers SCENARIOS-<asset>.md and mixed_asset_problems refuses a mixed scenario (c3); the session hook creates, marks, dbt-deps and counts supply_<asset> per asset (c4).'
+    - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate
+      among them) - the scenario map and scenarios gates pass per asset. No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read
+      here, not re-run.'
     decisions:
     - TWO DATABASES, TWO BOOTSTRAPS (Keith, 2026-10-31, implied by 'each built only from its own asset's database').
     - 'ONE STREAM PER ASSET (delivery-scoper): REQ-PIPE-262 grouped collections by shared calendar; under one baseline that grouping is every calendared collection of the asset. plans/running-thoughts.md #111 is unchanged by this.'
@@ -48336,6 +48575,25 @@ requirements:
     - 'THE SCENARIO-REGISTER CHECK IS PER ASSET (delivery-scoper, v4): v2''s ''a scenario naming datasets of two assets'' needed a gate that knew both hierarchies, which Q4''s closure rules out; criterion 3 asks each asset''s pass whether a scenario names one of its datasets and one it does not hold.'
     - 'THE MAP BUILDER NEVER IMPORTS THE GENERATOR (the merge of bmove into work, 2026-11-03, post-build-review #311): criterion 3''s build had qa_tools/common/scenario_map.py call generator.scenario_injection.other_assets_scenarios() itself, which REQ-GEN-043 criterion 7''s wall forbids (tests/test_arrivals.py::TestTheGeneratorsBookkeepingIsWalledOff::test_no_pipeline_module_imports_the_generator_package failed on bmove alone, and went red in the critical set once work marked that module critical). build_for_selected and write_map now take the other assets'' scenarios as a REQUIRED keyword, leave_out, and their callers in cli/ (cli/scenarios.py, cli/pipeline.py) - which may run the generator - pass it. Behaviour unchanged. REJECTED a default of leaving nothing out, which would quietly put every asset''s scenarios in a map.'
     - 'C4 BUILT (split T1, 2026-11-15, branch wip/split-t1): the session hook counts each asset''s staged tables from its own supply_<asset>, saying the asset and the database, and asks each for the period-table guard; the pre-split `supply` database is no longer counted (tests/test_db_identity.py::TestEveryPlaceMarksItsOwn::test_the_sandbox_hook reads the block). The hook still creates `supply` and exports MOTHMAN_SUPPLY_DSN at it, which neither asset can open (it carries data-asset-1); left alone, since one DSN variable cannot name two databases and what it should name is not this criterion''s - for Keith. STILL UNMET when the status is next set: criterion 5 (12 minutes each; quarterly took 111m09s), blocked by the speed batch REQ-PIPE-397 to 408; criterion 6, blocked on criterion 5''s run.'
+    - 'STATUS PASS 2026-11-15 (split T0): met c1-c4, flipped to built with c5 and c6 unmet, blocked by the speed batch. C2 is met in effect only (one calendar per asset), as recorded in evidence.'
+    unmet_criteria:
+    - criterion: Criterion 5 - each asset's from-empty bootstrap within 12 minutes on this sandbox.
+      why: 'Measured 3 November: daily 11m24s, quarterly 111m09s (plans/morning-reports.md; post-build-review #318). The quarterly asset is about nine times over.'
+      owner: the signed speed batch
+      blocked_by:
+        requirements:
+        - REQ-PIPE-397
+        - REQ-GEN-398
+        - REQ-GEN-399
+        - REQ-PIPE-400
+        - REQ-TEST-402
+        - REQ-PIPE-403
+    - criterion: Criterion 6 - each asset's bootstrap wall clock alone and side by side recorded in evidence beside the pre-split single bootstrap's figures, with and without the two test collections.
+      why: No side-by-side figures exist, and the measurement is only worth taking once criterion 5's run is within budget.
+      owner: the speed batch's measuring requirement
+      blocked_by:
+        requirements:
+        - REQ-PIPE-403
     open_questions: []
   - id: REQ-TEST-353
     title: CI checks both assets on every push within 10 percent of today's billed minutes on a cache hit, each asset's bootstrapped database cached on its own key, and records the cache-miss cost
@@ -48374,6 +48632,10 @@ requirements:
     - 'ONE DEPLOYMENT JOB, NOT TWO (Keith, 2026-10-31, architect Q2 (a)): criterion 2. REJECTED a job per asset, which would report a daily failure sooner but bill a second runner on every push.'
     - 'dbt deps RUNS IN THREE JOBS, NOT ONE (architect v3 SHOULD 6): criterion 8 names every job that runs dbt, once per asset.'
     - 'C9 BUILT (split T1, 2026-11-15, branch wip/split-t1): --cov=assets on both test.yml coverage lines and assets with include_namespace_packages in coverage''s source, as REQ-PIPE-369''s criterion-6 decision says; the coverage job''s combine reads what those write. Not yet run in CI ([skip ci] pushes). STILL UNMET when the status is next set: criteria 1, 2, 5 and 7 (T3), criterion 6 not confirmed; criterion 4''s amendment is T0''s.'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5): met c3 (rebuild-results and build-data once per asset in test.yml), c4 as amended (one deployment pytest session per asset, --only-asset), c8 (`mothman
+      env dbt-deps` per asset in all three test.yml jobs and critical.yml) and c9 (--cov=assets on both test.yml coverage lines, assets in coverage''s source). UNMET c1 - one cache key (replay_inputs.INPUTS
+      hashes assets/**) and one cache cover both assets; c2 - the bootstraps run one after the other in a for-loop, not side by side; c5 - one restored/rebuilt line for the job, not per asset; c7 - no ci-usage
+      figures before and after. NOT CONFIRMED c6 (the fast half''s skip count; needs a hand-started test.yml). Left not_started: four of nine met; the split plan''s T3 owns the rest.'
     open_questions: []
   - id: REQ-PIPE-372
     title: Until REQ-PIPE-255 gives an asset its own hosting, a publish is refused for any asset whose data-asset.yaml does not hold today's publish setting - only the quarterly asset holds it - exiting non-zero and pointing to `mothman dashboard rebuild`
@@ -48631,7 +48893,7 @@ requirements:
     date_written: '2026-10-31'
     story: As Keith, I want proof that splitting the configuration moved files and nothing else, so that the split can be trusted as a refactor before the new datasets and the period control are built on it.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48672,6 +48934,22 @@ requirements:
     - REQ-PIPE-365
     - REQ-PIPE-369
     - REQ-QAC-368
+    linked_tests:
+    - tests/test_assets.py::TestTheRealLayout
+    - tests/test_calendar_move_pin.py
+    - tests/test_asset_time_semantics.py
+    implemented_by:
+    - qa_tools/common/assets.py::_Assets
+    - cli/env.py::reset_synthetic_command
+    - assets/environments.yaml
+    evidence:
+    - '2026-11-15 (Perth), split T0 status pass: c1 - each asset''s history regenerated from empty after the split, daily 11m24s and quarterly 111m09s (plans/morning-reports.md, 3 November; fbe3359b). c5 -
+      the move is one commit, de009e91, on f123a582, its content checked in decisions (84 targets, 0 differences; the gates passing through the move map on 2026-11-02), with the REQ-DASH-299 base-clause deviation
+      recorded there.'
+    - '2026-11-15: c6 - the groundwork (the resolver, asset selection, one asset per process, call-time state paths, loading by path, the per-asset dbt mechanics) landed before de009e91. The 12 tests that passed
+      at the base and failed after C11 (decisions, 2026-11-02) no longer stand: the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading
+      agents'' worktrees, since fixed (post-build-review #329). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here,
+      not re-run.'
     decisions:
     - 'REGENERATE, NOT MIGRATE (delivery-scoper, following Keith''s REQ-PIPE-089 choice): the history is synthetic and seeded.'
     - 'THE PINS ARE NOT RE-CAPTURED (REQ-PIPE-110 criterion 20''s rule): a pin captured from the post-split tree would prove only that the tree agrees with itself.'
@@ -48686,11 +48964,14 @@ requirements:
     - 'EVERY TEST MODULE NAMES ITS ASSET (C11, Keith 2026-11-02): a module-level pytestmark = pytest.mark.asset(...) in each, a test or case of the other asset marked on its own, and no quarterly default - tests/conftest.py refuses an unmarked module by name before any test runs. tests/asset_inference.py stays as a helper that reads which asset''s registry ids a test names; it no longer decides anything at collection. A case list holding both assets'' values marks each with its own asset (tests/asset_params.per_asset, read from each asset''s data-asset.yaml). A test naming both assets or neither keeps the quarterly asset it ran under before C11, marked explicitly.'
     - 'A WORKER''S DATABASE IS EMPTIED WHEN ITS TESTS CHANGE ASSET (tests/conftest.py, 2026-11-02): one worker database served both assets'' tests, so a daily test''s Birth Registrations hold was read by a quarterly reader that cannot name the dataset - test_not_supplied and test_supersession_critic failed only beside other modules. On a switch every data schema is dropped, past the period-view guard (REQ-PIPE-129) with event triggers off for the drop, and the identity re-marked, as a separate deployment''s database would be. Rejected: a database per asset per worker, because supply_dsn is a session value many tests use as a string and could not follow the switch.'
     - 'PRODUCT DEFECTS FROM THE MOVE, FIXED TEST-FIRST (2026-11-02): the freeze gate''s, the calendar refusal''s and the schedule-ended notice''s messages named contract/ files that no longer exist (agreement_freeze, schedule, supply_holds.schedule_file); the adapter line report read the old adapter and provider folders and reported nothing; the provider orphan gate scanned generator/collections/, which holds only the shared base; the two mothman pre-commit hooks watched ^contract/ and so never ran on an asset''s files; the collections gate crashed on an adapter it could not import instead of reporting it, and named adapters by the old folder. 66 user-facing strings elsewhere still name contract/ paths: a follow-on wording sweep, not done here.'
-    - 'EXISTING TESTS AFTER C11, MEASURED (2026-11-02): every module but tests/test_dashboard_e2e.py, in four batches, at 5cddb454: 7067 passed, 53 failed, 17 skipped, against f123a582''s 6974 passed, 43 failed, 16 skipped. Of the 43 base failures 41 still fail and 2 pass. 12 tests passing at the base fail after, each classified: 2 need a product decision (validate_feedback''s agency check, PROVISIONAL since phase 1; the settle pointer on the one-collection daily asset), 4 cannot run within one asset (three sibling-on-another-calendar cases and Birth Registrations'' cross-table rebuild, which borrowed a Child Protection check), 5 need a regenerated deployment database (status_parity, cross_table_scope, evidently_recorded_reference), 1 waits on the cache key (test_replay_inputs: replay_inputs.INPUTS still lists contract/**). After that sweep tests/test_generator_providers.py changed alone and was re-run whole on the final tree.'
+    - 'EXISTING TESTS AFTER C11, MEASURED (2026-11-02): every module but tests/test_dashboard_e2e.py, in four batches, at 5cddb454: 7067 passed, 53 failed, 17 skipped, against f123a582''s 6974 passed, 43 failed, 16 skipped. Of the 43 base failures 41 still fail and 2 pass. 12 tests passing at the base fail after, each classified: 2 need a product decision (validate_feedback''s agency check, PROVISIONAL since phase 1 and answered by Keith 2026-11-03, morning report 12 Q8, in REQ-DOCS-219 criterion 10; the settle pointer on the one-collection daily asset), 4 cannot run within one asset (three sibling-on-another-calendar cases and Birth Registrations'' cross-table rebuild, which borrowed a Child Protection check), 5 need a regenerated deployment database (status_parity, cross_table_scope, evidently_recorded_reference), 1 waits on the cache key (test_replay_inputs: replay_inputs.INPUTS still lists contract/**). After that sweep tests/test_generator_providers.py changed alone and was re-run whole on the final tree.'
     - 'A CASE LIST BUILT AT IMPORT HOLDS ONE ASSET (2026-11-02): test_a_real_generation_draws_only_declared_seeds took its cases from the registry when its quarterly module was imported, so Birth Registrations'' case stopped running, and its probe counted only draws made in generator/ files while providers draw in assets/<asset>/synthetic/collections/. Its cases now come from every asset''s providers folder, each under its own asset, and draws in the selected asset''s providers count. Every other base test id absent after the move has a renamed successor carrying its assertion, except test_status_parity''s words test, removed on work and merged in.'
     - 'CRITERION 3 AMENDED, A1 (Keith, 2026-11-02, morning report 12): the compare NORMALISES per-asset receipt sequence numbers and delivery-folder names, comparing each delivery by its contents and each receipt by its order. REJECTED a shared cross-asset receipt counter (breaks the isolation REQ-PIPE-365 criterion 1 gives each asset''s tree) and sequence-free delivery naming (a generator change to recorded data). Criterion 2''s ''normalising only'' predates the amendment and is read with it; its wording is left for Keith rather than changed unsigned.'
     - 'A1 BUILT (bfol follow-on, 2026-11-02): equivalence.normalise_deliveries, applied by compare only where the two sides'' asset-id sets differ (a pre-split side against a post-split one) - so a compare within one layout, including two post-split captures, still sees a renamed delivery or a renumbered receipt. CORRECTED 2026-11-03 (post-build-review #313 M1): it was first applied wherever asset ids are normalised (either side several assets), which hid both between two post-split captures; tests/test_equivalence_assets.py::TestDeliveriesAcrossTheSplit::test_two_post_split_captures_compare_names_and_sequences_raw failed first. A delivery is named by a digest of its files'' names and contents (with ''#n'' among identical ones, in receipt order); a receipt''s sequence becomes its rank in receipt order within its asset, and a one-asset side''s deliveries are grouped by the asset the other side files the same contents under, so the old single sequence is compared asset by asset. Applied to S4''s paths and receipt records, qa.delivery_file.receipt_sequence (by its row''s own delivery and file, since the numbers repeat across assets) and every S1 and S5 value naming a delivery. S4 now records each receipt as its parsed record rather than its digest, so HARNESS_VERSION is 3 and NORMALISER_VERSION 4 and an older baseline is refused rather than mis-compared. REJECTED normalising always (it would hide a real rename within one layout) and ranking within each collection (weaker: it would not see two collections'' receipts interleaving differently inside one asset). Driven on hand-built baselines (tests/test_equivalence_assets.py::TestDeliveriesAcrossTheSplit); criterion 3''s real compare still waits on the end-of-run bootstrap.'
     - 'CRITERION 2 REWORDED (Keith 2026-11-03, morning report 12 Q11, wording approved as written): it said compare normalises "only" the data_asset_id segment and the database identity row, which contradicted criterion 3 as A1 amended it; it now ends with the delivery names and receipt sequences criterion 3 lists (post-build-review #313 For Keith 2).'
+    - 'STATUS PASS 2026-11-15 (split T0): c1, c5 and c6 met (c2, c3 and c4 retired), flipped to built. JUDGEMENT on c6: the builder''s ''NOT MET'' measured existing tests AFTER the move (610 then 12 regressions),
+      while c6 is about the groundwork passing on the PRE-move layout; today''s full suite has no regression left, so it is read as met. What was never measured is a pre-groundwork against post-groundwork run
+      on the old layout - the evidence is today''s suite, not that comparison.'
     open_questions: []
   - id: REQ-DOCS-358
     title: 'Signed requirements, CLAUDE.md and the README are restated for two assets in the change that makes the split: path-only edits under one blanket rule, every meaning change quoted and signed'
@@ -48770,6 +49051,9 @@ requirements:
     - 'REQ-DASH-054 DECISION 14 IS SUPERSEDED, NOT EDITED (delivery-scoper): decisions are history, and REQ-DASH-355''s decisions say why it is reopened. REQ-DASH-054 criteria 1 and 6 (''each of the asset''s named calendars'') stay true of an asset with one.'
     - 'SIGNING (Keith, 2026-10-31, draft Q4 (a)): the blanket rule signed once, the 43 amendments and C1 one by one. REJECTED (b), every path-only edit quoted and signed, and (c), leaving path-only criteria naming files that no longer exist. The rule widened (architect) to reports/, SCENARIOS.md and snapshot paths; data/ added by the scoper on the same reasoning; v3 widened it again to the assets/ layout - dbt_project/, qa_tools/collections/, generator/collections/ and the synthetic files.'
     - 'THE BLANKET SWEEP, counted by script on 2026-10-31 at commit 7e9bf6e over signed or built requirements, to be re-counted when applying - the v3 path classes (dbt_project/, qa_tools/collections/, generator/collections/, contract/scripted_decisions.yaml, contract/synthetic_inputs.yaml) are NOT in this count and are counted then. Asset-wide contract files, 99 criteria in 57 requirements: REQ-DASH-054 2; REQ-DASH-209 3; REQ-DASH-220 13; REQ-DASH-299 9, 10; REQ-DOCS-219 10; REQ-GEN-135 9; REQ-GEN-183 1; REQ-GEN-184 9; REQ-GEN-185 7; REQ-GEN-199 13, 29, 38; REQ-GEN-200 10; REQ-GEN-201 3; REQ-GEN-205 1, 4; REQ-GEN-218 1, 2; REQ-GEN-235 2; REQ-GEN-251 1; REQ-GEN-295 12; REQ-GEN-325 4; REQ-GEN-334 4; REQ-GHUB-082 14, 29; REQ-GHUB-171 5; REQ-GHUB-174 1, 2; REQ-PIPE-048 1; REQ-PIPE-049 4, 8, 9; REQ-PIPE-093 12, 13; REQ-PIPE-103 16; REQ-PIPE-110 12, 13, 14, 16, 17, 19, 23, 26; REQ-PIPE-111 1, 22; REQ-PIPE-112 1, 17; REQ-PIPE-122 1, 13, 24; REQ-PIPE-132 4; REQ-PIPE-134 2; REQ-PIPE-146 1, 6; REQ-PIPE-147 7; REQ-PIPE-156 1; REQ-PIPE-161 1; REQ-PIPE-163 22; REQ-PIPE-166 1; REQ-PIPE-169 13, 14; REQ-PIPE-179 4, 20, 28, 34, 37, 40; REQ-PIPE-202 1, 11; REQ-PIPE-254 1, 6; REQ-PIPE-320 1, 3; REQ-PIPE-322 9; REQ-QAC-176 22; REQ-QAC-231 1, 2, 8; REQ-QAC-241 8; REQ-QAC-294 1, 11, 12; REQ-QAC-300 1, 10; REQ-QAC-330 1, 2, 8; REQ-TEST-249 3, 6, 10. reports/: REQ-TEST-239 8, 12; REQ-TEST-252 15; REQ-TEST-249 6; REQ-TEST-281 4. SCENARIOS.md: REQ-PIPE-131 15; REQ-DASH-139 2; REQ-TEST-253 1, 2; REQ-GEN-201 10; REQ-GEN-325 4 (REQ-GEN-045 names ''a map'', not the file). Snapshots: REQ-PIPE-089 10; REQ-PIPE-255 22, 32; REQ-DASH-292 3, 4. data/: REQ-PIPE-102 3; REQ-GEN-201 5; REQ-GEN-334 6; REQ-GEN-295 3. (REQ-PIPE-107 1, REQ-PIPE-110 1 and 18, REQ-PIPE-240 1, REQ-PIPE-248 7, REQ-PIPE-255 1, 8 and 24, REQ-PIPE-257 8 and REQ-GHUB-258 1 also name a path and are covered by A15, A4, A9, A18, A23, A24, A25 and A26 instead.)'
+    - 'STATUS PASS 2026-11-15 (split T0, at HEAD 8df9ddb5): nothing met. UNMET c1 - amendments A1-A43 and C1 are not applied (no criterion carries ''AMENDED ... by'' any requirement of this batch; e.g. A38''s
+      REQ-QAC-223 criterion 8 still names dbt_project/macros/matches_regex.sql); c2 - the blanket sweep is not done; c3 - only the dbt-deps lines and the README tour are updated, CLAUDE.md''s layout table still
+      describes contract/ and dbt_project/, and .env.example has no MOTHMAN_ASSET= line; c4 - #131, #55, #109 and #134''s configuration half are still in plans. Left not_started; the split plan''s T5.'
     open_questions: []
   - id: REQ-TEST-375
     title: 'An interim fast CI set: a hand-picked critical pytest mark on every push, the full suite started by hand'
