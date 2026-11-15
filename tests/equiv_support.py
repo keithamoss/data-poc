@@ -1,24 +1,14 @@
 """Support for the tests that compare two runs of today's code in one session:
-the bootstrap-equivalence test (REQ-TEST-116 criterion 4), the resume
-against a full replay (REQ-TEST-159), the kept routes (REQ-PIPE-086
-criterion 11) and the replay clock (REQ-PIPE-081).
+the kept routes (REQ-PIPE-086 criterion 11) and the replay clock
+(REQ-PIPE-081).
 
-TWO JOBS, both of which have to work in a SPAWNED process as well as in
-the test's own, which is why they live in an importable module rather
-than in the test file's fixtures:
+TWO JOBS:
 
 1. REDIRECT every path a collection pipeline reads or writes on disk -
    the delivery tree, the receipts, the in-flight observations and the
-   two results files under reports/ - to the test's own corpus. A
-   parallel bootstrap runs each collection in a process spawned by
-   `bootstrap._run_concurrently`, and a monkeypatch made in the test
-   process does not exist there: a spawned child imports every module
-   afresh, so `delivery.default_deliveries_dir()` would be the REAL data/deliveries
-   again. The redirection travels as an environment variable instead,
-   which a spawned child does inherit, and is re-applied by
-   `redirected_run_collection` on the child's side.
+   two results files under reports/ - to the test's own tree.
 
-2. SNAPSHOT and COMPARE what a bootstrap recorded - see `snapshot()`.
+2. SNAPSHOT and COMPARE what a run recorded - see `snapshot()`.
 """
 from __future__ import annotations
 
@@ -29,17 +19,6 @@ from collections import Counter
 from pathlib import Path
 
 from state_paths import fixed
-
-#: The environment variable carrying the corpus root into spawned children.
-CORPUS_ENV = "MOTHMAN_EQUIV_CORPUS"
-
-from qa_tools.common import bootstrap as _bootstrap  # noqa: E402
-
-#: CAPTURED AT IMPORT, before the test patches `bootstrap._run_collection`
-#: to point here - otherwise the in-process (sequential) path would call
-#: this wrapper, which would call the patched name, which is this wrapper.
-_REAL_RUN_COLLECTION = _bootstrap._run_collection
-_REAL_RUN_STREAM = _bootstrap._run_stream
 
 
 def apply_redirects(root: Path) -> dict:
@@ -94,51 +73,13 @@ def restore(original: dict) -> None:
         setattr(module, name, value)
 
 
-def redirected_run_collection(name: str, sequential: bool,
-                              record_deliveries: bool = False, **replay) -> float:
-    """`bootstrap._run_collection`, with the corpus redirection applied first.
-
-    The test patches `bootstrap._run_collection` to this in BOTH modes,
-    so the sequential reference and the parallel run go through exactly
-    the same wrapper - the only difference left between them is the one
-    under test. Pickled BY NAME into the spawned child, which is why it
-    is a top-level function of an importable module.
-    """
-    root = os.environ.get(CORPUS_ENV)
-    if not root:
-        raise RuntimeError(
-            f"{CORPUS_ENV} is not set - refusing to run a collection pipeline "
-            f"against this repo's real delivery tree")
-    apply_redirects(Path(root))
-    return _REAL_RUN_COLLECTION(name, sequential, record_deliveries=record_deliveries, **replay)
-
-
-def redirected_run_stream(key: str, sequential: bool) -> float:
-    """`bootstrap._run_stream` (REQ-PIPE-262), with the corpus redirection
-    applied first - the same wrapper in both modes, for the reason
-    redirected_run_collection gives. A stream of one collection goes
-    through redirected_run_collection, as the real one goes through
-    _run_collection."""
-    root = os.environ.get(CORPUS_ENV)
-    if not root:
-        raise RuntimeError(
-            f"{CORPUS_ENV} is not set - refusing to run a stream's pipelines "
-            f"against this repo's real delivery tree")
-    apply_redirects(Path(root))
-    if _bootstrap.STREAM_JOIN not in key:
-        return redirected_run_collection(key, sequential)
-    return _REAL_RUN_STREAM(key, sequential)
-
-
 # --------------------------------------------------------------------------
 # What is compared, and what is not.
 # --------------------------------------------------------------------------
 
 # THE SNAPSHOT RULES AND CODE: what a run recorded, normalised so two runs
 # of today's code in one test session can be compared row for row - a
-# resumed replay against a full one (tests/test_checkpoints.py), a parallel
-# bootstrap against a sequential one (tests/test_bootstrap_equivalence.py),
-# one delivery kept three ways (tests/test_kept_routes_agree.py), a replay's
+# delivery kept three ways (tests/test_kept_routes_agree.py), a replay's
 # stamps (tests/test_replay_clock.py). Moved here from the retired
 # before-and-after harness, qa_tools/common/equivalence.py (REQ-TEST-393),
 # because only tests use it.
@@ -227,20 +168,10 @@ _DECISION = "(SELECT r.ref FROM equiv_decision_ref r WHERE r.id = t.{col})"
 #: a bigserial, new each time a result is recorded again, and interleaves
 #: between collections replaying side by side.
 _RESULT = "(SELECT r.ref FROM equiv_result_ref r WHERE r.id = t.{col})"
-#: OPENING ORDER (REQ-PIPE-279's run_seq) as a run's place among its own
-#: collection's runs. Collections replaying side by side draw from one
-#: sequence, so the raw numbers interleave differently from one bootstrap to
-#: the next while each collection's own order does not - which is the order
-#: compared. An attempt's run_seq is placed the same way, by its run's
-#: collection. Applied only by snapshot(run_seq_within_collection=True);
-#: otherwise the raw numbers are compared.
-_RUN_RANK = "(SELECT r.rank FROM equiv_run_rank r WHERE r.run_seq = t.run_seq)"
 #: A REFERENCE TO A PACKAGE-GATE APPLICATION (REQ-PIPE-266) is compared as
 #: WHICH application: its collection and its place in that collection's
 #: sequence - the ordinal its own id becomes (ORDINAL_COLUMNS).
 _GATE = "(SELECT r.ref FROM equiv_gate_ref r WHERE r.id = t.{col})"
-_ATTEMPT_RANK = ("(SELECT r.rank FROM equiv_attempt_rank r "
-                 "WHERE r.run_key = t.run_key AND r.run_seq = t.run_seq)")
 #: The lookups, as CTEs in the one SELECT that needs each - a snapshot only
 #: ever reads.
 _CTES = {
@@ -253,18 +184,7 @@ _CTES = {
     "equiv_gate_ref": (
         "SELECT id, collection_id || '#' || row_number() OVER "
         "(PARTITION BY collection_id ORDER BY id) AS ref FROM qa.gate_application"),
-    "equiv_run_rank": (
-        "SELECT run_seq, row_number() OVER (PARTITION BY collection_id ORDER BY run_seq) "
-        "AS rank FROM qa.run WHERE run_seq IS NOT NULL"),
-    "equiv_attempt_rank": (
-        "SELECT a.run_key, a.run_seq, row_number() OVER (PARTITION BY r.collection_id "
-        "ORDER BY a.run_seq) AS rank FROM qa.run_attempt a LEFT JOIN qa.run r "
-        "ON r.run_key = a.run_key"),
 }
-#: The derived columns that are opening order, derived only under
-#: snapshot(run_seq_within_collection=True).
-_OPENING_ORDER = {("run", "run_seq"), ("run_attempt", "run_seq")}
-
 DERIVED_COLUMNS = {
     # A completion stamp is clock time, but WHETHER a run completed is not.
     # A GATE APPLICATION'S START AND END are the replay clock, which runs on
@@ -276,11 +196,9 @@ DERIVED_COLUMNS = {
     "run": {"completed_at": "completed_at IS NOT NULL",
             "gate_application": _GATE.format(col="gate_application"),
             "caused_by_decision": _DECISION.format(col="caused_by_decision"),
-            "caused_by_load": _LOAD.format(col="caused_by_load"),
-            "run_seq": _RUN_RANK},
+            "caused_by_load": _LOAD.format(col="caused_by_load")},
     "run_attempt": {"began_at": "began_at IS NOT NULL",
-                    "ended_at": "ended_at IS NOT NULL",
-                    "run_seq": _ATTEMPT_RANK},
+                    "ended_at": "ended_at IS NOT NULL"},
     # WHAT A RESULT READ, keyed by the result it belongs to.
     "check_read": {"check_result_id": _RESULT.format(col="check_result_id")},
     # Ids pointing at another table's surrogate: compared as what they name.
@@ -358,14 +276,12 @@ def _cols(conn, table: str) -> list[str]:
         [table]).fetchall()]
 
 
-def _qa_select(conn, table: str, run_seq_within_collection: bool = False) -> tuple[list[str], str]:
+def _qa_select(conn, table: str) -> tuple[list[str], str]:
     names, exprs = [], []
     for col in _cols(conn, table):
         if col in UNCOMPARABLE_COLUMNS.get(table, ()):
             continue
         derived = DERIVED_COLUMNS.get(table, {}).get(col)
-        if not run_seq_within_collection and (table, col) in _OPENING_ORDER:
-            derived = None
         if derived:
             names.append(col + "*")
             exprs.append(derived)
@@ -391,7 +307,7 @@ def _canon(value) -> str:
     return json.dumps(value, sort_keys=True, default=str)
 
 
-def snapshot(dsn: str, *, run_seq_within_collection: bool = False) -> dict:
+def snapshot(dsn: str) -> dict:
     """Everything a bootstrap recorded, normalised to be comparable.
 
     - every BASE TABLE in the `qa` schema, every row, every column except
@@ -403,13 +319,7 @@ def snapshot(dsn: str, *, run_seq_within_collection: bool = False) -> dict:
     - the list of schemas, so a per-run schema one mode leaves behind
       shows too.
 
-    run_seq is compared as drawn unless `run_seq_within_collection`, which
-    compares each run's place among its own collection's runs instead - for
-    two histories whose collections may have been opened side by side in
-    different interleavings: a parallel bootstrap against a sequential one,
-    or two captures of a parallel bootstrap. A resume against its full
-    replay opens one collection in one order, so it compares the raw
-    numbers.
+    run_seq is compared as drawn.
     """
     import psycopg
 
@@ -419,7 +329,7 @@ def snapshot(dsn: str, *, run_seq_within_collection: bool = False) -> dict:
             "SELECT table_name FROM information_schema.tables "
             "WHERE table_schema = 'qa' AND table_type = 'BASE TABLE' ORDER BY 1")]
         for table in qa_tables:
-            names, sql = _qa_select(conn, table, run_seq_within_collection)
+            names, sql = _qa_select(conn, table)
             rows = Counter(tuple(_canon(v) for v in r) for r in conn.execute(sql))
             snap[f"qa.{table}"] = (tuple(names), rows)
 

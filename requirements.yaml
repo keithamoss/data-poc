@@ -28539,8 +28539,13 @@ requirements:
         write once - the delivery log, schema migrations, shared period
         schemas - is made safe to run together, not merely usually fine.
     dependencies: []
+    retired_criteria:
+      - criterion: 4
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-TEST-393]
+        reason: "retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping"
     linked_tests:
-      - tests/test_bootstrap_equivalence.py
       - tests/test_bootstrap.py
       - tests/test_tools_beside.py
     implemented_by:
@@ -32598,9 +32603,14 @@ requirements:
     - cli/pipeline.py::resume_command
     - cli/pipeline.py::checkpoint_list_command
     - cli/pipeline.py::checkpoint_delete_command
+    retired_criteria:
+    - criterion: 5
+      date: '2026-11-15'
+      by: Keith
+      replaced_by: [REQ-TEST-393]
+      reason: 'retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping'
     linked_tests:
     - tests/test_checkpoints.py
-    - tests/test_bootstrap_equivalence.py
     - tests/test_promotion_waits_for_next_receipt.py
     - tests/test_ci_on_demand.py
     - tests/test_processing_pass.py
@@ -39773,8 +39783,6 @@ requirements:
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_corrections_are_confirmed_once_both_replays_finish
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_unclaimed_deliveries_are_recorded_once_after_both_run
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_wall_clock_is_reported
-    - tests/test_bootstrap_equivalence.py::TestASharedCalendarIsReplayedInReceiptOrder::test_eds_gap_inherits_its_newest_supply
-    - tests/test_bootstrap_equivalence.py::TestParallelRecordsTheSameHistory::test_identical_apart_from_the_named_exclusions
     - tests/test_inheritance.py::TestAPeriodIsOpenedWholeOrNotAtAll::test_a_failure_partway_leaves_it_unopened_and_nothing_inherited
     implemented_by:
     - qa_tools/common/bootstrap.py::streams
@@ -49697,12 +49705,12 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want the before-and-after harness gone from the product code, so that nobody spends a 58-minute bootstrap proving the synthetic demo history did not move, while the tests that prove two real routes through today's code agree keep working.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-14, answering the architect''s QD: ''Just delete the equivalence thing, I told you I do not care.'' Asked how far: delete it everywhere. REQ-TEST-239''s retirement wording approved by Keith 2026-11-14 (''Yes, as worded''), applied separately; this requirement is the code half. The read-only command audit of 2026-11-14 (docs/drafts/command-audit-2026-11-14.md) supplied the callers. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL delete `mothman debug equivalence capture` and `mothman debug equivalence compare` (cli/debug.py lines 247-323, with the --renamed-by option REQ-PIPE-248 criterion 8 added, that criterion moving to REQ-PIPE-248's retired_criteria with REQ-TEST-239's approved reason, v6 Q4) and qa_tools/common/equivalence.py (1,312 lines at 72ec04d7).
     - 'THE SYSTEM SHALL delete the tests whose only subject is the harness or a before-and-after capture: tests/test_equivalence.py, tests/test_equivalence_assets.py and tests/test_sample_keys_equivalence.py (REQ-PIPE-341 criterion 7''s on-demand capture test), with conftest.py''s --run-full-capture option and full_capture mark (lines 1225-1298) and tests/test_ci_on_demand.py''s test_no_job_takes_full_captures (line 41), which exist only for it.'
-    - THE SYSTEM SHALL keep tests/test_checkpoints.py (REQ-TEST-159, a resumed replay against a full one), tests/test_replay_clock.py (REQ-PIPE-081, a replay's records stamped with its own time), tests/test_bootstrap_equivalence.py (REQ-TEST-116 criterion 4, a parallel bootstrap against a sequential one) and tests/test_kept_routes_agree.py (REQ-PIPE-086 criterion 11, one delivery kept three ways), each passing and asserting what it asserts today, by moving the code they use from equivalence.py - snapshot, differences, summary and the *_COLUMNS constants - into tests/equiv_support.py, which already holds their redirection.
+    - "THE SYSTEM SHALL keep tests/test_replay_clock.py (REQ-PIPE-081, a replay's records stamped with its own time) and tests/test_kept_routes_agree.py (REQ-PIPE-086 criterion 11, one delivery kept three ways), each passing and asserting what it asserts today, by moving the code they use from equivalence.py - snapshot, differences, summary and the *_COLUMNS constants - into tests/equiv_support.py, which already holds their redirection; and SHALL delete tests/test_bootstrap_equivalence.py and test_checkpoints.py's TestAResumeRecordsWhatAFullReplayDoes (retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping)."
     - 'THE SYSTEM SHALL leave no product module that only tests call: whatever equivalence.py held that the four tests need lives under tests/ (CLAUDE.md''s test rule: test helpers live in tests/, never in product code).'
     - 'THE SYSTEM SHALL remove test.yml''s `fetch-depth: 0` (lines 212-216 and 348-352), which exists only for tests/test_equivalence.py, and run the affected jobs'' tests in a depth-1 clone before the push to show nothing else needed the history; IF something else does, THEN the line stays with its comment rewritten to name what needs it.'
     - THE SYSTEM SHALL keep MOTHMAN_PINNED_NOW (tests/test_cli_cp.py lines 255 and 328 pin it) and rewrite the docstrings that justify it by the harness (qa_tools/common/asset_time.py lines 187-190, tests/test_pinned_now.py's module docstring) to say what it is for now.
@@ -49720,6 +49728,25 @@ requirements:
     - REQ-PIPE-086
     - REQ-PIPE-248
     - REQ-PIPE-341
+    linked_tests:
+    - tests/test_replay_clock.py
+    - tests/test_kept_routes_agree.py
+    - tests/test_checkpoints.py
+    - tests/test_ci_on_demand.py
+    - tests/test_pinned_now.py
+    - tests/test_cli_app.py::test_a_deleted_command_is_answered_as_any_unknown_command
+    implemented_by:
+    - tests/equiv_support.py::snapshot
+    - tests/equiv_support.py::differences
+    - tests/equiv_support.py::summary
+    - tests/equiv_support.py::run_into_fresh_database
+    - cli/debug.py::debug_group
+    - tests/conftest.py::pytest_collection_modifyitems
+    - qa_tools/common/asset_time.py::now
+    evidence:
+    - '2026-11-15 (Perth), branch wip/b393-deletions: after the deletions, test_replay_clock.py and test_kept_routes_agree.py run with --run-on-demand on the moved helper - green (39 passed across those and test_checkpoints.py''s other tests, with the bootstrap-equivalence and resume-against-full tests erroring at setup). Those errors - KeyError ''birth-registrations'' in the shared corpus fixture - were identical on the unchanged parent ac3a1376, so they predate this change; Keith then retired both tests (criterion 3 as reworded 2026-11-15).'
+    - 'CRITERION 5, the depth-1 clone: commit 83b1f16 cloned with --depth 1, 25 git-touching test modules run with -m "not needs_deployment" - 598 passed, 0 skipped - so the two fetch-depth: 0 lines went with nothing rewritten. critical.yml and validate-config.yml keep their own fetch-depth: 0, which the criterion does not name.'
+    - 'CRITERION 7, THE REGISTER CLAIMS NAMED FOR KEITH (built-requirement claim edits): REQ-PIPE-248 lost tests/test_equivalence.py and qa_tools/common/equivalence.py::compare (and its criterion 8 is retired); REQ-QAC-247 lost tests/test_equivalence.py; REQ-PIPE-341 lost tests/test_sample_keys_equivalence.py; the retired REQ-TEST-239 lost its ten deleted tests and nine deleted symbols. After Keith''s 2026-11-15 decision: REQ-TEST-116 and REQ-TEST-159 lost tests/test_bootstrap_equivalence.py, and REQ-PIPE-262 lost its two tests in that file (its criteria 13 and 14, which those tests evidenced and 14 of which names the file, are not retired - for Keith). Evidence prose is unchanged.'
     decisions:
     - 'DELETE THE EQUIVALENCE COMPARE EVERYWHERE (QD, Keith 2026-11-14, dictated): ''Just delete the equivalence thing, I told you I do not care. Synthetic [can] be removed. We have tests approved and we don''t need to assure that [the] demo hasn''t moved.'' The same stance as plans/supply-model.md''s ''I don''t care. This is all just fake data''. REJECTED (the architect''s QD options) a capture per build group, per requirement, or a first and a last.'
     - 'ITS OWN SMALL REQUIREMENT, FIRST IN THE BUILD (delivery-scoper, v6): Keith''s rule is small, self-contained requirements, and this deletion touches CLI, product code, five test files, conftest and a workflow, none of it part of any other requirement''s subject. It lands before the imports gate so the gate''s first allowlist does not list edges about to vanish. It could fold into REQ-TEST-384 if Keith prefers one fewer id.'
@@ -49727,6 +49754,9 @@ requirements:
     - 'test_sample_keys_equivalence.py GOES (delivery-scoper, v6): it is a before-and-after capture of REQ-PIPE-341, exactly what QD retires.'
     - 'REQ-PIPE-248 CRITERION 8 BECOMES UNTRUE (delivery-scoper, v6, from the register): it added --renamed-by to the compare; the option goes with the command. RETIRED under retired_criteria with REQ-TEST-239''s approved reason (v6 Q4, SETTLED by Keith 2026-11-14). REJECTED amending it to say the option existed until 2026-11-14.'
     - 'MOTHMAN_PINNED_NOW OUTLIVES ITS ORIGIN (delivery-scoper, v6): it began as REQ-TEST-239 criterion 16 but test_cli_cp.py uses it; REQ-PIPE-382 criterion 12 routes it through the one clock.'
+    - 'RETIRE THE TWO BROKEN KEPT TESTS (Keith, 2026-11-15, criterion 3 reworded verbatim as approved): tests/test_bootstrap_equivalence.py and test_checkpoints.py''s TestAResumeRecordsWhatAFullReplayDoes had failed at setup since the asset split (their corpus fixture''s KeyError ''birth-registrations''; on-demand, so nothing caught it) and no longer prove anything worth keeping. REQ-TEST-116 criterion 4 and REQ-TEST-159 criterion 5 retired with them, replaced_by REQ-TEST-393. REJECTED fixing the fixture per asset (the recommended option), and marking criterion 3 unmet.'
+    - 'WHAT THE RETIRED TESTS ALONE USED WENT WITH THEM (builder): the corpus fixture, equiv_support''s spawned-child redirection (CORPUS_ENV, redirected_run_collection, redirected_run_stream) and snapshot''s run_seq_within_collection option with its opening-order rules - only the parallel-against-sequential comparison asked for it. run_into_database stays, as run_into_fresh_database''s body.'
+    - 'THE MOVED RULES ARE VERBATIM (builder): equivalence.py''s S1 section - the four *_COLUMNS maps, the derived and uncomparable columns, snapshot, differences and summary - moved unchanged into tests/equiv_support.py, which no longer imports product code to do it; the surfaces S4, S5 and S7, capture and compare had no caller left and went.'
     open_questions: []
     signed_off:
       by: Keith

@@ -4,8 +4,9 @@ receipt-ordered stream, as the live pass does (REQ-PIPE-262).
 The fast half: how streams are formed (criteria 1, 2, 9), the order a
 stream's arrivals are processed in (criterion 3) and every collection's
 scripted decisions played across the whole stream (criterion 4). The
-history it produces is tests/test_bootstrap_equivalence.py's (criteria 12
-to 14), which runs real bootstraps.
+history it produces was tests/test_bootstrap_equivalence.py's (criteria 12
+to 14), which ran real bootstraps; that test was deleted with REQ-TEST-393
+(Keith, 2026-11-15) after its corpus fixture had failed since the asset split.
 """
 from __future__ import annotations
 

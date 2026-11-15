@@ -14636,3 +14636,24 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
        27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
        (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
+
+326. **[done, 2026-11-15]** **[Testing & dev tooling]** **The on-demand bootstrap-equivalence corpus fixture had failed since the asset split, and nothing noticed.**
+     Found building REQ-TEST-393, whose criterion 3 asked for the four tests on
+     tests/equiv_support.py to keep passing. Two of them could not:
+     tests/test_bootstrap_equivalence.py (8 tests) and test_checkpoints.py's
+     TestAResumeRecordsWhatAFullReplayDoes (2, which borrowed the same `corpus`
+     fixture) all erred at setup with `KeyError: 'birth-registrations'`. The
+     fixture generates one asset's collections and then looks up a KEEP list
+     naming datasets from both. Identical on the unchanged parent ac3a1376, so
+     it predates REQ-TEST-393; it went unseen because both are on demand, run
+     only by a hand-started test.yml - the same blind spot as #324.
+     - **Decided** (Keith, 2026-11-15): retire both rather than fix the fixture
+       per asset (the recommended option) or leave criterion 3 unmet. REQ-TEST-393
+       criterion 3 reworded as approved; REQ-TEST-116 criterion 4 and REQ-TEST-159
+       criterion 5 retired, replaced_by REQ-TEST-393. The fixture and the
+       equiv_support helpers only they used went with them.
+     - **For Keith, not changed**: REQ-PIPE-262's criteria that extend the
+       deleted file's KEEP corpus (its criteria 13 and 14, evidenced by the two
+       linked tests now dropped) still name the file; REQ-TEST-393 criterion 4
+       still says "the four tests".
+     - **Ran**: see REQ-TEST-393's evidence.
