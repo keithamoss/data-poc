@@ -5700,32 +5700,6 @@ could never have computed it), and it belongs with batch 5's check work.
      recording instants; 279 orders by evaluation start (`run_seq`). Not
      scoped.
 
-120. **[todo, 2026-10-22]** **[QA Pipeline]** **[Dashboard UI]** **How long
-     the checks took - and noticing when that grows.** Keith, 2026-10-22,
-     same conversation: "showing how long the checks took, and maybe
-     alerting, monitoring, something around that. So the check starts at 5
-     minutes, 10 minutes, 3 minutes, 3 hours. At some point that becomes
-     visually obvious, so you can go and look into it and try and address
-     it." `qa.run` already records `created_at` and `completed_at`. Related
-     to the pipeline-observability item in plans/wider.md. Not scoped.
-     **SCOPED AND SIGNED 2026-11-14 (Keith)** as timing-attempts v2
-     (REQ-PIPE-409 to REQ-TEST-418; docs/drafts/timing-attempts-v2.yaml,
-     answers in docs/drafts/decisions-2026-11-01.md). Not built; this entry's
-     prose comes out when they are.
-
-121. **[todo, 2026-10-22]** **[Dashboard UI]** **[QA Pipeline]** **Make it
-     obvious when a run timed out or crashed before it succeeded.** Keith,
-     2026-10-22, answering REQ-PIPE-279 K5 (a retried run takes a fresh place
-     in the order): "it should also be obvious somewhere that it did time out
-     or crash. Maybe that one for the UX review." Today a retry leaves no
-     trace of the failed attempt (`reopen_run` clears `completed_at`;
-     results are replaced), so recording attempts would have to come first.
-     Display for the UX review alongside #118-#120.
-     **SCOPED AND SIGNED 2026-11-14 (Keith)** as timing-attempts v2
-     (REQ-PIPE-409 to REQ-TEST-418; docs/drafts/timing-attempts-v2.yaml,
-     answers in docs/drafts/decisions-2026-11-01.md). Not built; this entry's
-     prose comes out when they are.
-
 123. **[todo, 2026-10-22]** **[Dashboard UI]** **[Pipeline & publishing]** **Make
      publishing the dashboard part of a routine, so the site cannot silently
      fall weeks behind.** Keith, 2026-10-22, on finding the published site
@@ -5751,9 +5725,11 @@ could never have computed it), and it belongs with batch 5's check work.
      Maybe it becomes the dashboard integrates with AWS APIs and pulls
      real-time information." Belongs with this file's Thread B (the AWS MVP,
      AWS CDK in Python) and plans/wider.md's pipeline-observability item;
-     related to #120 (check durations) and #121 (showing a timed-out or
-     crashed run), which REQ-PIPE-279's run-attempt record and per-attempt
-     lock will feed. Not scoped.
+     related to check durations and showing a timed-out or crashed run -
+     built 2026-11-16 as REQ-PIPE-409 to REQ-TEST-418 on REQ-PIPE-279's
+     run-attempt record (#120 and #121 came out with them). A Lambda killed at
+     its limit still gets no run time (REQ-PIPE-409's decision on N8): having
+     the pass stop itself just before the limit belongs here. Not scoped.
      **Added 2026-10-24 (Keith: "leave until AWS")**: the run lock's own
      weakness belongs here too (post-build-review #262 R3). The lock rides
      one idle connection with no TCP keepalive, so a dead host holds it

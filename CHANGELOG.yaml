@@ -111,9 +111,42 @@ intro: >
 releases:
   - date: "2026-11-16"
     summary: >
-      Each supply's checks take less time: dbt runs a supply's tests two at a
-      time, and datacontract-cli now runs beside the other tools.
+      Each supply's checks take less time, and you can now see how long each
+      check took, when one needed another try, and when one could not be
+      checked at all.
     changes:
+      - category: New
+        items:
+          - headline: How long each check took
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              Every try at a supply's checks now records how long it really
+              took. A dataset's supply history opens with a trend of those
+              times, and each row says "Checked in 3m 12s"; a run that took
+              more than twice its dataset's usual time is marked slow in
+              words, which never changes a status.
+          - headline: A check that needed another try
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              A supply checked on its second or later try says so on its row
+              - "Checked on the second try - the first timed out after 45m" -
+              with every try listed when you open it. Its Pass, Warn or Fail
+              is the successful try's.
+          - headline: Could not be checked
+            components: ["QA checks & contract", "Dashboard UI", "Testing & dev tooling"]
+            description: >
+              A supply whose check timed out or crashed now makes its dataset
+              read red as "Could not be checked", with a "needs a person"
+              item, rather than leaving the previous supply's verdict on show.
+              The next processing pass retries it, and you can reject it in
+              Filing decisions if it keeps failing.
+          - headline: The terminal says how a run ended, once
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              Each QA run prints one line beginning with its run id - how long
+              it took, or how and after how long it failed, with the error
+              once beneath it. `mothman supply failures` lists every try of a
+              supply that could not be checked, with its full error.
       - category: Improved
         items:
           - headline: dbt tests side by side

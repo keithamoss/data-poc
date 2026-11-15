@@ -293,5 +293,5 @@ class TestPackageGatingReadsTheOneReader:
         monkeypatch.setattr(qa_results_reader, "attempts_by_run", spy)
         with supply_db.connect(read_only=True, label="test-package-gating") as conn:
             package_gating.for_collection(conn, CP)
-        assert asked and "dataset_ids" in asked[0]
+        assert any("dataset_ids" in k for k in asked)
 

@@ -31520,17 +31520,31 @@ requirements:
     - tests/test_lifecycle_report.py::TestSeveralArrivalsAreReportedCompactly
     source: 'Split out of REQ-PIPE-086 at its 2026-10-04 refresh by delivery-scoper: original criteria 5, 6 and 11 and its 30-dataset operability NFR, from Keith''s 2026-09-26 framing that the terminal is the first real path. Checked against the code the same day - filing.file_arrivals is silent (qa_tools/common/filing.py:246; its one print, line 297, is for a dataset with no slots), and a kept run ends with the check table and ''Kept. <run> is a real arrival'' (cli/common.py:458-468), so of every lifecycle stage only the promotion gate reports itself (qa_tools/common/promotion.py:888-905). Split and component confirmed by Keith 2026-10-04 (Q5, Q7).'
     acceptance_criteria:
-    - WHEN a person keeps a supply from the terminal, THE SYSTEM SHALL report, for each arrival it became, the dataset recognition placed it in and the period and slot it was filed to.
-    - WHEN a kept arrival is filed to a slot, THE SYSTEM SHALL report its arrival classification - early, on time or late - against that slot.
-    - IF filing holds a kept arrival, THEN THE SYSTEM SHALL say so, name the slots it considered and why each was unavailable (REQ-PIPE-064 criterion 4), and say that no check ran over it.
+    - WHEN a person keeps a supply from the terminal, THE SYSTEM SHALL report, for each arrival it became, the dataset recognition
+      placed it in and the period and slot it was filed to.
+    - WHEN a kept arrival is filed to a slot, THE SYSTEM SHALL report its arrival classification - early, on time or late - against
+      that slot.
+    - IF filing holds a kept arrival, THEN THE SYSTEM SHALL say so, name the slots it considered and why each was unavailable
+      (REQ-PIPE-064 criterion 4), and say that no check ran over it.
     - IF a kept arrival is contested, THEN THE SYSTEM SHALL say so and name the other file staged for the same table and period.
-    - WHEN the promotion gate has acted on a kept arrival, THE SYSTEM SHALL report what it did - promoted, withheld, or left for a person - with the reason it recorded, and SHALL say that the rule, not the person running the command, made that decision.
-    - WHERE filing a kept arrival opened a period and the cadence inherited a supply into it, THE SYSTEM SHALL report the inheritance as the rule's.
-    - IF any stage fails for a kept arrival, THEN THE SYSTEM SHALL name the arrival and the stage, say which stages completed before it, and SHALL NOT end with the message that describes a completed kept run.
-    - WHERE one kept delivery became more than one arrival, THE SYSTEM SHALL report an outcome shared by several arrivals once, naming how many, and SHALL report each arrival whose outcome differs on a line of its own.
-    - THE SYSTEM SHALL take every outcome it reports from what was recorded - the filing, the hold, the decision-log entry - and SHALL NOT work any of them out again in the terminal.
-    - WHERE a person runs a trial, THE SYSTEM SHALL say what recognition would make of each file if it were kept - the dataset that claims it, or that none or several do - and SHALL NOT stop the trial on the answer.
-    - WHERE one kept run covers more than one arrival, THE SYSTEM SHALL show every failing and warning check in full and passing checks as a count per dataset, SHALL show every check in full when `--all-checks` is given, and SHALL end on criteria 1 to 8's lifecycle summary.
+    - WHEN the promotion gate has acted on a kept arrival, THE SYSTEM SHALL report what it did - promoted, withheld, or left for
+      a person - with the reason it recorded, and SHALL say that the rule, not the person running the command, made that decision.
+    - WHERE filing a kept arrival opened a period and the cadence inherited a supply into it, THE SYSTEM SHALL report the inheritance
+      as the rule's.
+    - 'IF any stage fails for a kept arrival, THEN THE SYSTEM SHALL name the arrival and the stage, say which stages completed
+      before it, and SHALL NOT end with the message that describes a completed kept run. AMENDED by REQ-TEST-416 (Keith, on signing
+      it): where the stage that failed is the checks stage and a QA attempt was opened, the failure''s outcome, tool, run time,
+      error type and message are said once, by the run step''s summary line and the lines beneath it (REQ-TEST-416), and this
+      report names the arrival, the stage, which stages completed before it and what follows, without repeating the message.'
+    - WHERE one kept delivery became more than one arrival, THE SYSTEM SHALL report an outcome shared by several arrivals once,
+      naming how many, and SHALL report each arrival whose outcome differs on a line of its own.
+    - THE SYSTEM SHALL take every outcome it reports from what was recorded - the filing, the hold, the decision-log entry - and
+      SHALL NOT work any of them out again in the terminal.
+    - WHERE a person runs a trial, THE SYSTEM SHALL say what recognition would make of each file if it were kept - the dataset
+      that claims it, or that none or several do - and SHALL NOT stop the trial on the answer.
+    - WHERE one kept run covers more than one arrival, THE SYSTEM SHALL show every failing and warning check in full and passing
+      checks as a count per dataset, SHALL show every check in full when `--all-checks` is given, and SHALL end on criteria 1
+      to 8's lifecycle summary.
     non_functional_requirements:
     - 'OPERABILITY AT 30 DATASETS: a quarterly round driven by hand from a terminal is a long sitting, and what the terminal reports has to stay readable when the answer is the same thirty times running - hence criterion 8, the same aggregate-not-repeat rule REQ-DASH-070 applies on the dashboard.'
     - 'ONE SOURCE OF TRUTH: the report reads the recorded filing, hold and decision rows (criterion 9). A terminal that re-derived ''which slot'' would be a second implementation of assignment, which is exactly what REQ-PIPE-086 forbids.'
@@ -40127,107 +40141,110 @@ requirements:
       2026-10-23 (Perth), after the #95 v6 walk-through (unjudged-cross-table/summary.md, ''Keith''s sign-off walk-through,
       2026-10-23''). Building starts with this requirement.'
     acceptance_criteria:
-    - 'WHEN the result of a cross-table check is recorded, THE SYSTEM SHALL record in qa.check_read, in the same transaction
-      and replaced with the result whenever it is recorded again, one row for EVERY table that check reads - those it declares
-      and its own (carried._reads_of) - giving that table''s state in the recording run''s own resolution and the supply it
-      names: READ (the supply read; for a contested table that fell through to the period''s promoted supply, that supply, flagged
-      contested with the contested files named), HELD (the held supply''s id, never a physical name or an empty string), ABSENT
-      (no supply), or NO-SUPPLY (a sample or trial table that belongs to no supply).'
+    - 'WHEN the result of a cross-table check is recorded, THE SYSTEM SHALL record in qa.check_read, in the same transaction and
+      replaced with the result whenever it is recorded again, one row for EVERY table that check reads - those it declares and
+      its own (carried._reads_of) - giving that table''s state in the recording run''s own resolution and the supply it names:
+      READ (the supply read; for a contested table that fell through to the period''s promoted supply, that supply, flagged contested
+      with the contested files named), HELD (the held supply''s id, never a physical name or an empty string), ABSENT (no supply),
+      or NO-SUPPLY (a sample or trial table that belongs to no supply).'
     - THE SYSTEM SHALL carry in a run's resolution the supply of every table it reads or holds, a staged table included, taken
       from the filing and supply-file records the period overlay already walks (period_overlay.staged_for_period, filing.CURRENT,
       supply_files.resolve), with whether the table was read from staging or from the period recorded as its own field - never
-      inferred from the presence of a supply - and SHALL write that supply on qa.tables_read for staged tables too, leaving
-      the physical names in a result's tables_read unchanged.
+      inferred from the presence of a supply - and SHALL write that supply on qa.tables_read for staged tables too, leaving the
+      physical names in a result's tables_read unchanged.
     - THE SYSTEM SHALL treat the result of a check that reads only its own table as about its run's own supply (qa.run.supply_id),
       and IF such a result is offered for recording under a run whose dataset_id is not the check's own dataset, THEN THE SYSTEM
       SHALL refuse it.
-    - IF the read of any table a cross-table check reads cannot be recorded with its result, THEN THE SYSTEM SHALL refuse to
-      record that result and fail the run's write loudly, rather than record a cross-table result with no read (qa_results_writer._with_tables_read's
+    - IF the read of any table a cross-table check reads cannot be recorded with its result, THEN THE SYSTEM SHALL refuse to record
+      that result and fail the run's write loudly, rather than record a cross-table result with no read (qa_results_writer._with_tables_read's
       swallowed exception goes).
     - 'WHEN the orchestrator opens a run for evaluation (qa_results_writer.open_run, called by orchestrate._run_one_inner after
       the run''s resolution is recorded and before any tool is invoked), THE SYSTEM SHALL draw the run a new sequence number,
       qa.run.run_seq, and SHALL draw a new one each time that run key is opened again - a reopen, or an owed re-check retried
       under its own key - so a retry ranks after every run opened in between; qa_results_writer.record_run and qa_store.register_run_if_absent
-      SHALL NOT set it, and complete_run SHALL refuse a run that has none. run_seq is the order runs were OPENED: what a run
-      saw is its qa.check_read rows, and no criterion or code SHALL infer what a run saw from run_seq alone.'
-    - 'WHEN the orchestrator opens a run for evaluation, THE SYSTEM SHALL record a new ATTEMPT of it in a new qa.run_attempt
-      table - its run key, the run_seq criterion 5 drew and when it began, written in open_run''s one transaction with that
-      run_seq - and WHEN the attempt ends, in a finally that catches every BaseException and writes on a fresh connection, when
-      it ended and how: COMPLETED (complete_run succeeded; the census and the gate that follow are not part of the attempt),
-      TIMED-OUT (one of this project''s own connections raised SQLSTATE 55P03 lock_not_available or 57014 query_canceled, anywhere
-      in the exception chain), INTERRUPTED (a stop seen from outside - KeyboardInterrupt, SIGTERM, SystemExit or a stopped pass
-      - with its end time), or CRASHED (any other exception, including a tool''s own timeout arriving as QaRunFailure, with
-      its type and its message truncated to 1,000 characters); and SHALL NOT change an attempt once it has ended, nor remove
-      it on a reopen (reopen_run), a retry or a re-recording of the run''s results (record_results) - the one exception being
-      trial.discard (REQ-PIPE-103 criterion 6), which deletes a trial run''s attempts by run key along with the run, qa.run_attempt
-      carrying no foreign key that would make the discard fail.'
+      SHALL NOT set it, and complete_run SHALL refuse a run that has none. run_seq is the order runs were OPENED: what a run saw
+      is its qa.check_read rows, and no criterion or code SHALL infer what a run saw from run_seq alone.'
+    - 'WHEN the orchestrator opens a run for evaluation, THE SYSTEM SHALL record a new ATTEMPT of it in a new qa.run_attempt table
+      - its run key, the run_seq criterion 5 drew and when it began, written in open_run''s one transaction with that run_seq
+      - and WHEN the attempt ends, in a finally that catches every BaseException and writes on a fresh connection, when it ended
+      and how: COMPLETED (complete_run succeeded; the census and the gate that follow are not part of the attempt), TIMED-OUT
+      (one of this project''s own connections raised SQLSTATE 55P03 lock_not_available or 57014 query_canceled, anywhere in the
+      exception chain), INTERRUPTED (a stop seen from outside - KeyboardInterrupt, SIGTERM, SystemExit or a stopped pass - with
+      its end time), or CRASHED (any other exception, including a tool''s own timeout arriving as QaRunFailure, with its type
+      and its message truncated to 1,000 characters); and SHALL NOT change an attempt once it has ended, nor remove it on a reopen
+      (reopen_run), a retry or a re-recording of the run''s results (record_results) - the one exception being trial.discard (REQ-PIPE-103
+      criterion 6), which deletes a trial run''s attempts by run key along with the run, qa.run_attempt carrying no foreign key
+      that would make the discard fail. AMENDED by REQ-PIPE-410 (Keith, on signing it): an attempt that ends because one of the
+      four tools failed is recorded TOOL-ERROR, naming the tool, with the tool''s own exception type and its message truncated
+      to 1,000 characters - a tool''s own timeout arriving as QaRunFailure included, so it no longer records CRASHED; CRASHED
+      is any other exception; a TIMED-OUT attempt also records its error''s type and message; and every attempt with a recorded
+      end records its run time in whole milliseconds (REQ-PIPE-409).'
     - THE SYSTEM SHALL have every attempt hold a PostgreSQL session advisory lock keyed on its run key from the moment it begins
       until it ends, so an attempt with no recorded end is RUNNING while that lock is held; WHEN the next attempt of that run
       key takes the lock and finds an earlier attempt with no recorded end, THE SYSTEM SHALL close that earlier attempt as INTERRUPTED
-      with its end time unknown (NULL, never invented); and SHALL NOT close an attempt from qa_store.incomplete_runs or from
-      any other reader that does not hold that run key's lock - a reader asking whether an attempt is still running answers
-      from whether the lock is held, and leaves the attempt as it is.
+      with its end time unknown (NULL, never invented); and SHALL NOT close an attempt from qa_store.incomplete_runs or from any
+      other reader that does not hold that run key's lock - a reader asking whether an attempt is still running answers from whether
+      the lock is held, and leaves the attempt as it is.
     - IF a results write (record_run, record_results) is offered for a run that has a run_seq and no open attempt - a mothman
-      debug run-* invocation against a run the orchestrator already evaluated - THEN THE SYSTEM SHALL refuse it and say so,
-      rather than replace that run's results and qa.check_read rows under its old run_seq with no attempt recorded.
+      debug run-* invocation against a run the orchestrator already evaluated - THEN THE SYSTEM SHALL refuse it and say so, rather
+      than replace that run's results and qa.check_read rows under its old run_seq with no attempt recorded.
     - WHERE two results about one supply are to be put in order - which is newer, in the promotion gate and on the page alike
       - THE SYSTEM SHALL order them by their runs' run_seq, replacing the gate's order by a decision's effective time (supply_status.runs_about's
       caused_at), and SHALL NOT break any tie by recording time, effective time, run instant, run index or run-id text.
-    - THE SYSTEM SHALL key every result recorded under another table's run, on a dataset's page and in the dataset list, to
-      ONE POINT - (dataset, the supply of its table criterion 1 recorded it read, the recording run's CAUSE) - where an arrival
-      run's cause is its ARRIVAL, the group of REQ-PIPE-265 siblings it belongs to (criterion 22; a lone arrival is a group
-      of one), a re-check, readers-only or knock-on run's cause is the decision id or load id it records, and, WHERE REQ-PIPE-267
-      is built, a run opened under a gate application has that application as its cause (qa.run's gate-application id, REQ-PIPE-267
-      criterion 12); so two arrivals of one delivery checked at different receipt instants are two causes and two points whatever
-      the gap between them, every run that one decision, load or gate application causes adds one point for each supply it read,
-      and a supply's OWN point is the point whose cause is that of the supply's current run (REQ-PIPE-140 criterion 5). A run
-      that belongs to no supply (qa.run.supply_id NULL - a trial's or a fixture's) has no cause and is placed on no point, shown
-      as today.
+    - THE SYSTEM SHALL key every result recorded under another table's run, on a dataset's page and in the dataset list, to ONE
+      POINT - (dataset, the supply of its table criterion 1 recorded it read, the recording run's CAUSE) - where an arrival run's
+      cause is its ARRIVAL, the group of REQ-PIPE-265 siblings it belongs to (criterion 22; a lone arrival is a group of one),
+      a re-check, readers-only or knock-on run's cause is the decision id or load id it records, and, WHERE REQ-PIPE-267 is built,
+      a run opened under a gate application has that application as its cause (qa.run's gate-application id, REQ-PIPE-267 criterion
+      12); so two arrivals of one delivery checked at different receipt instants are two causes and two points whatever the gap
+      between them, every run that one decision, load or gate application causes adds one point for each supply it read, and a
+      supply's OWN point is the point whose cause is that of the supply's current run (REQ-PIPE-140 criterion 5). A run that belongs
+      to no supply (qa.run.supply_id NULL - a trial's or a fixture's) has no cause and is placed on no point, shown as today.
     - THE SYSTEM SHALL give each check, within one point, the result of that point's highest-run_seq run that recorded it, whichever
       table's run that was - so of two sibling arrivals the later one's verdict outranks the earlier one's not-evaluated record
       (REQ-PIPE-265 criterion 6), and of one cause's several runs the last opened wins - replacing the rule that another table's
       result replaces the own verdict.
-    - THE SYSTEM SHALL count each point once, through ONE function shared by the dataset list's counts, its sparklines and a
-      check panel's run count, ordered by its rank (criterion 16), a point that is not a supply's own carrying every other check's
-      verdict into it from the point before; and WHEN a later point is recorded SHALL NOT re-date, merge into or overwrite any
-      earlier point; REQ-DASH-264 criterion 12's same-day rule is RETIRED in favour of this.
+    - THE SYSTEM SHALL count each point once, through ONE function shared by the dataset list's counts, its sparklines and a check
+      panel's run count, ordered by its rank (criterion 16), a point that is not a supply's own carrying every other check's verdict
+      into it from the point before; and WHEN a later point is recorded SHALL NOT re-date, merge into or overwrite any earlier
+      point; REQ-DASH-264 criterion 12's same-day rule is RETIRED in favour of this.
     - WHEN a check panel compares one point against another, THE SYSTEM SHALL by default compare it against the newest earlier
       point (lower emitted rank, criterion 16) whose result for that check was evaluated (carried.not_evaluated_reason and NOT_EVALUATED_KEYS
       - the one existing definition), with ONE function deciding both that default and whether the ?cmp= URL state is written
-      (setCompareIdx, defaultCompareIndex), and SHALL name on every compare and history entry, and in the sparkline tooltip
-      of every point that is not a supply's own, the cause it came from ("from the <table>'s run, <time>", "from the <table>'s
-      re-check, <time>") - amending REQ-DASH-264 criterion 11 as summary.md words it.
-    - IF a result's recorded state for a dataset's table is ABSENT or NO-SUPPLY, THEN THE SYSTEM SHALL NOT show or count it
-      on that dataset's page, and SHALL show it unchanged on the page of the dataset the check is declared on - amending REQ-DASH-264
+      (setCompareIdx, defaultCompareIndex), and SHALL name on every compare and history entry, and in the sparkline tooltip of
+      every point that is not a supply's own, the cause it came from ("from the <table>'s run, <time>", "from the <table>'s re-check,
+      <time>") - amending REQ-DASH-264 criterion 11 as summary.md words it.
+    - IF a result's recorded state for a dataset's table is ABSENT or NO-SUPPLY, THEN THE SYSTEM SHALL NOT show or count it on
+      that dataset's page, and SHALL show it unchanged on the page of the dataset the check is declared on - amending REQ-DASH-264
       criterion 1.
     - WHILE REQ-PIPE-115 criterion 10 applies to a dataset, THE SYSTEM SHALL show on that dataset's page each cross-table result
       whose recorded state for its table is HELD with the held supply's id, and as not run (the existing grey 'No data') each
       cross-table check with none - amending REQ-DASH-264 criterion 3's "recorded at or after the held supply's receipt".
-    - THE SYSTEM SHALL emit, for each collection, each own point's supply id (qa.run.supply_id), each result's read supplies
-      as criterion 1 recorded them, each point's cause, and a dense rank for every point and every history entry computed from
-      run_seq within that collection, SHALL NOT emit run_seq itself, and the template SHALL order points and entries by that
-      rank alone - still dating each result by when it was recorded (REQ-DASH-264 criterion 9), a point by its lowest-ranked
-      result, and clipping each result by the in-place-on date (REQ-DASH-264 criterion 1).
+    - THE SYSTEM SHALL emit, for each collection, each own point's supply id (qa.run.supply_id), each result's read supplies as
+      criterion 1 recorded them, each point's cause, and a dense rank for every point and every history entry computed from run_seq
+      within that collection, SHALL NOT emit run_seq itself, and the template SHALL order points and entries by that rank alone
+      - still dating each result by when it was recorded (REQ-DASH-264 criterion 9), a point by its lowest-ranked result, and
+      clipping each result by the in-place-on date (REQ-DASH-264 criterion 1).
     - THE SYSTEM SHALL take which dataset a run is for and what kind of run it is - for own_runs, recorded_by and REQ-DASH-264
       criterion 7's sentences - from qa.run's dataset_id and scope, and SHALL NOT read either off the run id.
-    - THE SYSTEM SHALL decide which datasets' pages a cross-table result is shared to from the tables qa.check_read recorded
-      it reading, and SHALL NOT use the checkout's current declarations (share_cross_table_results, _cross_table_info), so the
-      same history builds the same placement under a later checkout.
-    - 'THE SYSTEM SHALL NOT compare calendar days, recording times, run indexes or run-id text to decide which supply, cause
-      or point a result belongs to, nor to order two results or two runs, and SHALL remove each place that does - in pipeline/build_dashboard_data.py:
+    - THE SYSTEM SHALL decide which datasets' pages a cross-table result is shared to from the tables qa.check_read recorded it
+      reading, and SHALL NOT use the checkout's current declarations (share_cross_table_results, _cross_table_info), so the same
+      history builds the same placement under a later checkout.
+    - 'THE SYSTEM SHALL NOT compare calendar days, recording times, run indexes or run-id text to decide which supply, cause or
+      point a result belongs to, nor to order two results or two runs, and SHALL remove each place that does - in pipeline/build_dashboard_data.py:
       read_run''s stamp inference, _merged_by_time, the own-run sort by _run_date then run_index then run key, the current value
       taken as the max recorded_at, and own_runs'' and recorded_by''s run_owner(run_id); in the readers: qa_results_reader.list_run_ids''
       natural sort, qa_store.runs_for''s ORDER BY run_instant, run_key, and results_history''s manifest sort by run_index, with
       recheck.execute''s run_index stamp that exists only for that sort (post-build-review #161); in the template: unitCounts''
       day comparison, its "read || ownRun" stand-in, its chain sort by date and at, its point sort by date, at and runId, recordedAtOf,
       and sameDelivery, with deliveryCount and defaultCompareIndex re-based on the point key; in the gate: supply_status.runs_about''s
-      ORDER BY caused_at, run_key and its physical-name match, and qa.supply_current_run''s run_instant, run_key tie-breaks;
-      drift_reference.run_for''s fallback order by run instant and its LIKE on run-id text, which take run_seq and qa.run''s
-      dataset_id instead; and carried.decide''s text-sorted siblings.'
+      ORDER BY caused_at, run_key and its physical-name match, and qa.supply_current_run''s run_instant, run_key tie-breaks; drift_reference.run_for''s
+      fallback order by run instant and its LIKE on run-id text, which take run_seq and qa.run''s dataset_id instead; and carried.decide''s
+      text-sorted siblings.'
     - THE SYSTEM SHALL have one test that fails if any placement or ordering code in pipeline/build_dashboard_data.py, qa_tools/tools/results_history.py,
       qa_results_reader, qa.supply_current_run, the template's unitCounts, sameDelivery, defaultCompareIndex and point sorts,
-      supply_status, drift_reference or carried reads recorded_at, a run id's text or a calendar day - an architecture-rule
-      test that says so in its docstring (CLAUDE.md, a test earns its place, rule 1).
+      supply_status, drift_reference or carried reads recorded_at, a run id's text or a calendar day - an architecture-rule test
+      that says so in its docstring (CLAUDE.md, a test earns its place, rule 1).
     - 'THE SYSTEM SHALL answer "which results are about this supply" with ONE function (supply_status.results_about, or equivalent)
       joining qa.check_result, qa.check_read and qa.run, used by the dashboard build, the promotion gate (runs_about, latest_results),
       carried.decide (whose _same_supplies reduces to comparing recorded supply ids, its siblings taken in run_seq order) and
@@ -40247,12 +40264,12 @@ requirements:
       in one day, 09:00 and a 15:00 resupply, and a Notifications run reading the 15:00 one - placed on the 15:00 supply; (2)
       one delivery across midnight, Notifications 23:50 Monday and Clients 00:10 Tuesday - on Notifications'' page, Notifications''
       own Monday point unchanged and Clients'' Tuesday result a second, newer point; (3) one delivery within one day, Notifications
-      09:00 and Clients 11:50 - two points, not one; (4) runs sharing one run instant with badly sorting keys (__r10 against
-      __r9, cp_notifications__X against cp_clients__X__r1) - page order, qa.supply_current_run and list_run_ids follow run_seq;
-      (5) an owed re-check retried under its own key after another run opened - its run_seq is the greater; (6) another collection''s
+      09:00 and Clients 11:50 - two points, not one; (4) runs sharing one run instant with badly sorting keys (__r10 against __r9,
+      cp_notifications__X against cp_clients__X__r1) - page order, qa.supply_current_run and list_run_ids follow run_seq; (5)
+      an owed re-check retried under its own key after another run opened - its run_seq is the greater; (6) another collection''s
       runs interleaved - built output byte-identical; (7) a check''s declared reads edited after recording - placement unchanged;
-      (8) a contested own table - placed on the promoted supply it fell through to; (9) a settled pair - two supplies of one
-      table in one delivery, each placed on its own supply.'
+      (8) a contested own table - placed on the promoted supply it fell through to; (9) a settled pair - two supplies of one table
+      in one delivery, each placed on its own supply.'
     - 'THE SYSTEM SHALL also have, written first and seen to fail: (10) the writer refusing a cross-table result with no read
       recorded; (11) JS unitCounts ordering two points with the same date and recording time by their emitted rank; (12) a Notifications
       supply delivered with Clients at 09:00 and a Clients re-check decision at 15:00 the same day - the 15:00 result a re-check
@@ -40263,18 +40280,18 @@ requirements:
       page, not on Clients'' page, whose newest stays its Q2 supply''s result; (16) a decision recorded on Wednesday with Monday''s
       effective time, its Wednesday re-check of Client reference against a Notifications arrival''s Tuesday result - the Wednesday
       result newest for the gate and the page alike; (17) one Clients re-file whose decision re-runs Notifications'' and Investigations''
-      readers checks - one re-check point on Clients'' page, not two; (18) a decision recorded between a run''s overlay and
-      its open_run - the gate''s choice of result unchanged, because it filters on recorded supplies.'
-    - 'THE SYSTEM SHALL have, written first and seen to fail: (19) a run whose first attempt raises a lock timeout and whose
-      retry completes - two attempts, TIMED-OUT then COMPLETED, each with its start, end and run_seq; (20) a run whose first
-      attempt crashes in a tool and whose retry completes - the CRASHED attempt kept with its exception type and message after
-      the retry''s record_results and complete_run; (21) an attempt stopped by KeyboardInterrupt, and one by SIGTERM - each
-      INTERRUPTED with its end time, never CRASHED; (22) an attempt whose process is killed, then a retry - the earlier attempt
-      closed INTERRUPTED with no end time when the retry takes the lock; (23) an attempt still running in another process -
-      qa_store.incomplete_runs reports it and nothing closes it; (24) mothman debug run-dbt against an evaluated run - refused,
-      its results and run_seq unchanged; (25) trial.discard of a trial run with attempts - the discard succeeds and its attempts
-      go; (26) a JS test that the panel''s default comparison is the newest earlier evaluated point and that choosing it writes
-      no ?cmp=, while choosing any other point writes one, so a copied link opens the same comparison.'
+      readers checks - one re-check point on Clients'' page, not two; (18) a decision recorded between a run''s overlay and its
+      open_run - the gate''s choice of result unchanged, because it filters on recorded supplies.'
+    - 'THE SYSTEM SHALL have, written first and seen to fail: (19) a run whose first attempt raises a lock timeout and whose retry
+      completes - two attempts, TIMED-OUT then COMPLETED, each with its start, end and run_seq; (20) a run whose first attempt
+      crashes in a tool and whose retry completes - the CRASHED attempt kept with its exception type and message after the retry''s
+      record_results and complete_run; (21) an attempt stopped by KeyboardInterrupt, and one by SIGTERM - each INTERRUPTED with
+      its end time, never CRASHED; (22) an attempt whose process is killed, then a retry - the earlier attempt closed INTERRUPTED
+      with no end time when the retry takes the lock; (23) an attempt still running in another process - qa_store.incomplete_runs
+      reports it and nothing closes it; (24) mothman debug run-dbt against an evaluated run - refused, its results and run_seq
+      unchanged; (25) trial.discard of a trial run with attempts - the discard succeeds and its attempts go; (26) a JS test that
+      the panel''s default comparison is the newest earlier evaluated point and that choosing it writes no ?cmp=, while choosing
+      any other point writes one, so a copied link opens the same comparison.'
     non_functional_requirements:
     - 'DETERMINISM. Same recorded history, same placement, same bytes: no ordering by recording time, effective time, run instant,
       run index or run-id text anywhere in the placement or gate path, and every query feeding either says ORDER BY a recorded
@@ -42104,69 +42121,78 @@ requirements:
       standing on REQ-PIPE-279 v4 (N1 = B, N2 = A). SIGNED by Keith 2026-10-23 (Perth) after the v6 walk-through, with C = A,
       D = A and E = B applied (summary.md, ''Keith''s sign-off walk-through, 2026-10-23'').'
     acceptance_criteria:
-    - 'WHERE a dataset page''s verdict line says the newest supply is awaiting a decision and names the supply in the warehouse (REQ-PIPE-081 criterion 1), THE SYSTEM SHALL end it with that supply''s status on the date on show, counted by REQ-PIPE-269, worded ''The supply in place in the warehouse is the one received <instant>, and is <status>.'' with <instant> as fmtInstant gives it and <status> in its verb form (REQ-DASH-359''s statusWords) - for example ''The supply in place in the warehouse is the one received 9:00am Monday, 1 July 2024, and is passing.'' AMENDED 2026-11-01 by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).'
+    - WHERE a dataset page's verdict line says the newest supply is awaiting a decision and names the supply in the warehouse
+      (REQ-PIPE-081 criterion 1), THE SYSTEM SHALL end it with that supply's status on the date on show, counted by REQ-PIPE-269,
+      worded 'The supply in place in the warehouse is the one received <instant>, and is <status>.' with <instant> as fmtInstant
+      gives it and <status> in its verb form (REQ-DASH-359's statusWords) - for example 'The supply in place in the warehouse
+      is the one received 9:00am Monday, 1 July 2024, and is passing.' AMENDED 2026-11-01 by REQ-DOCS-362 (Pass / Warn / Fail,
+      signed by Keith 2026-11-01).
     - THE SYSTEM SHALL show <status> with the status legend's own word and icon, never colour alone.
-    - 'THE SYSTEM SHALL word the clause for every case: green or amber ''..., and is <status>.''; red and promoted while red ''..., and is failing: it was promoted while failing.''; red since promotion ''..., and is failing: it started failing <time>, after <cause>'' (redPromotedBadge''s wording) - WHERE the cause is a person''s promotion, naming that person from the decision log - and SHALL put the in-the-warehouse half on its own line at phone width. AMENDED 2026-11-01 by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).'
+    - 'THE SYSTEM SHALL word the clause for every case: green or amber ''..., and is <status>.''; red and promoted while red ''...,
+      and is failing: it was promoted while failing.''; red since promotion ''..., and is failing: it started failing <time>,
+      after <cause>'' (redPromotedBadge''s wording) - WHERE the cause is a person''s promotion, naming that person from the decision
+      log - and SHALL put the in-the-warehouse half on its own line at phone width. AMENDED 2026-11-01 by REQ-DOCS-362 (Pass /
+      Warn / Fail, signed by Keith 2026-11-01).'
     - WHERE the supply in the warehouse for the period is inherited or substituted, THE SYSTEM SHALL word the clause 'The supply
-      in place in the warehouse is the one carried forward from <period> (received <instant>), and is <status>.', judging it
-      as at the date on show from the promotion timeline (promotionStateOn), not from the latest promotion state.
-    - WHERE nothing is in the warehouse for the period, THE SYSTEM SHALL say 'Nothing is in place in the warehouse for this
-      period yet.'
+      in place in the warehouse is the one carried forward from <period> (received <instant>), and is <status>.', judging it as
+      at the date on show from the promotion timeline (promotionStateOn), not from the latest promotion state.
+    - WHERE nothing is in the warehouse for the period, THE SYSTEM SHALL say 'Nothing is in place in the warehouse for this period
+      yet.'
     - THE SYSTEM SHALL show a dataset's cross-table checks as a grid with ONE ROW PER CHECK, not per tool, in crossTableRowOrder's
       relationship-then-name order, under the columns 'Check', 'Against what's staged' and 'Against what's in the warehouse',
-      each row naming the check and, under its name, '<declared on> → <reads>' (REQ-DASH-264 criterion 2), and carrying one
-      status pill that is the gate's reading of the check - the result REQ-PIPE-269 counts toward the supply on show; SHALL
-      omit a result column that holds no result in any row of the page, keeping the other column's heading, and SHALL NOT show
-      a column of dashes; and on the page of a supply awaiting a decision SHALL caption the grid, in the section blurb's slot,
-      'Results for the supply received <instant>, awaiting a decision', so that a lone 'Against what's in the warehouse' column
-      is never read as the warehouse supply's own result.
-    - 'THE SYSTEM SHALL place a result, judged as at the date on show from the promotion timeline and decided in the Python
-      build from REQ-PIPE-279''s per-check read record (each other-table supply the check read, and whether from staging or
-      the period) and the structured reason code, never from text: in the ''Against what''s in the warehouse'' cell where every
-      other-table supply the check read was in the warehouse; in the ''Against what''s staged'' cell - on the page of a WAITING
-      supply only - where an other-table supply it read was waiting and none had left; and in NEITHER cell where an other-table
-      supply it read was neither waiting nor in the warehouse (superseded, rejected, or replaced in the warehouse since), that
-      result staying only in the check''s panel history under its ''Read against'' sentence - taking the newest such result
-      per cell by REQ-PIPE-279''s rank, and showing a dash in a cell with no result.'
+      each row naming the check and, under its name, '<declared on> → <reads>' (REQ-DASH-264 criterion 2), and carrying one status
+      pill that is the gate's reading of the check - the result REQ-PIPE-269 counts toward the supply on show; SHALL omit a result
+      column that holds no result in any row of the page, keeping the other column's heading, and SHALL NOT show a column of dashes;
+      and on the page of a supply awaiting a decision SHALL caption the grid, in the section blurb's slot, 'Results for the supply
+      received <instant>, awaiting a decision', so that a lone 'Against what's in the warehouse' column is never read as the warehouse
+      supply's own result.
+    - 'THE SYSTEM SHALL place a result, judged as at the date on show from the promotion timeline and decided in the Python build
+      from REQ-PIPE-279''s per-check read record (each other-table supply the check read, and whether from staging or the period)
+      and the structured reason code, never from text: in the ''Against what''s in the warehouse'' cell where every other-table
+      supply the check read was in the warehouse; in the ''Against what''s staged'' cell - on the page of a WAITING supply only
+      - where an other-table supply it read was waiting and none had left; and in NEITHER cell where an other-table supply it
+      read was neither waiting nor in the warehouse (superseded, rejected, or replaced in the warehouse since), that result staying
+      only in the check''s panel history under its ''Read against'' sentence - taking the newest such result per cell by REQ-PIPE-279''s
+      rank, and showing a dash in a cell with no result.'
     - THE SYSTEM SHALL show in each filled cell the result's word - the WORST of its marks, through rollupStatuses, never the
-      first tool's - then one mark per tool in the fixed order dbt, Soda, datacontract-cli (✓ for a pass, ✗ for a fail, the
-      page's existing marks for any other result, and '·' holding the place of a tool that has no such check), and a short plain-text
-      note of which supply of the other table was read - '<dataset> received <day>' (fmtDay, adding the time only where two
-      supplies of that table share a day), '<dataset> received <day>, carried forward from <period>' for an inherited one, or
-      'no <dataset> in the warehouse for <period>' where none was.
-    - WHERE a check's two cells differ and the result counted toward the gate is the warehouse one - whichever run recorded
-      it, a re-check of REQ-PIPE-267 criterion 6 or an earlier arrival's result against the warehouse - THE SYSTEM SHALL fill
-      both cells, end the warehouse cell's note with '— why it is held back', carry criterion 14's 'read against a supply itself
-      awaiting a decision' sentence in the row's accessible name, and take the row's pill from the gate - for S6, Escalation
-      completeness reads 'Pass ✓ ✓ ✓, Investigations received 2 Oct' against what's staged and 'Fail ✗ ✗ ✗, Investigations received
-      1 Jul — why it is held back' against what's in the warehouse, with a Red pill.
+      first tool's - then one mark per tool in the fixed order dbt, Soda, datacontract-cli (✓ for a pass, ✗ for a fail, the page's
+      existing marks for any other result, and '·' holding the place of a tool that has no such check), and a short plain-text
+      note of which supply of the other table was read - '<dataset> received <day>' (fmtDay, adding the time only where two supplies
+      of that table share a day), '<dataset> received <day>, carried forward from <period>' for an inherited one, or 'no <dataset>
+      in the warehouse for <period>' where none was.
+    - WHERE a check's two cells differ and the result counted toward the gate is the warehouse one - whichever run recorded it,
+      a re-check of REQ-PIPE-267 criterion 6 or an earlier arrival's result against the warehouse - THE SYSTEM SHALL fill both
+      cells, end the warehouse cell's note with '— why it is held back', carry criterion 14's 'read against a supply itself awaiting
+      a decision' sentence in the row's accessible name, and take the row's pill from the gate - for S6, Escalation completeness
+      reads 'Pass ✓ ✓ ✓, Investigations received 2 Oct' against what's staged and 'Fail ✗ ✗ ✗, Investigations received 1 Jul —
+      why it is held back' against what's in the warehouse, with a Red pill.
     - WHERE a check's result in the warehouse is the owed re-check of REQ-PIPE-269 criterion 5, THE SYSTEM SHALL show 'Not yet
       re-checked' in the warehouse cell with the note '<dataset> promoted <day>'.
     - THE SYSTEM SHALL end the grid with a key line, 'The marks are dbt, Soda and datacontract-cli, in that order; · means that
       tool has no such check. Select a check for each tool's full result.', showing the marks themselves (✓ ✗ ·).
     - 'THE SYSTEM SHALL make each whole row the existing <button class="scope-check"> that opens its check''s panel, as every
-      other scope section''s row is, with its aria-label extended to spell out each tool''s result by name and to carry the
-      full sentences of this criterion and of criterion 13; SHALL keep the cell notes plain text with no link inside the row;
-      and the panel SHALL show each tool''s full result and, for each, the full sentence of what it read - ''Read against the
-      <dataset> in place in the warehouse, received <instant>'', ''Read against the <dataset> supply received <instant>, not
-      in place in the warehouse yet'', ''Read against the <dataset> in place in the warehouse for <period>, carried forward
-      from <period> (received <instant>)'' ''Read against: no <dataset> in place in the warehouse for <period>'', or, for a
-      result in neither cell (criterion 7), ''Read against the <dataset> received <instant>, since replaced in the warehouse
-      by the one received <instant>'' or ''Read against the <dataset> received <instant>, since turned down'' - the same sentences
-      in the compare list - with REQ-DASH-264 criterion 7''s sentence, and, for a could-not-run result, one clause saying it
-      counts only against the table that asks the question.'
+      other scope section''s row is, with its aria-label extended to spell out each tool''s result by name and to carry the full
+      sentences of this criterion and of criterion 13; SHALL keep the cell notes plain text with no link inside the row; and the
+      panel SHALL show each tool''s full result and, for each, the full sentence of what it read - ''Read against the <dataset>
+      in place in the warehouse, received <instant>'', ''Read against the <dataset> supply received <instant>, not in place in
+      the warehouse yet'', ''Read against the <dataset> in place in the warehouse for <period>, carried forward from <period>
+      (received <instant>)'' ''Read against: no <dataset> in place in the warehouse for <period>'', or, for a result in neither
+      cell (criterion 7), ''Read against the <dataset> received <instant>, since replaced in the warehouse by the one received
+      <instant>'' or ''Read against the <dataset> received <instant>, since turned down'' - the same sentences in the compare
+      list - with REQ-DASH-264 criterion 7''s sentence, and, for a could-not-run result, one clause saying it counts only against
+      the table that asks the question.'
     - 'WHERE a result was recorded by a re-evaluation REQ-PIPE-267 criterion 6 made, THE SYSTEM SHALL give it in the panel and
       the accessible name, in place of the ''Read against'' sentence, as ''Re-checked <time and day> against the <dataset> in
       place in the warehouse (received <instant>): the <dataset> received with this supply was held back.'' (or, for a joined
       supply, '': the <dataset> waiting for a decision (received <instant>) is held back.'') or, where none was in the warehouse,
-      ''Could not be checked <time and day>: no <dataset> is in place in the warehouse, and the <dataset> received with this
-      supply was held back.'' (or the joined form); and WHERE it is the owed re-check, ''Not yet re-checked against the <dataset>
-      promoted <instant>; the re-check runs on the next processing pass.'''
-    - WHERE a waiting supply's staging result was read against a supply that is itself awaiting a decision, THE SYSTEM SHALL
-      say so in the panel, naming that supply's receipt.
-    - THE SYSTEM SHALL render every dataset name in this requirement's panel sentences and in the verdict line's clause as a
-      real link (<a href>) to that dataset's page at the same date on show, built with navHref / affectsLinks, SHALL NOT put
-      a link inside a row's button, and SHALL render every name as text, never markup.
+      ''Could not be checked <time and day>: no <dataset> is in place in the warehouse, and the <dataset> received with this supply
+      was held back.'' (or the joined form); and WHERE it is the owed re-check, ''Not yet re-checked against the <dataset> promoted
+      <instant>; the re-check runs on the next processing pass.'''
+    - WHERE a waiting supply's staging result was read against a supply that is itself awaiting a decision, THE SYSTEM SHALL say
+      so in the panel, naming that supply's receipt.
+    - THE SYSTEM SHALL render every dataset name in this requirement's panel sentences and in the verdict line's clause as a real
+      link (<a href>) to that dataset's page at the same date on show, built with navHref / affectsLinks, SHALL NOT put a link
+      inside a row's button, and SHALL render every name as text, never markup.
     - AT PHONE WIDTH, THE SYSTEM SHALL stack each check's results under its name, each starting with its view's label - 'Staged:'
       or 'In the warehouse:' - SHALL omit a view with no result rather than show a bare dash, and SHALL keep the row's status
       pill wholly visible inside the viewport.
@@ -42177,33 +42203,52 @@ requirements:
       one (REQ-PIPE-279, N1 = B), THE SYSTEM SHALL compare within one grid bucket - staged with staged, warehouse with warehouse.
     - 'THE SYSTEM SHALL take a supply''s pill, counts, rollups and grid cells from the results REQ-PIPE-269 counts at the date
       on show, through the build''s one function, and SHALL NOT show in those a result about a supply of another table not in
-      the warehouse; and SHALL show in its history and its trend every evaluation of the supply on show (REQ-PIPE-279: every
-      evaluation its own point), a result whose partner has since left included, so that a hold-back the history records is
-      never missing from the trend.'
-    - WHEN a waiting supply is rejected or superseded, THE SYSTEM SHALL show the page from the in-warehouse supply's results
-      from that decision's date on, as clipDatasetToInPlaceOn does today for a withdrawn run.
+      the warehouse; and SHALL show in its history and its trend every evaluation of the supply on show (REQ-PIPE-279: every evaluation
+      its own point), a result whose partner has since left included, so that a hold-back the history records is never missing
+      from the trend.'
+    - WHEN a waiting supply is rejected or superseded, THE SYSTEM SHALL show the page from the in-warehouse supply's results from
+      that decision's date on, as clipDatasetToInPlaceOn does today for a withdrawn run.
     - WHERE a supply was promoted in one gate application with others (REQ-PIPE-266 criterion 10) - a package, or supplies joined
       from an earlier hold-back (REQ-PIPE-267 criterion 2) - THE SYSTEM SHALL say so on its supply-history row, 'Promoted <time>
-      with the <dataset> supply received <instant>, by the rule', naming up to three supplies and, past three, the first two
-      and 'and <n> more'; and WHERE the rule promoted it after a re-check against the warehouse, 'Promoted <time> by the rule,
-      re-checked against the <dataset> in place in the warehouse (received <instant>) because the <dataset> received with it
-      was held back.' (or the joined form).
-    - 'THE SYSTEM SHALL word a page''s verdict line, WHILE its supply''s gate is not yet applied or its gate application has
-      not settled, in the form that applies, computed at build from the owed ''gate'' item, the packages'' runs and qa.gate_application:
-      an arrival of a package whose own run is not yet recorded, ''Being checked with its delivery (received <instant>): <n>
-      of <m> files checked. Nothing needs deciding yet.'', with no status pill other than that line and no check results until
-      its own run is recorded; a checked arrival whose package-mates are not all checked, ''Checked, waiting for the rest of
-      its delivery (received <instant>): <n> of <m> files checked. Nothing needs deciding yet.''; a package every file of which
-      is checked but not gated, a package of one whose gate is owed, or a supply of an application not yet settled, ''Checked,
-      being gated (received <instant>). Nothing needs deciding yet.''; adding, where a package-mate''s run stopped, ''<dataset>''s
-      run stopped; the next processing pass re-runs it.''; and SHALL NOT show any of them as ''Awaiting a decision'' or green
-      before its gate is applied.'
+      with the <dataset> supply received <instant>, by the rule', naming up to three supplies and, past three, the first two and
+      'and <n> more'; and WHERE the rule promoted it after a re-check against the warehouse, 'Promoted <time> by the rule, re-checked
+      against the <dataset> in place in the warehouse (received <instant>) because the <dataset> received with it was held back.'
+      (or the joined form).
+    - 'THE SYSTEM SHALL word a page''s verdict line, WHILE its supply''s gate is not yet applied or its gate application has not
+      settled, in the form that applies, computed at build from the owed ''gate'' item, the packages'' runs and qa.gate_application:
+      an arrival of a package whose own run is not yet recorded, ''Being checked with its delivery (received <instant>): <n> of
+      <m> files checked. Nothing needs deciding yet.'', with no status pill other than that line and no check results until its
+      own run is recorded; a checked arrival whose package-mates are not all checked, ''Checked, waiting for the rest of its delivery
+      (received <instant>): <n> of <m> files checked. Nothing needs deciding yet.''; a package every file of which is checked
+      but not gated, a package of one whose gate is owed, or a supply of an application not yet settled, ''Checked, being gated
+      (received <instant>). Nothing needs deciding yet.''; adding, where a package-mate''s run stopped, ''<dataset>''s run stopped;
+      the next processing pass re-runs it.''; and SHALL NOT show any of them as ''Awaiting a decision'' or green before its gate
+      is applied. AMENDED by REQ-PIPE-417 (Keith, 2026-11-14, TR2): WHILE a supply of the package could not be checked (REQ-PIPE-417),
+      that supply''s own page and its dataset show ''Could not be checked'' with its ''needs a person'' item in place of any of
+      these forms; and each package-mate''s line keeps ''<dataset>''s run stopped; the next processing pass re-runs it.'' but
+      does not say ''Nothing needs deciding yet.'' while that supply''s ''Could not be checked'' is open.'
     - THE SYSTEM SHALL compute the clause, each cell, note and sentence, and the history row at build time in Python from recorded
       QA results and the decision log, naming every supply through ONE Python helper (so that the period-clarity work changes
       supply naming once), and SHALL NOT re-derive them in the page's script.
     - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-081 criterion 1, REQ-DASH-264 criteria 2, 5 and 7 and non-functional
       requirement 2 with the wording in summary-v4.md, summary-v5.md and summary-v6.md once Keith has approved it.
-    - 'THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews, against a dashboard built from a fixture history, written first and seen to fail: S1 green branch - Notifications'' page reads ''Awaiting a decision'' for v2 and ''The supply in place in the warehouse is the one received <v1 instant>, and is passing.''; S6 - Escalation completeness is one row with Pass in the staged cell, Fail and ''— why it is held back'' in the warehouse cell and a Fail pill, and its accessible name carries both full sentences; S4 - Clients'' page after Notifications v2''s hold-back reads Pass with no result from Notifications v2''s run; STAGGERED (dashboard UX v4 B1) - Notifications v2 at 09:00 read against Clients v1, Clients v2 at 09:05 promoted alone, and Notifications v2''s page shows its 09:00 result in neither cell and its 09:05 result in the warehouse cell; an in-warehouse page shows one result column, headed ''Against what''s in the warehouse'', and no ''—'' cell; each of criterion 21''s forms - an unchecked package member reads ''Being checked with its delivery'' with no pill and no results, a checked one ''Checked, waiting for the rest of its delivery'', a fully checked or contended one ''Checked, being gated''; an awaiting page captions its grid ''Results for the supply received ..., awaiting a decision''; staggered Order B red at 09:05 - Clients'' row shows both cells with ''— why it is held back'' though the warehouse result came from its 09:00 arrival; a result in neither cell carries ''since replaced in the warehouse'' in its panel; Clients'' trend after Order A keeps its 09:00 point; on a held table''s page no red row sits under a non-red cross-table pill; an inherited supply''s clause; the owed re-check; the joint-promotion history row; after a rejection the page reads the in-warehouse supply''s verdict; and at 375px wide every row''s pill is inside the viewport and each stacked result starts ''Staged:'' or ''In the warehouse:''. AMENDED 2026-11-01 by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).'
+    - 'THE SYSTEM SHALL have real-browser tests, tests/test_dashboard_e2e.py::TestWarehouseAndStagingViews, against a dashboard
+      built from a fixture history, written first and seen to fail: S1 green branch - Notifications'' page reads ''Awaiting a
+      decision'' for v2 and ''The supply in place in the warehouse is the one received <v1 instant>, and is passing.''; S6 - Escalation
+      completeness is one row with Pass in the staged cell, Fail and ''— why it is held back'' in the warehouse cell and a Fail
+      pill, and its accessible name carries both full sentences; S4 - Clients'' page after Notifications v2''s hold-back reads
+      Pass with no result from Notifications v2''s run; STAGGERED (dashboard UX v4 B1) - Notifications v2 at 09:00 read against
+      Clients v1, Clients v2 at 09:05 promoted alone, and Notifications v2''s page shows its 09:00 result in neither cell and
+      its 09:05 result in the warehouse cell; an in-warehouse page shows one result column, headed ''Against what''s in the warehouse'',
+      and no ''—'' cell; each of criterion 21''s forms - an unchecked package member reads ''Being checked with its delivery''
+      with no pill and no results, a checked one ''Checked, waiting for the rest of its delivery'', a fully checked or contended
+      one ''Checked, being gated''; an awaiting page captions its grid ''Results for the supply received ..., awaiting a decision'';
+      staggered Order B red at 09:05 - Clients'' row shows both cells with ''— why it is held back'' though the warehouse result
+      came from its 09:00 arrival; a result in neither cell carries ''since replaced in the warehouse'' in its panel; Clients''
+      trend after Order A keeps its 09:00 point; on a held table''s page no red row sits under a non-red cross-table pill; an
+      inherited supply''s clause; the owed re-check; the joint-promotion history row; after a rejection the page reads the in-warehouse
+      supply''s verdict; and at 375px wide every row''s pill is inside the viewport and each stacked result starts ''Staged:''
+      or ''In the warehouse:''. AMENDED 2026-11-01 by REQ-DOCS-362 (Pass / Warn / Fail, signed by Keith 2026-11-01).'
     - THE SYSTEM SHALL have a JS test, tests-js/cross-table-grid.test.js, written first and seen to fail, asserting that a cell
       whose tools disagree (dbt pass, Soda fail) reads Fail, and that a two-tool check shows '·' in the missing tool's place.
     non_functional_requirements:
@@ -51368,7 +51413,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want every attempt at a QA run to record how long it really took, so that a run that grows from 5 minutes to 3 hours becomes visible and I can go and look into it.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #120 (2026-10-22), T1 and F1 (SETTLED 2026-11-14), TA Q1 and Q6, review answer TR4; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with the architect''s B2, N1, N3, N4, N8 and N11. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.'
     acceptance_criteria:
     - WHEN an attempt begins, THE SYSTEM SHALL read time.monotonic() in qa_results_writer.Attempt (qa_tools/common/qa_results_writer.py lines 807-847), in the attempt's own process, and hold it on the attempt; qa_store SHALL stay a recorder that reads no counter (N1).
@@ -51394,21 +51439,78 @@ requirements:
     - REQ-PIPE-279
     - REQ-PIPE-410
     decisions:
-    - 'ONE RUN TIME PER QA RUN (T1, SETTLED by Keith 2026-11-14, after first choosing every check and then, on the follow-up about shared Soda queries and whole-tool runs: ''on second thought, let''s just time the run''). REJECTED timing every check (it needs each tool run once per check, or a share of a shared query invented); REJECTED a time per tool per run.'
-    - 'NEVER THE REPLAY''S SIMULATED CLOCK (T1): qa.run''s created_at and completed_at are replay-clock stamps in a synthetic history (6.3 days for one quarterly run), and the replay clock jumps forward on decision events mid-run (replay_clock.advance_to), so no difference of recorded instants is a run time.'
-    - 'A MONOTONIC COUNTER, OUTSIDE THE CLOCK SEAM, AND NO CLASH (delivery-scoper; confirmed by the architect, N1): REQ-PIPE-382 criteria 1-2 cover recorded instants and ''today'', not durations; REQ-TEST-384 gates imports between sides, and the standard-library time module is on no side. Real pipeline modules already read it (processing_pass.py lines 366-377, recheck.py lines 538-548, replay_clock.py line 61).'
-    - 'READ IN Attempt, RECORDED BY qa_store (the architect, N1): qa_store is one of the 17 modules REQ-PIPE-382 rewires, so it stays a pure recorder.'
-    - 'SUSPEND IS NOT WORK (the architect, N1): on Linux the monotonic clock excludes time suspended, so a container that sleeps mid-run under-reports; that suits ''how long the work took'', and is accepted.'
-    - 'WHOLE MILLISECONDS (the architect, N3): an integer makes REQ-PIPE-412''s ''exactly twice is not slow'' boundary exact; a float or Decimal through JSON would make it flaky.'
-    - 'THE NEWEST ATTEMPT, OR NONE (the architect, B2): every open_run reopens the run (qa_results_writer.py line 784, reopen_run at qa_store.py lines 2185-2193), so an older completed attempt describes results that have been replaced; v1''s ''newest completed attempt'' would have given a time to a run whose current attempt failed.'
+    - 'ONE RUN TIME PER QA RUN (T1, SETTLED by Keith 2026-11-14, after first choosing every check and then, on the follow-up about
+      shared Soda queries and whole-tool runs: ''on second thought, let''s just time the run''). REJECTED timing every check (it
+      needs each tool run once per check, or a share of a shared query invented); REJECTED a time per tool per run.'
+    - 'NEVER THE REPLAY''S SIMULATED CLOCK (T1): qa.run''s created_at and completed_at are replay-clock stamps in a synthetic
+      history (6.3 days for one quarterly run), and the replay clock jumps forward on decision events mid-run (replay_clock.advance_to),
+      so no difference of recorded instants is a run time.'
+    - 'A MONOTONIC COUNTER, OUTSIDE THE CLOCK SEAM, AND NO CLASH (delivery-scoper; confirmed by the architect, N1): REQ-PIPE-382
+      criteria 1-2 cover recorded instants and ''today'', not durations; REQ-TEST-384 gates imports between sides, and the standard-library
+      time module is on no side. Real pipeline modules already read it (processing_pass.py lines 366-377, recheck.py lines 538-548,
+      replay_clock.py line 61).'
+    - 'READ IN Attempt, RECORDED BY qa_store (the architect, N1): qa_store is one of the 17 modules REQ-PIPE-382 rewires, so it
+      stays a pure recorder.'
+    - 'SUSPEND IS NOT WORK (the architect, N1): on Linux the monotonic clock excludes time suspended, so a container that sleeps
+      mid-run under-reports; that suits ''how long the work took'', and is accepted.'
+    - 'WHOLE MILLISECONDS (the architect, N3): an integer makes REQ-PIPE-412''s ''exactly twice is not slow'' boundary exact;
+      a float or Decimal through JSON would make it flaky.'
+    - 'THE NEWEST ATTEMPT, OR NONE (the architect, B2): every open_run reopens the run (qa_results_writer.py line 784, reopen_run
+      at qa_store.py lines 2185-2193), so an older completed attempt describes results that have been replaced; v1''s ''newest
+      completed attempt'' would have given a time to a run whose current attempt failed.'
     - EACH ATTEMPT CARRIES ITS OWN RUN TIME (F1, SETTLED by Keith 2026-11-14), stored on qa.run_attempt rather than on qa.run.
-    - 'WHAT A RUN TIME SPANS: THE QA ATTEMPT (TA Q6, SETTLED by Keith 2026-11-14, option (a)): from open_run to complete_run - every tool, the dataset statistics, the reconciliation and the records; not the staging before it, nor the census and the gate after it (REQ-PIPE-279 criterion 6). REJECTED the whole arrival including staging the file and the gate after.'
-    - 'THE ONE CLOCK STAMPS AN ATTEMPT''S START AND END (TA Q1, SETTLED by Keith 2026-11-14, option (a)): the wall clock on a real asset, the history''s own instants in a replay, so the as-of view can place an attempt on the history''s timeline; F1''s ''real start and end'' is carried by the run time. REJECTED always the wall clock, which would make a replayed attempt read as made today (what REQ-PIPE-081 criteria 27-31 fixed).'
-    - 'UNKNOWN STAYS UNKNOWN (carried from REQ-PIPE-279 criterion 7): an attempt found dead has no end time, so it has no run time. REJECTED a heartbeat column, which #124 parks until the AWS build (post-build-review #262 R3).'
-    - 'A LAMBDA KILLED AT ITS LIMIT HAS NO RUN TIME (the architect, N8): the limit is 15 minutes (aws/cdk/data_pipeline_stack.py line 113), the pass''s deadline only stops it taking NEW arrivals, and a hard kill need not deliver a signal, so the attempt stays open until the next attempt of its run key - which the lock may refuse until TCP keepalive notices (#262 R3). The runs nearest the limit, the ones #120 most wanted to see, therefore never get a run time on the trend; they show as tries that did not finish (REQ-DASH-414). Having the pass stop itself just before the limit, ending INTERRUPTED with an end and a time, belongs to #124 and the AWS build.'
-    - 'HONEST, NOT NORMALISED (delivery-scoper): a bootstrap replays collections in parallel processes and a run''s tools overlap, so a run time reflects the machine it ran on that day; recorded as measured.'
-    - 'REGENERATE, NEVER MIGRATE (TR4, SETTLED by Keith 2026-11-14): as every bump since version 41; migrations wait for their own scoping. REJECTED a hand-written additive migration as a first worked example. NOTED for that scoping: Keith''s 2026-10-14 call that every bump from 41 ships a migration (docs/drafts/schema-migrations/README.md) has not been applied to versions 41-51.'
+    - 'WHAT A RUN TIME SPANS: THE QA ATTEMPT (TA Q6, SETTLED by Keith 2026-11-14, option (a)): from open_run to complete_run -
+      every tool, the dataset statistics, the reconciliation and the records; not the staging before it, nor the census and the
+      gate after it (REQ-PIPE-279 criterion 6). REJECTED the whole arrival including staging the file and the gate after.'
+    - 'THE ONE CLOCK STAMPS AN ATTEMPT''S START AND END (TA Q1, SETTLED by Keith 2026-11-14, option (a)): the wall clock on a
+      real asset, the history''s own instants in a replay, so the as-of view can place an attempt on the history''s timeline;
+      F1''s ''real start and end'' is carried by the run time. REJECTED always the wall clock, which would make a replayed attempt
+      read as made today (what REQ-PIPE-081 criteria 27-31 fixed).'
+    - 'UNKNOWN STAYS UNKNOWN (carried from REQ-PIPE-279 criterion 7): an attempt found dead has no end time, so it has no run
+      time. REJECTED a heartbeat column, which #124 parks until the AWS build (post-build-review #262 R3).'
+    - 'A LAMBDA KILLED AT ITS LIMIT HAS NO RUN TIME (the architect, N8): the limit is 15 minutes (aws/cdk/data_pipeline_stack.py
+      line 113), the pass''s deadline only stops it taking NEW arrivals, and a hard kill need not deliver a signal, so the attempt
+      stays open until the next attempt of its run key - which the lock may refuse until TCP keepalive notices (#262 R3). The
+      runs nearest the limit, the ones #120 most wanted to see, therefore never get a run time on the trend; they show as tries
+      that did not finish (REQ-DASH-414). Having the pass stop itself just before the limit, ending INTERRUPTED with an end and
+      a time, belongs to #124 and the AWS build.'
+    - 'HONEST, NOT NORMALISED (delivery-scoper): a bootstrap replays collections in parallel processes and a run''s tools overlap,
+      so a run time reflects the machine it ran on that day; recorded as measured.'
+    - 'REGENERATE, NEVER MIGRATE (TR4, SETTLED by Keith 2026-11-14): as every bump since version 41; migrations wait for their
+      own scoping. REJECTED a hand-written additive migration as a first worked example. NOTED for that scoping: Keith''s 2026-10-14
+      call that every bump from 41 ships a migration (docs/drafts/schema-migrations/README.md) has not been applied to versions
+      41-51.'
     - 'NO EQUIVALENCE COMPARE (Keith, 2026-11-14): the tests are the proof.'
+    - 'PROVISIONAL (2026-11-16): elapsed_ms is the counter''s difference rounded to the nearest millisecond (Python''s round,
+      floored at 0), read in Attempt.__init__ (just after open_run''s transaction draws the run_seq) and in Attempt.end. The counter
+      is qa_results_writer._counter, time.monotonic by default, a module attribute so the tests inject exact readings; the replay
+      clock reads time.monotonic itself, so injecting the counter never moves it.'
+    - 'PROVISIONAL (2026-11-16): schema 51, the next number after the tree''s 50. Another builder is working in parallel on the
+      asset configuration snapshot (REQ-PIPE-430); if it also bumps the schema, the second to merge takes 52 and the CHECKs here
+      carry over unchanged.'
+    - 'PROVISIONAL (2026-11-16): tests/attempt_support.opened() records elapsed_ms 0 for a fixture''s completed attempt: the CHECK
+      requires a run time wherever an end is recorded, and a fixture''s attempt is about ordering, not timing.'
+    linked_tests:
+    - tests/test_attempt_run_time.py::TestEveryEndedAttemptRecordsItsRunTime
+    - tests/test_attempt_run_time.py::TestTheTableHoldsTheRunTimeToItsEnd
+    - tests/test_check_read_and_attempts.py::TestAStopFromOutside
+    implemented_by:
+    - qa_tools/common/qa_results_writer.py::Attempt
+    - qa_tools/common/qa_results_writer.py::Ended
+    - qa_tools/common/qa_store.py::end_attempt
+    - qa_tools/common/qa_store.py::run_time_ms
+    - qa_tools/common/qa_store.py::SCHEMA_VERSION
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51418,7 +51520,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want to see whether a failed attempt was dbt-core, Soda Core, datacontract-cli or Evidently failing, a timeout, or something else crashing, so that I start looking in the right place.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, F1 of 'Failed attempts scoping' (SETTLED 2026-11-14); drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with the architect's B3 and B6 and CLI UX finding 5. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - WHEN an attempt ends because a tool's evaluation raised (orchestrate._run_step, qa_tools/tools/orchestrate.py lines 57-67), THE SYSTEM SHALL record its outcome as TOOL-ERROR, the tool in a new qa.run_attempt column tool, and as error_type and error_message the type and message of the exception that tool raised, the message cut to qa_store.ERROR_MESSAGE_LIMIT characters.
@@ -51439,13 +51541,56 @@ requirements:
     - REQ-PIPE-279
     - REQ-PIPE-409
     decisions:
-    - TOOL ERROR IS ITS OWN OUTCOME (F1, SETTLED by Keith 2026-11-14, which lists 'completed, timed out, crashed, tool error'). Today a tool's failure records CRASHED with error_type 'QaRunFailure'. REJECTED keeping CRASHED and reading the tool off the message (never parse text).
-    - 'FIELDS, NOT THE CHAIN (the architect, B3, verified at parallel_orchestrate.py lines 147-151): ''raise first from None'' clears the first failure''s __cause__ and leaves its __context__ pointing at the other tool''s QaRunFailure, so v1''s ''the chained cause'' would have named the wrong tool and the wrong SQLSTATE.'
-    - 'INTERRUPTED STAYS (delivery-scoper): F1''s list is an example; REQ-PIPE-279 is built with INTERRUPTED for a Ctrl-C, SIGTERM or a stopped pass.'
-    - 'A TOOL''S OWN TIMEOUT IS A TOOL-ERROR (delivery-scoper): dbt and Soda connect through their own drivers, so their timeouts are not SQLSTATEs on this project''s connections (qa_results_writer.py lines 821-828). There is no per-tool time limit today, so ''timed out after 45m'' in F2''s example can only be a lock or statement timeout on our side.'
-    - 'ONE NAME PER TOOL, THE RUN STEP''S (CLI UX finding 5): v1''s example said ''a tool failed (dbt)'' while the run step says ''dbt-core''.'
-    - 'A FAILURE BEFORE THE ATTEMPT OPENS IS OUT OF SCOPE (delivery-scoper): a resolution or a check file that will not parse fails before open_run (qa_results_writer.py lines 757-763), so no attempt exists; the processing pass reports it, and #134 v6''s REQ-DASH-394 queues a configuration error.'
-    - 'THE AMENDMENT TO REQ-PIPE-279 CRITERION 6, WORDED FOR KEITH (the architect, B6; appended so the original stays as the record of its day): ''AMENDED by REQ-PIPE-410 (Keith, on signing it): an attempt that ends because one of the four tools failed is recorded TOOL-ERROR, naming the tool, with the tool''s own exception type and its message truncated to 1,000 characters - a tool''s own timeout arriving as QaRunFailure included, so it no longer records CRASHED; CRASHED is any other exception; a TIMED-OUT attempt also records its error''s type and message; and every attempt with a recorded end records its run time in whole milliseconds (REQ-PIPE-409).'''
+    - TOOL ERROR IS ITS OWN OUTCOME (F1, SETTLED by Keith 2026-11-14, which lists 'completed, timed out, crashed, tool error').
+      Today a tool's failure records CRASHED with error_type 'QaRunFailure'. REJECTED keeping CRASHED and reading the tool off
+      the message (never parse text).
+    - 'FIELDS, NOT THE CHAIN (the architect, B3, verified at parallel_orchestrate.py lines 147-151): ''raise first from None''
+      clears the first failure''s __cause__ and leaves its __context__ pointing at the other tool''s QaRunFailure, so v1''s ''the
+      chained cause'' would have named the wrong tool and the wrong SQLSTATE.'
+    - 'INTERRUPTED STAYS (delivery-scoper): F1''s list is an example; REQ-PIPE-279 is built with INTERRUPTED for a Ctrl-C, SIGTERM
+      or a stopped pass.'
+    - 'A TOOL''S OWN TIMEOUT IS A TOOL-ERROR (delivery-scoper): dbt and Soda connect through their own drivers, so their timeouts
+      are not SQLSTATEs on this project''s connections (qa_results_writer.py lines 821-828). There is no per-tool time limit today,
+      so ''timed out after 45m'' in F2''s example can only be a lock or statement timeout on our side.'
+    - 'ONE NAME PER TOOL, THE RUN STEP''S (CLI UX finding 5): v1''s example said ''a tool failed (dbt)'' while the run step says
+      ''dbt-core''.'
+    - 'A FAILURE BEFORE THE ATTEMPT OPENS IS OUT OF SCOPE (delivery-scoper): a resolution or a check file that will not parse
+      fails before open_run (qa_results_writer.py lines 757-763), so no attempt exists; the processing pass reports it, and #134
+      v6''s REQ-DASH-394 queues a configuration error.'
+    - 'THE AMENDMENT TO REQ-PIPE-279 CRITERION 6, WORDED FOR KEITH (the architect, B6; appended so the original stays as the record
+      of its day): ''AMENDED by REQ-PIPE-410 (Keith, on signing it): an attempt that ends because one of the four tools failed
+      is recorded TOOL-ERROR, naming the tool, with the tool''s own exception type and its message truncated to 1,000 characters
+      - a tool''s own timeout arriving as QaRunFailure included, so it no longer records CRASHED; CRASHED is any other exception;
+      a TIMED-OUT attempt also records its error''s type and message; and every attempt with a recorded end records its run time
+      in whole milliseconds (REQ-PIPE-409).'''
+    - 'PROVISIONAL (2026-11-16): a TIMED-OUT attempt records the timeout''s own psycopg type and message (e.g. LockNotAvailable,
+      ''canceling statement due to lock timeout''), not the exception that wrapped it, and no tool - criterion 5 requires a tool
+      exactly on TOOL-ERROR.'
+    - 'FIELDS STILL NOT ENOUGH ON THEIR OWN (found building it, test test_the_tool_and_cause_come_from_fields_never_the_chain):
+      a tool''s own exception raised while another lane''s failure was being handled carries that failure as its __context__,
+      so walking the CAUSE field''s chain for a 55P03/57014 still reached the other tool''s lock timeout. The walk of a tool''s
+      own chain stops at any QaRunFailure (_timeout_in''s not_into) - that wait was not this tool''s.'
+    - REQ-PIPE-279 criterion 6 amended in this change, as approved (B6).
+    linked_tests:
+    - tests/test_attempt_run_time.py::TestAToolsFailureIsAToolError
+    - tests/test_check_read_and_attempts.py::TestEveryAttemptIsRecorded
+    - tests/test_tables_read.py::TestTheFailureNamesTheDatasetAndTheTool
+    implemented_by:
+    - qa_tools/common/qa_results_writer.py::_outcome
+    - qa_tools/common/qa_results_writer.py::_timeout_in
+    - qa_tools/tools/orchestrate.py::QaRunFailure
+    - qa_tools/tools/orchestrate.py::_run_step
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51455,7 +51600,7 @@ requirements:
     date_written: '2026-11-14'
     story: As a data team leader, I want the page built from the record of every attempt, not only of finished runs, so that a supply whose check timed out or crashed is shown as such rather than silently replaced by the supply before it.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, T2, F2 and F3 (SETTLED 2026-11-14), TA Q5, review answers TR1, TR3; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with the architect's B1, B2, B4, B5, N2, N7, N10 and security note. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - THE SYSTEM SHALL read attempts for the build through ONE function in qa_tools/common/qa_results_reader.py beside run_facts and incomplete_runs (lines 234, 368), joining qa.run and qa.run_attempt, used by results_history, by REQ-PIPE-417's blocker and by pipeline/package_gating.py in place of its own query (lines 139-146), its docstring stating criterion 4's condition exactly (B4, N7).
@@ -51481,16 +51626,67 @@ requirements:
     - REQ-PIPE-279
     - REQ-DASH-272
     decisions:
-    - 'THE RECORD OF ATTEMPTS IS READ AT LAST (REQ-PIPE-279 NFR: ''so check durations (#120) and a failed attempt''s visibility (#121) can be read from it later'').'
-    - 'NOT THE FIRST READER, AND ONE READER (the architect, B4 and N7, verified): pipeline/package_gating.py (REQ-DASH-272 criterion 21, lines 139-146) and pipeline/red_promoted.py already read qa.run and qa.run_attempt outside qa.run_visible; v1''s flag that 411 would be the first was wrong. One reader beside run_facts keeps the not-checked condition in one place.'
-    - 'WHICH RUNS ARE NOT-CHECKED (TR1, SETTLED by Keith 2026-11-14, NOT the recommendation): arrival runs AND decision-caused full re-checks; gate re-checks (REQ-PIPE-267 criterion 12) and readers-only runs never count. REJECTED arrival runs only (the architect''s and the dashboard reviewer''s recommendation); REJECTED any run (v1''s criterion 3).'
-    - 'completed_at NULL AND THE NEWEST ATTEMPT NOT COMPLETED (the architect, B2, verified: open_run calls reopen_run at qa_results_writer.py line 784): v1''s ''and that has no completed attempt'' hid a run that completed, was reopened and failed, letting an older run''s verdict stand as current.'
-    - 'THE FIRST TRY, THE NEWEST FIVE AND A COUNT (TR3, SETTLED by Keith 2026-11-14): the full list stays in mothman (REQ-TEST-418) and the database. REJECTED every try (unbounded for a supply that crashes on every pass, B5); REJECTED collapsing repeats (unbounded where errors alternate).'
-    - 'ONLY OUTCOME, TOOL AND ERROR TYPE ARE PUBLISHED (TA Q5, SETTLED by Keith 2026-11-14, option (b)): a message can quote a value from the supply, a host or a path. REJECTED publishing it as recorded; REJECTED publishing it scrubbed.'
+    - 'THE RECORD OF ATTEMPTS IS READ AT LAST (REQ-PIPE-279 NFR: ''so check durations (#120) and a failed attempt''s visibility
+      (#121) can be read from it later'').'
+    - 'NOT THE FIRST READER, AND ONE READER (the architect, B4 and N7, verified): pipeline/package_gating.py (REQ-DASH-272 criterion
+      21, lines 139-146) and pipeline/red_promoted.py already read qa.run and qa.run_attempt outside qa.run_visible; v1''s flag
+      that 411 would be the first was wrong. One reader beside run_facts keeps the not-checked condition in one place.'
+    - 'WHICH RUNS ARE NOT-CHECKED (TR1, SETTLED by Keith 2026-11-14, NOT the recommendation): arrival runs AND decision-caused
+      full re-checks; gate re-checks (REQ-PIPE-267 criterion 12) and readers-only runs never count. REJECTED arrival runs only
+      (the architect''s and the dashboard reviewer''s recommendation); REJECTED any run (v1''s criterion 3).'
+    - 'completed_at NULL AND THE NEWEST ATTEMPT NOT COMPLETED (the architect, B2, verified: open_run calls reopen_run at qa_results_writer.py
+      line 784): v1''s ''and that has no completed attempt'' hid a run that completed, was reopened and failed, letting an older
+      run''s verdict stand as current.'
+    - 'THE FIRST TRY, THE NEWEST FIVE AND A COUNT (TR3, SETTLED by Keith 2026-11-14): the full list stays in mothman (REQ-TEST-418)
+      and the database. REJECTED every try (unbounded for a supply that crashes on every pass, B5); REJECTED collapsing repeats
+      (unbounded where errors alternate).'
+    - 'ONLY OUTCOME, TOOL AND ERROR TYPE ARE PUBLISHED (TA Q5, SETTLED by Keith 2026-11-14, option (b)): a message can quote a
+      value from the supply, a host or a path. REJECTED publishing it as recorded; REJECTED publishing it scrubbed.'
     - 'REFUSE ON THE KEY, NOT THE VALUE (the architect, N10): a null run time is legitimate.'
     - 'NO LOCK READ IN THE BUILD (delivery-scoper): the build may read recorded QA results and never anything else.'
-    - 'THE PASS/WARN/FAIL COMES FROM THE SUCCESSFUL ATTEMPT ONLY (F2): already true by construction - a retry''s record_results replaces the results.'
-    - 'A RELOAD''S RE-CHECK COUNTS (TV1, SETTLED by Keith 2026-11-14, option (a)): a reload''s full re-check is the supply''s first verdict, like an arrival''s, so a crash there makes it not-checked. REJECTED (b) decision-caused re-checks only, which left a supply with neither a verdict nor a red once its ''Could not be loaded'' closed.'
+    - 'THE PASS/WARN/FAIL COMES FROM THE SUCCESSFUL ATTEMPT ONLY (F2): already true by construction - a retry''s record_results
+      replaces the results.'
+    - 'A RELOAD''S RE-CHECK COUNTS (TV1, SETTLED by Keith 2026-11-14, option (a)): a reload''s full re-check is the supply''s
+      first verdict, like an arrival''s, so a crash there makes it not-checked. REJECTED (b) decision-caused re-checks only, which
+      left a supply with neither a verdict nor a red once its ''Could not be loaded'' closed.'
+    - 'PROVISIONAL (2026-11-16): a not-checked run sits in run_facts beside the rest with not_checked true (and every fact carries
+      run_time_ms, ended_at and not_checked); the results file also lists the not-checked run keys at the top level. The dashboard
+      data carries them per dataset as notChecked, and every run''s run time and tries as runTimes - each run''s newest try''s
+      ended_at included, for the as-of clip.'
+    - 'PROVISIONAL (2026-11-16): criterion 10''s refusal is on a run_facts entry with no run_time_ms key, the key every fact now
+      has; a null value is accepted.'
+    - 'PROVISIONAL (2026-11-16): a not-checked run neither replaces an earlier run nor is one a supply is listed by (superseded_runs
+      and the cross-table runs_by_supply leave it out): it recorded no result.'
+    - NFR 'DASHBOARD WEIGHT' asks for the page size measured on the bootstrapped build as evidence; not measured here - it needs
+      the cache-miss bootstrap (N11), which this builder may not run against the real databases.
+    linked_tests:
+    - tests/test_attempts_in_the_build.py::TestEachRunsRunTimeAndTries
+    - tests/test_attempts_in_the_build.py::TestWhichRunsAreNotChecked
+    - tests/test_attempts_in_the_build.py::TestNoMessageIsPublished
+    - tests/test_attempts_in_the_build.py::TestTheDashboardData
+    - tests/test_attempts_in_the_build.py::TestARefusedOlderFile
+    - tests/test_attempts_in_the_build.py::TestTheSameHistoryBuildsTheSameBytes
+    - tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+    - tests/test_build_from_the_record.py::TestTheResultsFileCarriesTheRecord
+    implemented_by:
+    - qa_tools/common/qa_results_reader.py::attempts_by_run
+    - qa_tools/common/qa_results_reader.py::RunAttempts
+    - qa_tools/common/qa_results_reader.py::tries_emitted
+    - qa_tools/common/qa_results_reader.py::run_facts
+    - qa_tools/tools/results_history.py::write_results_file
+    - pipeline/build_dashboard_data.py::run_times
+    - pipeline/package_gating.py::for_collection
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51500,7 +51696,7 @@ requirements:
     date_written: '2026-11-14'
     story: As a data team leader, I want a supply nobody could check to make its dataset read red for a stated reason, with something a person can do about it if it keeps failing, so that I never read the previous supply's Pass as this one's and a supply that always crashes cannot sit red with no way out.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, F3, TA Q4 and TA Q9 (SETTLED 2026-11-14), review answers TR1, TR2, TR5, TR7; split out of v1's REQ-PIPE-411 by delivery-scoper in v2 (2026-11-14) with the architect's B1, B4, N5, N6 and CLI UX findings 1 and 7. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - THE SYSTEM SHALL DERIVE, when blockers are read (qa_tools/common/dataset_blockers.py, beside _failed_loads at lines 370-413 and all_blockers at 433-438), a blocker of a new kind COULD_NOT_CHECK for each supply whose newest own run (arrival or decision-caused full re-check) is a not-checked run (REQ-PIPE-411 criterion 4), its reason giving how the newest try ended, the tool where there is one, when, and - where more than one try failed - how many (N5, N6, dashboard finding 9).
@@ -51525,17 +51721,77 @@ requirements:
     - REQ-DASH-272
     - REQ-PIPE-153
     decisions:
-    - 'LIKE A FAILED LOAD (TA Q4, SETTLED by Keith 2026-11-14, option (a)): one dataset-level red reason plus a ''needs a person'' item, no Fail recorded on the supply - REQ-DASH-148''s pattern. REJECTED a new ''Not checked'' status; REJECTED the red reason with no queue item.'
-    - 'CLEARED BY A COMPLETED RETRY OR A PERSON''S REJECTION (TA Q9, SETTLED by Keith 2026-11-14, option (a)): the item offers ''reject the supply'' and says the next pass retries it. REJECTED (b) clearing only by a completed retry.'
-    - 'A SUPERSESSION OR RE-FILE CLOSES IT TOO (the architect, N5): otherwise a supply moved out of its slot by a person''s decision would keep its dataset red for good.'
-    - 'OPENED AT RECEIPT FOR AN ARRIVAL, AT THE DECISION FOR A RE-CHECK (TR1, SETTLED by Keith 2026-11-14; the architect agreed receipt for arrivals, following post-build-review #118 D-B). The cost, stated as the architect asked: the as-of red window includes the normal wait between receipt and the check. A receipt-opened window for a decision re-check would paint the supply''s whole earlier history red, which TR1 rules out.'
+    - 'LIKE A FAILED LOAD (TA Q4, SETTLED by Keith 2026-11-14, option (a)): one dataset-level red reason plus a ''needs a person''
+      item, no Fail recorded on the supply - REQ-DASH-148''s pattern. REJECTED a new ''Not checked'' status; REJECTED the red
+      reason with no queue item.'
+    - 'CLEARED BY A COMPLETED RETRY OR A PERSON''S REJECTION (TA Q9, SETTLED by Keith 2026-11-14, option (a)): the item offers
+      ''reject the supply'' and says the next pass retries it. REJECTED (b) clearing only by a completed retry.'
+    - 'A SUPERSESSION OR RE-FILE CLOSES IT TOO (the architect, N5): otherwise a supply moved out of its slot by a person''s decision
+      would keep its dataset red for good.'
+    - 'OPENED AT RECEIPT FOR AN ARRIVAL, AT THE DECISION FOR A RE-CHECK (TR1, SETTLED by Keith 2026-11-14; the architect agreed
+      receipt for arrivals, following post-build-review #118 D-B). The cost, stated as the architect asked: the as-of red window
+      includes the normal wait between receipt and the check. A receipt-opened window for a decision re-check would paint the
+      supply''s whole earlier history red, which TR1 rules out.'
     - 'DERIVED, NOT RECORDED (the architect, N5): blockers are derived when read; v1 said ''record a dataset blocker''.'
-    - 'COULD_NOT_CHECK, NOT UNCHECKED (the architect N6 and CLI UX finding 7, verified: processing_pass.UNCHECKED at line 62 means ''owed the whole lifecycle''): named after COULD_NOT_LOAD, and kept clear of the page''s ''Not checked'' status word (TR5).'
-    - 'THE TERMINAL OFFERS WHAT THE PAGE NAMES (CLI UX finding 1, verified: filing_queue.COULD_NOT_LOAD line 86, operations_for''s REJECT only, REPROCESS line 98): outstanding.py is the dashboard''s queue only; every terminal surface and ticket policy reads filing_queue, so the state must exist there or the page would name a response nothing in the terminal offers.'
-    - 'THE NEW RED WINS INSIDE A PACKAGE (TR2, SETTLED by Keith 2026-11-14): REJECTED staying neutral until the package completes, under which a package with a mate that always crashes would never go red.'
-    - 'THE AMENDMENT TO REQ-DASH-272 CRITERION 21, WORDED FOR KEITH (appended so the original stays as the record of its day): ''AMENDED by REQ-PIPE-417 (Keith, 2026-11-14, TR2): WHILE a supply of the package could not be checked (REQ-PIPE-417), that supply''s own page and its dataset show ''Could not be checked'' with its ''needs a person'' item in place of any of these forms; and each package-mate''s line keeps ''''<dataset>''s run stopped; the next processing pass re-runs it.'''' but does not say ''Nothing needs deciding yet.'' while that supply''s ''Could not be checked'' is open.'''
-    - 'A REJECTION SETTLES THE ARRIVAL FOR THE PASS (TV2, SETTLED by Keith 2026-11-14, option (a)): a rejected arrival whose run never completed is processed - not retried, holding nothing back - since otherwise the person''s one available decision leaves the collection stuck. REJECTED (b) the pass retrying a rejected arrival, the rejection clearing only the page and the queue.'
-    - 'THE THREE AMENDMENTS APPROVED AS WORDED (Keith, 2026-11-14): REQ-PIPE-279 c6 (REQ-PIPE-410), REQ-DASH-272 c21 (this requirement) and REQ-TEST-150 c7 (REQ-TEST-416), each appended when its requirement is built.'
+    - 'COULD_NOT_CHECK, NOT UNCHECKED (the architect N6 and CLI UX finding 7, verified: processing_pass.UNCHECKED at line 62 means
+      ''owed the whole lifecycle''): named after COULD_NOT_LOAD, and kept clear of the page''s ''Not checked'' status word (TR5).'
+    - 'THE TERMINAL OFFERS WHAT THE PAGE NAMES (CLI UX finding 1, verified: filing_queue.COULD_NOT_LOAD line 86, operations_for''s
+      REJECT only, REPROCESS line 98): outstanding.py is the dashboard''s queue only; every terminal surface and ticket policy
+      reads filing_queue, so the state must exist there or the page would name a response nothing in the terminal offers.'
+    - 'THE NEW RED WINS INSIDE A PACKAGE (TR2, SETTLED by Keith 2026-11-14): REJECTED staying neutral until the package completes,
+      under which a package with a mate that always crashes would never go red.'
+    - 'THE AMENDMENT TO REQ-DASH-272 CRITERION 21, WORDED FOR KEITH (appended so the original stays as the record of its day):
+      ''AMENDED by REQ-PIPE-417 (Keith, 2026-11-14, TR2): WHILE a supply of the package could not be checked (REQ-PIPE-417), that
+      supply''s own page and its dataset show ''Could not be checked'' with its ''needs a person'' item in place of any of these
+      forms; and each package-mate''s line keeps ''''<dataset>''s run stopped; the next processing pass re-runs it.'''' but does
+      not say ''Nothing needs deciding yet.'' while that supply''s ''Could not be checked'' is open.'''
+    - 'A REJECTION SETTLES THE ARRIVAL FOR THE PASS (TV2, SETTLED by Keith 2026-11-14, option (a)): a rejected arrival whose run
+      never completed is processed - not retried, holding nothing back - since otherwise the person''s one available decision
+      leaves the collection stuck. REJECTED (b) the pass retrying a rejected arrival, the rejection clearing only the page and
+      the queue.'
+    - 'THE THREE AMENDMENTS APPROVED AS WORDED (Keith, 2026-11-14): REQ-PIPE-279 c6 (REQ-PIPE-410), REQ-DASH-272 c21 (this requirement)
+      and REQ-TEST-150 c7 (REQ-TEST-416), each appended when its requirement is built.'
+    - 'PROVISIONAL (2026-11-16): a blocker is derived for every qualifying run that had a failed try with no completed try after
+      it, over its whole life - closed when a later try completed - so the as-of view shows the red window a retried supply had.
+      A run that had completed and was reopened opens its red when the first try after that completion began, not at receipt,
+      since its earlier verdict stood until then.'
+    - 'PROVISIONAL (2026-11-16): criterion 3''s closings also include a LATER own run of the supply completing (a newer verdict
+      replaces this run''s), alongside a completing try, a person''s rejection, and a supersede or refile decision about the supply.'
+    - 'PROVISIONAL (2026-11-16): an arrival run with no recorded receipt opens at its first failed try''s start; a re-check whose
+      decision or load record cannot be found does the same.'
+    - 'PROVISIONAL (2026-11-16): a rejection settles the arrival for the pass only once it has TAKEN EFFECT on the one clock (effective_at
+      no later than now), as criterion 10 says; a rejection dated in the future does not yet.'
+    - 'PROVISIONAL (2026-11-16): criterion 8''s package test drives package_gating''s own _state and words with the windows the
+      build derives, rather than a whole recorded package.'
+    - REQ-DASH-272 criterion 21 amended in this change, as approved (its two nested quotes written once each).
+    linked_tests:
+    - tests/test_could_not_check.py::TestAnArrivalWhoseOnlyTryCrashed
+    - tests/test_could_not_check.py::TestADecisionRecheckThatCrashed
+    - tests/test_could_not_check.py::TestRunsThatNeverCount
+    - tests/test_could_not_check.py::TestReopenedThenCrashed
+    - tests/test_could_not_check.py::TestWhatClosesIt
+    - tests/test_could_not_check.py::TestARejectedArrivalNobodyCouldCheck
+    - tests/test_could_not_check.py::TestAReloadsRecheckThatCrashed
+    - tests/test_could_not_check.py::TestAPackageMatesLine
+    implemented_by:
+    - qa_tools/common/dataset_blockers.py::_could_not_check
+    - qa_tools/common/dataset_blockers.py::tried_words
+    - qa_tools/common/outstanding.py::_from_could_not_check
+    - qa_tools/common/filing_queue.py::could_not_check
+    - qa_tools/common/filing_queue.py::operations_for
+    - qa_tools/common/processing_pass.py::state_of
+    - pipeline/package_gating.py::words
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51545,7 +51801,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want a run that suddenly takes far longer than that dataset's runs usually do picked out for me, so that a growing run time becomes visually obvious without anyone having to read a chart closely.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, #120 (''At some point that becomes visually obvious'') and T3 (SETTLED 2026-11-14), TA Q2, Q3, Q7, review answers TR8, TR9; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with the architect''s N9 and code-quality note 4. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.'
     acceptance_criteria:
     - THE SYSTEM SHALL mark a run SLOW WHEN its run time is strictly more than twice the median run time of the last 20 earlier WHOLE-SUPPLY runs of its dataset - runs of scope arrival or full with a lower rank (REQ-PIPE-279 criterion 16) and a run time (TA Q2, TA Q3).
@@ -51563,16 +51819,46 @@ requirements:
     dependencies:
     - REQ-PIPE-411
     decisions:
-    - TWICE THE MEDIAN OF THE DATASET'S PREVIOUS RUNS (T3, SETTLED by Keith 2026-11-14). REJECTED a trend with no mark; REJECTED a configurable per-dataset rule.
+    - TWICE THE MEDIAN OF THE DATASET'S PREVIOUS RUNS (T3, SETTLED by Keith 2026-11-14). REJECTED a trend with no mark; REJECTED
+      a configurable per-dataset rule.
     - NEVER A STATUS, NEVER A BLOCK (T3).
-    - WHOLE-SUPPLY RUNS ONLY (TA Q2, SETTLED by Keith 2026-11-14, option (a)). REJECTED every run in one series; REJECTED one series per scope.
-    - THE LAST 20, MINIMUM 3 (TA Q3, SETTLED by Keith 2026-11-14, option (b), a choice rather than a measurement). REJECTED all earlier runs with a minimum of 3; REJECTED all earlier runs judged from the second.
-    - 'FAILED TRIES ARE SHOWN, NEVER JUDGED (TR8): they appear on the trend as hollow markers (REQ-DASH-413) and are counted in no median.'
-    - 'THE PAGE ONLY JUDGES SLOW (TR9, SETTLED by Keith 2026-11-14): the terminal prints the run time. REJECTED the run step judging it (a second copy of the rule and a history read per run); REJECTED read-only commands repeating the mark.'
-    - 'NO ALERT (delivery-scoper): #120''s ''maybe alerting, monitoring'' was settled by T3 as a mark; an alert would be new scope belonging to #124.'
+    - WHOLE-SUPPLY RUNS ONLY (TA Q2, SETTLED by Keith 2026-11-14, option (a)). REJECTED every run in one series; REJECTED one
+      series per scope.
+    - THE LAST 20, MINIMUM 3 (TA Q3, SETTLED by Keith 2026-11-14, option (b), a choice rather than a measurement). REJECTED all
+      earlier runs with a minimum of 3; REJECTED all earlier runs judged from the second.
+    - 'FAILED TRIES ARE SHOWN, NEVER JUDGED (TR8): they appear on the trend as hollow markers (REQ-DASH-413) and are counted in
+      no median.'
+    - 'THE PAGE ONLY JUDGES SLOW (TR9, SETTLED by Keith 2026-11-14): the terminal prints the run time. REJECTED the run step judging
+      it (a second copy of the rule and a history read per run); REJECTED read-only commands repeating the mark.'
+    - 'NO ALERT (delivery-scoper): #120''s ''maybe alerting, monitoring'' was settled by T3 as a mark; an alert would be new scope
+      belonging to #124.'
     - A PURE FUNCTION (the architect, code-quality note 4).
-    - 'JUDGED AGAINST EARLIER RUNS ONLY, STRICTLY MORE THAN TWICE (delivery-scoper): a mark that flipped later would make the as-of view show a different past; ''more than twice'' is T3''s wording.'
-    - 'NO PLANTED SCENARIO (TA Q7, SETTLED by Keith 2026-11-14, option (a)): tests on a test database prove the mark, a retried run and a not-checked supply; the replay gets no fault hook. REJECTED the replay forcing a failure; REJECTED a supply left not checked for good.'
+    - 'JUDGED AGAINST EARLIER RUNS ONLY, STRICTLY MORE THAN TWICE (delivery-scoper): a mark that flipped later would make the
+      as-of view show a different past; ''more than twice'' is T3''s wording.'
+    - 'NO PLANTED SCENARIO (TA Q7, SETTLED by Keith 2026-11-14, option (a)): tests on a test database prove the mark, a retried
+      run and a not-checked supply; the replay gets no fault hook. REJECTED the replay forcing a failure; REJECTED a supply left
+      not checked for good.'
+    - 'PROVISIONAL (2026-11-16): ''the dataset''s newest run'' (criterion 4) is its newest whole-supply run with a run time; it
+      carries median_ms and judged_against where it was judged.'
+    linked_tests:
+    - tests/test_slow_runs.py::TestTheRule
+    - tests/test_slow_runs.py::TestItIsNeverAStatus
+    implemented_by:
+    - pipeline/slow_runs.py::marks
+    - pipeline/slow_runs.py::WINDOW
+    - pipeline/slow_runs.py::MINIMUM
+    - pipeline/build_dashboard_data.py::run_times
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51582,7 +51868,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, and as a data team leader asked why a supply took so long, I want to see how long each run of a dataset took and how that has changed, so that a run that went from minutes to hours - and then timed out - is obvious at a glance.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, #120, T2 and T3 (SETTLED 2026-11-14), review answers TR6, TR8, TR10; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with dashboard UX findings 3-6 and 10. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL show the run-time trend at the head of each real dataset''s Supply history section, above its cycles, in unitTrendBlock''s existing frame (template line 4692: .unit-trend, .unit-trend-title, .chart-axis-title and its ''View as table'' toggle), and SHALL render it on blocked and could-not-be-checked pages too (#supply-history-wrap) (TR6).'
@@ -51606,14 +51892,52 @@ requirements:
     - REQ-PIPE-412
     - REQ-TEST-416
     decisions:
-    - BOTH A TREND AND A TIME PER RUN, AND THE CLI TOO (T2, SETTLED by Keith 2026-11-14). REJECTED dashboard only; REJECTED CLI and logs only.
-    - 'AT THE HEAD OF THE SUPPLY HISTORY (TR6, SETTLED by Keith 2026-11-14): below the verdict, and present on blocked and could-not-be-checked pages, where #120''s story - a run growing, then timing out - matters most. REJECTED beside the column trend near the top (it competes with the verdict); REJECTED collapsed behind ''Run times'' (no longer obvious at a glance).'
-    - 'FAILED TRIES AS HOLLOW MARKERS (TR8, SETTLED by Keith 2026-11-14): otherwise a run that grew and then timed out drops off the chart at the moment that matters. REJECTED completed runs only.'
-    - 'THE STATUS CELL, NOT TIMING (dashboard finding 3, verified: SUPPLY_CYCLE_HEAD line 9525, waitedChip''s bare duration and waitedTitle''s own warning that a bare duration beside an arrival reads as the arrival''s): facts about our check sit together.'
-    - '''SLOW'' OUTSIDE THE STATUS GRAMMAR (dashboard finding 4): every pill in the Status cell is about the verdict, so slow is a bold word, and the trend is neutral ink.'
-    - 'NO ROLLUPS (dashboard finding 4): at about thirty collections an aggregated slow count beside a status pill would become a status in all but name.'
-    - 'A ROW''S TIME IS ITS ARRIVAL RUN''S (dashboard finding 6): supply-history rows are supplies; re-check runs, which TA Q2 puts on the trend, are said in the row''s existing re-check note.'
+    - BOTH A TREND AND A TIME PER RUN, AND THE CLI TOO (T2, SETTLED by Keith 2026-11-14). REJECTED dashboard only; REJECTED CLI
+      and logs only.
+    - 'AT THE HEAD OF THE SUPPLY HISTORY (TR6, SETTLED by Keith 2026-11-14): below the verdict, and present on blocked and could-not-be-checked
+      pages, where #120''s story - a run growing, then timing out - matters most. REJECTED beside the column trend near the top
+      (it competes with the verdict); REJECTED collapsed behind ''Run times'' (no longer obvious at a glance).'
+    - 'FAILED TRIES AS HOLLOW MARKERS (TR8, SETTLED by Keith 2026-11-14): otherwise a run that grew and then timed out drops off
+      the chart at the moment that matters. REJECTED completed runs only.'
+    - 'THE STATUS CELL, NOT TIMING (dashboard finding 3, verified: SUPPLY_CYCLE_HEAD line 9525, waitedChip''s bare duration and
+      waitedTitle''s own warning that a bare duration beside an arrival reads as the arrival''s): facts about our check sit together.'
+    - '''SLOW'' OUTSIDE THE STATUS GRAMMAR (dashboard finding 4): every pill in the Status cell is about the verdict, so slow
+      is a bold word, and the trend is neutral ink.'
+    - 'NO ROLLUPS (dashboard finding 4): at about thirty collections an aggregated slow count beside a status pill would become
+      a status in all but name.'
+    - 'A ROW''S TIME IS ITS ARRIVAL RUN''S (dashboard finding 6): supply-history rows are supplies; re-check runs, which TA Q2
+      puts on the trend, are said in the row''s existing re-check note.'
     - NO FABRICATED TIMES ON MOCK DATASETS (docs/project-context-for-agents.md, 'What's real vs illustrative').
+    - 'PROVISIONAL (2026-11-16): a re-check''s run time is its own muted note after the row''s status (''· re-checked <day> in
+      <d>''), beside rather than inside the existing re-check words.'
+    - 'PROVISIONAL (2026-11-16): the trend''s x labels are the day each run''s newest try ended; its y labels 0, half and the
+      largest time shown, in the shared format.'
+    linked_tests:
+    - tests-js/run-times.test.js
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::runTimeTrend
+    - dashboard/qa-reporting-dashboard.template.html::runTimeNotes
+    - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    unmet_criteria:
+    - criterion: Criterion 11, in part - the real-browser tests on the built dashboard (a real dataset's supply history shows
+        the trend, a could-not-be-checked page included, with zero console errors).
+      why: tests/test_dashboard_e2e.py builds from the deployment database, which is at schema 50 and is refused at 51 until it
+        is rebuilt; this builder may not rebuild the real databases. The JS half is built and passing.
+      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
+        not run against the real databases'
+      blocked_by:
+        unowned: true
     open_questions: []
     signed_off:
       by: Keith
@@ -51623,7 +51947,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want it obvious when a run timed out or crashed before it succeeded, so that a run that keeps needing retries is noticed rather than hidden by its eventual success.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, #121 (''it should also be obvious somewhere that it did time out or crash. Maybe that one for the UX review'') and F2 (SETTLED 2026-11-14), TA Q8, review answers TR3, TR7, TR10; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with dashboard UX findings 2, 6-9 and the architect''s N8. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.'
     acceptance_criteria:
     - 'WHEN a run completed on its second or later try, THE SYSTEM SHALL say on its supply-history row - in the Status cell for its arrival run, in the re-check note for a re-check - ''Checked on the <ordinal> try - the <ordinal> <ended> after <duration>'', where <ended> is ''timed out'', ''crashed'', ''failed in <tool>'' or ''was stopped'' and <duration> comes from the shared JS duration function (REQ-TEST-416 criterion 4): ''Checked on the second try - the first timed out after 45m''; WHERE the earlier try has no recorded end, ''Checked on the second try - the first did not finish''; and SHALL NOT use the word ''attempt'', which stays the resupply''s word (TA Q8, TR10, N8).'
@@ -51645,12 +51969,46 @@ requirements:
     - REQ-TEST-418
     decisions:
     - A SHORT NOTE PLUS THE LIST (F2, SETTLED by Keith 2026-11-14). REJECTED the list only; REJECTED lifting the supply to Warn.
-    - '''SECOND TRY'', NOT ''ATTEMPT'' (TA Q8, SETTLED by Keith 2026-11-14): ''attempt'' stays the resupply''s word (''Resupply, attempt N'', template line 9464). REJECTED ''Check attempt 2 succeeded''; REJECTED F2''s words as given. The dashboard reviewer confirmed the two read clearly apart: a pill in How it got here against muted prose in Status.'
-    - '''45m'', NOT ''45 min'' (TR10, SETTLED by Keith 2026-11-14): TA Q8''s sentence reads ''...the first timed out after 45m'' in the shared compact format. REJECTED words (''45 min'').'
-    - 'THE NOTE IS THE DISCLOSURE (dashboard finding 7, verified: details.file-passed and .category-group are the page''s existing pattern): one click target where v1 had two; no run-level detail panel exists, so the row holds it.'
+    - '''SECOND TRY'', NOT ''ATTEMPT'' (TA Q8, SETTLED by Keith 2026-11-14): ''attempt'' stays the resupply''s word (''Resupply,
+      attempt N'', template line 9464). REJECTED ''Check attempt 2 succeeded''; REJECTED F2''s words as given. The dashboard reviewer
+      confirmed the two read clearly apart: a pill in How it got here against muted prose in Status.'
+    - '''45m'', NOT ''45 min'' (TR10, SETTLED by Keith 2026-11-14): TA Q8''s sentence reads ''...the first timed out after 45m''
+      in the shared compact format. REJECTED words (''45 min'').'
+    - 'THE NOTE IS THE DISCLOSURE (dashboard finding 7, verified: details.file-passed and .category-group are the page''s existing
+      pattern): one click target where v1 had two; no run-level detail panel exists, so the row holds it.'
     - 'BOUNDED, AND THE REST IN mothman (TR3, TR7): the first try says how it started, the newest five how it is going.'
-    - 'EACH TRY JUDGED AS AT THE DATE ON SHOW (dashboard finding 2): v1''s ''attempts that began by that date'' would have shown an outcome from after the date; in a replay one quarterly run spans about 6.3 simulated days, so this is not an edge case.'
-    - '''DID NOT FINISH'' (the architect, N8): a try killed without a signal has no end, so ''after <duration>'' cannot be filled in.'
+    - 'EACH TRY JUDGED AS AT THE DATE ON SHOW (dashboard finding 2): v1''s ''attempts that began by that date'' would have shown
+      an outcome from after the date; in a replay one quarterly run spans about 6.3 simulated days, so this is not an edge case.'
+    - '''DID NOT FINISH'' (the architect, N8): a try killed without a signal has no end, so ''after <duration>'' cannot be filled
+      in.'
+    - 'PROVISIONAL (2026-11-16): the note is shown only once the completing try had ended by the date on show; before that the
+      row shows no tries note.'
+    linked_tests:
+    - tests-js/run-times.test.js
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::triesNote
+    - dashboard/qa-reporting-dashboard.template.html::triesAsAt
+    - dashboard/qa-reporting-dashboard.template.html::tryLine
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    unmet_criteria:
+    - criterion: Criterion 8, in part - the real-browser test on a built dashboard holding a retried run that opening the details
+        does not touch location.
+      why: 'As REQ-DASH-413''s: the e2e module needs the deployment database rebuilt at schema 51. The details element adds no
+        handler of its own.'
+      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
+        not run against the real databases'
+      blocked_by:
+        unowned: true
     open_questions: []
     signed_off:
       by: Keith
@@ -51660,7 +52018,7 @@ requirements:
     date_written: '2026-11-14'
     story: As a data team leader, I want a supply whose check timed out or crashed to say plainly that it could not be checked, whose fault that probably is and what happens next, so that I never read the previous supply's Pass as this one's and do not chase the supplier for our own failure.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, F3, TA Q4, Q5, Q9 (SETTLED 2026-11-14), review answers TR1, TR5, TR7; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with dashboard UX findings 1, 2, 9 and 10. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - WHILE a supply's COULD_NOT_CHECK blocker is open (REQ-PIPE-417), THE SYSTEM SHALL lead with 'Could not be checked' everywhere it labels that supply - BLOCKER_LABEL, OUTSTANDING_KIND_LABEL (template lines 7661-7702), the dataset banner (blockedBanner, line 10213) and its supply-history row - with BLOCKER_SAYS 'its supply arrived and our check of it did not finish', and SHALL NOT use the 'Not checked' label or the notchecked pill (STATUS_WORDS.notchecked, line 2256) for it (TR5, dashboard finding 1).
@@ -51682,12 +52040,50 @@ requirements:
     - REQ-DASH-414
     - REQ-DASH-148
     decisions:
-    - '''COULD NOT BE CHECKED'' AND THE GREY ''NO DATA'' (TR5, SETTLED by Keith 2026-11-14): leads on the banner, the row, the queue item and BLOCKER_LABEL, exactly as a failed load (REQ-DASH-148 criterion 2). SUPERSEDES F3''s ''Not checked - ...'' and ''No result''. REJECTED keeping F3''s words; REJECTED the label with ''No result''.'
-    - 'WHY NOT F3''S WORDS (dashboard finding 1, verified: STATUS_WORDS.notchecked at line 2256, defined by notCheckedNote as ''neither a Fail nor a result, and does not count toward this dataset''s status''; ''No result'' is only the cross-table grid''s word): the same label would have meant two things on one page, one of them ''does not count''.'
+    - '''COULD NOT BE CHECKED'' AND THE GREY ''NO DATA'' (TR5, SETTLED by Keith 2026-11-14): leads on the banner, the row, the
+      queue item and BLOCKER_LABEL, exactly as a failed load (REQ-DASH-148 criterion 2). SUPERSEDES F3''s ''Not checked - ...''
+      and ''No result''. REJECTED keeping F3''s words; REJECTED the label with ''No result''.'
+    - 'WHY NOT F3''S WORDS (dashboard finding 1, verified: STATUS_WORDS.notchecked at line 2256, defined by notCheckedNote as
+      ''neither a Fail nor a result, and does not count toward this dataset''s status''; ''No result'' is only the cross-table
+      grid''s word): the same label would have meant two things on one page, one of them ''does not count''.'
     - 'LIKE A FAILED LOAD (TA Q4) and CLEARED BY A RETRY OR A REJECTION (TA Q9): see REQ-PIPE-417.'
     - 'WHICH RUNS (TR1): arrival runs and decision-caused full re-checks; see REQ-PIPE-417.'
-    - 'THE ERROR TYPE A LEVEL DOWN (dashboard finding 9): a psycopg class name on the banner is the raw tool jargon the data team leader finds noisiest; it is in the try list.'
+    - 'THE ERROR TYPE A LEVEL DOWN (dashboard finding 9): a psycopg class name on the banner is the raw tool jargon the data team
+      leader finds noisiest; it is in the try list.'
     - 'THE SAME WORDS FOR RUNNING AND DEAD (delivery-scoper): the build may not read pg_locks.'
+    - 'THE EXISTING BLOCKER PATH DOES THE BLANKING: a could-not-check blocker is a blocker like a failed load, so the page''s
+      own rule (blockerWithoutARunOfItsOwn) makes the dataset red and every own check the grey No data whenever it opened after
+      the latest checked supply - which an arrival''s receipt and a re-check''s decision both are.'
+    - 'PROVISIONAL (2026-11-16): an arrival nobody could check has no run in the cycle table (it recorded no dataset_stats), so
+      its supply-history row is the ''Waiting for a person'' table''s, as a failed load''s is; a supply re-checked and not checked
+      keeps its cycle row, which reads the grey No data while its blocker is open.'
+    - 'PROVISIONAL (2026-11-16): the try count in ''could not be checked on <n> tries'' is the count recorded, not clipped to
+      the date on show.'
+    linked_tests:
+    - tests-js/run-times.test.js
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::couldNotCheckWords
+    - dashboard/qa-reporting-dashboard.template.html::blockerReasonOn
+    - dashboard/qa-reporting-dashboard.template.html::supplyRowStatus
+    - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    unmet_criteria:
+    - criterion: Criterion 10, in part - the real-browser test on a built dashboard holding a run whose only try crashed.
+      why: 'As REQ-DASH-413''s: the e2e module needs the deployment database rebuilt at schema 51.'
+      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
+        not run against the real databases'
+      blocked_by:
+        unowned: true
     open_questions: []
     signed_off:
       by: Keith
@@ -51697,7 +52093,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever runs the pipeline from the terminal, I want each run to tell me once how long it took or how and after how long it failed, and what happens next, so that I notice a slow or failing run while I am watching without reading the same error three times.
     moscow: should
-    status: not_started
+    status: built
     source: Keith, T2 (SETTLED 2026-11-14), review answers TR9, TR10, TR11; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with CLI UX findings 2-6 and the architect's N12. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - 'WHEN a run''s attempt ends, THE SYSTEM SHALL print from the orchestrator''s run step (qa_tools/tools/orchestrate.run_one, lines 76-107) one summary line beginning with the run id - ''<run>: checked in 3m 12s'', ''<run>: crashed in dbt-core after 1m 04s (CompilationError)'', ''<run>: timed out after 45m (LockNotAvailable)'', ''<run>: stopped after 2m 10s'' - using the outcome and run time Attempt.end returns, with no re-read of the record (N12, CLI UX finding 3).'
@@ -51721,14 +52117,75 @@ requirements:
     - REQ-PIPE-410
     - REQ-TEST-150
     decisions:
-    - PRINTED WHEN A RUN FINISHES (T2, SETTLED by Keith 2026-11-14), alongside the dashboard. REJECTED CLI and logs only, as the only place.
-    - NO 'SLOW' IN THE TERMINAL (TR9, SETTLED by Keith 2026-11-14). REJECTED the run step judging it; REJECTED read-only commands repeating the mark.
-    - 'COMPACT FORMAT (TR10, SETTLED by Keith 2026-11-14): ''45s'', ''3m 12s'', ''2h 05m'', ''under 1s''. REJECTED words (''45 sec''). Close to the page''s existing fmtWaited (''45m'', ''4h''; template line 2014), which rounds to minutes and so cannot be reused for runs under a minute.'
-    - 'RUN TIMES PLUS THE SAME-SCREEN ONES (TR11, SETTLED by Keith 2026-11-14): the bootstrap''s ''Took ...'' and the bulk re-check''s elapsed/left; claim windows keep their authored form. REJECTED run times only; REJECTED every duration.'
-    - 'ONE MESSAGE, PRINTED ONCE (CLI UX finding 2, verified: lifecycle_report.stage_failure prints exc.cause''s message, and processing_pass.fail_arrival prints it again): v1''s line would have been a third copy at the moment the error context asks to be clearest.'
-    - 'IN qa_tools/common, NOT cli/ (CLI UX finding 4): orchestrate cannot import cli/; display_time already holds the shared instant formatter.'
-    - 'THE CODE STAYS TEST (the architect, N12): the line is printed from qa_tools/tools/ but what is being built is the terminal''s report; the architect found TEST acceptable.'
-    - 'THE AMENDMENT TO REQ-TEST-150 CRITERION 7, WORDED FOR KEITH (appended so the original stays as the record of its day): ''AMENDED by REQ-TEST-416 (Keith, on signing it): where the stage that failed is the checks stage and a QA attempt was opened, the failure''s outcome, tool, run time, error type and message are said once, by the run step''s summary line and the lines beneath it (REQ-TEST-416), and this report names the arrival, the stage, which stages completed before it and what follows, without repeating the message.'''
+    - PRINTED WHEN A RUN FINISHES (T2, SETTLED by Keith 2026-11-14), alongside the dashboard. REJECTED CLI and logs only, as the
+      only place.
+    - NO 'SLOW' IN THE TERMINAL (TR9, SETTLED by Keith 2026-11-14). REJECTED the run step judging it; REJECTED read-only commands
+      repeating the mark.
+    - 'COMPACT FORMAT (TR10, SETTLED by Keith 2026-11-14): ''45s'', ''3m 12s'', ''2h 05m'', ''under 1s''. REJECTED words (''45
+      sec''). Close to the page''s existing fmtWaited (''45m'', ''4h''; template line 2014), which rounds to minutes and so cannot
+      be reused for runs under a minute.'
+    - 'RUN TIMES PLUS THE SAME-SCREEN ONES (TR11, SETTLED by Keith 2026-11-14): the bootstrap''s ''Took ...'' and the bulk re-check''s
+      elapsed/left; claim windows keep their authored form. REJECTED run times only; REJECTED every duration.'
+    - 'ONE MESSAGE, PRINTED ONCE (CLI UX finding 2, verified: lifecycle_report.stage_failure prints exc.cause''s message, and
+      processing_pass.fail_arrival prints it again): v1''s line would have been a third copy at the moment the error context asks
+      to be clearest.'
+    - 'IN qa_tools/common, NOT cli/ (CLI UX finding 4): orchestrate cannot import cli/; display_time already holds the shared
+      instant formatter.'
+    - 'THE CODE STAYS TEST (the architect, N12): the line is printed from qa_tools/tools/ but what is being built is the terminal''s
+      report; the architect found TEST acceptable.'
+    - 'THE AMENDMENT TO REQ-TEST-150 CRITERION 7, WORDED FOR KEITH (appended so the original stays as the record of its day):
+      ''AMENDED by REQ-TEST-416 (Keith, on signing it): where the stage that failed is the checks stage and a QA attempt was opened,
+      the failure''s outcome, tool, run time, error type and message are said once, by the run step''s summary line and the lines
+      beneath it (REQ-TEST-416), and this report names the arrival, the stage, which stages completed before it and what follows,
+      without repeating the message.'''
+    - 'PROVISIONAL (2026-11-16): seconds are shown below ten minutes only (''9m 59s'', then ''10m''): the one rule that gives
+      both ''1m 00s'' for 59.6s and ''45m'' for exactly 45 minutes, as criterion 4''s cases ask. Recorded in duration-cases.json''s
+      own readme.'
+    - 'PROVISIONAL (2026-11-16): a CRASHED try outside any tool reads ''<run>: crashed after <d> (<type>)''; a try stopped from
+      outside prints its line and no next step, since it is not a failed try.'
+    - 'PROVISIONAL (2026-11-16): ''on the second try - the first ...'' describes the try just before, numbered across the run
+      key as the page numbers them, and is said only where that try did not complete (a run reopened after a completion needed
+      no ''another try''). The earlier tries are read once by open_run, in its own transaction after begin_attempt has closed
+      any found dead, so the run step itself still makes no read.'
+    - 'PROVISIONAL (2026-11-16): QaRunFailure''s text keeps the tool''s own message (other tests and a bare traceback read it)
+      and gains the next step; the reports that follow a summarised failure - lifecycle_report.stage_failure, processing_pass.fail_arrival
+      and its summary line - say ''as its summary line above says'' instead of the message, keyed on a mark the run step sets
+      on the exception (run_summary.SAID), so the message is printed once.'
+    - 'PROVISIONAL (2026-11-16): criterion 10''s ''message printed exactly once in mothman cp qa and mothman pipeline process''
+      is driven through orchestrate.run_one inside arrival_lifecycle.process, then the stage-failure report `mothman <short> qa`
+      prints and the real processing_pass.run_pass with its stages stubbed - not through the click commands over a staged arrival.'
+    - 'PROVISIONAL (2026-11-16): the wizard''s panel reads the run time back (one read-only query), since report_recorded is called
+      after the run step has finished.'
+    - REQ-TEST-150 criterion 7 amended in this change, as approved.
+    linked_tests:
+    - tests/test_run_summary_line.py::TestEachSummaryLine
+    - tests/test_run_summary_line.py::TestARetriedRunsLine
+    - tests/test_run_summary_line.py::TestTheMessageIsPrintedOnce
+    - tests/test_run_summary_line.py::TestTheSameWordsWithoutColour
+    - tests/test_run_summary_line.py::TestTheWizard
+    - tests/test_duration_cases.py::test_each_case_reads_the_way_the_table_says
+    - tests/test_bootstrap.py::TestCollectionsRunSideBySide
+    - tests/test_bulk_recheck.py::TestRunning
+    implemented_by:
+    - qa_tools/common/run_summary.py::lines
+    - qa_tools/common/run_summary.py::already_said
+    - qa_tools/common/display_time.py::format_elapsed
+    - qa_tools/tools/orchestrate.py::_say_how_it_ended
+    - cli/lifecycle_report.py::stage_failure
+    - cli/common.py::report_recorded
+    - dashboard/qa-reporting-dashboard.template.html::fmtElapsed
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - 'npm test: tests-js/duration-cases.test.js, the browser half of duration-cases.json, in the full JS run named above.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51738,7 +52195,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want to read a failed check's full error and decide on its supply from the terminal, in the commands I already use for a supply that could not be loaded, so that the message the page withholds is never a dead end.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, TA Q5 and Q9 (SETTLED 2026-11-14), review answer TR7; new in v2 (delivery-scoper, 2026-11-14) from dashboard UX finding 9 and CLI UX findings 1, 5 and 7. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.
     acceptance_criteria:
     - 'THE SYSTEM SHALL have `mothman supply failures` (cli/supply.py lines 363-391) list every supply whose COULD_NOT_CHECK blocker is open beside the loads that failed, under ''could not be checked'', each with its dataset, its supply, how many tries failed, and every try - number, when it began and ended, how it ended, the tool, the run time and its error''s type and full stored message - and say the two responses: reject the supply, or let the next `mothman pipeline process` retry it (TR7).'
@@ -51755,9 +52212,35 @@ requirements:
     - REQ-PIPE-417
     - REQ-TEST-416
     decisions:
-    - 'EXTEND EXISTING COMMANDS (TR7, SETTLED by Keith 2026-11-14): supply failures and supply history; the page''s try list names `mothman supply failures`. REJECTED a new `mothman supply tries` command; REJECTED pointing at the run log.'
+    - 'EXTEND EXISTING COMMANDS (TR7, SETTLED by Keith 2026-11-14): supply failures and supply history; the page''s try list names
+      `mothman supply failures`. REJECTED a new `mothman supply tries` command; REJECTED pointing at the run log.'
     - 'THE QUEUE IS filing_queue''s (CLI UX finding 1): see REQ-PIPE-417''s decision ''THE TERMINAL OFFERS WHAT THE PAGE NAMES''.'
-    - 'ONE PLACE PER SUPPLY (CLI UX finding 7): a decision-caused re-check that crashed is now a could-not-be-checked supply (TR1) and also an owed re-check, which `supply queue` lists with its last failure today.'
+    - 'ONE PLACE PER SUPPLY (CLI UX finding 7): a decision-caused re-check that crashed is now a could-not-be-checked supply (TR1)
+      and also an owed re-check, which `supply queue` lists with its last failure today.'
+    - 'PROVISIONAL (2026-11-16): a queue line reads ''could not be checked - <how the newest try ended, with its tool where there
+      is one, and when>, <error type>''; the tool is in the ''failed in <tool>'' words rather than a field of its own.'
+    - 'PROVISIONAL (2026-11-16): the period door''s straight-to-the-decision branch is extended to a supply that could not be
+      checked; tested through filing_queue.supplies_in and _decide_on, not by driving the interactive door.'
+    linked_tests:
+    - tests/test_could_not_check.py::TestTheTerminal
+    implemented_by:
+    - cli/supply.py::_say_could_not_check
+    - cli/supply.py::history_command
+    - cli/supply.py::_fold_owed_into_unchecked
+    - cli/supply.py::_say_owed
+    - cli/filing_tui.py::listed_words
+    - cli/filing_tui.py::_decide_on
+    evidence:
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
+      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
+      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
+      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
+      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
+      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
+      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
+      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
+      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
+      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     open_questions: []
     signed_off:
       by: Keith
