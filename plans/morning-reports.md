@@ -3667,4 +3667,60 @@ one or more component tags, and a date.
       mutation folders, which it was told to re-create) and eleven clean,
       merged agent worktrees. A full pytest basetemp is 5-10GB, so each one is
       now deleted when its run ends.
+    - **#134 STEP 3 MERGED (~05:15 Perth, f8fe5c1a)**: REQ-PIPE-382 (one
+      clock in `asset_model/asset_time.py`; its c7 footer half waits on
+      REQ-PIPE-385), REQ-PIPE-383 (only the bootstrap plays scripted decisions)
+      and REQ-GEN-381 (the `bootstrap/` package) are built, and REQ-GEN-370 c3
+      is met. The critic found no blocker; its findings were fixed test-first
+      (#359-#362). The merge also turned up one new defect, #363: a checkpoint
+      copy was refused while speed A's datacontract worker held a connection,
+      so the workers are now stopped first. Builder's runs on f8fe5c1a: fast
+      half 7522 passed, 1 failed (`test_distribution_groups`, which fails on
+      its base too, #340); `mothman check --no-pytest` passed. CLAUDE.md is
+      unchanged. **FOR KEITH (Q13.5)**:
+      (a) Batch timestamps. Step 3 stamped each arrival in a real batch on its
+      own, which would flood the QA activity feed, and its write-up (#355)
+      wrongly cited the processing pass as a precedent. PROVISIONAL: a real
+      pass keeps one instant, through a new question to the clock,
+      `stamp_in_pass` (#359). A replay still stamps each run's own replayed
+      time, so the demo's feed is not collapsed either.
+      (b) REQ-PIPE-385 c4 and parts of REQ-GEN-386 (c3, c4, c10) were built
+      ahead of their requirements, which are still `not_started` (#357). How
+      should that be recorded?
+      (c) REQ-PIPE-382 is `built` with an `unmet_criteria` entry, because the
+      validator refuses that field on `in_progress`.
+      (d) `test_carried`'s intermittent fixture error (#358) is open; the
+      critic could not reproduce it.
+      (e) Step 3's two CLAUDE.md layout rows, for `bootstrap/` and
+      `scenarios/` (REQ-GEN-381 c9), are held back for your approval in
+      `docs/drafts/claude-md-step3-edits.md`.
+      (f) Its 8 PROVISIONAL choices are in the three requirements' decisions.
+      (g) Signed speed and timing criteria still cite line numbers in
+      `qa_tools/common/bootstrap.py`, which is now `bootstrap/bootstrap.py`.
+    - **REQ-GEN-392 BUILT, not yet merged (origin/wip/gen-392, 628a8c4a)**:
+      fault sizes come from the check bands they aim at, planted as exact
+      counts. Criteria 11-13 (regenerate, bootstrap from empty, the release
+      note) wait for after the speed baseline, because 392 moves the history.
+      The critic found real defects, all fixed test-first (#380-#384). Among
+      them, planted counts were added on top of the frame's natural faults.
+      The builder's last run: 29 modules, 629 passed. **FOR KEITH (Q13.6)**:
+      (a) J1: "lowest failing count" reads as the rule's first failing check,
+      giving 916 rows, where the worked example says 965. The critic could
+      reproduce 965 under neither reading, so it looks like a slip. Must a
+      Fail clear EVERY tool's fail line? At 1,081-1,086 rows the derived Fail
+      sits under dbt's own `error_if > 600`.
+      (b) J2: a Child Protection Warn preset whose aimed rules are all
+      single-tier plants nothing, so the supply reads Pass. PROVISIONAL:
+      accepted, since partial resupplies are off by default and none exist
+      today. The decision that said these "move from Fail to Warn" is
+      corrected.
+      (c) PROVISIONAL: duplicate keys made by overwriting break references in
+      other tables. That limit is stated in decisions rather than fixed (F6).
+      (d) The per-check picture inside Fail supplies moves: with 5 rows on a
+      single-tier rule, some Soda and dbt checks read Warn or Pass.
+    - **REQ-PIPE-403 c1 BASELINE STARTED (21:14 UTC)** on f8fe5c1a, quarterly
+      then daily, from empty, nothing else running. It is taken after speed
+      A (431/432) and after REQ-PIPE-380, so it is not a clean "before" for
+      either. Those were measured per run instead (431/432), and 380's 5% NFR
+      has no pre-move baseline from tonight.
 
