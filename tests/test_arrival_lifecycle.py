@@ -27,8 +27,10 @@ def _recording_steps(log):
         promote_after=lambda a, got, run_by: log.append(("gate", a.run_id, len(got))))
 
 
-A = SimpleNamespace(run_id="r1")
-B = SimpleNamespace(run_id="r2")
+#: Each carries its receipt, as every real arrival does: the lifecycle
+#: announces it (REQ-PIPE-382 criterion 8), and the wall clock ignores it.
+A = SimpleNamespace(run_id="r1", received_at="2026-01-01T09:00:00+08:00")
+B = SimpleNamespace(run_id="r2", received_at="2026-01-02T09:00:00+08:00")
 
 
 class TestOneArrivalAtATime:

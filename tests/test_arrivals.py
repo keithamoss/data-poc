@@ -328,6 +328,9 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     ROOT = Path(__file__).resolve().parent.parent
     # Everything downstream of an arrival. The generator itself is
     # deliberately absent: writing the bookkeeping is its job.
+    #: bootstrap/ is not walled: it left qa_tools/ with REQ-GEN-381 and may
+    #: import the generator's public module (REQ-TEST-384), which is how it
+    #: reads what the generator built.
     WALLED = ("qa_tools", "pipeline", "dashboard", "cli")
 
     # delivery.py DEFINES the constant so the generator has one name to
@@ -392,8 +395,8 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
 
     #: THE ONE SANCTIONED PATH to what the generator says it built (Keith,
     #: 2026-10-11, post-build-review #157): REQ-GEN-186's comparison after a
-    #: replay reads it through cli.pipeline.generated_targets ->
-    #: generator.targets, and the generation-time trial through
+    #: replay reads it through generator.public.generated_targets ->
+    #: generator.targets (cli.pipeline's copy went with REQ-GEN-381 criterion 3), and the generation-time trial through
     #: generator.targets.just_written. It feeds an after-the-fact check that
     #: changes nothing - never a filing, which is what criterion 7 protects.
     #: Any OTHER walled module reaching it fails below, so the exception
@@ -402,8 +405,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     #: cli/one_table.py into cli/collection_cli.py, and its in-period form into
     #: cli/target_trial.py: the same sanctioned reader, split in two, still
     #: feeding a check that records and files nothing.
-    SANCTIONED_TARGET_READERS = {"bootstrap/bootstrap.py", "cli/pipeline.py",
-                                 "cli/collection_cli.py", "cli/target_trial.py"}
+    SANCTIONED_TARGET_READERS = {"cli/collection_cli.py", "cli/target_trial.py"}
 
     @pytest.mark.asset("quarterly")
     def test_only_the_sanctioned_modules_reach_what_the_generator_built(self):

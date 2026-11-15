@@ -220,7 +220,8 @@ class TestTheTargetTrialIsTheProvidersToDeclare:
         assert planned == [], "the refusal comes before anything is generated"
 
     def test_the_cli_and_the_bootstrap_read_the_providers_declaration(self, third_collection):
-        from cli import pipeline
+        # THROUGH THE GENERATOR'S PUBLIC MODULE (REQ-GEN-381 criterion 3).
+        from generator import public as pipeline
 
         # The quarterly asset's: Linkage Products declares a trial and Child
         # Protection none (the asset split - Birth Registrations' is the daily's).

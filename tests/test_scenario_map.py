@@ -236,7 +236,9 @@ class TestItIsRebuiltWithTheHistory:
         done = []
         monkeypatch.setattr(driver, "generate", lambda cid: done.append(("generate", cid)))
         monkeypatch.setattr(sm, "write_map", lambda **_: done.append(("map", None)))
-        collections = pipeline.generated_collections()
+        from generator import public
+
+        collections = public.generated_collections()
         assert collections
         for cid in collections:
             done.clear()

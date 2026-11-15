@@ -332,7 +332,7 @@ class TestOweNothingQuarter:
     nothing could be the first promotion that would have brought it."""
 
     def test_readers_of_case_workers_promote_in_a_quarter_it_sits_out(
-            self, cp_raw_dir, supply_dsn, monkeypatch, tmp_path):
+            self, cp_raw_dir, supply_dsn, monkeypatch, tmp_path, request):
         import random
         import uuid as _uuid
         from datetime import date as _date
@@ -397,6 +397,15 @@ class TestOweNothingQuarter:
 
         steps = orchestrate.steps("child-protection")
         (cw,) = [a for a in found if CASE_WORKERS in a.files_by_dataset]
+        # A PAST-DATED HISTORY IS A REPLAY'S (REQ-PIPE-382): on the wall clock a
+        # promotion takes effect now, months after these 2026 receipts, so the
+        # Q4 opening in February would find Q2 not yet promoted. The replay
+        # clock answers with receipt plus the seeded lag, as the history means.
+        from bootstrap import replay_clock
+
+        replay = replay_clock.replaying()
+        replay.__enter__()
+        request.addfinalizer(lambda: replay.__exit__(None, None, None))
         arrival_lifecycle.process_all([cw], steps=steps, run_by="pytest")
         with supply_db.connect(label="pytest-s6") as conn:
             # Q2's Case Workers in the warehouse: a person's promotion, since the
