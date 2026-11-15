@@ -77,10 +77,25 @@ def _run_step(collection: str, tool: str, run_id: str, call):
     try:
         return call()
     except Exception as exc:  # noqa: BLE001 - re-raised, named, and chained
-        raise QaRunFailure(
+        failure = QaRunFailure(
             f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: {exc}. "
             f"This run is INCOMPLETE and is not recorded as a finished one; "
-            f"its partial results stay recorded, under an unfinished run.") from exc
+            f"its partial results stay recorded, under an unfinished run.")
+        # WHOSE IT WAS, for ranking two lanes' failures (REQ-PIPE-431 criterion 5).
+        failure.tool = tool
+        raise failure from exc
+
+
+#: The order a run's tools record in, and report a failure in (REQ-PIPE-431
+#: criteria 4 and 5).
+_TOOL_ORDER = ("dbt-core", "Soda Core", "datacontract-cli", "Evidently")
+
+
+def _tool_rank(exc: BaseException) -> int:
+    """Where a lane's failure sits in tool order - after every tool for one
+    that names none."""
+    tool = getattr(exc, "tool", None)
+    return _TOOL_ORDER.index(tool) if tool in _TOOL_ORDER else len(_TOOL_ORDER)
 
 
 def _announce(on_step, label: str) -> None:
@@ -209,26 +224,45 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
         return run_step(coll.id, "dbt-core", run_id,
                         lambda: run_dbt.evaluate(coll.id, run_id, run_timestamp))
 
-    def _the_rest() -> list[dict]:
-        got: list[dict] = []
+    def _soda() -> list[dict]:
         _announce(on_step, RUN_STEPS[1])
-        got.extend(run_step(coll.id, "Soda Core", run_id,
-                            lambda: run_soda.evaluate(coll.id, run_id, run_timestamp)))
-        _announce(on_step, RUN_STEPS[2])
-        got.extend(run_step(coll.id, "datacontract-cli", run_id,
-                            lambda: run_datacontract.evaluate(coll.id, run_id, run_timestamp)))
-        _announce(on_step, RUN_STEPS[3])
-        got.extend(run_step(coll.id, "Evidently", run_id,
-                            lambda: run_evidently.evaluate(
-                                coll.id, run_id, run_timestamp,
-                                reference_run_id=reference_run_id, assessment=assessment)))
-        return got
+        return run_step(coll.id, "Soda Core", run_id,
+                        lambda: run_soda.evaluate(coll.id, run_id, run_timestamp))
 
-    # dbt BESIDE THE OTHER THREE (REQ-TEST-116 criterion 3); results keep tool
-    # order either way.
+    def _datacontract() -> list[dict]:
+        return run_step(coll.id, "datacontract-cli", run_id,
+                        lambda: run_datacontract.evaluate(coll.id, run_id, run_timestamp))
+
+    def _evidently() -> list[dict]:
+        _announce(on_step, RUN_STEPS[3])
+        return run_step(coll.id, "Evidently", run_id,
+                        lambda: run_evidently.evaluate(
+                            coll.id, run_id, run_timestamp,
+                            reference_run_id=reference_run_id, assessment=assessment))
+
     _announce(on_step, RUN_STEPS[0])
-    from_dbt, from_the_rest = parallel_orchestrate.beside(_dbt, _the_rest)
-    results: list[dict] = [*from_dbt, *from_the_rest]
+    if parallel_orchestrate.TOOLS_CONCURRENTLY:
+        # THREE LANES AT ONCE (REQ-PIPE-431 criterion 4): dbt in its worker,
+        # datacontract-cli's library call in its worker, and Soda Core then
+        # Evidently here (REQ-TEST-116 criterion 3 put dbt beside the rest).
+        # Results keep tool order whichever lane finishes first, and when two
+        # lanes fail the tool earliest in that order is the one reported.
+        def _foreground() -> tuple[list[dict], list[dict]]:
+            got = _soda()
+            return got, _evidently()
+
+        _announce(on_step, RUN_STEPS[2])
+        from_dbt, from_datacontract, (from_soda, from_evidently) = \
+            parallel_orchestrate.side_by_side([_dbt, _datacontract], _foreground,
+                                              rank=_tool_rank)
+    else:
+        # --sequential: all four one after another, in tool order, here.
+        from_dbt = _dbt()
+        from_soda = _soda()
+        _announce(on_step, RUN_STEPS[2])
+        from_datacontract = _datacontract()
+        from_evidently = _evidently()
+    results: list[dict] = [*from_dbt, *from_soda, *from_datacontract, *from_evidently]
 
     # COMPUTED HERE, the one point with a legitimate connection to the rows,
     # and through the run's own view schema (REQ-PIPE-068 criterion 2). THE

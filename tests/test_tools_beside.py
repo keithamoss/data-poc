@@ -73,7 +73,7 @@ def test_the_orchestrator_runs_dbt_beside_the_rest(module):
     mod = __import__(module, fromlist=["_run_one_inner"])
     tree = ast.parse(inspect.getsource(mod._run_one_inner))
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
-             and isinstance(n.func, ast.Attribute) and n.func.attr == "beside"]
+             and isinstance(n.func, ast.Attribute) and n.func.attr in ("beside", "side_by_side")]
     assert calls, f"{module} still runs its four tools strictly one after another"
 
 

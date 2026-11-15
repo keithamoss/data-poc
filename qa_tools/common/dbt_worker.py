@@ -21,7 +21,9 @@ and Soda reloads .env into os.environ (plans/tooling.md #26). Spawned, not
 forked, for the reason bootstrap._run_concurrently gives.
 
 ONE REQUEST AT A TIME, behind a lock: runs within a process are sequential,
-and the stable schemas are this process's alone.
+and the stable schemas are this process's alone. The start, lock, request
+and restart code is tool_worker's, which datacontract-cli's worker shares
+(REQ-PIPE-431).
 """
 from __future__ import annotations
 
@@ -30,15 +32,27 @@ import os
 import shutil
 import sys
 import tempfile
-import threading
 from types import SimpleNamespace
 
-_lock = threading.Lock()
-_worker = None  # (process, connection, partial-parse directory, dbt threads)
+from qa_tools.common import tool_worker
+
+#: This process's one dbt worker: (process, connection, partial-parse
+#: directory, dbt threads) once started. Its start, lock, request and restart
+#: code is tool_worker's, shared with datacontract-cli's worker (REQ-PIPE-431).
+_WORKER = tool_worker.Worker(
+    "dbt", on_stop=lambda state: shutil.rmtree(state[2], ignore_errors=True))
+
+#: The dbt worker died mid-request (the next request starts another), or did
+#: not start.
+WorkerLost = tool_worker.WorkerLost
 
 
-class WorkerLost(RuntimeError):
-    """The dbt worker process died mid-request; the next request starts another."""
+def __getattr__(name: str):
+    # `_worker` - the running worker's state, or None - as it was before the
+    # shared helper held it.
+    if name == "_worker":
+        return _WORKER.state
+    raise AttributeError(name)
 
 
 def _serve(conn, root: str, pp_dir: str, threads: int = 1) -> None:
@@ -107,80 +121,35 @@ def _serve(conn, root: str, pp_dir: str, threads: int = 1) -> None:
 
 
 def _start(threads: int):
-    """Launch the worker as ITS OWN MODULE (`python -m`), connected back over
-    an authenticated local socket. Not multiprocessing's spawn: that
-    re-imports the parent's __main__ in the child, so any caller script
-    without a main guard ran itself again inside the worker (found timing
-    the 12-arrival replay, whose script has none)."""
-    import secrets
-    import subprocess
-    from multiprocessing.connection import Listener
-
+    """Launch the worker (tool_worker.spawn) with a partial-parse folder of
+    its own, removed again if it does not start."""
     from qa_tools.common import supply_db
 
-    key = secrets.token_bytes(32)
     pp_dir = tempfile.mkdtemp(prefix="mothman-dbt-parse-")
-    with Listener(("127.0.0.1", 0), authkey=key) as listener:
-        host, port = listener.address
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "qa_tools.common.dbt_worker", host, str(port),
-             str(supply_db.ROOT), pp_dir, str(threads)],
-            cwd=str(supply_db.ROOT), stdin=subprocess.PIPE,
-            env={**os.environ, _KEY_ENV: key.hex()})
-        # The key went through the environment, never the command line, which
-        # any user on the machine can read.
-        # NEVER WAIT FOREVER for a worker that failed to start: the accept is
-        # bounded where the platform's listener allows it, and a worker that
-        # exited instead of connecting is reported rather than waited on.
-        sock = getattr(getattr(listener, "_listener", None), "_socket", None)
-        if sock is not None:
-            sock.settimeout(60)
-        from multiprocessing import AuthenticationError
-
-        try:
-            conn = listener.accept()
-        except (OSError, AuthenticationError) as exc:
-            # A STRAY LOCAL CONNECTION FAILS AUTHENTICATION rather than
-            # timing out; either way the process and its directory go
-            # (#131 D4).
-            proc.kill()
-            shutil.rmtree(pp_dir, ignore_errors=True)
-            raise WorkerLost(f"the dbt worker did not start (exit {proc.poll()})") from exc
+    try:
+        proc, conn = tool_worker.spawn(
+            "qa_tools.common.dbt_worker", [str(supply_db.ROOT), pp_dir, str(threads)],
+            "dbt", cwd=str(supply_db.ROOT))
+    except BaseException:
+        # Either way the process and its directory go (#131 D4).
+        shutil.rmtree(pp_dir, ignore_errors=True)
+        raise
     return proc, conn, pp_dir, threads
-
-
-#: Carries the socket's key to the worker - out of the process list.
-_KEY_ENV = "MOTHMAN_DBT_WORKER_KEY"
 
 
 def invoke(args: list[str], env: dict, target_path: str) -> SimpleNamespace:
     """Run one dbt command in this process's worker; a result shaped like a
     finished subprocess's (returncode, stdout, stderr) for
     dbt_common._refuse_a_build_that_did_not_run."""
-    global _worker
     from qa_tools.common import dbt_common
 
     # REFUSED BEFORE dbt IS STARTED (REQ-PIPE-432 criterion 3).
     threads = dbt_common.dbt_threads()
-    with _lock:
-        if _worker is not None and _worker[0].poll() is not None:
-            # DIED WHILE IDLE: let go of its connection and parse directory
-            # before starting another (#131 D4 - they leaked).
-            stop()
-        if _worker is not None and _worker[3] != threads:
-            # ONE VALUE PER WORKER'S LIFE (criterion 2): a changed setting
-            # gets a new worker, never a different value in the old one.
-            stop()
-        if _worker is None:
-            _worker = _start(threads)
-        proc, conn, _pp, _threads = _worker
-        try:
-            conn.send((list(args), dict(env), str(target_path)))
-            ok, said, log = conn.recv()
-        except (EOFError, BrokenPipeError, ConnectionResetError, OSError) as exc:
-            stop()
-            raise WorkerLost(f"the dbt worker process stopped mid-run ({type(exc).__name__})"
-                             ) from exc
+    # ONE VALUE PER WORKER'S LIFE (criterion 2): the threads are the worker's
+    # key, so a changed setting gets a new worker, never a different value in
+    # the old one.
+    ok, said, log = _WORKER.request((list(args), dict(env), str(target_path)),
+                                    start=lambda: _start(threads), key=threads)
     return SimpleNamespace(returncode=0 if ok else 1, stdout=log, stderr=said)
 
 
@@ -188,33 +157,15 @@ def stop() -> None:
     """End this process's worker and remove its partial-parse file - at exit,
     and for a caller that must hold nothing once it finishes (REQ-PIPE-157's
     disk NFR)."""
-    global _worker
-    if _worker is None:
-        return
-    proc, conn, pp_dir, _threads = _worker
-    _worker = None
-    try:
-        conn.send(None)
-    except (BrokenPipeError, OSError):
-        pass
-    try:
-        proc.wait(timeout=10)
-    except Exception:  # noqa: BLE001 - a worker that will not stop is killed
-        proc.kill()
-        proc.wait(timeout=5)
-    conn.close()
-    shutil.rmtree(pp_dir, ignore_errors=True)
+    _WORKER.stop()
 
 
 atexit.register(stop)
 
 
 def _main(argv: list[str]) -> None:
-    from multiprocessing.connection import Client
-
     host, port, root, pp_dir, threads = argv
-    key = bytes.fromhex(os.environ.pop(_KEY_ENV))
-    with Client((host, int(port)), authkey=key) as conn:
+    with tool_worker.connect_back(host, port) as conn:
         _serve(conn, root, pp_dir, int(threads))
 
 

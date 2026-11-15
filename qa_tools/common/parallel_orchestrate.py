@@ -134,20 +134,46 @@ def beside(background, foreground, *, concurrent: bool | None = None):
     both fail, as it would have run - and failed - first. Nothing is left
     running behind an exception; the background is always waited for.
     """
+    return tuple(side_by_side([background], foreground, concurrent=concurrent))
+
+
+def side_by_side(background, foreground, *, concurrent: bool | None = None,
+                 rank=None) -> list:
+    """Run each of `background` in a thread of its own while `foreground`
+    runs here; return `[*each background's result, foreground's result]`.
+
+    FOR A RUN'S THREE LANES (REQ-PIPE-431 criterion 4): dbt in its worker,
+    datacontract-cli in its worker - each lane's thread only waits on its
+    worker - and Soda Core then Evidently in the foreground.
+
+    WHEN MORE THAN ONE LANE FAILS, the failure `rank(exc)` puts first is
+    raised - the caller's tool order - and lane order where none is given,
+    so a report never depends on which lane finished first (criterion 5).
+    NOTHING IS LEFT RUNNING BEHIND AN EXCEPTION: every lane is waited for
+    before anything is raised. Not concurrent: each lane in turn, the
+    background ones first.
+    """
     if concurrent is None:
         concurrent = TOOLS_CONCURRENTLY
+    lanes = [*background, foreground]
     if not concurrent:
-        return background(), foreground()
+        return [lane() for lane in lanes]
     from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        pending = pool.submit(background)
+    outcomes: list = [None] * len(lanes)
+    failed: list[tuple[int, BaseException]] = []
+    with ThreadPoolExecutor(max_workers=max(1, len(background))) as pool:
+        pending = [pool.submit(lane) for lane in background]
         try:
-            ahead = foreground()
-        except BaseException:
+            outcomes[-1] = foreground()
+        except BaseException as exc:  # noqa: BLE001 - ranked and re-raised below
+            failed.append((len(lanes) - 1, exc))
+        for index, future in enumerate(pending):
             try:
-                pending.result()
-            except BaseException as first:  # noqa: BLE001 - re-raised as the one that ran first
-                raise first from None
-            raise
-        return pending.result(), ahead
+                outcomes[index] = future.result()
+            except BaseException as exc:  # noqa: BLE001 - ranked and re-raised below
+                failed.append((index, exc))
+    if failed:
+        first = min(failed, key=lambda f: (rank(f[1]) if rank is not None else f[0], f[0]))[1]
+        raise first
+    return outcomes

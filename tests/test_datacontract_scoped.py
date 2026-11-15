@@ -146,6 +146,13 @@ class TestWhatTheToolIsHanded:
     def handed(self, monkeypatch):
         import datacontract.data_contract as dc_module
 
+        from qa_tools.common import parallel_orchestrate
+
+        # IN THIS PROCESS, so the spy below sees the tool being constructed:
+        # with the tools overlapping, the call is made in datacontract-cli's
+        # worker (REQ-PIPE-431), which runs the same function.
+        monkeypatch.setattr(parallel_orchestrate, "TOOLS_CONCURRENTLY", False)
+
         calls = []
         real = dc_module.DataContract
 

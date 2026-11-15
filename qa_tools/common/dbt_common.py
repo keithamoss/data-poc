@@ -38,8 +38,10 @@ _NUM_RE = re.compile(r"([\d.]+)")
 #: starts and constant for that worker's life (dbt_worker), so its partial
 #: parse stays valid; a run's tests are independent reads, and one thread ran
 #: them one after another. The value is a measurement, not a guess - see
-#: REQ-PIPE-432's evidence for 1, 2 and 4 threads with two streams running.
-DBT_THREADS = 4
+#: REQ-PIPE-432's evidence for 1, 2 and 4 threads with two streams running:
+#: 2 and 4 measured the same, both about a quarter faster than 1, so 2, which
+#: opens half the database connections.
+DBT_THREADS = 2
 
 
 class DbtThreadsRefused(ValueError):
