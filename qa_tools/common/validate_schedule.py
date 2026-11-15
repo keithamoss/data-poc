@@ -1601,7 +1601,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
         # ONCE ONLY WHERE THE COLLECTION COULD BE THE FIX (Keith, 2026-10-11,
         # on the critic's F6): it has defaults, and the datasets take them.
         has_defaults = bool(_raw_versions(collections.get(cid, {}).get("participation_defaults")))
-        grouped = [g for g in gaps if has_defaults and not g[5]]
+        grouped = [g for g in gaps if has_defaults]
         if len({g[0] for g in grouped}) < 2:
             grouped = []
         datasets = sorted({g[0] for g in grouped})
@@ -2290,13 +2290,13 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _schema_errors(raw, src)
     errors += _schema_errors(cal_raw, src, CalendarFile, cal_path.name)
     errors += _baseline_errors(raw, cal_raw, src)
+    errors += _calendar_errors(cal_raw, cal_src)
     if len(cal_raw.get("calendars") or []) > 1:
         # TWO CALENDARS AND NOTHING BELOW CAN BE JUDGED (REQ-PIPE-345): every
         # later check reads the datasets' periods off the one baseline, and
         # guessing which of two is meant would judge them against the wrong
         # one. The refusals above say what to do; the rest waits for it.
         return _attribute(errors, merged)
-    errors += _calendar_errors(cal_raw, cal_src)
     errors += _dataset_errors(merged, cal_src)
     errors += _participation_errors(cal_raw, raw, src)
     errors += _defaults_errors(cal_raw, raw, src)

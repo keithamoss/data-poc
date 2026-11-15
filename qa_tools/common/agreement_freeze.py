@@ -1205,21 +1205,16 @@ def revert(cal_doc: dict, asset_doc: dict,
             if old is not None:
                 listed.append({"period": p[3], "reason": old})
             entry(p[1])["not_expected"] = listed
-        elif len(p) == 5 and p[0] == "dataset" and p[2] == "dates" and p[3] in ("version", "period"):
-            versions = _own(entry(p[1]), "dates", {}).setdefault("versions", [])
-            if p[3] == "version":
-                _set_settings(versions, p[4], old, keep=("dates",) + _SKIPPED)
-            else:
-                _set_period(versions, p[4], old)
         elif len(p) == 3 and p[0] == "dataset" and p[2] == "calendar":
+            # A CALENDAR NAME REVERTS TO BEING ON THE BASELINE (REQ-PIPE-345):
+            # nothing names a calendar, so a dataset that was on one is on the
+            # asset's baseline, and only a no-calendar declaration is written.
             e = entry(p[1])
             e.pop("calendar", None)
             e.pop("no_calendar", None)
             text = "" if old is None else str(old)
             if text.startswith("no calendar (") and text.endswith(")"):
                 e["no_calendar"] = text[len("no calendar ("):-1]
-            elif old is not None:
-                e["calendar"] = old
         elif len(p) == 3 and p[:2] == ["timezone", "version"]:
             tz = asset.setdefault("timezone", {})
             versions = tz.setdefault("versions", [])

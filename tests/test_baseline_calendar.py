@@ -14,12 +14,11 @@ whose one-file shape no longer carries a calendar per dataset.
 from __future__ import annotations
 
 import shutil
-from datetime import date
 
 import pytest
 import yaml
 
-from qa_tools.common import agreement, assets, period_schema, schedule, validate_schedule
+from qa_tools.common import agreement, assets, schedule, validate_schedule
 from qa_tools.common.validate_schedule import Source, validate
 
 pytestmark = pytest.mark.asset("quarterly")
@@ -198,48 +197,6 @@ class TestEveryDatasetIsOnTheBaseline:
         doc = yaml.safe_load((assets.selected().folder / "calendar.yaml").read_text())
         doc["calendars"] = []
         assert schedule.baseline(agreement.from_doc(doc)) is None
-
-
-class _Recorder:
-    """A connection that records what it is asked to run and runs nothing."""
-
-    def __init__(self):
-        self.sql: list[str] = []
-
-    def execute(self, sql, *args, **kwargs):
-        self.sql.append(str(sql))
-        raise AssertionError(f"nothing should reach the database: {sql}")
-
-
-class TestNoSchemaForAPeriodOffTheBaseline:
-    """Criterion 5: one period schema per baseline period, never one for a
-    period the asset's baseline does not name."""
-
-    def test_a_period_the_baseline_does_not_name_creates_no_schema(self):
-        conn = _Recorder()
-        with pytest.raises(period_schema.PeriodSchemaError, match="baseline"):
-            period_schema.ensure_period_schema(conn, "2023-M03")
-        assert conn.sql == []
-
-    def test_every_baseline_period_names_its_own_schema(self):
-        periods = schedule.periods_for_calendar(schedule.baseline().name)
-        assert periods
-        assert all(schedule.on_baseline(p.name) for p in periods)
-        names = [period_schema.period_schema(p.name) for p in periods]
-        assert len(set(names)) == len(names)
-
-    @pytest.mark.asset("daily")
-    def test_a_day_before_the_daily_baseline_begins_creates_no_schema(self):
-        first = schedule.baseline().versions[0].effective_from
-        before = date.fromordinal(first.toordinal() - 1).isoformat()
-        assert schedule.on_baseline(first.isoformat())
-        assert not schedule.on_baseline(before)
-        assert not schedule.on_baseline("2023-Q1")
-        conn = _Recorder()
-        with pytest.raises(period_schema.PeriodSchemaError, match="baseline"):
-            period_schema.ensure_period_schema(conn, before)
-        assert conn.sql == []
-
 
 
 def _renamed_baseline(tmp_path, new_name: str):

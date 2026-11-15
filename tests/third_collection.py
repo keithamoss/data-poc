@@ -72,14 +72,14 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
             "datasets": [{"id": "bare-things", "name": "Bare Things", "table": "bare_things",
                           "arrival_pattern": r"bare_things[^/]*\.csv"}]})
     (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
-    # ITS CALENDAR, as a real collection declares one (REQ-PIPE-262 criterion
-    # 9 refuses a bootstrap of a collection whose calendar cannot be
-    # resolved): the quarterly one, so it replays in Child Protection's stream.
+    # ITS ENTRY in calendar.yaml, as a real collection has one. It names no
+    # calendar: it is on the asset's baseline (REQ-PIPE-345), so it replays in
+    # Child Protection's stream (REQ-PIPE-262 criterion 9).
     from qa_tools.common import agreement
 
     cal = yaml.safe_load(agreement.calendar_yaml().read_text())
     for cid in [FAKE_ID] + ([BARE_ID] if bare else []):
-        cal["collections"].append({"id": cid, "calendar": "quarterly"})
+        cal["collections"].append({"id": cid})
     (contract_dir / "calendar.yaml").write_text(yaml.safe_dump(cal, sort_keys=False))
     # How the dashboard describes the asset sits beside the hierarchy
     # (REQ-DASH-244); the third collection has no entry until a test gives it one.

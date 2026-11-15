@@ -721,7 +721,7 @@ def _versions(change: str, **extra) -> dict:
 
 def _calendar_blocks() -> tuple[str, str]:
     colls = [(c["id"], "09:00") for c in sources()] + [(PRODUCT["collection"], "18:00")]
-    entries = [{"id": cid, "calendar": "quarterly",
+    entries = [{"id": cid,
                 "files_go_to_period": _versions("Files go into the period they arrive in.", value=0),
                 "participation_defaults": _versions(f"Owes a supply every quarter, due {due}.",
                                                     expected_time=due, grace="8h")}

@@ -1125,17 +1125,14 @@ class TestCriticFindingsOn190:
         its calendar still owes - so every OTHER dataset on Child Protection's
         calendar (Emergency Department's, since REQ-QAC-231) turns off for
         good on the same terms, or it would still owe and drive the minimum."""
-        from qa_tools import collections
         from qa_tools.common import runway
 
         doc = _unshare(_doc())
         log = [{"date": "2026-09-01", "author": "a test", "change": "off", "turns_off": True}]
         _turn_off(_defaults_version(doc), to="2027-03-31", log=log)
-        cp_calendar = _collection(doc)["calendar"]
+        # Every dataset is on the asset's one baseline (REQ-PIPE-345).
         others = [e["id"] for e in doc["datasets"]
-                  if not e["id"].startswith("cp-") and e.get("participation")
-                  and _collection(doc, collections.collection_of(e["id"]).id).get("calendar")
-                  == cp_calendar]
+                  if not e["id"].startswith("cp-") and e.get("participation")]
         # THE VERSION IN FORCE - the last - not the first: a dataset with
         # later versions (geo-ed-presentations mirrors its source's 2015-Q4
         # gap, REQ-QAC-294) still owes through them, and would drive the

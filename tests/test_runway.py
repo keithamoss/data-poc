@@ -166,34 +166,6 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
         assert named == ["cp-case-workers"], (
             f"exactly the driving dataset should be named, not {named}")
 
-    def test_the_summary_counts_calendars_when_more_than_one_is_low(self, tmp_path, monkeypatch):
-        import shutil
-
-
-        contract_dir = tmp_path / "contract"
-        shutil.copytree(asset_folders.real_folder(), contract_dir)
-        doc = agreement_split.merged_view(contract_dir)
-        # A second authored calendar, also nearly out, with one dataset
-        # on it. NEARLY out rather than fully out, and the dates below
-        # were extended to 2028 on 2026-09-24 to make that true: it used
-        # to carry a single 2023 date, which is EXHAUSTED at this test's
-        # own as-of, not "nearly out" as this comment always said. That
-        # went unnoticed while both states shared one summary sentence;
-        # post-build-review #21 gave the exhausted state its own words,
-        # and this assertion is about counting LOW calendars.
-        doc["calendars"].append({
-            "name": "annual", "description": "Once a year.",
-            "versions": [{"effective_from": "2023-01-01", "changelog": ["initial"],
-                           "claim_window": "14d",
-                           "dates": [{"period": str(y), "date": f"{y}-03-01"}
-                                      for y in range(2023, 2029)]}]})
-        doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"].append(
-            {"id": "extra", "name": "Extra", "table": "extra", "calendar": "annual"})
-        agreement_split.repoint(monkeypatch, contract_dir, doc)
-        note = runway.summary(date(2026, 9, 23))
-        assert "2 calendar(s) low on runway" in note
-
-
 class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
     def test_nothing_is_exhausted_while_dates_remain(self):
         assert runway.exhausted_datasets(date(2026, 9, 23)) == {}

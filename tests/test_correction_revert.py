@@ -70,7 +70,7 @@ def _timezone(cal, asset):
 
 
 def _membership(cal, asset):
-    _entry(cal, "cp-clients")["calendar"] = "daily"
+    _entry(cal, "cp-clients")["no_calendar"] = "never"
 
 
 def _several(cal, asset):

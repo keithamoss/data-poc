@@ -320,34 +320,6 @@ def test_the_gate_names_the_round_a_version_takes_effect_from(capsys):
             "takes effect from the 2 February 2015 round") in out
 
 
-def test_a_fall_is_reported_on_every_calendar_its_collection_names(tmp_path):
-    """Critic finding 6: fall_lines read only the first member's calendar.
-    cp-case-workers moved onto a calendar twenty days later than
-    'quarterly' (REQ-PIPE-181 lets a dataset name its own) has its held
-    round on 21 August 2026, and that is said too."""
-    import copy
-    from datetime import timedelta
-
-    contract = tmp_path / "contract"
-    shutil.copytree(REAL, contract)
-    path = contract / "calendar.yaml"
-    doc = yaml.safe_load(path.read_text())
-    late = copy.deepcopy(next(c for c in doc["calendars"] if c["name"] == "quarterly"))
-    late["name"] = "quarterly-late"
-    for version in late["versions"]:
-        for entry in version.get("dates") or []:
-            entry["date"] = (date.fromisoformat(str(entry["date"]))
-                             + timedelta(days=20)).isoformat()
-    doc["calendars"].append(late)
-    _dataset(doc, "cp-case-workers")["calendar"] = "quarterly-late"
-    _cp(doc)["files_go_to_period"] = {"versions": [_v("2000-01-01", 1), _v("2026-08-01", 0)]}
-    path.write_text(yaml.safe_dump(doc, sort_keys=False))
-
-    lines = " ".join(fall_lines(agreement.load(path)))
-    assert "from the 1 August 2026 round" in lines
-    assert "from the 21 August 2026 round" in lines
-
-
 def test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from(contract):
     """Critic finding 8 (REQ-PIPE-322 criterion 3): after a fall from 2 to 0
     from the 1 August 2026 round, the 1 November round's supply is held too.

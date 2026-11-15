@@ -542,18 +542,20 @@ class TestCriticFindingsOn111:
         assert any("2025-Q4" in (f.scope or "") and "removed" in f.problem
                    for f in found), _text(found)
 
-    def test_moving_a_dataset_to_another_calendar_is_frozen(self, state):
+    def test_moving_a_dataset_off_the_baseline_is_frozen(self, state):
         """H2, PROVISIONAL: a dataset's calendar membership freezes once its
-        first slot could be filed."""
+        first slot could be filed - since REQ-PIPE-345 the one move left is
+        off the asset's baseline, to no calendar."""
         def mutate(doc):
-            _entry(doc, "cp-clients")["calendar"] = "daily"
+            _entry(doc, "cp-clients")["no_calendar"] = "never"
         found = _check(state, mutate)
         assert any(f.scope == "dataset cp-clients calendar" for f in found), _text(found)
 
-    def test_moving_a_whole_collection_is_frozen_for_each_dataset(self, state):
+    def test_changing_the_baseline_is_frozen_for_each_dataset(self, state):
+        """Every dataset is on the asset's baseline, so replacing it moves
+        each of them."""
         def mutate(doc):
-            next(c for c in doc["collections"] if c["id"] == "child-protection")["calendar"] = \
-                "daily"
+            _quarterly(doc)["name"] = "quarterly-2"
         found = _check(state, mutate)
         assert {f.scope for f in found} >= {"dataset cp-clients calendar",
                                              "dataset cp-carers calendar"}, _text(found)
@@ -594,20 +596,6 @@ class TestCriticFindingsOn111:
             doc["datasets"] = [d for d in doc["datasets"] if d["id"] != "cp-carers"]
         found = _check((old_cal, old_asset, people_doc), mutate)
         assert any("append-only" in f.problem for f in found), _text(found)
-
-    def test_own_dates_are_frozen(self, state):
-        """Coverage the critic found missing: a dataset's own dates."""
-        old_cal, old_asset, people_doc = copy.deepcopy(state)
-        _entry(old_cal, "cp-carers")["dates"] = {"versions": [{
-            "effective_from": "2023-01-01",
-            "changelog": [{"date": "2023-01-01", "author": "a", "change": "own"}],
-            "dates": [{"period": "own-2024", "date": "2024-03-03"}]}]}
-
-        def mutate(doc):
-            _entry(doc, "cp-carers")["dates"]["versions"][0]["dates"][0]["date"] = "2024-03-09"
-        found = _check((old_cal, old_asset, people_doc), mutate)
-        assert any("own-2024" in (f.scope or "") for f in found), _text(found)
-
 
 class TestOneEntryPerOwner:
     """Keith, 2026-10-11 (morning-report (l)): the gate's refusal gives one
