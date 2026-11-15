@@ -6412,7 +6412,6 @@ requirements:
       - qa_tools/tools/stage.py::build_all
       - cli/one_table.py::OneTableCLI::load_manifest
       - cli/many_tables.py::ManyTablesCLI::load_manifest
-      - cli/debug.py::capture_arrival_golden_command
     evidence:
       - >
         2026-09-23: docs/delivery-format.md is the normative
@@ -37210,28 +37209,9 @@ requirements:
       - "NO NEW DEPENDENCY: git worktrees, PostgreSQL, Playwright and the generators are already required."
     dependencies: []
     linked_tests:
-      - tests/test_equivalence.py::TestCompare
-      - tests/test_equivalence.py::TestCaptureRefuses
-      - tests/test_equivalence.py::TestTheSurfacesReadTheTree
-      - tests/test_equivalence.py::test_a_failed_capture_names_its_stage_and_leaves_nothing
-      - tests/test_equivalence.py::test_a_killed_captures_leftovers_go_with_the_next_capture
-      - tests/test_equivalence.py::test_a_second_capture_while_one_runs_is_refused
-      - tests/test_equivalence.py::test_a_refiling_is_compared_as_the_decision_that_made_it
-      - tests/test_equivalence.py::test_two_captures_of_one_commit_compare_equal
       - tests/test_pinned_now.py
-      - tests/test_ci_on_demand.py::test_no_job_takes_full_captures
-      - tests/test_equivalence_assets.py::TestDeliveriesAcrossTheSplit
     implemented_by:
-      - qa_tools/common/equivalence.py::capture
-      - qa_tools/common/equivalence.py::compare
-      - qa_tools/common/equivalence.py::snapshot
-      - qa_tools/common/equivalence.py::report_context
-      - qa_tools/common/equivalence.py::reports
-      - qa_tools/common/equivalence.py::generated_files
-      - qa_tools/common/equivalence.py::help_and_menus
       - qa_tools/common/asset_time.py::now
-      - cli/debug.py::equivalence_capture_command
-      - cli/debug.py::equivalence_compare_command
       - tests/conftest.py::pytest_collection_modifyitems
     evidence:
       - "2026-10-16, THE SELF-CHECK (criterion 5), recorded before any other requirement uses the harness: two full captures of 66efd5d, `mothman debug equivalence compare self-check-a self-check-b` - S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0. Bootstrap A 1756s (Birth Registrations 562s, Child Protection 1645s), B 1935s (674s, 1811s), difference +179s; B ran alongside this session's test and gate runs for part of its span."
@@ -38130,7 +38110,6 @@ requirements:
       - tests/test_dashboard_for_every_collection.py
       - tests/test_build_dashboard_data.py
       - tests/test_dashboard_e2e.py
-      - tests/test_equivalence.py
     implemented_by:
       - qa_tools/tools/run_soda.py::evaluate
       - qa_tools/common/soda_common.py::resource_attribute
@@ -38166,6 +38145,12 @@ requirements:
       - REQ-PIPE-243
       - REQ-DASH-244
       - REQ-QAC-241
+    retired_criteria:
+      - criterion: 8
+        date: "2026-11-14"
+        by: Keith
+        replaced_by: [REQ-TEST-393]
+        reason: "Retired by Keith, 2026-11-14: the synthetic demo history may move whenever a change needs it, and the test suite is the proof that a refactor is sound. A before-and-after capture of a ~58-minute bootstrap proves something nobody needs proved. The `mothman debug equivalence` commands, their module and their tests are deleted by REQ-TEST-393 - and with the compare goes the --renamed-by option this criterion added (REQ-TEST-239's approved reason, applied to this criterion by REQ-TEST-393, v6 Q4)."
     linked_tests:
       - tests/test_dataset_stats.py
       - tests/test_build_dashboard_data.py
@@ -38174,7 +38159,6 @@ requirements:
       - tests/test_collections_registry.py
       - tests/test_run_evidently_bdm.py
       - tests/test_evidently_recorded_reference.py
-      - tests/test_equivalence.py
       - tests/test_publish.py
       - tests/test_dashboard_e2e.py
     implemented_by:
@@ -38187,7 +38171,6 @@ requirements:
       - pipeline/build_dashboard_data.py::build
       - qa_tools/collections/__init__.py::Collection
       - qa_tools/common/validate_collections.py::config_problems
-      - qa_tools/common/equivalence.py::compare
       - assets/daily/dbt/models/civil-registration/stg_birth_registrations.sql
     evidence:
       - "2026-10-18, CRITERION 5: `mothman debug equivalence compare after-247b after-248 --renamed-by REQ-PIPE-248` (7c2913a against 578b2d5, 20 commits; bootstraps 1371s and 1465s). S4 generated files the same. S1: 111 recorded results differ, every one Birth Registrations' row-count-growth check and every one in `column_name` alone (registration_number -> (table)) - status, value and reference identical, so the per-table count read from the record equals the count the old path made; and all 482 dataset_stats records differ in shape only (row_count -> row_counts by table, aggregates keyed table.column, no arrival/earliest_extract). S5, with the four files mapped to their new names: Child Protection's dashboard file identical; its results file loses each record's `arrival`; Birth Registrations' results file gains the collection header and the stats shape above; Birth Registrations' dashboard file moves under `datasets`, where its one dataset equals the old document except that the volume check sits in Supply-level checks rather than registration_number and the Table-level and Supply-level pseudo-columns take Child Protection's order. S7: one line, `mothman debug equivalence compare`'s help gaining --renamed-by, which criterion 8 adds. Every difference is one this requirement or REQ-QAC-247's two moved calls names."
@@ -47302,7 +47285,6 @@ requirements:
     - tests/test_validate_soda.py::test_two_collections_sharing_a_table_name_are_each_held_to_their_own_key
     - tests/test_validate_soda.py::test_the_registry_keys_are_by_collection_and_table
     - tests/test_dashboard_e2e.py::TestASeveralColumnSampleOnTheRealPage
-    - tests/test_sample_keys_equivalence.py
     - tests/test_thirty_linked_datasets.py::TestEveryLinkageResultNamesItsRowsByTheWholeKey::test_each_result_records_the_key_columns
     evidence:
     - '2026-11-01 Perth, worktree b341: tests/test_sample_keys_composite.py, test_sample_keys_deterministic.py, test_common_helpers.py, test_collections_registry.py, test_validate_soda.py, test_check_fingerprint.py, test_linkage_check_sql.py, test_linked_datasets.py, test_qa_results_reader.py, test_build_from_the_record.py, test_check_lifecycle.py, test_validate_check_lifecycle.py, the six test_run_{soda,dbt,datacontract}_{bdm,cp}.py, test_soda_scoped.py and test_linkage_scenarios.py green; vitest sample-keys-compare, sample-fine-print, tool-verdict-status and dashboard-loads green. No bootstrap, no full suite (Keith''s terms for the build run).'
