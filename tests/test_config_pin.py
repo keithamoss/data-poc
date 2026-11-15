@@ -128,6 +128,27 @@ class TestAPinHoldsTheConfigurationStill:
         assert len(one.short) == 12
 
 
+class TestThePinAnswersTheReadersBuiltOnConfigYaml:
+    """Criterion 7, and REQ-PIPE-401's deferred half: a reader that reads
+    through config_yaml - here the Linkage Products set-member checks, which
+    parse three dbt schema files on every call - reads no file inside a pin."""
+
+    def test_the_set_member_checks_read_no_schema_file_inside_a_pin(self, monkeypatch):
+        from asset_model import set_member_checks
+
+        outside = set_member_checks.declared()
+        assert outside, "precondition - the quarterly asset declares set-member checks"
+        read = []
+        real = config_yaml.read_from_disk
+        monkeypatch.setattr(config_yaml, "read_from_disk",
+                            lambda p: read.append(str(p)) or real(p))
+        with config_pin.ConfigSnapshot.take():
+            read.clear()
+            inside = set_member_checks.declared()
+        assert inside == outside
+        assert not [p for p in read if p.endswith((".yml", ".yaml"))], read
+
+
 class TestAFileThatCannotBeReadIsNotRemembered:
     """Criterion 9."""
 

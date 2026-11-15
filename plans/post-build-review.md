@@ -15560,3 +15560,37 @@ twice. It deliberately did not re-find the `TypeError`.
        two-rule Fail test added.
      - **Ran** (#381-#385): see REQ-GEN-392's evidence - 29 affected modules,
        629 passed, 2 skipped; ruff clean.
+
+390. **[done, 2026-11-16]** **[QA pipeline]** **One pinned generation built 329 agreements from the same few documents, so REQ-PIPE-400's memo kept forgetting the committed one.**
+     Found building REQ-PIPE-400: `tests/test_derived_once.py`'s counting test
+     saw `Agreement.standing_on` worked out twice for the same agreement,
+     zones and arguments. generator/correction_claims builds the agreement
+     either side of each declared correction afresh on every call
+     (`agreement.from_doc`), and a staged correction parses its zones afresh
+     each time, so one Birth Registrations generation passed 329 distinct
+     (agreement, zones) pairs through a memo that keeps 16 - the committed
+     agreement's values were evicted and worked out again.
+     - **Fix** (defect of the build, failing test first): `agreement.from_doc`
+       answers one instance per document content and
+       `asset_time.parse_timezone_versions` one tuple per `timezone:` block,
+       each through a `config_yaml.Built` keyed on the canonical JSON. The
+       same generation sees 3 pairs; the counting test passes. Both values
+       are immutable, so sharing one instance is safe.
+
+391. **[todo]** **[QA pipeline]** **[Testing & dev tooling]** **dbt's own partial parse misses a schema edit that keeps the file's modification time.**
+     Found writing REQ-PIPE-397 criterion 15's "a dbt model edited inside a
+     pin reaches dbt": an in-place edit of a daily schema.yml with its
+     modification time put back (the REQ-PIPE-254 test style) changed
+     `dbt_common._project_fingerprint`, so `parsed_test_nodes` asked dbt to
+     parse again - and dbt answered the old meta name, very likely from the
+     long-lived worker's partial-parse file, which outlives the call (not
+     traced further). With the time moved, dbt sees the edit (the test now
+     moves it). NOT CAUSED BY THE PIN: dbt reads
+     its project itself, outside config_yaml (SA Q4). It means a mothman
+     cache keyed on content can sit over a dbt answer keyed on time - the
+     shape REQ-PIPE-254 criterion 15 exists to forbid, one layer down.
+     - **For Keith**: worth a requirement? Options: delete the worker's
+       partial-parse file whenever the project fingerprint changes, or pass
+       `--no-partial-parse` to the parse in `parsed_test_nodes` only. Not
+       fixed here: outside the speed batch's criteria, and it touches the
+       dbt worker REQ-PIPE-157 settled.

@@ -33,9 +33,11 @@ richer - the hierarchy's Dataset records, the agreement, compiled patterns,
 a check-id lookup - keeps what it built in a `Built` store, keyed on the
 file's path AND its text as read on this call. So an edited or swapped file
 is answered for what it says now, with nothing to clear, and an unchanged one
-is answered without being parsed or built again. The file is READ ON EVERY
-CALL and never skipped on its modification time, size or inode (criterion
-15): a same-size edit inside one clock tick keeps all three. Before this, nine
+is answered without being parsed or built again. OUTSIDE A PINNED RUN
+(REQ-PIPE-397) the file is READ ON EVERY CALL and never skipped on its
+modification time, size or inode (criterion 15, as amended): a same-size edit
+inside one clock tick keeps all three. Inside one, a file of the pinned
+snapshot is answered from the snapshot - see THE PIN below. Before this, nine
 such values sat behind functools.lru_cache, one per process or per path, and
 a test that swapped a file had to know every cache to clear
 (plans/post-build-review.md #217 is the one it missed). `mothman check`'s

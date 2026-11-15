@@ -162,6 +162,108 @@ class TestTheReplayReadsThePinnedConfiguration:
         assert seen == [(None, 22), (None, 21)]
 
 
+# ---- a real replay with the calendar edited part-way (criterion 7) ------------
+
+@pytest.fixture(scope="module")
+def three_arrivals(tmp_path_factory) -> Path:
+    """Birth Registrations' first three arrivals, generated for real into a
+    tree of the module's own and cut down to them."""
+    import contextlib
+    import io
+    import shutil
+    import warnings
+
+    from generator import driver, output
+
+    whole = tmp_path_factory.mktemp("whole")
+    undo = output.redirect(whole)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            driver.generate("civil-registration")
+            first = arrivals.recognise_arrivals("civil-registration", "", whole / "deliveries",
+                                                whole / "receipts")[:3]
+    finally:
+        undo()
+    cut = tmp_path_factory.mktemp("cut")
+    for name in {a.delivery_name for a in first}:
+        shutil.copytree(whole / "deliveries" / name, cut / "deliveries" / name)
+        shutil.copytree(whole / "receipts" / name, cut / "receipts" / name)
+    shutil.rmtree(whole)
+    return cut
+
+
+def _replayed(tree: Path, monkeypatch, *, edit=None, edit_before=False) -> dict:
+    """The filings and verdicts a real bootstrap replay of `tree` records into
+    an empty database of its own - its generation and its target comparison
+    left out - with `edit()` applied before the bootstrap, or as the second
+    arrival begins processing."""
+    from asset_model import delivery
+    from bootstrap import replay_clock
+    from qa_tools.common import qa_store, supply_db
+
+    dbsupport.use_empty_supply_db(monkeypatch)
+    with supply_db.connect(label="test") as conn:
+        supply_db.ensure_schemas(conn)
+    monkeypatch.setattr(delivery, "default_deliveries_dir", lambda: tree / "deliveries")
+    monkeypatch.setattr(delivery, "default_receipts_dir", lambda: tree / "receipts")
+    monkeypatch.setattr("bootstrap.generation.generate_collection", lambda cid, **_k: None)
+    monkeypatch.setattr(boot, "targets_agree", lambda names: ())
+    monkeypatch.setattr("bootstrap.correction_replay.confirm_due", lambda **k: [])
+    # NO SCRIPTED DECISION: the scripts name supplies far past these three.
+    from bootstrap import decision_player
+
+    real_player = decision_player.Player
+    monkeypatch.setattr(decision_player, "Player",
+                        lambda cid, **k: real_player(cid, scripts=[]))
+    if edit is not None and edit_before:
+        edit()
+    elif edit is not None:
+        real = replay_clock.ReplayClock.processing_arrival
+        seen = []
+
+        def processing(self, received_at):
+            seen.append(received_at)
+            if len(seen) == 2:
+                edit()
+            return real(self, received_at)
+        monkeypatch.setattr(replay_clock.ReplayClock, "processing_arrival", processing)
+    result = boot.bootstrap(collection="all", skip_target_trial=True)
+    assert result.populated, result.reason
+    with supply_db.connect(label="test", read_only=True) as conn:
+        filings = conn.execute(
+            f'SELECT supply_id, slot, branch FROM "{qa_store.SCHEMA}".filing '
+            "ORDER BY supply_id").fetchall()
+        verdicts = conn.execute(
+            f'SELECT supply_id, classification, inputs::text FROM "{qa_store.SCHEMA}".verdict '
+            "ORDER BY supply_id, id").fetchall()
+    assert len(filings) == 3, filings
+    return {"filings": filings, "verdicts": verdicts}
+
+
+class TestARealReplayFilesAsThePinnedCalendarSays:
+    """REQ-GEN-399 criterion 7, through the real pipeline: a calendar edited
+    while a replay runs leaves that replay's filings and verdicts as the
+    pinned calendar says, and the next bootstrap reads the edit."""
+
+    def test_an_edit_mid_replay_changes_nothing_the_replay_records(self, three_arrivals,
+                                                                     calendar, monkeypatch):
+        original = calendar.read_text(encoding="utf-8")
+
+        def restore():
+            calendar.write_text(original, encoding="utf-8")
+
+        clean = _replayed(three_arrivals, monkeypatch)
+        during = _replayed(three_arrivals, monkeypatch,
+                           edit=lambda: edit_in_place(calendar, *WHEN))
+        assert during == clean, "an edit made mid-replay reached the replay's records"
+        # THE EDIT IS STILL ON DISK, and the next bootstrap reads it.
+        after = _replayed(three_arrivals, monkeypatch)
+        assert after["verdicts"] != clean["verdicts"], \
+            "the next bootstrap did not read the edited calendar"
+        restore()
+
+
 def _pid_and_pin(_n):
     time.sleep(0.5)
     held = config_pin.installed()
