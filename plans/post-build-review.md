@@ -14923,3 +14923,39 @@ twice. It deliberately did not re-find the `TypeError`.
      entry. Confirmed by parsing the copy's file. Its tests pass, so whatever
      reads the words tolerates the gap there; #333's fixture now inserts at the
      end of `collections:` instead, and the same change would fix this one.
+
+336. **[done, 2026-11-15]** **[Data generation]** **The providers gate raised a traceback on a provider that cannot be imported.**
+     Found building REQ-GEN-370 criterion 5 (split T4): `generator/validate_providers.py`'s
+     `problems()` loaded every provider through `collections.providers()`, which
+     catches only `NoProviderError`, so a provider whose own import fails - a
+     missing module, or the forbidden import the new rule names - raised a
+     `ModuleNotFoundError` out of the gate and `mothman check` showed a
+     traceback. The collections gate already reports an unimportable adapter as
+     a finding (REQ-PIPE-369 criterion 3's `config_problems`). Minor.
+     - **Fix** (test first): `problems()` asks the new import rule first, then
+       tries each provider; one that cannot be imported is named with its error
+       (`<path> cannot be imported: ...`), not twice where its forbidden import
+       is already named, and the checks that load every provider are skipped.
+     - **Ran**: `tests/test_provider_imports.py::TestTheGateReportsIt::test_a_provider_that_cannot_be_imported_is_a_finding_not_a_traceback`
+       failed first (`ModuleNotFoundError: No module named
+       'no_such_module_anywhere_st4'` raised out of `problems()`), then passed.
+
+337. **[done, 2026-11-15]** **[QA checks & contract]** **The check-definition fingerprint read the asset's synthetic/ folder.**
+     Found by REQ-GEN-370 criterion 3's new test (split T4), an audit hook over a
+     real batch pass: `validate_check_lifecycle.sources_fingerprint()` hashed
+     every YAML file under the asset folder, `synthetic/` included, so staging
+     (file checks recording their definition fingerprints through
+     `tables_read.definition_fingerprints`) listed `synthetic/` and read
+     `scripted_decisions.yaml` - the real pipeline reading synthetic-only
+     configuration, against criterion 3. Its effect was a cache key only (the
+     check-definition and bulk re-check caches): editing a scripted decision or
+     a placing input re-collected every check definition. No check is collected
+     from there. Minor.
+     - **Fix** (test first): the fingerprint walks the asset folder without
+       descending into `synthetic/`.
+     - **Ran**: `tests/test_validate_check_lifecycle.py::test_the_fingerprint_reads_nothing_under_synthetic`
+       failed first (the fingerprint moved when `scripted_decisions.yaml` was
+       edited), then the module 33 passed; and
+       `tests/test_synthetic_folder_unread.py` failed first on the present
+       variant (75 reads under `synthetic/`, the `os.scandir` and `open` calls
+       from `sources_fingerprint`), then 5 passed.

@@ -29,6 +29,7 @@ stays green when the read goes, rather than going red because work succeeded.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -144,12 +145,44 @@ def _asset_folder(tmp: Path, *, synthetic: bool) -> Path:
     return folder
 
 
-def _tree(tmp: Path, bdm_raw_dir: str) -> Path:
-    """A copy of the session's two Birth Registrations deliveries, so the run
-    writes its reports and observations beside a tree of its own."""
+#: How many of the generated history's first deliveries are run: the first
+#: fills its open slot and is promoted, the second is checked against it.
+DELIVERIES = 2
+
+
+@pytest.fixture(scope="module")
+def corpus(tmp_path_factory) -> Path:
+    """The real Birth Registrations generator's output, cut to its first
+    DELIVERIES deliveries (tests/test_kept_routes_agree.py's corpus) -
+    generated before anything is watched, since the generator is an allowed
+    reader."""
+
+    import generator_isolation
+    from generator import driver
+
+    root = tmp_path_factory.mktemp("synthetic_unread_corpus")
+    undo = generator_isolation.redirect(root)
+    try:
+        driver.generate("civil-registration")
+    finally:
+        undo()
+    book = json.loads((root / "generator_bookkeeping.json").read_text())
+    entries = sorted(book["birth-registrations"], key=lambda e: e["run_id"])
+    keep = {e["delivery"] for e in entries[:DELIVERIES]}
+    assert len(keep) == DELIVERIES, "precondition: the generator wrote enough deliveries"
+    for tree in ("deliveries", "receipts"):
+        for d in (root / tree).iterdir():
+            if d.name not in keep:
+                shutil.rmtree(d)
+    return root
+
+
+def _tree(tmp: Path, corpus: Path) -> Path:
+    """A copy of the corpus, so each run writes its reports and observations
+    beside a tree of its own."""
     tree = tmp / "tree"
     for part in ("deliveries", "receipts"):
-        shutil.copytree(Path(bdm_raw_dir) / part, tree / part)
+        shutil.copytree(corpus / part, tree / part)
     return tree
 
 
@@ -188,12 +221,12 @@ def _run_and_build(tree: Path, asset_folder: Path, out: Path, db_name: str) -> d
 
 
 @pytest.fixture(scope="module")
-def runs(bdm_raw_dir, tmp_path_factory, worker_id):
+def runs(corpus, tmp_path_factory, worker_id):
     out = {}
     for synthetic in (True, False):
         tmp = tmp_path_factory.mktemp("synthetic_unread")
         key = "present" if synthetic else "removed"
-        out[key] = _run_and_build(_tree(tmp, bdm_raw_dir), _asset_folder(tmp, synthetic=synthetic),
+        out[key] = _run_and_build(_tree(tmp, corpus), _asset_folder(tmp, synthetic=synthetic),
                                   tmp / "out", f"synthetic_unread_{key}_{worker_id}")
         out[key]["out"] = tmp / "out"
     return out
@@ -214,8 +247,12 @@ class TestTheRealPipelineReadsNothingThere:
         snap = runs[variant]
         assert sum(snap["qa.filing"][1].values()) >= 1
         assert sum(snap["qa.check_result"][1].values()) > 10
-        operations = {str(row).lower() for row in snap["qa.decision"][1]}
-        assert any("promot" in op for op in operations), operations
+        names, rows = snap["qa.check_result"]
+        # The snapshot holds each value as its JSON text.
+        tools = {json.loads(row[names.index("tool")]) for row in rows}
+        assert {"dbt", "soda", "datacontract", "evidently"} <= tools, tools
+        actions = {json.loads(d["action"]) for d in _decisions(snap)}
+        assert "promote" in actions, actions
         assert (runs[variant]["out"] / "qa-reporting-dashboard.html").is_file()
         assert snap["seen"]["asset_reads"] > 0
 
