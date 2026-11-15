@@ -286,7 +286,7 @@ def _first_period_on_or_after(dataset_id: str, day: date, end: date | None, agr)
     from asset_model import schedule, slots
 
     try:
-        periods = slots._calendar_periods(dataset_id, day + timedelta(days=400), agr)
+        periods = slots.period_sequence(dataset_id, day + timedelta(days=400), agr)
     except (schedule.ScheduleConfigError, KeyError, ValueError):
         return None
     dates = [p.date for p in periods if p.date >= day and (end is None or p.date < end)]
@@ -370,9 +370,9 @@ def freeze_instant(item: Item, agr) -> datetime | None:
         from asset_model import slots
 
         try:
-            periods = slots._calendar_periods(c["dataset"], None, agr)
+            periods = slots.period_sequence(c["dataset"], None, agr)
         except Exception:  # noqa: BLE001 - a cadence rule needs a bound
-            periods = slots._calendar_periods(
+            periods = slots.period_sequence(
                 c["dataset"], asset_time.local_date(datetime.now(UTC)) + timedelta(days=400), agr)
         match = next((p for p in periods if p.name == c["period"]), None)
         return _claim_open(c["dataset"], match.date, agr) if match else None
@@ -629,7 +629,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
     out = []
     for ds in sorted(set(_turn_off_datasets(item, old_agr)) | set(_turn_off_datasets(item, new_agr))):
         try:
-            periods = slots._calendar_periods(ds, start + _FLIP_REACH, new_agr)
+            periods = slots.period_sequence(ds, start + _FLIP_REACH, new_agr)
         except Exception:  # noqa: BLE001 - a dataset with no calendar flips nothing
             continue
         reason_only = len(tos) == 2 and tos[0] == tos[1]

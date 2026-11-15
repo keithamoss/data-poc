@@ -8276,7 +8276,7 @@ requirements:
     implemented_by:
       - asset_model/schedule.py::periods_for_calendar
       - asset_model/schedule.py::periods_for_dataset
-      - asset_model/schedule.py::schema_name
+      - qa_tools/common/period_schema.py::period_schema
       - asset_model/schedule.py::_effect_windows
       - asset_model/schedule.py::Period
     evidence:
@@ -23144,7 +23144,6 @@ requirements:
       - qa_tools/common/sample_data.py::ensure_schema_for_table
       - qa_tools/common/sample_data.py::discard
       - asset_model/schedule.py::no_calendar
-      - asset_model/schedule.py::will_graduate
       - asset_model/schedule.py::owes_from
       - asset_model/schedule.py::calendar_for_dataset
       - qa_tools/common/supply_db.py::add_run_views

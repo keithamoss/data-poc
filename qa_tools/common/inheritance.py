@@ -609,7 +609,7 @@ def offset_group(dataset_id: str, period_name: str) -> int | None:
     this dataset - its offset group in that period (REQ-PIPE-323 criterion
     1) - or None where the period is no period of its calendar."""
     try:
-        agr = schedule._agreement(None)
+        agr = schedule.agreement_to_read(None)
         on = (schedule.round_of(period_name, dataset_id, agr)
               or schedule.date_of(period_name, dataset_id))
     except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
@@ -675,7 +675,7 @@ def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]
     where the calendar's collections share one offset (criterion 4)."""
     from asset_model import asset_time, slots
 
-    agr = schedule._agreement(None)
+    agr = schedule.agreement_to_read(None)
     members = [d for d in hierarchy.all_datasets() if d.collection_id == collection_id]
     try:
         cal = schedule.calendar_for_dataset(members[0].dataset_id, agr).name

@@ -205,7 +205,7 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
 
     horizon = slots.lookup_horizon()
     try:
-        sequence = slots._calendar_periods(dataset_id, horizon)
+        sequence = slots.period_sequence(dataset_id, horizon)
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
         return None
     found = next((p for p in sequence if p.name == period), None)
@@ -214,7 +214,7 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     reasons = schedule.not_expected_periods(dataset_id)
     if period in reasons:
         return f"it is listed not_expected: {reasons[period]}"
-    agr = schedule._agreement(None)
+    agr = schedule.agreement_to_read(None)
     # ON THE ROUND THAT WOULD FILL IT (REQ-PIPE-321 criterion 2): participation
     # and its delivery months are a round's, so at files_go_to_period 1 a
     # quarter is owed nothing because the round BEFORE it is not delivered in.
@@ -348,7 +348,7 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     horizon = slots.lookup_horizon()
     try:
         owed = {s.name: s for s in slots.slots_for_dataset(dataset_id, until=horizon)}
-        sequence = [p for p in slots._calendar_periods(dataset_id, horizon)
+        sequence = [p for p in slots.period_sequence(dataset_id, horizon)
                     if p.date <= horizon or p.name in owed]
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
         # NO CALENDAR TO CHOOSE FROM (#188 D10) - an empty chooser, never a

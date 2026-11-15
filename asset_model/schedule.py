@@ -291,7 +291,7 @@ def _parse_version(raw: dict, calendar_name: str, index: int) -> CalendarVersion
             raise ScheduleConfigError(
                 f"{where}: cadence rule {rule!r} is not supported - only 'daily' is, which is "
                 f"the one schedule genuinely worth expressing as a rule rather than a date list.")
-        return CalendarVersion(effective_from=_as_date(effective_from, where),
+        return CalendarVersion(effective_from=as_date(effective_from, where),
                                 changelog=changelog, claim_window=claim_window,
                                 periods=(), cadence_rule=rule)
 
@@ -308,18 +308,18 @@ def _parse_version(raw: dict, calendar_name: str, index: int) -> CalendarVersion
                 f"names one bucket on the calendar, so two dates for it makes every slot "
                 f"referring to it ambiguous.")
         seen[name] = str(when)
-        periods.append(Period(name=name, date=_as_date(when, f"{where} period {name!r}")))
+        periods.append(Period(name=name, date=as_date(when, f"{where} period {name!r}")))
 
     out_of_order = [p.name for a, p in zip(periods, periods[1:]) if p.date <= a.date]
     if out_of_order:
         raise ScheduleConfigError(
             f"{where}: authored dates must run forwards in time, and these do not: "
             f"{', '.join(out_of_order)}.")
-    return CalendarVersion(effective_from=_as_date(effective_from, where), changelog=changelog,
+    return CalendarVersion(effective_from=as_date(effective_from, where), changelog=changelog,
                             claim_window=claim_window, periods=tuple(periods), cadence_rule=None)
 
 
-def _as_date(value, where: str) -> date:
+def as_date(value, where: str) -> date:
     if isinstance(value, date):
         return value
     try:
@@ -346,7 +346,7 @@ def parse_calendar(raw: dict) -> Calendar:
                     versions=tuple(versions), runway_warning_slots=runway)
 
 
-def _agreement(agreement=None):
+def agreement_to_read(agreement=None):
     """The agreement to read: the one passed, or the committed one
     (REQ-PIPE-110 criterion 31 - every reader takes it as an argument)."""
     if agreement is not None:
@@ -357,7 +357,7 @@ def _agreement(agreement=None):
 
 
 def _load(agreement=None) -> dict[str, Calendar]:
-    calendars = dict(_agreement(agreement).calendars)
+    calendars = dict(agreement_to_read(agreement).calendars)
     return calendars
 
 
@@ -403,7 +403,7 @@ def on_baseline(period_name: str, agreement=None) -> bool:
     base = baseline(agreement)
     if base is None or not period_name:
         return False
-    if any(p.name == period_name for p in _calendar_periods(base)):
+    if any(p.name == period_name for p in _authored_periods(base)):
         return True
     try:
         day = date.fromisoformat(period_name)
@@ -411,7 +411,7 @@ def on_baseline(period_name: str, agreement=None) -> bool:
         return False
     if day.isoformat() != period_name or day < base.versions[0].effective_from:
         return False
-    return _version_in_force(base, day).is_cadence_rule
+    return version_in_force_or_first(base, day).is_cadence_rule
 
 
 def calendar(name: str, agreement=None) -> Calendar:
@@ -482,7 +482,7 @@ def no_calendar(dataset_id: str, agreement=None) -> str | None:
     by accident - which would be the quiet direction.
     """
     hierarchy.dataset(dataset_id)
-    return _no_calendar(dataset_id, _agreement(agreement))
+    return _no_calendar(dataset_id, agreement_to_read(agreement))
 
 
 def _no_calendar(dataset_id: str, agreement) -> str | None:
@@ -499,15 +499,6 @@ def _no_calendar(dataset_id: str, agreement) -> str | None:
             f"schedule is agreed, and it will graduate; {NEVER} means a one-off extraction "
             f"that has supplies and no cadence at all.")
     return declared
-
-
-def will_graduate(dataset_id: str) -> bool:
-    """Whether a dataset with no calendar is expected to gain one.
-
-    Criterion 3. False for a one-off extraction, which must never be
-    presented as waiting for a schedule somebody has to agree.
-    """
-    return no_calendar(dataset_id) == NOT_YET_AGREED
 
 
 def owes_from(dataset_id: str, agreement=None) -> date | None:
@@ -532,7 +523,7 @@ def owes_from(dataset_id: str, agreement=None) -> date | None:
     key of its own.
     """
     hierarchy.dataset(dataset_id)
-    entry = _agreement(agreement).dataset(dataset_id)
+    entry = agreement_to_read(agreement).dataset(dataset_id)
     if entry is None or not entry.participation:
         return None
     return entry.participation[0].effective_from
@@ -553,7 +544,7 @@ def calendar_for_dataset(dataset_id: str, agreement=None) -> Calendar:
     somebody got it wrong.
     """
     hierarchy.dataset(dataset_id)  # raises UnknownDatasetError, naming the known ids
-    agreement = _agreement(agreement)
+    agreement = agreement_to_read(agreement)
     declared = _no_calendar(dataset_id, agreement)
     if declared is not None:
         raise NoCalendarAgreed(dataset_id, declared)
@@ -580,7 +571,7 @@ def delivery_months(dataset_id: str, on: date | None = None,
     participation version in force on `on` - the period's own date - or of
     the newest version where `on` is not given.
     """
-    agreement = _agreement(agreement)
+    agreement = agreement_to_read(agreement)
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         return None
@@ -599,11 +590,11 @@ def not_expected_periods(dataset_id: str, agreement=None) -> dict[str, str]:
     somebody having forgotten to configure November - and those are
     opposite problems.
     """
-    entry = _agreement(agreement).dataset(dataset_id)
+    entry = agreement_to_read(agreement).dataset(dataset_id)
     return dict(entry.not_expected) if entry else {}
 
 
-def _calendar_periods(cal: "Calendar", until: date | None = None) -> list[Period]:
+def _authored_periods(cal: "Calendar", until: date | None = None) -> list[Period]:
     """An authored calendar's periods, version by version - each version
     contributing only the periods inside its own period of effect."""
     out: list[Period] = []
@@ -642,7 +633,7 @@ def periods_for_calendar(calendar_name: str, until: date | None = None,
     from a rule to authored dates or back.
     """
     cal = calendar(calendar_name, agreement)
-    out = _calendar_periods(cal)
+    out = _authored_periods(cal)
     for version, start, end in _effect_windows(cal):
         if not version.is_cadence_rule:
             continue
@@ -658,32 +649,6 @@ def periods_for_calendar(calendar_name: str, until: date | None = None,
     if until is not None:
         out = [p for p in out if p.date <= until]
     return out
-
-
-def schema_name(period: Period) -> str:
-    """The warehouse schema this period's supplies are stored in
-    (REQ-PIPE-051 criterion 6).
-
-    ONE PERIOD, ONE SCHEMA - the physical storage model's own shape
-    (plans/supply-model.md Thread A). Which makes this function's
-    output a PHYSICAL NAME rather than a label: changing how a period
-    is named renames real schemas, so the NFR attached to this
-    criterion says to name it once and not revisit it, and this
-    docstring is where that warning has to live.
-
-    Lower-cased, non-alphanumerics folded to underscores, and prefixed
-    - `2026-Q1` becomes `period_2026_q1`, `2026-09-01` becomes
-    `period_2026_09_01`. The prefix is not decoration: an authored
-    period name is whatever the agency calls it, and a bare `2026_q1`
-    is not a legal unquoted identifier in every engine this might ever
-    touch, while a leading letter always is.
-    """
-    folded = re.sub(r"[^a-z0-9]+", "_", period.name.strip().lower()).strip("_")
-    if not folded:
-        raise ScheduleConfigError(
-            f"period {period.name!r} has no characters that can name a schema. A period "
-            f"name has to survive becoming a physical identifier.")
-    return f"period_{folded}"
 
 
 def periods_for_dataset(dataset_id: str, until: date | None = None,
@@ -703,7 +668,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     from asset_model.agreement import TURNED_OFF
 
     cal = calendar_for_dataset(dataset_id, agreement)
-    agreement = _agreement(agreement)
+    agreement = agreement_to_read(agreement)
     months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
     skipped = not_expected_periods(dataset_id, agreement)
@@ -726,7 +691,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
         if agreement.standing_on(dataset_id, r.date).state == TURNED_OFF:
             return False
         on = delivery_months(dataset_id, r.date, agreement)
-        if on is not None and _version_in_force(cal, r.date).is_cadence_rule:
+        if on is not None and version_in_force_or_first(cal, r.date).is_cadence_rule:
             # CRITERION 7 PER VERSION: months mean nothing against a
             # cadence rule, and dropping the period would leave the
             # dataset silently owing nothing for it.
@@ -814,7 +779,7 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
     # A PARTICIPATION VERSION MAY OVERRIDE IT (REQ-PIPE-110 criterion 4).
-    agreement = _agreement(agreement)
+    agreement = agreement_to_read(agreement)
     entry = agreement.dataset(dataset_id)
     if on is not None:
         # A period before the first version takes that first version's
@@ -836,10 +801,10 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     cal = calendar_for_dataset(dataset_id, agreement)
     if on is None:
         return cal.current.claim_window
-    return _version_in_force(cal, on).claim_window
+    return version_in_force_or_first(cal, on).claim_window
 
 
-def _version_in_force(cal: Calendar, on: date) -> CalendarVersion:
+def version_in_force_or_first(cal: Calendar, on: date) -> CalendarVersion:
     """The version whose period of effect contains `on`.
 
     A date BEFORE the first version's effective_from takes that first
@@ -954,7 +919,7 @@ def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
     round fills the period - a period a rise skips (REQ-PIPE-322), or one
     the calendar does not name.
     """
-    agr = _agreement(agreement)
+    agr = agreement_to_read(agreement)
     horizon = asset_time.now().date() + timedelta(days=365)
     sequence = periods_for_calendar(calendar_for_dataset(dataset_id, agr).name,
                                     until=horizon, agreement=agr)
@@ -983,7 +948,7 @@ def period_filled_by(dataset_id: str, round_period: Period, agreement=None) -> P
     files_go_to_period 0, the period N on at N (REQ-PIPE-321 criterion 1) - or
     None where the calendar gives that period no date (criterion 8). The one
     place a round is turned into the name a person reads."""
-    agr = _agreement(agreement)
+    agr = agreement_to_read(agreement)
     n = agr.files_go_to_period_for(dataset_id, round_period.date) or 0
     if n == 0:
         return round_period

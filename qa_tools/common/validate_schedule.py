@@ -907,10 +907,10 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
         # the replacement setting and each entry list_settings declares are
         # versioned by the same mechanism, so dated the same way - the list
         # settings iterated, never named.
-        if any(start in amber_setting._versions(setting)
+        if any(start in amber_setting.versions_by_date(setting)
                for key in (amber_setting.KEY, "replacement_setting",
                            *amber_setting.list_setting_keys(doc))
-               for setting in amber_setting._settings(doc, key).values()):
+               for setting in amber_setting.stated_settings(doc, key).values()):
             return asset_time.local_date(datetime.fromisoformat(stamp))
     return None
 
@@ -2376,8 +2376,8 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
         # traceback in filing rather than an error here (delivery-critic on
         # REQ-PIPE-113, #2).
         try:
-            agreement = schedule._agreement()
-            periods = [p for p in slots._calendar_periods(entry.dataset_id, until, agreement)
+            agreement = schedule.agreement_to_read()
+            periods = [p for p in slots.period_sequence(entry.dataset_id, until, agreement)
                        if p.date <= until]
         except Exception:  # noqa: BLE001 - no calendar, or reported by another gate
             continue
@@ -2385,7 +2385,7 @@ def _daylight_saving_errors(src: Source) -> list[ConfigError]:
             # The participation version in force on the period's own date,
             # and the day its due instant falls on (REQ-PIPE-113).
             try:
-                version = slots._participation_for(entry.dataset_id, period.date, agreement)
+                version = slots.participation_for(entry.dataset_id, period.date, agreement)
             except schedule.ScheduleConfigError:
                 continue  # reported by the participation checks
             expected_time = version.expected_time

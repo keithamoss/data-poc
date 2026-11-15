@@ -85,13 +85,13 @@ def resolved(dataset_id: str, period_date: date, agreement=None, *,
     """
     from asset_model import asset_time, in_force, schedule, slots
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     instants = slots.slot_instants(dataset_id, period_date, agreement)
-    version = slots._participation_for(dataset_id, period_date, agreement)
+    version = slots.participation_for(dataset_id, period_date, agreement)
     offset = agreement.files_go_to_period_for(dataset_id, period_date) or 0
     window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
-    cal_version = schedule._version_in_force(cal, period_date)
+    cal_version = schedule.version_in_force_or_first(cal, period_date)
     due_date = period_date - timedelta(days=version.days_before)
     zone = in_force.version_on(asset_time.timezone_versions(), due_date)
     inputs = {
@@ -315,7 +315,7 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     """
     from asset_model import schedule, slots
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     rows = conn.execute(
         f"SELECT f.supply_id, f.slot, v.id, v.classification, v.inputs, v.fingerprint, "
         f"r.received_instant, v.recorded_at "

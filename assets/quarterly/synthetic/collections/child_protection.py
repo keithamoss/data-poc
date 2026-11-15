@@ -741,7 +741,7 @@ def drawn_grown_periods() -> list:
     rounds = schedule.periods_for_calendar(baseline, until=get_anchor_date())[-n:-len(run_plan())]
     out = []
     for r in rounds:
-        offset = schedule._agreement(None).files_go_to_period_for(DATASET_ID, r.date) or 0
+        offset = schedule.agreement_to_read(None).files_go_to_period_for(DATASET_ID, r.date) or 0
         out.append(schedule.DatasetPeriod(period=sequence[index[r.name] + offset], round=r))
     return out
 

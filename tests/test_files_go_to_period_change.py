@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 import yaml
 
-from asset_model import agreement, schedule, slots
+from asset_model import agreement, schedule, slots, assignment
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
@@ -265,7 +265,7 @@ def test_where_an_arrival_falls_is_answered_on_29_february(contract):
     _, cal_path = contract(1, 0)
     agr = agreement.load(cal_path)
     at = datetime(2028, 2, 29, 10, tzinfo=timezone(timedelta(hours=8)))
-    assert slots.fall_hold("cp-clients", at, agr) is None
+    assert assignment.fall_hold("cp-clients", at, agr) is None
 
 
 def test_a_slot_is_found_when_now_is_29_february(monkeypatch):
@@ -305,8 +305,8 @@ class TestTheRoundFillingAPeriodAgreesWithTheSlotsAfterAFall:
         agr = agreement.load(cal_path)
         monkeypatch.setattr(agreement, "current", lambda: agr)
         at = datetime(2026, 8, 1, 10, tzinfo=timezone(timedelta(hours=8)))
-        assert slots.fall_hold("cp-case-workers", at, agr) is None
-        assert slots.fall_hold("cp-clients", at, agr) is not None
+        assert assignment.fall_hold("cp-case-workers", at, agr) is None
+        assert assignment.fall_hold("cp-clients", at, agr) is not None
 
 
 def test_the_gate_names_the_round_a_version_takes_effect_from(capsys):
@@ -331,7 +331,7 @@ def test_a_hold_after_a_fall_of_two_names_the_round_the_change_took_effect_from(
     _, cal_path = contract(2, 0)
     agr = agreement.load(cal_path)
     at = datetime(2026, 11, 1, 10, tzinfo=timezone(timedelta(hours=8)))
-    fed = slots.fall_hold("cp-clients", at, agr)
+    fed = assignment.fall_hold("cp-clients", at, agr)
     assert fed["round"] == "2026-11-01"
     assert fed["from_round"] == "2026-08-01"
 

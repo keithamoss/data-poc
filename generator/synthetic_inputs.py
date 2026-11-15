@@ -24,9 +24,9 @@ def _path(root: Path) -> Path:
     """The selected asset's synthetic_inputs.yaml in the checkout at `root`,
     asked of the resolver at call time (REQ-PIPE-342 criterion 6; it was the
     import-time constant PATH)."""
-    from asset_model.linked_datasets import _asset_folder
+    from asset_model.linked_datasets import asset_folder
 
-    return _asset_folder(root) / "synthetic" / NAME
+    return asset_folder(root) / "synthetic" / NAME
 
 
 @dataclass(frozen=True)
@@ -68,9 +68,9 @@ def placings(root: Path = REPO) -> dict[str, Placing]:
 
 
 def _table(root: Path, contract: str, table: str) -> dict:
-    from asset_model.linked_datasets import _asset_folder
+    from asset_model.linked_datasets import asset_folder
 
-    doc = yaml.safe_load((_asset_folder(root) / contract).read_text()) or {}
+    doc = yaml.safe_load((asset_folder(root) / contract).read_text()) or {}
     return next((t for t in doc.get("schema") or [] if t.get("name") == table), {}) or {}
 
 
@@ -85,10 +85,10 @@ def problems(root: Path = REPO) -> list[str]:
     contract, and each declared value is among the placed column's allowed
     values; naming the dataset and the column or value."""
     from asset_model import assets
-    from asset_model.linked_datasets import _asset_folder, _walk
+    from asset_model.linked_datasets import asset_folder, walk
 
-    asset = yaml.safe_load((_asset_folder(root) / "data-asset.yaml").read_text()) or {}
-    where = {ds.get("id"): (coll, ds) for _a, coll, ds in _walk(asset)}
+    asset = yaml.safe_load((asset_folder(root) / "data-asset.yaml").read_text()) or {}
+    where = {ds.get("id"): (coll, ds) for _a, coll, ds in walk(asset)}
     out = []
     for p in placings(root).values():
         head = f"{assets.config_dir()}/synthetic/{NAME}: {p.dataset}"

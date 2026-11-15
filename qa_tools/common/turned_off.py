@@ -57,11 +57,11 @@ def gap_at(dataset_id: str, at: datetime, agreement=None) -> agreement_mod.TurnO
     which resolves a turned-off period's inputs as criterion 14 says."""
     from asset_model import schedule, slots
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return None
     try:
-        sequence = slots._calendar_periods(
+        sequence = slots.period_sequence(
             dataset_id, slots.claimable_until(dataset_id, at.date(), agr), agr)
     except schedule.NoCalendarAgreed:
         return None
@@ -78,7 +78,7 @@ def label_at(dataset_id: str, at: datetime, agreement=None) -> Label:
     owed slot, turned off, schedule ended, or the plain hold."""
     from asset_model import assignment, schedule, slots
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     try:
         found = slots.slots_for_dataset(
             dataset_id, until=slots.claimable_until(dataset_id, at.date(), agr), agreement=agr)
@@ -136,12 +136,12 @@ def gap_for_period(dataset_id: str, period: str, agreement=None) -> agreement_mo
     where the period is owed, not yet owing, or not the calendar's."""
     from asset_model import schedule, slots
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return None
     horizon = slots.lookup_horizon()
     try:
-        sequence = slots._calendar_periods(dataset_id, horizon, agr)
+        sequence = slots.period_sequence(dataset_id, horizon, agr)
     except schedule.NoCalendarAgreed:
         return None
     found = next((p for p in sequence if p.name == period), None)
@@ -194,7 +194,7 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
         schedule,
     )
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return []
     cal_doc, asset_doc = docs or agreement_drift.load_docs()
@@ -229,7 +229,7 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
             # What ends it is standing_on's own answer (post-build-review #190
             # D4): for a collection's, a version of the dataset's own brought
             # back inside the gap ends it for this dataset.
-            until = agreement_mod._turn_off(v, level, versions, back).until
+            until = agreement_mod.turn_off(v, level, versions, back).until
             logged = v.turns_off_logged[-1].isoformat() if v.turns_off_logged else None
             out.append({"effectiveTo": v.effective_to.isoformat(),
                         "until": until.isoformat() if until else None,

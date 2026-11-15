@@ -107,7 +107,7 @@ class TestCriterionElevenTheAssetLevelDemandIsTheSettingsOwn:
 
     def test_its_settings_are_found_at_every_level(self):
         doc = _doc(coll_list=FOUR, ds_list=FOUR, asset_list=FOUR)
-        assert set(amber_setting._settings(doc, PATH)) == {
+        assert set(amber_setting.stated_settings(doc, PATH)) == {
             amber_setting.ASSET, "collection c1", "dataset d1"}
         assert amber_setting.list_setting_keys(doc) == [PATH]
 
@@ -190,7 +190,7 @@ class TestTheScheduleGateFreezesEveryListSetting:
         assert self._errors(monkeypatch, old, copy.deepcopy(old)) == []
 
     def test_the_committed_census_years(self):
-        from asset_model.amber_setting import _doc as committed
+        from asset_model.amber_setting import load_doc as committed
 
         doc = committed()
         assert amber_setting.list_setting_keys(doc) == [PATH]

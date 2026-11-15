@@ -56,7 +56,7 @@ def columns() -> list[str]:
     from asset_model import hierarchy, linked_datasets
 
     ds = hierarchy.dataset(DATASET_ID)
-    ids = [c for c in linked_datasets._columns(linked_datasets.REPO, ds.contract, ds.table)
+    ids = [c for c in linked_datasets.contract_columns(linked_datasets.REPO, ds.contract, ds.table)
            if re.fullmatch(r"id_\d+", c or "")]
     return ["linkage_key", "dataset", *sorted(ids, key=lambda c: int(c[3:]))]
 
@@ -279,7 +279,7 @@ def geo_columns(dataset_id: str) -> list[str]:
     from asset_model import hierarchy, linked_datasets
 
     ds = hierarchy.dataset(dataset_id)
-    return linked_datasets._columns(linked_datasets.REPO, ds.contract, ds.table)
+    return linked_datasets.contract_columns(linked_datasets.REPO, ds.contract, ds.table)
 
 
 def geocode_rows(dataset_id: str, source_rows, id_columns, years, failure_rate: float):

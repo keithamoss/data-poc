@@ -190,7 +190,7 @@ def _build(path, text: str) -> tuple[Collection, ...]:
     # registry while they import.
     doc = config_yaml.parse(text, name=str(path)) or {}
     by_collection: dict[str, list[hierarchy.Dataset]] = {}
-    for d in hierarchy._from_text(path, text)[1].values():
+    for d in hierarchy.from_text(path, text)[1].values():
         by_collection.setdefault(d.collection_id, []).append(d)
     found = []
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
@@ -199,11 +199,11 @@ def _build(path, text: str) -> tuple[Collection, ...]:
             found.append(Collection(
                 id=coll["id"], name=coll["name"], agency_id=agency["id"],
                 agency_name=agency["name"],
-                short=str(hierarchy._require(coll, "short", where)),
-                run_prefix=str(hierarchy._require(coll, "run_prefix", where)),
-                contract=str(hierarchy._require(coll, "contract", where)),
+                short=str(hierarchy.require(coll, "short", where)),
+                run_prefix=str(hierarchy.require(coll, "run_prefix", where)),
+                contract=str(hierarchy.require(coll, "contract", where)),
                 datasets=tuple(by_collection.get(coll["id"], ())),
-                agency_short=str(hierarchy._require(agency, "short",
+                agency_short=str(hierarchy.require(agency, "short",
                                                     f"agency {agency.get('id')!r}"))))
     return tuple(found)
 

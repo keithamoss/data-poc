@@ -113,7 +113,7 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
     keys = {f"dataset {dataset_id} calendar", f"dataset {dataset_id} not_expected {slot}",
             f"dataset {dataset_id} dates period {slot}"}
     try:
-        version = slots._participation_for(dataset_id, period_date, agreement)
+        version = slots.participation_for(dataset_id, period_date, agreement)
         keys.add(f"dataset {dataset_id} participation {version.effective_from.isoformat()}")
         # A VALUE TAKEN FROM THE COLLECTION (REQ-PIPE-181) comes from its
         # defaults version, which a correction names under the collection.
@@ -125,7 +125,7 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
         pass
     try:
         cal = schedule.calendar_for_dataset(dataset_id, agreement)
-        cal_version = schedule._version_in_force(cal, period_date)
+        cal_version = schedule.version_in_force_or_first(cal, period_date)
         keys.add(f"calendar {cal.name} version {cal_version.effective_from.isoformat()}")
         keys.add(f"calendar {cal.name} period {slot}")
     except Exception:  # noqa: BLE001

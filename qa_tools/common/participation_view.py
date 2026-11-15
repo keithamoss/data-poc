@@ -104,7 +104,7 @@ def _turn_off_lines(dataset_id: str, on: date,
                      f"{asset_time.localise(s.closes_at).strftime('%-d %b %Y %H:%M')}."
                      if s.closes_at else f"Still owes {s.name}.")
     try:
-        sequence = slots._calendar_periods(dataset_id, (turn.until or turn.effective_to)
+        sequence = slots.period_sequence(dataset_id, (turn.until or turn.effective_to)
                                            + _ONE_DAY * 400, agr)
     except Exception:  # noqa: BLE001
         sequence = []
@@ -199,7 +199,7 @@ def _fallback(key: str) -> str:
 def view(dataset_id: str, on: date, agreement=None) -> View:
     from asset_model import hierarchy, schedule
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     entry = agr.dataset(dataset_id)
     resolved = agr.participation_on(dataset_id, on)
     if resolved is None:
@@ -216,7 +216,7 @@ def view(dataset_id: str, on: date, agreement=None) -> View:
         if key == "claim_window" and source[0] == agreement_mod.FALLBACK:
             # THE CALENDAR IS A LEVEL TOO (delivery-critic on 181, F7): its
             # version's date, and a later version changing the window.
-            source = (agreement_mod.FALLBACK, schedule._version_in_force(cal, on).effective_from)
+            source = (agreement_mod.FALLBACK, schedule.version_in_force_or_first(cal, on).effective_from)
         words = agreement_mod.describe_source(source, collection_name=name,
                                               calendar_name=cal_name, key=key)
         if words == "no level states this":

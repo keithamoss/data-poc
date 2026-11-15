@@ -286,7 +286,7 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
 
     Beside assign(), its one caller (REQ-PIPE-376 criterion 4); it was
     slots.fall_hold."""
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     try:
         cid = hierarchy.dataset(dataset_id).collection_id
         name = hierarchy.dataset(dataset_id).collection_name

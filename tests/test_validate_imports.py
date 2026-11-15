@@ -180,7 +180,7 @@ def test_tests_scripts_and_docs_are_not_read(repo, capsys, top):
 
 def test_a_provider_loaded_by_path_from_the_real_pipeline_fails(repo, capsys):
     _write(repo, "qa_tools/common/thing.py",
-           "from qa_tools.common import assets\n\ndef f():\n"
+           "from asset_model import assets\n\ndef f():\n"
            "    return assets.load('provider', 'x')\n")
     code, out = _run(repo, capsys)
     assert code == 1
@@ -206,9 +206,7 @@ def test_loads_on_their_own_sides_pass(repo, capsys):
 
 def test_a_loader_kind_that_is_not_a_literal_fails_naming_the_call(repo, capsys):
     _write(repo, "generator/thing.py",
-           "from qa_tools.common import assets\n\ndef f(kind):\n    return assets.load(kind, 'x')\n")
-    _allow(repo, {"file": "generator/thing.py", "imports": "asset_model.assets",
-                  "removed_by": "REQ-PIPE-380"})
+           "from asset_model import assets\n\ndef f(kind):\n    return assets.load(kind, 'x')\n")
     code, out = _run(repo, capsys)
     assert code == 1
     assert ("generator/thing.py:4: generator loads by path with a kind that is not a literal "
@@ -558,9 +556,9 @@ def test_each_new_package_once_it_exists_is_named_in_every_list():
     bootstrap/, once each exists, are named in validate-config.yml's paths,
     both SCANNED tuples, the coverage sources and replay_inputs.INPUTS.
 
-    TODAY THIS PASSES BECAUSE NONE OF THE THREE EXISTS YET - the requirements
-    that create them (REQ-PIPE-380, REQ-GEN-381, REQ-GEN-386) add each to the
-    lists. That it can fail is shown on a fixture repository below."""
+    asset_model/ exists since REQ-PIPE-380 and is in every list; scenarios/ and
+    bootstrap/ join with the requirements that create them (REQ-GEN-381,
+    REQ-GEN-386). That it can fail is shown on a fixture repository below."""
     lists = _lists(ROOT)
     assert all(lists.values()), f"a list read empty - nothing to check: {lists}"
     assert unlisted(ROOT) == []
@@ -592,19 +590,99 @@ def test_a_new_package_named_in_every_list_passes(tmp_path):
     for rel, old, new in (
         (".github/workflows/validate-config.yml", '- "qa_tools/**"',
          '- "qa_tools/**"\n      - "bootstrap/**"'),
-        ("qa_tools/common/validate_caches.py", 'SCANNED = ("qa_tools",',
-         'SCANNED = ("bootstrap", "qa_tools",'),
-        ("qa_tools/common/validate_collections.py", 'SCANNED = ("qa_tools",',
-         'SCANNED = ("bootstrap", "qa_tools",'),
-        ("pyproject.toml", 'source = ["qa_tools",', 'source = ["bootstrap", "qa_tools",'),
-        ("cli/check.py", 'COVERAGE_PACKAGES = ("qa_tools",',
-         'COVERAGE_PACKAGES = ("bootstrap", "qa_tools",'),
+        ("qa_tools/common/validate_caches.py", 'SCANNED = ("asset_model", "qa_tools",',
+         'SCANNED = ("asset_model", "bootstrap", "qa_tools",'),
+        ("qa_tools/common/validate_collections.py", 'SCANNED = ("asset_model", "qa_tools",',
+         'SCANNED = ("asset_model", "bootstrap", "qa_tools",'),
+        ("pyproject.toml", 'source = ["asset_model", "qa_tools",',
+         'source = ["asset_model", "bootstrap", "qa_tools",'),
+        ("cli/check.py", 'COVERAGE_PACKAGES = ("asset_model", "qa_tools",',
+         'COVERAGE_PACKAGES = ("asset_model", "bootstrap", "qa_tools",'),
         (".github/workflows/test.yml", "--cov=qa_tools", "--cov=bootstrap --cov=qa_tools"),
-        ("qa_tools/common/replay_inputs.py", 'INPUTS = ("generator/**",',
-         'INPUTS = ("bootstrap/**", "generator/**",'),
+        ("qa_tools/common/replay_inputs.py", 'INPUTS = ("asset_model/**", "generator/**",',
+         'INPUTS = ("asset_model/**", "bootstrap/**", "generator/**",'),
     ):
         path = tmp_path / rel
         text = path.read_text()
         assert old in text, (rel, old)
         path.write_text(text.replace(old, new))
     assert unlisted(tmp_path) == []
+
+
+def test_asset_model_is_named_in_every_list_now_it_exists():
+    """REQ-PIPE-380 criterion 17: asset_model/ landed, so it is in every
+    list - shown against this repository, not a fixture."""
+    assert (ROOT / "asset_model").is_dir()
+    lists = _lists(ROOT)
+    assert [name for name, entries in lists.items() if not _named("asset_model", entries)] == []
+
+
+# --------------------- REQ-PIPE-376 criterion 8: no underscore asset_model name
+
+
+@pytest.mark.parametrize("text", [
+    "from asset_model.reader import _hidden\n",
+    "from asset_model import reader\nreader._hidden()\n",
+    "from asset_model import reader as r\n\ndef f():\n    return r._hidden\n",
+    "import asset_model.reader\nasset_model.reader._hidden()\n",
+    "from asset_model import reader\ngetattr(reader, '_hidden')\n",
+])
+def test_an_underscore_asset_model_name_read_outside_it_fails(repo, capsys, text):
+    _write(repo, HOMES["pipeline"], text)
+    code, out = _run(repo, capsys)
+    assert code == 1, out
+    assert "qa_tools/common/thing.py:" in out and "asset_model.reader._hidden" in out, out
+    assert "REQ-PIPE-376" in out, out
+
+
+def test_an_underscore_name_inside_asset_model_and_a_public_one_outside_pass(repo, capsys):
+    _write(repo, "asset_model/other.py", "from asset_model import reader\nreader._hidden()\n")
+    _write(repo, HOMES["generator"], "from asset_model import reader\nreader.shown()\n"
+                                     "reader.__name__\n")
+    code, out = _run(repo, capsys)
+    assert code == 0, out
+
+
+def test_an_underscore_name_is_not_excused_by_the_allowlist(repo, capsys):
+    _write(repo, HOMES["pipeline"], "from asset_model.reader import _hidden\n")
+    _allow(repo, {"file": HOMES["pipeline"], "imports": "asset_model.reader._hidden",
+                  "removed_by": "REQ-PIPE-376"})
+    code, out = _run(repo, capsys)
+    assert code == 1 and "underscore-led" in out, out
+
+
+# --------------------- REQ-PIPE-390 criterion 5: no status ranking of its own
+
+
+@pytest.mark.parametrize("side", ["pipeline", "generator", "cli"])
+def test_a_status_ranking_outside_asset_model_fails(repo, capsys, side):
+    _write(repo, HOMES[side], '_RANK = {"green": 0, "amber": 1, "red": 2}\n')
+    code, out = _run(repo, capsys)
+    assert code == 1, out
+    assert f"{HOMES[side]}:1:" in out and "ranking of the status words" in out, out
+    assert "REQ-PIPE-390" in out, out
+
+
+def test_a_ranking_with_nodata_below_zero_fails_too(repo, capsys):
+    _write(repo, HOMES["bootstrap"], 'ORDER = {"nodata": -1, "green": 0}\n')
+    code, out = _run(repo, capsys)
+    assert code == 1 and "ranking of the status words" in out, out
+
+
+def test_asset_models_ranking_and_words_that_rank_nothing_pass(repo, capsys):
+    _write(repo, HOMES["asset_model"],
+           'ORDER = {"nodata": -1, "green": 0, "amber": 1, "red": 2}\n')
+    _write(repo, HOMES["pipeline"], 'WORDS = {"green": "Pass", "amber": "Warn", "red": "Fail"}\n'
+                                    'ONE = {"green": 0}\n')
+    code, out = _run(repo, capsys)
+    assert code == 0, out
+
+
+def test_the_two_rules_find_nothing_in_this_repository():
+    """Both rules over the real tree: every former ranking copy reads
+    asset_model.statuses, and no underscore-led asset_model name is used
+    outside it. Asserts the tree was read, so an empty scan cannot pass."""
+    findings, problems = vi.scan(ROOT)
+    assert findings, "the scan read nothing - the allowlist's findings are missing"
+    said = [str(p) for p in problems if "REQ-PIPE-376" in str(p) or "REQ-PIPE-390" in str(p)]
+    assert said == []

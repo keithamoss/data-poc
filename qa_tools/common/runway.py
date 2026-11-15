@@ -231,7 +231,7 @@ def off_for_good(dataset_id: str, on: date, agreement=None) -> bool:
     exhausted like any other."""
     from asset_model import agreement as agreement_mod
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return False
     standing = agr.standing_on(dataset_id, on)
@@ -248,7 +248,7 @@ def off_gaps(dataset_id: str, agreement=None) -> list[dict]:
 
     from qa_tools.common import turned_off
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return []
     return [{"from": (date.fromisoformat(t["effectiveTo"]) + timedelta(days=1)).isoformat(),

@@ -87,7 +87,7 @@ def in_force(dataset_id: str, period: str, *, doc: dict | None = None) -> list[I
     first). Empty where the dataset does not owe the period."""
     from asset_model import amber_setting
 
-    doc = doc if doc is not None else amber_setting._doc()
+    doc = doc if doc is not None else amber_setting.load_doc()
     on = _round_date(dataset_id, period)
     if on is None:
         return []

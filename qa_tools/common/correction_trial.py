@@ -659,9 +659,9 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     from asset_model import asset_time, schedule, slots
     from qa_tools.common import verdict
 
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
-    version = slots._participation_for(dataset_id, on, agreement)
+    version = slots.participation_for(dataset_id, on, agreement)
     entry = agreement.dataset(dataset_id)
     begins = [cal.versions[0].effective_from]
     if entry and entry.participation:

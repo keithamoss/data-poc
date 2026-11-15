@@ -41,10 +41,10 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
     if cal.version_in_force(today).is_cadence_rule:
         return None
     until = today + timedelta(days=400)
-    agr = schedule._agreement(None)
+    agr = schedule.agreement_to_read(None)
     try:
         found = slots.slots_for_dataset(dataset_id, until=until)
-        sequence = slots._calendar_periods(dataset_id, until, agr)
+        sequence = slots.period_sequence(dataset_id, until, agr)
     except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
         return None
     owed = {s.period.name: s for s in found}

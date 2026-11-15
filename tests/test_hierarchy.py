@@ -103,6 +103,25 @@ class TestFailsLoudly:
         with pytest.raises(ValueError, match="defined twice"):
             hierarchy.all_datasets()
 
+    def test_two_datasets_naming_one_table_are_refused_naming_both(self, tmp_path, monkeypatch):
+        """REQ-PIPE-376 criteria 7 and 8: the table index kept the FIRST
+        dataset (by_table.setdefault), so dataset_for_table answered for one
+        of two datasets silently - not the inverse its docstring claims.
+        Refused instead, naming both datasets and the table."""
+        self._write(tmp_path, monkeypatch, {
+            "data_asset_id": "a",
+            "hierarchy": {"agencies": [{"id": "ag", "name": "Ag", "collections": [
+                {"id": "c1", "name": "C1", "contract": "c.yaml",
+                 "datasets": [{"id": "d1", "name": "D1", "table": "shared"}]},
+                {"id": "c2", "name": "C2", "contract": "c.yaml",
+                 "datasets": [{"id": "d2", "name": "D2", "table": "shared"}]},
+            ]}]},
+        })
+        with pytest.raises(ValueError) as exc:
+            hierarchy.dataset_for_table("shared")
+        said = str(exc.value)
+        assert "'d1'" in said and "'d2'" in said and "'shared'" in said, said
+
     def test_a_missing_data_asset_id_is_an_error(self, tmp_path, monkeypatch):
         self._write(tmp_path, monkeypatch, {"hierarchy": {"agencies": []}})
         with pytest.raises(ValueError, match="data_asset_id"):

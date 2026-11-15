@@ -268,12 +268,12 @@ class Agreement:
             return Standing(NOT_YET_OWING, None)
         if mine.off_after(on):
             return Standing(TURNED_OFF, resolve(own, defaults, mine.effective_to),
-                            _turn_off(mine, DATASET, own))
+                            turn_off(mine, DATASET, own))
         above = in_force.version_on(defaults, on) if defaults else None
         if above is not None and above.effective_to is not None:
             if above.off_after(on) and mine.effective_from <= above.effective_to:
                 return Standing(TURNED_OFF, resolve(own, defaults, above.effective_to),
-                                _turn_off(above, COLLECTION, defaults, own))
+                                turn_off(above, COLLECTION, defaults, own))
             if above.off_after(on):
                 return Standing(OWING, resolve(own, defaults, on), brought_back=True)
         return Standing(OWING, resolve(own, defaults, on))
@@ -355,7 +355,7 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
                    sources=MappingProxyType(sources))
 
 
-def _turn_off(version: ParticipationVersion, level: str,
+def turn_off(version: ParticipationVersion, level: str,
               versions: tuple[ParticipationVersion, ...],
               own: tuple[ParticipationVersion, ...] = ()) -> TurnOff:
     """A version's turn-off, with what ends it: the next version at the same
@@ -405,7 +405,7 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
     # without the other (criterion 2) and `inherit` for either (criterion
     # 10). A value that is not a date FAILS LOUD here (the requirement's
     # NFR): read as absent, it would be a dataset silently owing again.
-    effective_to = (schedule._as_date(raw.get("effective_to"), f"{where} effective_to")
+    effective_to = (schedule.as_date(raw.get("effective_to"), f"{where} effective_to")
                     if raw.get("effective_to") is not None else None)
     inherits = frozenset(k for k in VALUES if raw.get(k) == INHERIT)
     raw = {k: v for k, v in raw.items() if k not in inherits}
@@ -428,7 +428,7 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
             f"{where}: days_before is {days_before!r} - write a whole number of days, 0 or "
             f"more, like 1 for a supply due the evening before its period's date.")
     return ParticipationVersion(
-        effective_from=schedule._as_date(raw.get("effective_from"), f"{where} effective_from"),
+        effective_from=schedule.as_date(raw.get("effective_from"), f"{where} effective_from"),
         participates=participates,
         reason=(str(raw["reason"]).strip() if raw.get("reason") else None),
         expected_time=(str(raw["expected_time"]) if raw.get("expected_time") is not None else None),
@@ -465,7 +465,7 @@ def _offset_versions(block, where: str) -> tuple[OffsetVersion, ...]:
                 f"{at} (effective_from {v.get('effective_from')}): value is {value!r} - write a "
                 f"whole number of periods, 0 for the period the files arrive in or N for the "
                 f"period N after it.")
-        out.append(OffsetVersion(effective_from=schedule._as_date(v.get("effective_from"),
+        out.append(OffsetVersion(effective_from=schedule.as_date(v.get("effective_from"),
                                                                   f"{at} effective_from"),
                                  value=value, changelog=_changelog(v.get("changelog"), at)))
     return tuple(sorted(out, key=lambda v: v.effective_from))

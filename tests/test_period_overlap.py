@@ -59,8 +59,8 @@ class TestAnOverlapIsFound:
         earlier period stops being on time leaves one instant in both."""
         import dataclasses
 
-        real = slots._participation_for
-        monkeypatch.setattr(slots, "_participation_for",
+        real = slots.participation_for
+        monkeypatch.setattr(slots, "participation_for",
                             lambda d, on, a: dataclasses.replace(real(d, on, a),
                                                                  expected_time="09:00",
                                                                  grace=timedelta(0)))

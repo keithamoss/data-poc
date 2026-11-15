@@ -34,7 +34,7 @@ def round_words(on: date) -> str:
 def _first_round_on_or_after(dataset_id: str, when: date, agr) -> date | None:
     from asset_model import slots
 
-    for period in slots._calendar_periods(dataset_id, None, agr):
+    for period in slots.period_sequence(dataset_id, None, agr):
         if period.date >= when:
             return period.date
     return None
@@ -48,7 +48,7 @@ def describe(dataset_id: str, on: date, agreement=None) -> str | None:
     rule (REQ-DASH-326 criterion 3) or no version is in force."""
     from asset_model import in_force
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     try:
         cal = schedule.calendar_for_dataset(dataset_id, agr)
     except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
@@ -73,7 +73,7 @@ def later_version(dataset_id: str, on: date, agreement=None) -> str | None:
     """The next version due after `on`, in words, for the terminal - 'from
     the 1 August 2026 round: Files go into the period they arrive in' - or
     None where none is authored (REQ-PIPE-327 criterion 1)."""
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     for version in agr.offsets.get(agr.collection_of(dataset_id), ()):
         if version.effective_from > on:
             first = _first_round_on_or_after(dataset_id, version.effective_from, agr)
@@ -124,11 +124,11 @@ def rounds_fill(dataset_id: str, months, on: date, agreement=None) -> str | None
     the collection's value is not 0 (REQ-PIPE-327 criterion 8), else None."""
     from asset_model import slots
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     value = agr.files_go_to_period_for(dataset_id, on) or 0
     if not value or not months:
         return None
-    sequence = slots._calendar_periods(dataset_id, None, agr)
+    sequence = slots.period_sequence(dataset_id, None, agr)
     names = []
     for i, rnd in enumerate(sequence):
         if rnd.date < on or rnd.date.month not in months or i + value >= len(sequence):
@@ -150,11 +150,11 @@ def fall_rounds(dataset_id: str, agreement=None) -> list[tuple[date, str]]:
     (REQ-PIPE-322 criterion 3, REQ-PIPE-327 criterion 7)."""
     from asset_model import slots
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     # A CADENCE RULE HAS NO END to walk, and no files_go_to_period other
     # than its collection's: only an authored calendar's rounds are listed.
     try:
-        sequence = slots._calendar_periods(dataset_id, None, agr)
+        sequence = slots.period_sequence(dataset_id, None, agr)
     except schedule.ScheduleConfigError:
         return []
     out, furthest = [], -1

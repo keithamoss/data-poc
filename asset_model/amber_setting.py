@@ -124,7 +124,7 @@ class Resolved:
         return self.value == PROMOTE_AND_ACKNOWLEDGE
 
 
-def _doc(path: Path | None = None) -> dict:
+def load_doc(path: Path | None = None) -> dict:
     from asset_model.hierarchy import data_asset_yaml
 
     with open(path or data_asset_yaml()) as f:
@@ -150,7 +150,7 @@ def _nodes_for(doc: dict, dataset_id: str) -> tuple[dict | None, dict | None]:
     return None, None
 
 
-def _resolve_on(doc: dict, dataset_id: str, on: date, key=KEY) -> Resolved | None:
+def resolve_on(doc: dict, dataset_id: str, on: date, key=KEY) -> Resolved | None:
     collection, dataset = _nodes_for(doc, dataset_id)
     for level, node in ((DATASET, dataset), (COLLECTION, collection), (ASSET, doc)):
         version = _in_effect(_get(node or {}, key), on)
@@ -166,7 +166,7 @@ def resolve_on_date(dataset_id: str, on: date, *, doc: dict | None = None,
     wins - or None where no version covers it (REQ-QAC-300 criterion 2). The
     caller says which date: a period's round date, for a list setting a
     period is judged against (criterion 4)."""
-    return _resolve_on(doc if doc is not None else _doc(), dataset_id, on, key)
+    return resolve_on(doc if doc is not None else load_doc(), dataset_id, on, key)
 
 
 def timeline(dataset_id: str, *, doc: dict | None = None, key=KEY) -> list[dict]:
@@ -177,7 +177,7 @@ def timeline(dataset_id: str, *, doc: dict | None = None, key=KEY) -> list[dict]
     from the KEY GIVEN (REQ-QAC-300 criterion 2), where they were once read
     from amber_setting's whatever was resolved (plans/post-build-review.md
     #293)."""
-    doc = doc if doc is not None else _doc()
+    doc = doc if doc is not None else load_doc()
     collection, dataset = _nodes_for(doc, dataset_id)
     starts = sorted({str(v["effective_from"])
                      for node in (dataset, collection, doc)
@@ -185,7 +185,7 @@ def timeline(dataset_id: str, *, doc: dict | None = None, key=KEY) -> list[dict]
                      if isinstance(v, dict) and v.get("effective_from")})
     out: list[dict] = []
     for start in starts:
-        r = _resolve_on(doc, dataset_id, date.fromisoformat(start), key)
+        r = resolve_on(doc, dataset_id, date.fromisoformat(start), key)
         if r is None:
             continue
         if out and (out[-1]["value"], out[-1]["level"], out[-1]["version"]) == (
@@ -220,8 +220,8 @@ def describe(dataset_id: str, on: date, *, doc: dict | None = None, key=KEY) -> 
     Oct 2026)' (NFR 1), or for a list '2011, 2016 and 2021 (set for Linkage
     Products, since 1 Aug 2022)'. Raises AmberSettingError where none is in
     force, as resolve() does - there is no default."""
-    doc = doc if doc is not None else _doc()
-    r = _resolve_on(doc, dataset_id, on, key)
+    doc = doc if doc is not None else load_doc()
+    r = resolve_on(doc, dataset_id, on, key)
     if r is None:
         raise AmberSettingError(f"no {_name(key)} is in effect for {dataset_id} on "
                                 f"{on.isoformat()}")
@@ -239,8 +239,8 @@ def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
 
     instant = at if isinstance(at, datetime) else asset_time.parse_instant(at, "at")
     on = asset_time.local_date(instant)
-    doc = doc if doc is not None else _doc()
-    found = _resolve_on(doc, dataset_id, on, key)
+    doc = doc if doc is not None else load_doc()
+    found = resolve_on(doc, dataset_id, on, key)
     if found is not None:
         return found
     if not requires_asset_value(key):
@@ -265,7 +265,7 @@ def standing_problems(doc: dict, today: date, key=KEY) -> list[tuple[str, str]]:
     silently.
     """
     problems: list[tuple[str, str]] = []
-    for where, setting in _settings(doc, key).items():
+    for where, setting in stated_settings(doc, key).items():
         starts = [str(v.get("effective_from")) for v in (setting.get("versions") or [])
                   if isinstance(v, dict)]
         for start in sorted({s for s in starts if starts.count(s) > 1}):
@@ -287,7 +287,7 @@ def _levels(doc: dict):
                 yield f"dataset {dataset.get('id')}", dataset
 
 
-def _settings(doc: dict, key=KEY) -> dict[str, dict]:
+def stated_settings(doc: dict, key=KEY) -> dict[str, dict]:
     """{where: setting} for every level that states one, `key` a path."""
     return {where: setting for where, node in _levels(doc)
             if (setting := _get(node, key)) is not None}
@@ -330,7 +330,7 @@ def _appends_to(before: list, after: list) -> bool:
     return after[:len(before)] == before
 
 
-def _versions(setting: dict) -> dict[str, dict]:
+def versions_by_date(setting: dict) -> dict[str, dict]:
     return {str(v.get("effective_from")): v for v in (setting.get("versions") or [])
             if isinstance(v, dict)}
 
@@ -356,10 +356,10 @@ def past_change_problems(old: dict, new: dict, today: date, *,
         found = added(start) if callable(added) else added
         return found or today
     problems: list[tuple[str, str]] = []
-    was, now = _settings(old, key), _settings(new, key)
+    was, now = stated_settings(old, key), stated_settings(new, key)
     for where, setting in was.items():
-        before = _versions(setting)
-        after = _versions(now.get(where) or {})
+        before = versions_by_date(setting)
+        after = versions_by_date(now.get(where) or {})
         for start, version in before.items():
             try:
                 started = date.fromisoformat(start)
@@ -379,8 +379,8 @@ def past_change_problems(old: dict, new: dict, today: date, *,
                                         f"been changed or removed, and its date has passed - a "
                                         f"changelog is append-only"))
     for where, setting in now.items():
-        before = _versions(was.get(where) or {})
-        for start in _versions(setting):
+        before = versions_by_date(was.get(where) or {})
+        for start in versions_by_date(setting):
             if start in before:
                 continue
             try:

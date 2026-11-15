@@ -80,12 +80,12 @@ def overlaps_for(dataset_id: str, until: date | None = None,
     # the module docstring - or the dataset's own dates where it states
     # them, exactly the sequence its slots close against.
     if bound is None:
-        periods = slots._calendar_periods(dataset_id, None, agreement)
+        periods = slots.period_sequence(dataset_id, None, agreement)
     else:
-        periods = [p for p in slots._calendar_periods(dataset_id, bound, agreement)
+        periods = [p for p in slots.period_sequence(dataset_id, bound, agreement)
                    if p.date <= bound]
 
-    agr = schedule._agreement(agreement)
+    agr = schedule.agreement_to_read(agreement)
     turned_off = agr.ever_turned_off(dataset_id)
     found: list[Overlap] = []
     previous = None

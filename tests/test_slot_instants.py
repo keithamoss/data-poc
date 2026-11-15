@@ -177,8 +177,8 @@ class TestEveryHorizonReachesPastTheLargestDaysBefore:
         ninety = _with(tmp_path, dataset_id="birth-registrations",
                        first={"days_before": 3})
         seen = []
-        real = slots._calendar_periods
-        monkeypatch.setattr(slots, "_calendar_periods",
+        real = slots.period_sequence
+        monkeypatch.setattr(slots, "period_sequence",
                             lambda d, until, a=None: seen.append(until) or real(d, until, a))
         period_overlap.overlaps_for("birth-registrations", until=date(2026, 9, 1),
                                     agreement=ninety)
@@ -270,14 +270,14 @@ class TestCriticFindingsOn113:
 
         sydney = (asset_time.ZoneVersion(date(1970, 1, 1), ZoneInfo("Australia/Sydney")),)
         monkeypatch.setattr(asset_time, "timezone_versions", lambda: sydney)
-        real = slots._participation_for
+        real = slots.participation_for
 
         def due_0230_days_before(d, on, a):
             v = real(d, on, a)
             if d != "cp-case-workers":
                 return v
             return dataclasses.replace(v, expected_time="02:30", days_before=28)
-        monkeypatch.setattr(slots, "_participation_for", due_0230_days_before)
+        monkeypatch.setattr(slots, "participation_for", due_0230_days_before)
         # The NON-OWED 2027-Q1 (2026-11-01), 28 days back, is due 2026-10-04 -
         # Sydney's spring-forward day, when 02:30 does not exist. The owed
         # February and August periods land on 4 January and 4 July: fine.

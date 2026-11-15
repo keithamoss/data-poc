@@ -106,7 +106,7 @@ class SlotInstants:
     claim_opens_at: datetime
 
 
-def _participation_for(dataset_id: str, period_date: date, agreement):
+def participation_for(dataset_id: str, period_date: date, agreement):
     """The participation version that governs a period: the one in force on
     the period's OWN date (REQ-PIPE-113 criterion 2).
 
@@ -165,8 +165,8 @@ def slot_instants(dataset_id: str, round_date: date, agreement=None) -> SlotInst
     changes how early a supply may arrive and never the due instant
     (criterion 6).
     """
-    agreement = schedule._agreement(agreement)
-    version = _participation_for(dataset_id, round_date, agreement)
+    agreement = schedule.agreement_to_read(agreement)
+    version = participation_for(dataset_id, round_date, agreement)
     due_at = asset_time.wall_clock(round_date - timedelta(days=version.days_before),
                                    version.expected_time)
     window = schedule.claim_window(dataset_id, on=round_date, agreement=agreement)
@@ -178,7 +178,7 @@ def max_days_before(dataset_id: str, agreement=None) -> int:
     states - what every slot-generation horizon has to reach past
     (REQ-PIPE-113 criterion 11)."""
     return max((v.days_before for v in
-                schedule._agreement(agreement).resolved_versions(dataset_id)), default=0)
+                schedule.agreement_to_read(agreement).resolved_versions(dataset_id)), default=0)
 
 
 def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
@@ -210,9 +210,9 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     # the 01:00 case; a blunt round-up would add a day the daily feed can
     # never claim. The EARLIEST expected time any version has is the
     # conservative one.
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     versions = agreement.resolved_versions(dataset_id)
-    window = claim_window(dataset_id, agreement)
+    window = widest_claim_window(dataset_id, agreement)
     earliest = min((timedelta(hours=h, minutes=m) for h, m in
                     (asset_time.parse_hhmm(v.expected_time) for v in versions if v.expected_time)),
                    default=timedelta(0))
@@ -231,7 +231,7 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     return at + timedelta(days=reach + days)
 
 
-def claim_window(dataset_id: str, agreement=None) -> timedelta:
+def widest_claim_window(dataset_id: str, agreement=None) -> timedelta:
     """The WIDEST claim window this dataset has ever had - a bound on how
     far ahead to generate slots, not a property of any one slot.
 
@@ -243,7 +243,7 @@ def claim_window(dataset_id: str, agreement=None) -> timedelta:
     candidate; generating a period too many costs nothing, because the
     slot it makes is still filtered on its own `claim_opens_at`.
     """
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
     candidates = [v.claim_window for v in
                   schedule.calendar_for_dataset(dataset_id, agreement).versions]
     candidates += [v.claim_window for v in agreement.resolved_versions(dataset_id)
@@ -263,7 +263,7 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     is still RETURNED by the schedule, flagged, so the dashboard can
     show "no November file, agreed" rather than a silent gap.
     """
-    agreement = schedule._agreement(agreement)
+    agreement = schedule.agreement_to_read(agreement)
 
     def claim_opens(period_date: date) -> datetime:
         # Resolved PER PERIOD, on that period's own date, so a new calendar
@@ -280,7 +280,7 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     # round fills and whether or not it opens a slot (REQ-PIPE-131 criterion
     # 1 as REQ-PIPE-321 amends it). Read by index, never by walking the
     # sequence per slot (NFR 1).
-    sequence = _calendar_periods(dataset_id, until, agreement)
+    sequence = period_sequence(dataset_id, until, agreement)
     following = {p.name: sequence[i + 1].date for i, p in enumerate(sequence[:-1])}
     preceding = {p.name: sequence[i - 1].date for i, p in enumerate(sequence) if i > 0}
 
@@ -363,7 +363,7 @@ def relative_period(dataset_id: str, period: str, offset: int,
     return names[at] if 0 <= at < len(names) else None
 
 
-def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
+def period_sequence(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
     asset's baseline's (REQ-PIPE-345: no dataset has dates of its own) - with
     the period AFTER `until` included, so the last slot generated still
