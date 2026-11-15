@@ -22,11 +22,13 @@ dbt --vars, which re-parses every run.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from types import MappingProxyType
 
-import yaml
+from qa_tools.common import config_yaml
 
 REPO = Path(__file__).resolve().parent.parent.parent
 
@@ -169,26 +171,24 @@ class SetMemberCheck:
     changelog: tuple
 
 
-#: A dbt schema file's (path, mtime_ns, size) -> its parsed document.
-_SCHEMAS: dict = {}
-
-
-def _schema(path: Path) -> dict:
-    """A dbt schema file, parsed once per version of it. declared() is asked
-    for every geocoding file the generator writes (through
-    member_setting_of), and re-parsing every schema file each time was 84% of
-    a Linkage Products generation (post-build-review #318). Keyed by the
-    file's stat, so an edited file - or a test's copy - is read afresh. Read,
-    never mutated, by declared()."""
-    stat = path.stat()
-    key = (str(path), stat.st_mtime_ns, stat.st_size)
-    if key not in _SCHEMAS:
-        _SCHEMAS[key] = yaml.safe_load(path.read_text()) or {}
-    return _SCHEMAS[key]
+#: Each dbt schema file's set-member checks, keyed on the file's path, the
+#: tables asked about, and the file's text as read on this call
+#: (REQ-PIPE-401, REQ-PIPE-254): bounded and behind a lock, as the other
+#: content-keyed stores are.
+_SCHEMAS = config_yaml.Built()
 
 
 def declared(root: Path = REPO) -> list[SetMemberCheck]:
-    """Every set-member check the collections' dbt schema files declare."""
+    """Every set-member check the collections' dbt schema files declare.
+
+    EACH FILE IS READ ON EVERY CALL and its checks built once per version of
+    its text. declared() is asked for every geocoding file the generator
+    writes (through member_setting_of), and re-parsing every schema file each
+    time was 84% of a Linkage Products generation (post-build-review #318);
+    #318 remembered the parse by the file's mtime and size, which a same-size
+    edit inside one clock tick keeps, so it could answer for what the file
+    used to say. REQ-PIPE-254 criterion 15 forbids that, and REQ-PIPE-401
+    keyed it on the content instead."""
     from qa_tools import collections
 
     out = []
@@ -196,29 +196,49 @@ def declared(root: Path = REPO) -> list[SetMemberCheck]:
         path = root / coll.dbt_schema
         if not path.is_file():
             continue
-        doc = _schema(path)
-        tables = {d.table: d.dataset_id for d in coll.datasets}
-        for model in doc.get("models") or []:
-            table = str(model.get("name", "")).removeprefix("stg_")
-            if table not in tables:
-                continue
-            for column in model.get("columns") or []:
-                for test in column.get("tests") or column.get("data_tests") or []:
-                    if not isinstance(test, dict):
-                        continue
-                    for name, body in test.items():
-                        if name not in TESTS:
-                            continue
-                        body = body or {}
-                        args = body.get("arguments") or body
-                        meta = body.get("meta") or {}
-                        out.append(SetMemberCheck(
-                            dataset_id=tables[table], test=name, check_id=meta.get("check_id"),
-                            key_columns=tuple(args.get("key_columns") or ()),
-                            column=column.get("name"),
-                            member_setting=args.get("member_setting"),
-                            changelog=tuple(meta.get("changelog") or ())))
+        tables = tuple(sorted((d.table, d.dataset_id) for d in coll.datasets))
+        text = config_yaml.read(path)
+        out.extend(_SCHEMAS.get((str(path), tables), text,
+                                lambda: _build_checks(path, text, dict(tables))))
     return out
+
+
+def _freeze(value):
+    """A stored value is shared between callers (config_yaml.Built), so what
+    a check carries from the file is made immutable."""
+    if isinstance(value, dict):
+        return MappingProxyType({k: _freeze(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
+def _build_checks(path: Path, text: str, tables: dict) -> tuple[SetMemberCheck, ...]:
+    """The set-member checks one schema file's text declares, for the tables
+    its collection holds - from the one read declared() made."""
+    doc = config_yaml.parse(text, name=str(path)) or {}
+    out = []
+    for model in doc.get("models") or []:
+        table = str(model.get("name", "")).removeprefix("stg_")
+        if table not in tables:
+            continue
+        for column in model.get("columns") or []:
+            for test in column.get("tests") or column.get("data_tests") or []:
+                if not isinstance(test, dict):
+                    continue
+                for name, body in test.items():
+                    if name not in TESTS:
+                        continue
+                    body = body or {}
+                    args = body.get("arguments") or body
+                    meta = body.get("meta") or {}
+                    out.append(SetMemberCheck(
+                        dataset_id=tables[table], test=name, check_id=meta.get("check_id"),
+                        key_columns=tuple(args.get("key_columns") or ()),
+                        column=column.get("name"),
+                        member_setting=args.get("member_setting"),
+                        changelog=_freeze(list(meta.get("changelog") or ()))))
+    return tuple(out)
 
 
 def problems(root: Path = REPO) -> list[str]:
@@ -250,7 +270,7 @@ def _declaration_problems(checks, doc, root) -> list[str]:
             out.append(f"{c.dataset_id}: {c.test} names the member_setting "
                        f"{c.member_setting!r}, which is no declared list setting.")
     have = {(c.dataset_id, c.test) for c in checks}
-    asset = yaml.safe_load((linked_datasets._asset_folder(root) / "data-asset.yaml").read_text()) or {}
+    asset = config_yaml.load(linked_datasets._asset_folder(root) / "data-asset.yaml") or {}
     for _agency, coll, ds in linked_datasets._walk(asset):
         linked = ds.get("linked_datasets") or []
         if len(linked) != 1 or linked[0].get("code") is not None:
@@ -312,7 +332,7 @@ def _breaking_entry_problems(checks, doc) -> list[str]:
         key = (amber_setting.LIST_SETTINGS, c.member_setting)
         line = amber_setting.timeline(c.dataset_id, doc=doc, key=key)
         dated = {str(e.get("date", ""))[:10] for e in c.changelog
-                 if isinstance(e, dict) and e.get("breaking") is True}
+                 if isinstance(e, Mapping) and e.get("breaking") is True}
         for before, after in zip(line, line[1:]):
             if before["value"] != after["value"] and after["from"] not in dated:
                 out.append(f"check {c.check_id} has no breaking changelog entry dated "

@@ -153,6 +153,17 @@ class _Assets:
         self._assets: dict[str, Asset] = {}
 
     def names(self) -> list[str]:
+        """The asset folders under assets/, as they are now.
+
+        REMEMBERED BY THE assets/ DIRECTORY'S OWN STAT (mtime and inode), and
+        deliberately so: REQ-PIPE-254 criterion 15's rule - a configuration
+        file is read on every call and never skipped on its modification time,
+        size or inode - is about a file's CONTENT, and this reads no
+        configuration file. It lists which folders exist, and a directory's
+        mtime moves whenever an entry is added, removed or renamed, which is
+        all it needs to see (REQ-PIPE-401 criterion 4). Listing the folder
+        on every call was over half of a generation (post-build-review #318).
+        """
         try:
             st = os.stat(self.root)
         except OSError:
