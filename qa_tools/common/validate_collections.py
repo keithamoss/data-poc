@@ -38,11 +38,14 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Where product code lives (criterion 8).
 SCANNED = ("qa_tools", "pipeline", "generator", "cli", "dashboard")
 
-#: EXEMPT, each for its reason (criterion 9).
+#: EXEMPT, each for its reason (criterion 9, as amended by A18 for the asset
+#: split). qa_tools/collections/ and generator/collections/ are no longer
+#: exempt: they hold only their shared base modules, which name no collection,
+#: and the layout gate refuses any collection's file there (REQ-PIPE-342
+#: criterion 10, qa_tools/common/validate_layout.py).
 EXEMPT_DIRS = {
-    "contract": "the configuration itself - where collections are declared",
-    "qa_tools/collections": "the adapters - code that is, by design, one collection's",
-    "generator/collections": "the generator's per-collection providers (REQ-GEN-246)",
+    "assets": "the configuration, adapters and providers themselves - where collections "
+              "are declared and the code that is, by design, one collection's",
     "aws": "reaches collections only through the processing pass (position.md call 9)",
 }
 #: In the scenario register, only these assignments' values: a scenario is
@@ -242,6 +245,17 @@ def config_problems(package: Path | None = None) -> list[str]:
                             f"short {short!r}")
         agency_shorts[short] = agency_id
 
+    # A COLLECTION ID DECLARED TWICE in one asset (REQ-PIPE-364 criterion 3):
+    # both would load one adapter and every lookup by id would find the first,
+    # so it is refused here, naming both agencies. Two ASSETS may each declare
+    # it - nothing here reads another asset.
+    agency_of: dict[str, str] = {}
+    for c in declared:
+        if c.id in agency_of:
+            problems.append(f"collection id {c.id!r} is declared twice - in agency "
+                            f"{agency_of[c.id]!r} and in agency {c.agency_id!r}")
+        agency_of.setdefault(c.id, c.agency_id)
+
     for field in ("short", "run_prefix", "label"):
         seen: dict[str, str] = {}
         for c in declared:
@@ -267,15 +281,18 @@ def config_problems(package: Path | None = None) -> list[str]:
         if not (hierarchy.data_asset_yaml().parent / c.contract).is_file():
             problems.append(f"{c.id!r}'s contract file {_assets.config_dir()}/{c.contract} is missing")
 
-    for field in ("dataset_id", "table"):
-        seen = {}
-        for d in hierarchy.all_datasets():
-            value = getattr(d, field)
-            if value in seen and seen[value] != d.collection_id:
-                problems.append(f"collections {seen[value]!r} and {d.collection_id!r} both "
-                                f"declare the {'dataset id' if field == 'dataset_id' else 'table'}"
-                                f" {value!r}")
-            seen[value] = d.collection_id
+    # A TABLE IS ONE DATASET'S, within the asset (REQ-PIPE-364 criterion 3):
+    # hierarchy.by_table() keeps the first dataset naming it, so a second -
+    # in another collection OR the same one - would be silently unreachable.
+    # (A dataset id declared twice is the hierarchy reader's own refusal.)
+    seen: dict[str, object] = {}
+    for d in hierarchy.all_datasets():
+        first = seen.setdefault(d.table, d)
+        if first is not d:
+            where = (f"collection {d.collection_id!r}" if first.collection_id == d.collection_id
+                     else f"collections {first.collection_id!r} and {d.collection_id!r}")
+            problems.append(f"datasets {first.dataset_id!r} and {d.dataset_id!r} ({where}) "
+                            f"both declare the table {d.table!r}")
     return problems
 
 

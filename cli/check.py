@@ -82,6 +82,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # requirement that rewires it.
     ("collections", ["uv", "run", "python3", "-m", "qa_tools.common.validate_collections"],
      "every collection has an adapter and nothing else names one", False),
+    # REQ-PIPE-342 criterion 10 and REQ-PIPE-364 criterion 5: no collection's
+    # file in the shared code tree, and only environments.yaml and asset
+    # folders at the top of assets/. Repository-wide: it reads no asset.
+    ("layout", ["uv", "run", "python3", "-m", "qa_tools.common.validate_layout"],
+     "only asset folders at the top of assets/, and no collection's file in shared code",
+     False),
     # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
     # would draw the same rows.
     ("providers", ["uv", "run", "python3", "-m", "generator.validate_providers"],
@@ -187,20 +193,52 @@ _DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 #: Gates that read no asset's configuration: run once, whatever
 #: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
 #: criterion 9).
-_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "npm test", "pytest"})
+_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "layout", "npm test", "pytest"})
 
 
 def _asset_passes(label: str) -> list[dict]:
     """The environment additions for each run of one gate. WITH NO ASSET
     SELECTED - a fresh clone (REQ-PIPE-363 criterion 5, NFR PORTABILITY) - a
     gate that reads an asset's configuration runs once for each asset folder
-    found, each run told its asset; with one selected, once, for it.
-    REQ-PIPE-364 builds its per-asset passes on this."""
+    found, each run told its asset; with one selected, once, for it - told it
+    too, so its output is named for it like any other pass (REQ-PIPE-364
+    criterion 1)."""
     from qa_tools.common import assets
 
-    if label in _REPOSITORY_WIDE or os.environ.get(assets.ASSET_ENV):
+    if label in _REPOSITORY_WIDE:
         return [{}]
+    stated = os.environ.get(assets.ASSET_ENV)
+    if stated:
+        return [{assets.ASSET_ENV: stated}]
     return [{assets.ASSET_ENV: name} for name in assets.names()] or [{}]
+
+
+def _asset_of(extra: dict) -> str | None:
+    from qa_tools.common import assets
+
+    return extra.get(assets.ASSET_ENV)
+
+
+def _named(asset: str | None, output: str) -> str:
+    """EVERY LINE OF AN ASSET'S PASS NAMES THE ASSET (REQ-PIPE-364 criterion
+    1): two passes of one gate print alike, so a failure that did not say
+    which asset it came from could be read as the other's. Prefixed here, in
+    the one place every pass runs through, rather than in each gate."""
+    if asset is None or not output:
+        return output
+    return "".join(f"[{asset}] {line}\n" for line in output.splitlines())
+
+
+def _failed_in(passes: list[dict], codes: list[int], can_warn: bool) -> list[str]:
+    """The assets whose pass of one gate failed - named in the summary. A
+    warning is not a failure, but only from a gate that can warn."""
+    passed = (0, 127, WARNING_EXIT) if can_warn else (0, 127)
+    return [a for extra, c in zip(passes, codes) if c not in passed and (a := _asset_of(extra))]
+
+
+def _shown(label: str, failed: list[str]) -> str:
+    """A gate's name in the summary, with the assets it failed for."""
+    return f"{label} ({', '.join(failed)})" if failed else label
 
 
 def _worst(codes: list[int]) -> int:
@@ -235,14 +273,17 @@ def _outside_docs(paths: list[str]) -> list[str]:
             and not _DOCS_FILE_PATTERN.fullmatch(p)]
 
 
-def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str]:
-    """One gate, captured, over each of its asset passes."""
+def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str, list[str]]:
+    """One gate, captured, over each of its asset passes: its result, its
+    output - each pass's lines named for its asset - and the assets it failed
+    for."""
     codes, outputs = [], []
-    for extra in _asset_passes(label):
+    passes = _asset_passes(label)
+    for extra in passes:
         code, output = _run_captured_once(label, argv, can_warn, extra)
         codes.append(code)
-        outputs.append(output)
-    return _worst(codes), "".join(outputs)
+        outputs.append(_named(_asset_of(extra), output))
+    return _worst(codes), "".join(outputs), _failed_in(passes, codes, can_warn)
 
 
 def _run_captured_once(label: str, argv: list[str], can_warn: bool,
@@ -261,8 +302,9 @@ def _run_captured_once(label: str, argv: list[str], can_warn: bool,
     return done.returncode, (done.stdout or "") + (done.stderr or "")
 
 
-def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
-    """Streams the gate's own output rather than capturing it.
+def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list[str]]:
+    """Streams the gate's own output rather than capturing it, and returns
+    its result and the assets it failed for.
 
     A summary table telling you `pytest` failed and nothing else would
     be worse than no command at all - the failure itself is what you
@@ -278,21 +320,40 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
     as their own workflow steps, where any non-zero exit is a failed
     step - so a gate must return 0 there, and only say more when
     something asked it to.
+
+    AN ASSET'S PASS IS PRINTED A PASS AT A TIME, every line named for its
+    asset (REQ-PIPE-364 criterion 1): read whole, prefixed, and printed as
+    soon as that pass ends - a configuration gate's pass takes seconds, so a
+    failure still shows before the next gate starts. Colour is asked for
+    when this terminal shows it, since the gate's own stdout is then a pipe.
+    A repository-wide gate - the Python suite among them - still streams.
     """
     console.rule(f"[bold]{label}", style="dim")
     if shutil.which(argv[0]) is None:
         console.print(
             f"{argv[0]!r} is not installed - skipping {label}. "
             f"See CLAUDE.md's environment-setup bullet.", style="yellow")
-        return 127
+        return 127, []
     codes = []
-    for extra in _asset_passes(label):
+    passes = _asset_passes(label)
+    for extra in passes:
         # NOTHING TO ADD, NOTHING PASSED: the gate inherits this environment.
         env = {**os.environ, **extra} if (extra or can_warn) else None
         if can_warn:
             env[WARNING_EXIT_VAR] = str(WARNING_EXIT)
-        codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)
-    return _worst(codes)
+        asset = _asset_of(extra)
+        if asset is None:
+            codes.append(subprocess.run(argv, cwd=ROOT, env=env).returncode)
+            continue
+        if sys.stdout.isatty():
+            env.setdefault("FORCE_COLOR", "1")
+        done = subprocess.run(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, text=True)
+        output = _named(asset, done.stdout or "")
+        if output:
+            console.out(output.rstrip("\n"), highlight=False)
+        codes.append(done.returncode)
+    return _worst(codes), _failed_in(passes, codes, can_warn)
 
 
 #: What the full gate measures coverage over - the same four packages test.yml
@@ -437,8 +498,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         def timed(gate):
             label, argv, why, can_warn = gate
             started = time.monotonic()
-            code, output = _run_captured(label, argv, can_warn)
-            return label, code, why, can_warn, time.monotonic() - started, output
+            code, output, failed = _run_captured(label, argv, can_warn)
+            return _shown(label, failed), code, why, can_warn, time.monotonic() - started, output
 
         with ThreadPoolExecutor(max_workers=len(gates)) as pool:
             ran = list(pool.map(timed, gates))
@@ -459,8 +520,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         if label == "pytest":
             argv = _pytest_argv(argv, reports)
         started = time.monotonic()
-        code = _run(label, argv, can_warn)
-        results.append((label, code, why, can_warn, time.monotonic() - started))
+        code, failed = _run(label, argv, can_warn)
+        results.append((_shown(label, failed), code, why, can_warn, time.monotonic() - started))
 
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")

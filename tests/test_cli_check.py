@@ -110,7 +110,7 @@ def test_a_missing_toolchain_is_reported_as_not_run_rather_than_passed(monkeypat
     dangerous outcome is not the failure, it is a green summary that
     quietly covered one suite fewer than it claims to."""
     monkeypatch.setattr(check_cli.subprocess, "run",
-                        lambda argv, cwd=None, env=None: _Result(0))
+                        lambda argv, cwd=None, env=None, **_kw: _Result(0))
     monkeypatch.setattr(check_cli.shutil, "which",
                         lambda name: None if name == "npm" else f"/usr/bin/{name}")
     monkeypatch.setattr(check_cli, "_tree_state", lambda: "HEAD abc1234 (clean)")
@@ -188,7 +188,7 @@ class TestAGateCanSayPassedWithSomethingToKnow:
         failed step. So the runner opts in, and CI simply does not."""
         seen = {}
 
-        def fake_run(argv, cwd=None, env=None):
+        def fake_run(argv, cwd=None, env=None, **_kw):
             seen[argv[0]] = (env or {}).get(check_cli.WARNING_EXIT_VAR)
             return _Result(0)
 
@@ -203,7 +203,7 @@ class TestAGateCanSayPassedWithSomethingToKnow:
         sentinel in the first place."""
         seen = {}
 
-        def fake_run(argv, cwd=None, env=None):
+        def fake_run(argv, cwd=None, env=None, **_kw):
             seen[argv[0]] = env
             return _Result(0)
 
@@ -219,7 +219,7 @@ class TestAGateCanSayPassedWithSomethingToKnow:
         import os
 
         monkeypatch.setattr(check_cli.subprocess, "run",
-                             lambda argv, cwd=None, env=None: _Result(0))
+                             lambda argv, cwd=None, env=None, **_kw: _Result(0))
         monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
         _runner.invoke(check_cli.check_command, ["--only", "schedule"])
         assert check_cli.WARNING_EXIT_VAR not in os.environ
@@ -404,6 +404,66 @@ class TestTheFullGateIsTheWholeSuitesRecord:
                                                                           monkeypatch):
         monkeypatch.setattr(check_cli, "ROOT", tmp_path)  # not a repository
         assert check_cli._tree_state().startswith("tree unknown")
+
+
+class TestEveryFailureNamesItsAsset:
+    """REQ-PIPE-364 criterion 1: a gate run once per asset folder prints the
+    same kind of failure for each, so each line of a pass names the asset it
+    ran for, and the summary names the assets a gate failed for."""
+
+    @pytest.fixture
+    def two_passes(self, monkeypatch):
+        from qa_tools.common import assets
+
+        monkeypatch.delenv(assets.ASSET_ENV, raising=False)
+        monkeypatch.setattr(assets, "names", lambda: ["one", "two"])
+        monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+        monkeypatch.setattr(check_cli, "_tree_state", lambda: "HEAD abc1234 (clean)")
+
+        def fake_run(argv, cwd=None, env=None, **_kw):
+            asset = (env or {}).get(assets.ASSET_ENV)
+            result = _Result(1 if asset == "two" else 0)
+            result.stdout = f"checked {asset}\nduplicate short 'x'\n" if asset == "two" \
+                else f"checked {asset}\n"
+            return result
+
+        monkeypatch.setattr(check_cli.subprocess, "run", fake_run)
+
+    def test_each_line_of_a_pass_names_its_asset(self, two_passes):
+        result = _runner.invoke(check_cli.check_command, ["--only", "schedule"])
+        assert "[two] duplicate short 'x'" in result.output
+        assert "[two] checked two" in result.output
+        assert "[one] checked one" in result.output
+        assert "\nduplicate short" not in result.output
+
+    def test_the_summary_names_the_asset_it_failed_for(self, two_passes):
+        result = _runner.invoke(check_cli.check_command, ["--only", "schedule"])
+        assert result.exit_code != 0
+        assert "1 gate(s) failed: schedule (two)" in result.output
+
+    def test_the_side_by_side_docs_passes_name_it_too(self, two_passes):
+        code, output, failed = check_cli._run_captured("scenarios", ["uv"], False)
+        assert code == 1 and failed == ["two"]
+        assert "[two] duplicate short 'x'\n" in output and "[one] checked one\n" in output
+
+    def test_one_selected_asset_is_named_too(self, monkeypatch):
+        from qa_tools.common import assets
+
+        monkeypatch.setenv(assets.ASSET_ENV, "quarterly")
+        monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+        def fake_run(argv, cwd=None, env=None, **_kw):
+            result = _Result(1)
+            result.stdout = "a problem\n"
+            return result
+
+        monkeypatch.setattr(check_cli.subprocess, "run", fake_run)
+        result = _runner.invoke(check_cli.check_command, ["--only", "collections"])
+        assert "[quarterly] a problem" in result.output
+
+    def test_a_repository_wide_gate_is_not_prefixed(self, two_passes):
+        assert check_cli._asset_passes("layout") == [{}]
+        assert check_cli._asset_passes("pytest") == [{}]
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

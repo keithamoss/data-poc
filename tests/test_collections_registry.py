@@ -439,11 +439,19 @@ class TestTheLiteralGate:
 
     def test_the_exempt_places_are_exempt(self, tmp_path):
         assert self._found(tmp_path, {
-            "qa_tools/collections/child_protection.py": 'A = "child-protection"\n',
-            "generator/collections/cp.py": 'A = "cp"\n',
             "generator/scenario_injection.py": ('INJECTIONS = ("cp-clients",)\n'
                                                 'INHERITING_DATASET = "cp-case-workers"\n'),
         }) == set()
+
+    def test_the_shared_collections_trees_are_no_longer_exempt(self, tmp_path):
+        """REQ-PIPE-342 criterion 10 with A18: since the split they hold only
+        their shared base modules, so a collection literal there is found like
+        any other (and a collection's own module there fails the layout gate)."""
+        assert self._found(tmp_path, {
+            "qa_tools/collections/base.py": 'A = "child-protection"\n',
+            "generator/collections/base.py": 'A = "child-protection"\n',
+        }) == {("qa_tools/collections/base.py", "child-protection"),
+               ("generator/collections/base.py", "child-protection")}
 
     def test_the_scenario_register_is_exempt_only_in_its_two_values(self, tmp_path):
         assert self._found(tmp_path, {"generator/scenario_injection.py": (

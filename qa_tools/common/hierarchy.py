@@ -162,8 +162,11 @@ def _build(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]"
                 # ambiguous and silently resolve to whichever came
                 # last, so it is an error rather than a last-wins.
                 if entry.dataset_id in datasets:
+                    # Naming both declarations (REQ-PIPE-364 criterion 3).
                     raise ValueError(
-                        f"{path}: dataset id {entry.dataset_id!r} is defined twice"
+                        f"{path}: dataset id {entry.dataset_id!r} is defined twice - in "
+                        f"collection {datasets[entry.dataset_id].collection_id!r} and in "
+                        f"collection {entry.collection_id!r}"
                     )
                 datasets[entry.dataset_id] = entry
 
