@@ -844,7 +844,7 @@ def _repo_path(path: Path) -> str | None:
 
     REFUSED (OutsideTheRepository) ONLY WHERE A DEPLOYMENT HAS DELIBERATELY
     INJECTED ITS ASSET ROOT ELSEWHERE (assets.root_injected(); REQ-PIPE-342's
-    injection, #55) and the file is in the selected asset's configuration
+    injection) and the file is in the selected asset's configuration
     folder: read as "no previous state", the agreement freeze and the amber,
     replacement and list-setting guards would pass any edit to a past item
     unseen (post-build-review #313 M2). Any other outside path - one asset's

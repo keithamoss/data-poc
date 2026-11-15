@@ -14048,7 +14048,7 @@ twice. It deliberately did not re-find the `TypeError`.
        path to open (repository path inside, the folder itself outside), and
        only the readers that need a repository path - git-ref reads,
        CODEOWNERS, GitHub links - refuse. Refusing everywhere would also stop
-       the dashboard build reading #55's injected configuration. (CORRECTED
+       the dashboard build reading REQ-PIPE-342's injected configuration. (CORRECTED
        by #313: the line drawn here does NOT keep an injected-folder
        dashboard build working - the build embeds the GitHub links, and they
        refuse, so it stops there. #313 also found the schedule gate's git-ref guards and
@@ -14161,10 +14161,10 @@ twice. It deliberately did not re-find the `TypeError`.
           asset folder outside the repository, given C7. (a) Refuse, as C7
           says - and then the nine tests above need their copies inside the
           repository (or a test-only switch, which the test rules forbid);
-          and a #55 deployment's schedule gate refuses outright. (b) Keep
+          and an injected-root (REQ-PIPE-342) deployment's schedule gate refuses outright. (b) Keep
           "no previous state" for such a folder, as today - honest that git
           holds no history of it, but every past-item edit there passes. (c)
-          Refuse only for the injected-root (#55) layout and keep (b) for
+          Refuse only for the injected-root (REQ-PIPE-342) layout and keep (b) for
           the suite's folder copies - which ties product behaviour to how a
           test points the resolver. Until he answers, (b) stands.
      - **Runs (tree 1e1fde37, before this bullet was added)**: the touched
@@ -14282,7 +14282,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - **H1. Under an injected single-asset root, the both-hierarchies read
        treats the other asset's scenarios as mistyped (SETTLED by Keith
        2026-11-03, no code change).** `every_asset.declared()` reads the
-       assets the resolver finds, so a #55 root holding one asset would make
+       assets the resolver finds, so an injected (REQ-PIPE-342) root holding one asset would make
        the other asset's scenarios name "a dataset no asset declares". Keith:
        scenarios exist only for synthetic assets, and both synthetic assets
        are always present together for demo and test, so the read always

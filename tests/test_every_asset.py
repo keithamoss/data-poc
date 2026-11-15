@@ -44,7 +44,7 @@ class TestBothAssetsHierarchies:
         assert "no-such-dataset" not in got.datasets
 
     def test_an_injected_root_is_read_rather_than_the_repositorys(self, monkeypatch, tmp_path):
-        """REQ-PIPE-342's injection (#55): the assets the resolver finds."""
+        """REQ-PIPE-342's injection: the assets the resolver finds."""
         root = tmp_path / "assets"
         for name, ag in (("one", "ag-one"), ("two", "ag-two")):
             (root / name).mkdir(parents=True)

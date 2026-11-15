@@ -321,7 +321,7 @@ def check_file_problems(root: Path | None = None) -> list[str]:
 
     # The checkout the asset's paths are relative to (assets.folder_rel): the
     # repository, wherever the asset folder sits inside it; for a folder
-    # outside it (a test's copy, #55's injected configuration), its parent.
+    # outside it (a test's copy, REQ-PIPE-342's injected configuration), its parent.
     if root is None:
         folder = assets.selected().folder
         root = assets.ROOT if folder.is_relative_to(assets.ROOT) else folder.parent

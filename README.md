@@ -18,7 +18,7 @@ Run it yourself:
 ```bash
 uv sync --dev
 for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-deps; done
-./mothman pipeline run
+for asset in quarterly daily; do MOTHMAN_ASSET=$asset ./mothman pipeline run; done
 ```
 
 `mothman env dbt-deps` is a one-time step per asset (re-run only if that
@@ -174,12 +174,11 @@ generator/                   a real package (generator/__init__.py) - invoked vi
                                the slot loop, bookkeeping, delivery and receipt writing, and
                                injection placement; `mothman check`'s providers gate runs
                                validate_providers.py over it
-  collections/                 one PROVIDER per collection - its rows, seed schedule and period plan,
-                               importable without pandas or numpy:
-    civil_registration.py      Birth Registrations' daily deliveries - red ones trigger
-                               resupply.py's resupply-chain simulation
-    child_protection.py        Child Protection's quarterly snapshots (Feb/May/Aug/Nov anchor) -
-                               a red one drives the same simulation on a slower delay curve
+  collections/                 the shared provider base (base.py) only - each collection's PROVIDER
+                               (its rows, seed schedule and period plan, importable without pandas or
+                               numpy) lives in its asset's folder, assets/<asset>/synthetic/collections/,
+                               loaded by path (REQ-GEN-370): civil_registration.py (daily);
+                               child_protection.py, emergency_department.py, linkage_products.py (quarterly)
   resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
@@ -189,11 +188,11 @@ generator/                   a real package (generator/__init__.py) - invoked vi
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
                                package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
-  collections/                 the collection registry (REQ-PIPE-240): every collection the hierarchy in
-                               the asset's data-asset.yaml declares, each run through a small adapter module
-                               named by its id - civil_registration.py, child_protection.py. A new collection
-                               is picked up everywhere through it, or refused by name; `mothman check`'s
-                               collections gate fails on one without an adapter
+  collections/                 the collection registry (REQ-PIPE-240) and the shared adapter base: every
+                               collection the selected asset's data-asset.yaml hierarchy declares, each run
+                               through its adapter, assets/<asset>/collections/<module>.py, loaded by path
+                               (REQ-PIPE-369). A new collection is picked up everywhere through it, or refused
+                               by name; `mothman check`'s collections gate fails on one without an adapter
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                assets' dbt projects
   common/
@@ -213,7 +212,6 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
     dataset_stats.py          each run's presentation statistics, recorded at run time
     results_history.py        a collection's results file rebuilt from recorded history alone
     legacy.py                 the named flags that keep each collection's recorded output unchanged
-  collections/               the collection registry, and each collection's adapter (what the tools read)
 pipeline/                    a real package (pipeline/__init__.py) - invoked via `mothman pipeline
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   build_dashboard_data.py       reshapes every collection's results file into the dashboard's data
@@ -227,12 +225,13 @@ dashboard/
                                collection wired to real data
   embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
                                every registered collection's data into one COLLECTION_DATA const
-data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
-                               ONE database holding every staged supply, which each QA run reads
-                               through a schema of views of its own (REQ-PIPE-068). Not checked in.
-reports/                       generated - results_rs_civil-registration.json, results_cpfs_child-protection.json,
-                               rs_civil-registration_dashboard.json, cpfs_child-protection_dashboard.json
-                               (not checked in)
+data/<asset>/                  generated, one folder per asset - its deliveries/, receipts/,
+                               generator_bookkeeping.json and scenario_placements.json. The warehouse is
+                               each asset's own PostgreSQL database, supply_<asset> (REQ-PIPE-343), not a
+                               file here. Not checked in.
+reports/<asset>/               generated, one folder per asset - each collection's
+                               results_<agency short>_<collection>.json and
+                               <agency short>_<collection>_dashboard.json (not checked in)
 cli/                          `mothman` (plans/tooling.md #1) - the unified CLI/TUI, the only
                                programmatic access point to this repo; run `./mothman` or
                                `uv run mothman` - `mothman pipeline run` replaces the retired
@@ -432,7 +431,7 @@ what was tried and measured before landing here.
 
 ## The 120 (scheduled) runs — and resupply attempts on top
 
-`generator/collections/civil_registration.py` (it was `generator/generate_runs.py`) schedules 120 daily deliveries (a rolling
+`assets/daily/synthetic/collections/civil_registration.py` (it was `generator/generate_runs.py`) schedules 120 daily deliveries (a rolling
 window ending on the anchor date, ~1,700-2,050 rows each - widened from
 60 to 120 on 2026-09-17, Keith's own call, after `AS_OF_OFFSET_DAYS`
 and the old 60-delivery window turned out to collide: the as-of
@@ -487,7 +486,7 @@ Protection collection (see below) is untouched: the same illustrative,
 browser-fabricated mock data as before, still clearly labeled as such in
 the footer. Each real column's drawer shows every check that actually ran
 on it — real dbt-core, Soda Core, datacontract-cli, and Evidently checks
-side by side, straight from `reports/results_rs_civil-registration.json` — e.g. `sex` shows
+side by side, straight from `reports/daily/results_rs_civil-registration.json` — e.g. `sex` shows
 Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
 `accepted_values`, Soda's scoped last-24h check, *and* Evidently's PSI, all
 computed independently against the same real data, so you can see where
@@ -511,13 +510,10 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-./mothman pipeline run --collection cp
+MOTHMAN_ASSET=quarterly ./mothman pipeline run --collection cp
 ```
 
-(Generates Child Protection's 55 quarterly deliveries, runs the real tools ->
-reports/results_cpfs_child-protection.json, reshapes -> reports/cpfs_child-protection_dashboard.json,
-then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
-the default, does the same for Birth Registrations too in one call.)
+(Generates Child Protection's 55 quarterly deliveries, runs the real tools -> reports/quarterly/results_cpfs_child-protection.json, reshapes -> reports/quarterly/cpfs_child-protection_dashboard.json, then re-embeds the quarterly asset's collections into the dashboard HTML. `--collection all`, the default, does the same for every collection of the selected asset; Birth Registrations is the daily asset's, run with `MOTHMAN_ASSET=daily`.)
 
 A few things specific to this collection, each found by actually running
 it end to end rather than assumed:
@@ -526,7 +522,7 @@ it end to end rather than assumed:
   event feed (a fresh cohort of newborns each day); Child Protection is a
   periodic *snapshot* extract of the same underlying casework collection,
   re-pulled quarterly, anchored to 1 February each year
-  (`generator/collections/child_protection.py`) — row counts stay roughly stable run
+  (`assets/quarterly/synthetic/collections/child_protection.py`) — row counts stay roughly stable run
   to run, matching what a real active-caseload extract looks like.
 - **The 7 FK relationship checks never fail on this fixture** — `dirty.py`'s
   CP presets never touch a foreign-key column, only `concern_type` (the

@@ -15,7 +15,7 @@ ITS PREMISE (Keith, 2026-11-03, the Q6/Q8 follow-up, post-build-review #315
 H1): scenarios exist only for SYNTHETIC assets, and both synthetic assets are
 always present together, for demo and for test - so this read always finds
 both, and another asset's scenario is always told from a mistyped one. A
-deployment whose assets/ root is injected with a single asset (#55) is a
+deployment whose assets/ root is injected with a single asset (REQ-PIPE-342) is a
 real one, and a real asset carries no scenarios, so the case where the other
 asset's folder is missing - and its scenarios would read as mistyped - does
 not arise. REJECTED: staying quiet when the other asset's folder is absent,
