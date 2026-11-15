@@ -309,7 +309,7 @@ def reason_for(finding: Finding, filename: str) -> str:
 def expected_columns(contract_path, table: str) -> list[str]:
     """The contract's columns for one table, in the contract's order - what
     a header is compared with."""
-    doc = config_yaml.parse(Path(contract_path).read_text()) or {}
+    doc = config_yaml.load(Path(contract_path)) or {}
     for entry in doc.get("schema") or []:
         if entry.get("name") == table:
             return [p["name"] for p in entry.get("properties") or []]

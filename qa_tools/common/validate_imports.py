@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from asset_model import config_yaml
 
 from qa_tools.common import diff_base as _diff_base
 from qa_tools.common import syntax_walk
@@ -324,11 +325,159 @@ def status_rankings(rel: str, tree, root: Path) -> tuple[list[Finding], list[Pro
     return [], problems
 
 
+# ---- configuration read through config_yaml (REQ-PIPE-397 criterion 8) -------
+
+#: Where the rule reads: the code that runs inside a pinned generation or
+#: replay - the shared reading code, the real pipeline, the generator and the
+#: dashboard build, and each asset's adapters and providers.
+PINNED_READ_TOPS = ("asset_model", "qa_tools", "generator", "pipeline", "dashboard")
+
+#: The one module allowed to read a configuration file itself.
+CONFIG_YAML = "asset_model/config_yaml.py"
+
+#: PyYAML's parse calls - every one of them belongs in config_yaml.
+YAML_PARSES = frozenset({"safe_load", "load", "full_load", "unsafe_load", "safe_load_all",
+                         "load_all"})
+
+
+def _pinned_scope(rel: str) -> bool:
+    parts = rel.split("/")
+    if parts[0] in PINNED_READ_TOPS:
+        return rel != CONFIG_YAML
+    return parts[0] == "assets" and len(parts) > 3 and (
+        parts[2] == "collections" or parts[2:4] == ["synthetic", "collections"])
+
+
+def _yaml_names(tree) -> set[str]:
+    """Names the file binds to the yaml module."""
+    out = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out |= {a.asname or a.name for a in node.names if a.name == "yaml"}
+    return out
+
+
+def _is_file_read(node) -> bool:
+    """A call that reads a file's content: x.read_text(), x.read_bytes(),
+    open(x) or open(x, 'r'/'rb'), or x.read() on one of those."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Attribute) and func.attr in ("read_text", "read_bytes"):
+        return True
+    if isinstance(func, ast.Attribute) and func.attr == "read":
+        return _is_file_read(func.value)
+    if isinstance(func, ast.Name) and func.id == "open":
+        mode = node.args[1] if len(node.args) > 1 else next(
+            (k.value for k in node.keywords if k.arg == "mode"), None)
+        return mode is None or (isinstance(mode, ast.Constant) and isinstance(mode.value, str)
+                                and "r" in mode.value and "+" not in mode.value)
+    return False
+
+
+def _opened_names(tree) -> set[str]:
+    """Names bound by `with open(x) as name` (a read)."""
+    out = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if _is_file_read(item.context_expr) and isinstance(item.optional_vars, ast.Name):
+                    out.add(item.optional_vars.id)
+    return out
+
+
+def _names_yaml(node) -> bool:
+    """Whether an expression names a YAML file: a '.yaml'/'.yml' literal in
+    it, or a function, method or attribute whose name ends in yaml or yml
+    (data_asset_yaml(), calendar_yaml())."""
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) \
+                and (".yaml" in sub.value or ".yml" in sub.value):
+            return True
+        name = sub.attr if isinstance(sub, ast.Attribute) else (
+            sub.id if isinstance(sub, ast.Name) else None)
+        if name and name.lower().endswith(("_yaml", "_yml")):
+            return True
+    return False
+
+
+def _read_target(node: ast.Call):
+    func = node.func
+    if isinstance(func, ast.Attribute) and func.attr == "read":
+        return _read_target(func.value)
+    if isinstance(func, ast.Attribute):
+        return func.value
+    return node.args[0] if node.args else None
+
+
+def pinned_reads(rel: str, tree, root: Path) -> tuple[list[Finding], list[Problem]]:
+    """REQ-PIPE-397 criterion 8: a module that runs inside a pinned run reads
+    configuration through config_yaml (read, load or a Built store), never
+    itself - or the pin would miss it in silence. Three shapes fail, each
+    naming the file, the line and what it reads:
+
+    - a PyYAML parse call (yaml.safe_load, yaml.load, ...): config_yaml.parse
+      for text the caller holds, config_yaml.load for a file;
+    - config_yaml.parse of the caller's own read (x.read_text(), open(x), a
+      `with open(x) as f` handle): config_yaml.load(x) instead;
+    - read_text/open of a path naming a YAML file (a '.yaml' or '.yml' literal,
+      or a name ending in yaml or yml): config_yaml.read or load.
+
+    PROVISIONAL (2026-11-16): the gate cannot know statically which file a
+    path names, so it holds every YAML read in these packages to config_yaml
+    rather than only the snapshot set's - a YAML file outside the set (the
+    register, a workflow) read through config_yaml is simply read from disk.
+    Reads source, an architecture rule with no behaviour to observe. Never
+    allowlistable: the fix is a one-line change to config_yaml."""
+    if not _pinned_scope(rel):
+        return [], []
+    yaml_names = _yaml_names(tree)
+    opened = _opened_names(tree)
+    parses = {id(c.node) for c in syntax_walk.calls_of(
+        tree, rel, frozenset({"asset_model.config_yaml"}), "parse", root)}
+    problems = []
+
+    def found(node, what, instead):
+        problems.append(Problem(
+            f"{rel}:{node.lineno}: reads configuration outside config_yaml ({what}) - "
+            f"{instead}, so a pinned run answers it from its snapshot (REQ-PIPE-397 "
+            f"criterion 8)"))
+
+    seen: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if isinstance(func, ast.Attribute) and func.attr in YAML_PARSES \
+                and isinstance(func.value, ast.Name) and func.value.id in yaml_names:
+            found(node, ast.unparse(node),
+                  "use config_yaml.parse for text you hold, config_yaml.load for a file")
+            for sub in ast.walk(node):
+                seen.add(id(sub))
+        elif id(node) in parses and node.args:
+            arg = node.args[0]
+            if _is_file_read(arg) or (isinstance(arg, ast.Name) and arg.id in opened):
+                found(node, f"parses its own read of {ast.unparse(arg)}",
+                      "use config_yaml.load(path)")
+                for sub in ast.walk(arg):
+                    seen.add(id(sub))
+    for node in ast.walk(tree):
+        if id(node) in seen or not _is_file_read(node):
+            continue
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "read":
+            continue
+        target = _read_target(node)
+        if target is not None and _names_yaml(target):
+            found(node, f"reads {ast.unparse(target)}", "use config_yaml.read or load")
+    return [], problems
+
+
 #: Each rule takes (file relative to the root, its syntax tree, the root) and
 #: returns (allowlistable findings, problems): the forbidden edges
-#: (REQ-TEST-384), the underscore-name rule (REQ-PIPE-376 criterion 8) and the
-#: status-ranking rule (REQ-PIPE-390 criterion 5).
-RULES = (forbidden_edges, private_names, status_rankings)
+#: (REQ-TEST-384), the underscore-name rule (REQ-PIPE-376 criterion 8), the
+#: status-ranking rule (REQ-PIPE-390 criterion 5) and configuration read
+#: through config_yaml (REQ-PIPE-397 criterion 8).
+RULES = (forbidden_edges, private_names, status_rankings, pinned_reads)
 
 
 def scan(root: Path = ROOT) -> tuple[list[Finding], list[Problem]]:
@@ -370,7 +519,7 @@ def read_allowlist(text: str) -> tuple[list[Entry], list[str]]:
     that is not a list, or an entry that is not a mapping is reported rather
     than raised, each naming what it found."""
     try:
-        doc = yaml.safe_load(text) or {}
+        doc = config_yaml.parse(text) or {}
     except yaml.YAMLError as exc:
         return [], [f"{ALLOWLIST}: malformed - not YAML ({str(exc).splitlines()[0]})"]
     if not isinstance(doc, dict):

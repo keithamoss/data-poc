@@ -151,8 +151,7 @@ def run_against_warehouse(contract_path: str, schema: str, *,
     from datacontract.data_contract import DataContract
     from qa_tools.common import supply_db
 
-    with open(contract_path) as f:
-        contract_dict = config_yaml.parse(f)
+    contract_dict = config_yaml.load(contract_path)
 
     fields = supply_db.connection_fields()
     d = copy.deepcopy(contract_dict)

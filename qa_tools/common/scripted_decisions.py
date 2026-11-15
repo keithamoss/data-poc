@@ -149,7 +149,7 @@ def load(path: Path | str | None = None) -> list[Script]:
     p = Path(path or script_path())
     if not p.exists():
         return []
-    doc = config_yaml.parse(p.read_text()) or {}
+    doc = config_yaml.load(p) or {}
     out = []
     for raw in _expanded(doc.get("decisions") or []):
         out.append(Script(

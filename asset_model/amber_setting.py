@@ -127,8 +127,7 @@ class Resolved:
 def load_doc(path: Path | None = None) -> dict:
     from asset_model.hierarchy import data_asset_yaml
 
-    with open(path or data_asset_yaml()) as f:
-        return config_yaml.parse(f) or {}
+    return config_yaml.load(path or data_asset_yaml()) or {}
 
 
 def _in_effect(setting: dict | None, on: date) -> dict | None:

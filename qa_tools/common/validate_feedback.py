@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
-import yaml
+from asset_model import config_yaml
 
 from dashboard.plans_md import (feedback_files, parse_feedback_cards,
                                road_testing_sprints)
@@ -35,7 +35,7 @@ _TOP_ROUTES = {"", "plans", "demo", "scenarios", "feedback"}
 
 
 def _hierarchy(path: Path) -> dict:
-    doc = yaml.safe_load(path.read_text()) or {}
+    doc = config_yaml.load(path) or {}
     tree = {}
     for ag in (doc.get("hierarchy") or {}).get("agencies") or []:
         tree[ag["id"]] = {col["id"]: {d["id"] for d in col.get("datasets") or []}
@@ -90,7 +90,7 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
         errors += wrong
     if not files[0].is_file():
         return cards, errors
-    reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements).read_text()) or {}).get("requirements", [])}
+    reqs = {r["id"]: r for r in (config_yaml.load(Path(requirements)) or {}).get("requirements", [])}
     sprints = road_testing_sprints(files[0].read_text())
     tree = _hierarchy(Path(data_asset))
     from asset_model import every_asset

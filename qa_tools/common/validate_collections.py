@@ -463,7 +463,7 @@ def _names() -> tuple[set[str], tuple[str, ...]]:
     from asset_model import collections as declared_collections
     from asset_model import config_yaml, hierarchy
 
-    doc = config_yaml.parse(hierarchy.data_asset_yaml().read_text()) or {}
+    doc = config_yaml.load(hierarchy.data_asset_yaml()) or {}
     ids = set()
     for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
         ids.add(agency["id"])

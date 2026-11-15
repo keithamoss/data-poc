@@ -23,7 +23,7 @@ def declared(path: str | Path) -> dict[str, dict]:
     that declares one."""
     from asset_model import config_yaml
 
-    doc = config_yaml.parse(Path(path).read_text()) or {}
+    doc = config_yaml.load(Path(path)) or {}
     out = {}
     for key, checks in doc.items():
         if not str(key).startswith("checks for"):

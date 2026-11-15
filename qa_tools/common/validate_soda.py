@@ -111,15 +111,14 @@ def _failed_rows_checks(doc: dict):
 
 
 def _key_findings(paths, keys, collection_of=None) -> tuple[list[str], list[str]]:
-    import yaml
+    from asset_model import config_yaml
 
     found, warned = [], []
     collection_of = _collection_of_files() if collection_of is None else collection_of
     for path in paths:
         name = os.path.basename(str(path))
         file_keys = _keys_for(path, keys, collection_of)
-        with open(path) as f:
-            doc = yaml.safe_load(f) or {}
+        doc = config_yaml.load(path) or {}
         for table, check, query, no_row in _failed_rows_checks(doc):
             if no_row:
                 continue
@@ -149,8 +148,9 @@ def warnings(paths=None, sample_keys=None, collection_of=None) -> list[str]:
 
 
 def problems(paths=None, sample_keys=None, collection_of=None) -> list[str]:
-    import yaml
     from soda.scan import Scan
+
+    from asset_model import config_yaml
 
     found: list[str] = []
     for path in paths or check_files():
@@ -160,8 +160,7 @@ def problems(paths=None, sample_keys=None, collection_of=None) -> list[str]:
         scan.add_sodacl_yaml_file(str(path))
         for log in scan.get_error_logs():
             found.append(f"{name}: Soda Core cannot parse it - {' '.join(str(log.message).split())}")
-        with open(path) as f:
-            doc = yaml.safe_load(f) or {}
+        doc = config_yaml.load(path) or {}
         for key, checks in doc.items():
             if not (isinstance(key, str) and key.startswith("checks for ")):
                 continue

@@ -56,6 +56,7 @@ import sys
 from pathlib import Path
 
 import yaml
+from asset_model import config_yaml
 
 AGENTS_DIR = Path(__file__).resolve().parent.parent.parent / ".claude" / "agents"
 
@@ -101,7 +102,7 @@ def validate_file(path: Path) -> tuple[list[str], int]:
         return ([f"{path.name}: no YAML frontmatter (expected a leading '---' block)"], 0)
 
     try:
-        front = yaml.safe_load(block)
+        front = config_yaml.parse(block)
     except yaml.YAMLError as exc:
         # The real incident's shape. Worth naming the likely cause in
         # the message: the error PyYAML gives for a hard-wrapped plain

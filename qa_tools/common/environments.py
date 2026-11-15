@@ -75,7 +75,7 @@ def _load(path: Path | str | None = None) -> list[Environment]:
     path = Path(path or ENVIRONMENTS_PATH)
     if not path.exists():
         raise EnvironmentError_(f"no environments declared - {path} does not exist")
-    text = path.read_text()
+    text = config_yaml.read(path)
     hit = _loaded.get(text)
     if hit is None:
         hit = tuple(_parse_environments(path, text))
@@ -172,7 +172,7 @@ def ticket_repository() -> str | None:
     happens to run in."""
     from asset_model.hierarchy import data_asset_yaml
 
-    doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
+    doc = config_yaml.load(Path(data_asset_yaml())) or {}
     repo = str(doc.get("ticket_repository") or "").strip()
     return repo or None
 

@@ -279,7 +279,7 @@ def _known_tables() -> set[str]:
 
 def _yaml(path: Path):
     try:
-        return config_yaml.parse(path.read_text()) or {}
+        return config_yaml.load(path) or {}
     except (OSError, yaml.YAMLError):
         return {}
 

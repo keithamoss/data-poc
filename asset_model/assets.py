@@ -287,21 +287,37 @@ def _rebuild(described):
 
 def handoff() -> tuple:
     """What a process this one starts needs to act for the same asset: the
-    selected asset's NAME and the LAYOUT it was found in - an assets/ root
-    from use_root (REQ-PIPE-342), a folder from use_folder - since a spawned
-    interpreter sees neither this one's selection nor its layout
+    selected asset's NAME, the LAYOUT it was found in - an assets/ root from
+    use_root (REQ-PIPE-342), a folder from use_folder - and the CONFIGURATION
+    PINNED for this run, if one is (REQ-PIPE-397 criterion 12), since a spawned
+    interpreter sees neither this one's selection, its layout nor its pin
     (post-build-review, the groundwork critic). Passed to `adopt` as a pool's
-    initializer arguments; picklable."""
-    return (selected().name, _describe(_layout))
+    initializer arguments; picklable. THE ONE HAND-OFF (REQ-PIPE-369 criterion
+    4): no pool carries an initializer of its own.
+
+    THE CLOCK TRAVELS BESIDE IT, not in it (PROVISIONAL (2026-11-16)): a
+    pinned instant is MOTHMAN_PINNED_NOW, which a spawned process inherits with
+    the environment, and a replay clock is installed by each stream process
+    around its own replay, since a clock anchored on this process's monotonic
+    time means nothing in another. The rolling anchor (REQ-GEN-404) is not
+    built, so nothing of it is handed yet."""
+    from asset_model import config_pin
+
+    return (selected().name, _describe(_layout), config_pin.installed())
 
 
-def adopt(name: str, layout: tuple = ("default",)) -> Asset:
+def adopt(name: str, layout: tuple = ("default",), snapshot=None) -> Asset:
     """A started process's first act: take the layout and the asset it was
-    handed (`handoff()`), then select the asset - refused as `select`
-    refuses."""
+    handed (`handoff()`), select the asset - refused as `select` refuses - and
+    pin the configuration snapshot it was handed, verified against its digest
+    (REQ-PIPE-397 criterion 12), or hold none if it was handed none."""
     global _layout
     _layout = _rebuild(layout)
-    return select(name)
+    asset = select(name)
+    from asset_model import config_pin
+
+    config_pin.adopt(snapshot)
+    return asset
 
 
 def names() -> list[str]:

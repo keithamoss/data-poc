@@ -254,10 +254,8 @@ class Unreadable(ValueError):
 def load_docs() -> tuple[dict, dict]:
     """The asset's calendar.yaml and data-asset.yaml as they read on disk,
     parsed - it was agreement_drift._load_docs (REQ-PIPE-380 criterion 2)."""
-    with open(agreement.calendar_yaml()) as f:
-        cal_doc = config_yaml.parse(f) or {}
-    with open(asset_time.data_asset_yaml()) as f:
-        asset_doc = config_yaml.parse(f) or {}
+    cal_doc = config_yaml.load(agreement.calendar_yaml()) or {}
+    asset_doc = config_yaml.load(asset_time.data_asset_yaml()) or {}
     return cal_doc, asset_doc
 
 

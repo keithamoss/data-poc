@@ -171,9 +171,12 @@ def try_all(collection_id: str, specs: list[dict], say=None) -> tuple[list, floa
     from asset_model import assets
 
     context = multiprocessing.get_context("spawn")
+    # THE ONE HAND-OFF (REQ-PIPE-397 criterion 12): the asset, its layout and
+    # the configuration pinned for this generation - not an initializer of its
+    # own, which handed the asset's name alone.
     with ProcessPoolExecutor(max_workers=workers, mp_context=context,
-                             initializer=assets.select,
-                             initargs=(assets.selected().name,)) as pool:
+                             initializer=assets.adopt,
+                             initargs=assets.handoff()) as pool:
         futures = [(spec, pool.submit(_guarded, collection_id, spec)) for spec in specs]
         for spec, future in futures:
             say(f"Trying {spec['label']} against the real tools in {spec['period']} "

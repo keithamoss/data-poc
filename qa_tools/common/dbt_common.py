@@ -215,6 +215,8 @@ def _project_fingerprint(project_dir: str) -> str:
 
     import yaml
 
+    from asset_model import config_yaml
+
     digest = hashlib.sha256()
     root = Path(project_dir)
     for path in sorted(root.rglob("*")):
@@ -223,7 +225,7 @@ def _project_fingerprint(project_dir: str) -> str:
             continue
         digest.update(str(rel).encode() + b"\0" + path.read_bytes() + b"\0")
     try:
-        config = yaml.safe_load((root / "dbt_project.yml").read_text()) or {}
+        config = config_yaml.load(root / "dbt_project.yml") or {}
     except (OSError, yaml.YAMLError):
         config = {}
     outside = sorted({(root / p).resolve() for key in ("macro-paths", "test-paths")
@@ -540,13 +542,13 @@ def packages_installed(project_dir) -> bool:
     plain file there (the old stamp) is not a package and does not count."""
     from pathlib import Path
 
-    import yaml
+    from asset_model import config_yaml
 
     project = Path(project_dir)
     lock_path, packages = project / PACKAGE_LOCK, project / "dbt_packages"
     if not lock_path.is_file():
         return False
-    lock = yaml.safe_load(lock_path.read_text()) or {}
+    lock = config_yaml.load(lock_path) or {}
     if lock.get("sha1_hash") != _packages_hash(project / "packages.yml"):
         return False
     names = [p.get("name") for p in lock.get("packages") or []]

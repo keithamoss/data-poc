@@ -47,7 +47,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 from pydantic import ValidationError
 
 from qa_tools.common.schemas import Requirement, format_error
@@ -336,10 +336,10 @@ def main(path: str | None = None) -> int:
     if not target.exists():
         print(f"requirements YAML not found at {target}", file=sys.stderr)
         return 1
-    with open(target) as f:
-        # THE C PARSER (REQ-TEST-253 criterion 5): the same safe loader,
-        # about forty times faster on a 3.4MB register.
-        doc = yaml.load(f, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader)) or {}
+    # THE C PARSER (REQ-TEST-253 criterion 5): config_yaml's loader is the
+    # same safe loader, about forty times faster on a 3.4MB register - read
+    # through config_yaml (REQ-PIPE-397 criterion 8) and not kept.
+    doc = config_yaml.load(target, remember=False) or {}
     raw = doc.get("requirements") if isinstance(doc, dict) else doc
     requirements = [r or {} for r in (raw or [])]
     errors = validate(requirements)

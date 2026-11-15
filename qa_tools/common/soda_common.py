@@ -348,8 +348,7 @@ def left_out_checks(path: str, unreadable, keep=None) -> list[str]:
     gone = set(unreadable)
     if not gone:
         return []
-    with open(path) as f:
-        doc = config_yaml.parse(f)
+    doc = config_yaml.load(path)
     _, removed = _split(doc, gone, _declared_reads_tables(), keep)
     return removed
 

@@ -34,7 +34,7 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 from pydantic import ValidationError
 
 from qa_tools.common.schemas import Changelog, format_error
@@ -99,8 +99,7 @@ def main() -> int:
     if not CHANGELOG_YAML.exists():
         print(f"CHANGELOG.yaml not found at {CHANGELOG_YAML}", file=sys.stderr)
         return 1
-    with open(CHANGELOG_YAML) as f:
-        raw = yaml.safe_load(f) or {}
+    raw = config_yaml.load(CHANGELOG_YAML) or {}
     errors = validate(raw)
     if errors:
         print(f"changelog validation FAILED ({len(errors)} error(s)):", file=sys.stderr)

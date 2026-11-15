@@ -266,7 +266,7 @@ def _soda_when(text, unit: str, where: str) -> tuple[Bound, ...]:
 
 def soda_bounds(path: Path) -> dict[str, tuple]:
     """{check_id: (metric, warn, fail)} for every check in a Soda file."""
-    doc = config_yaml.parse(Path(path).read_text()) or {}
+    doc = config_yaml.load(path) or {}
     out = {}
     for key, checks in doc.items():
         if not str(key).startswith("checks for"):
@@ -336,7 +336,7 @@ def _dbt_one(metric: str, cfg: dict, meta: dict, path) -> tuple[str, tuple]:
 
 
 def dbt_bounds(path: Path) -> dict[str, tuple]:
-    doc = config_yaml.parse(Path(path).read_text()) or {}
+    doc = config_yaml.load(path) or {}
     out = {}
     for entry in (doc.get("data_tests") or doc.get("tests") or []):
         conf = entry.get("config") or {}
@@ -361,7 +361,7 @@ _MUST = {"mustBe": "!=", "mustBeLessThan": ">=", "mustBeLessOrEqualTo": ">",
 
 
 def contract_bounds(path: Path) -> dict[str, tuple]:
-    doc = config_yaml.parse(Path(path).read_text()) or {}
+    doc = config_yaml.load(path) or {}
     out = {}
     for table in doc.get("schema") or []:
         rules = list(table.get("quality") or [])
@@ -429,7 +429,7 @@ def file_bounds(metadata, doc=None) -> dict[str, tuple]:
     from asset_model import collections
 
     if doc is None:
-        doc = config_yaml.parse((ROOT / collections.file_checks()).read_text()) or {}
+        doc = config_yaml.load(ROOT / collections.file_checks()) or {}
     severity = {str(c.get("check")): str(c.get("severity")) for c in doc.get("checks") or []}
     out = {}
     for m in metadata:
@@ -456,7 +456,7 @@ def soda_reference_reads(path: Path) -> dict[str, tuple[str, str]]:
     reference check - its columns are structured fields of the check
     itself, so it declares no reads_columns, and without this the parent's
     column would not list it among its single-tier readers."""
-    doc = config_yaml.parse(Path(path).read_text()) or {}
+    doc = config_yaml.load(path) or {}
     out = {}
     for key, checks in doc.items():
         if not str(key).startswith("checks for"):

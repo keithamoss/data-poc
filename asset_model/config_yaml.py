@@ -48,7 +48,6 @@ import copy
 import os
 import threading
 from collections import OrderedDict
-from pathlib import Path
 
 import yaml
 
@@ -68,9 +67,13 @@ def _parse_raw(text: str):
     return yaml.load(text, Loader=LOADER)  # noqa: S506 - a SafeLoader, C or Python
 
 
-def parse(source, *, name: str | None = None):
+def parse(source, *, name: str | None = None, remember: bool = True):
     """A YAML document from text or an open stream, parsed at most once per
     distinct content in this process; the caller's own copy.
+
+    `remember=False` parses without keeping the document - for a large file
+    read once by a gate (the 6MB register), which the cache would only hold
+    and deep-copy for nothing.
 
     A SLIP NAMES ITS FILE: PyYAML took the name from the stream it read, and
     reading the text first would leave every error saying `<unicode string>`
@@ -83,10 +86,11 @@ def parse(source, *, name: str | None = None):
     text = source if isinstance(source, str) else source.read()
     if isinstance(text, bytes):
         text = text.decode("utf-8")
-    with _lock:
-        if text in _cache:
-            _cache.move_to_end(text)
-            return copy.deepcopy(_cache[text])
+    if remember:
+        with _lock:
+            if text in _cache:
+                _cache.move_to_end(text)
+                return copy.deepcopy(_cache[text])
     try:
         parsed = _parse_raw(text)
     except yaml.MarkedYAMLError as exc:
@@ -99,6 +103,8 @@ def parse(source, *, name: str | None = None):
                     setattr(exc, attr, yaml.Mark(str(name), mark.index, mark.line,
                                                  mark.column, None, None))
         raise
+    if not remember:
+        return parsed
     with _lock:
         _cache[text] = parsed
         _cache.move_to_end(text)
@@ -107,16 +113,89 @@ def parse(source, *, name: str | None = None):
     return copy.deepcopy(parsed)
 
 
-def load(path) -> object:
+def load(path, *, remember: bool = True) -> object:
     """A configuration file, read fresh and parsed at most once per distinct
-    content. A missing file raises as reading it would."""
-    return parse(Path(path).read_text(encoding="utf-8"), name=str(path))
+    content. A missing file raises as reading it would.
+
+    A DEEP COPY ON EVERY CALL, INSIDE A PIN AS OUTSIDE ONE (REQ-PIPE-397
+    criterion 10): callers mutate what they load (a fixture editing a document
+    before writing it back, a parser popping keys), so a pinned run answering
+    the same text a million times still hands each caller its own copy. Do not
+    optimise the copy away because the text is pinned - the text is shared, the
+    document must not be."""
+    return parse(read(path), name=str(path), remember=remember)
+
+
+# ---- THE PIN (REQ-PIPE-397) --------------------------------------------------
+#
+# For the span of a synthetic generation or replay, asset_model/config_pin.py
+# installs the asset's configuration as read once at the start, and every
+# read() below of a file in that snapshot is answered from it - so load(), every
+# Built store and every reader built on them answer from it too, and no real
+# pipeline module learns that a pin exists (criterion 4). Outside a pin nothing
+# here changes: the file is read whole on every call (REQ-PIPE-254 criterion 15).
+#
+# KEYED ON THE RESOLVED PATH (the architect's non-blocking point): callers mix
+# repository-relative spellings with the asset resolver's, and the suite's
+# asset folders link to the real files, so two spellings of one file are one
+# entry. An absolute spelling's resolution is remembered for the pin's span -
+# nothing in the snapshot moves while it is installed.
+#
+# PROCESS-WIDE, NOT A CONTEXT VARIABLE, as the clock is: a run's four tools read
+# from worker threads.
+
+
+class _Pin:
+    """The texts a pin answers, by resolved path."""
+
+    def __init__(self, texts):
+        self.texts = texts
+        self.spellings: dict[str, str] = {}
+
+    def text_of(self, path):
+        spelled = os.fspath(path)
+        key = self.spellings.get(spelled)
+        if key is None:
+            key = os.path.realpath(spelled)
+            if os.path.isabs(spelled):
+                self.spellings[spelled] = key
+        return self.texts.get(key)
+
+
+_pin: _Pin | None = None
+
+
+def pin(texts) -> None:
+    """Answer every read of a file in `texts` ({resolved path: text}) from it
+    until unpin() - asset_model/config_pin.py's alone to call (REQ-PIPE-397)."""
+    global _pin
+    _pin = _Pin(texts)
+
+
+def unpin() -> None:
+    """Read every file from disk again."""
+    global _pin
+    _pin = None
 
 
 def read(path) -> str:
     """A configuration file's text, read now. A missing or unreadable file
     raises as reading it would - on every call, since nothing is remembered
-    about a failure."""
+    about a failure.
+
+    INSIDE A PIN (REQ-PIPE-397) a file of the pinned snapshot is answered from
+    it, with no read; a file outside the snapshot - or one that could not be
+    read when the snapshot was taken (criterion 9) - is read as it always is."""
+    held = _pin
+    if held is not None:
+        text = held.text_of(path)
+        if text is not None:
+            return text
+    return read_from_disk(path)
+
+
+def read_from_disk(path) -> str:
+    """read(), never answered from a pin - what the pin itself is taken with."""
     # THE OPERATING SYSTEM'S OWN READ, then decoded, at about half
     # read_text's cost, on a path that runs tens of thousands of times in one
     # dashboard build (REQ-PIPE-254 criterion 19). Still the whole content,

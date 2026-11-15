@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from asset_model import config_yaml
 
 from qa_tools.common import diff_base as _diff_base
 
@@ -91,8 +92,7 @@ class Marker:
 
 
 def load_register(root: Path = ROOT) -> dict:
-    with open(root / REGISTER, encoding="utf-8") as f:
-        return yaml.load(f, Loader=_LOADER) or {}
+    return config_yaml.load(root / REGISTER, remember=False) or {}
 
 
 def scan(register: dict) -> list[Marker]:
@@ -115,8 +115,7 @@ def _entries(doc) -> set[tuple[str, str, str]]:
 
 
 def load_baseline(root: Path = ROOT) -> set[tuple[str, str, str]]:
-    with open(root / BASELINE, encoding="utf-8") as f:
-        return _entries(yaml.load(f, Loader=_LOADER))
+    return _entries(config_yaml.load(root / BASELINE))
 
 
 def write_baseline(root: Path, entries) -> None:
@@ -147,7 +146,7 @@ def _baseline_at_base(root: Path) -> set[tuple[str, str, str]] | None:
                            capture_output=True, text=True)
     if shown.returncode != 0:
         return None
-    return _entries(yaml.load(shown.stdout, Loader=_LOADER))
+    return _entries(config_yaml.parse(shown.stdout))
 
 
 def main(argv: list[str] | None = None, root: Path | None = None) -> int:

@@ -51,7 +51,7 @@ class Definition:
 
 def definitions(path: Path | str | None = None) -> list[Definition]:
     """Every file check in the committed configuration, in NAMES order."""
-    doc = config_yaml.parse(Path(path or definitions_path()).read_text()) or {}
+    doc = config_yaml.load(path or definitions_path()) or {}
     out = [Definition(check=str(raw["check"]), severity=str(raw["severity"]),
                       formats=tuple(raw.get("formats") or ("csv",)),
                       name=str(raw.get("name") or raw["check"]).strip(),

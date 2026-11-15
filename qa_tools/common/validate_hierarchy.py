@@ -53,7 +53,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 
 from asset_model import hierarchy
 from qa_tools.common import postgres_version, tables_read
@@ -216,8 +216,7 @@ def validate() -> list[str]:
             errors.append(f"{filename}: no such contract")
             continue
 
-        with open(path) as f:
-            doc = yaml.safe_load(f) or {}
+        doc = config_yaml.load(path) or {}
 
         try:
             expected_id, expected_name, expected_domain = _describes(describes)
