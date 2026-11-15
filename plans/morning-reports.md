@@ -3566,3 +3566,21 @@ one or more component tags, and a date.
       change. (b) Leave it and record the limit. RECOMMENDED (a): a release
       describing a supply that never arrived is wrong data. Scope which
       releases move before building.
+
+13. **[in-progress, 2026-11-15]** **[Docs & process]** **Build run, evening
+    2026-11-15 into the night: finishing the asset split.**
+
+    - **THE PLAN AND TERMS (Keith, 2026-11-15 ~17:05)**: "Just keep on
+      building, usual overnight policy applies. I'll be around for another
+      five hours though, so you can check in with me if critical decisions
+      come up." Order from the decisions file: finish the structural split
+      (T2 calendar names out of shared code - REQ-PIPE-345; T3 state and CI
+      per asset - REQ-PIPE-365, REQ-TEST-353; T4 GEN-370 c3/c5/c9; then T5
+      the docs restatement - REQ-DOCS-358), then #134's core, then speed,
+      then timing, REQ-GEN-206 straight after REQ-GEN-392. Usual policy:
+      parallel worktrees, a critic per batch, targeted tests between
+      batches, checkpoints to `wip/` with `[skip ci]`, one full gate and
+      one push at the end. Source of record: `docs/drafts/decisions-2026-11-01.md`.
+    - **START**: 647861ed pushed and CI green (critical and validate-config)
+      before the run began.
+
