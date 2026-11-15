@@ -778,3 +778,10 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - **REQ-PIPE-240 c9 WORDING APPROVED (Keith, 2026-11-15 ~21:00):** "...and in the scenario register only the INJECTIONS, INHERITING_DATASET and CORRECTION_RIDERS values, each exemption listed in the gate with its reason." AMENDED by REQ-DOCS-358 (the T5 critic found CORRECTION_RIDERS exempted in code but missing from the re-signed text).
 - **CLAUDE.md/README FIX APPROVED (Keith, 2026-11-15):** tonight's E2/E4 (and the README's matching line) say each of qa_tools/collections/ and generator/collections/ "holds only the shared __init__.py (the registry / the provider loader) and base.py", not "only base.py".
 - **OVERNIGHT SCOPE WIDENED (Keith, 2026-11-15 ~21:20):** "Do the speed and timing batches if you can. [Also] 392 and 206." After #134 steps 2-3: the speed batch (REQ-PIPE-397..408, 430-432), then timing (REQ-PIPE-409..418), then REQ-GEN-392, then REQ-GEN-206 - as far as the night allows. **RESETS APPROVED for tonight only:** `mothman env reset-synthetic` + bootstrap of supply_quarterly and supply_daily from empty, as often as 392 and 206 need. (392 is v6 step 9; if it truly needs steps 4-8 first, they come first, recorded PROVISIONAL.)
+
+## Resets, 2026-11-16 (Keith, ~07:30 Perth)
+
+- Asked: may supply_quarterly and supply_daily be reset and bootstrapped from
+  empty today, as often as REQ-GEN-392 c11-c13 and REQ-GEN-206 need (last
+  night's approval was for that night only)?
+- Keith: "Yes, reset as needed". The same terms as last night, for 2026-11-16.
