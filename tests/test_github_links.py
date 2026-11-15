@@ -10,7 +10,8 @@ import pytest
 
 import subprocess
 
-from qa_tools.common import assets, github_links
+from asset_model import assets
+from qa_tools.common import github_links
 
 
 def _git(repo, *args):
@@ -90,7 +91,7 @@ def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
 def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder():
     """REQ-DASH-244 criteria 12 and 13: every registered dataset and agency,
     from the registry, with a tooltip naming the target."""
-    from qa_tools import collections
+    from asset_model import collections
 
     folders = github_links.build_folder_links(sha="abc123")
     every = collections.all_collections()

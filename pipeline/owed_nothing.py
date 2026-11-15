@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from qa_tools.common import agreement as agreement_mod
-from qa_tools.common import asset_time, schedule, slots
+from asset_model import agreement as agreement_mod
+from asset_model import asset_time, schedule, slots
 
 #: The three kinds of period a dataset owes nothing in (criterion 2). The
 #: page words each; the build only names it.

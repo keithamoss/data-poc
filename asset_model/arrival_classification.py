@@ -50,7 +50,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from qa_tools.common import asset_time, slots as slots_mod
+from asset_model import asset_time, slots as slots_mod
 
 EARLY = "early"
 ON_TIME = "on_time"

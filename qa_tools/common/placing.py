@@ -36,7 +36,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qa_tools.common import decision_log, supply_holds
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 #: The words every route uses for a placement (criterion 41).
 VERB = "placed into"
@@ -130,7 +130,7 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
     waiting = supersession.waiting_in(conn, dataset_id, to_period, besides=supply)
     if waiting:
         # Criterion 34.
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         first = waiting[0]
         at = supersession._receipt(conn, dataset_id, first)
@@ -201,7 +201,7 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
     not generate it at all. One resolution, the participation in force on
     the date of the round that would fill it (REQ-PIPE-113 criterion 2, as
     REQ-PIPE-321 amends it)."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     horizon = slots.lookup_horizon()
     try:
@@ -341,9 +341,9 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     run of periods the dataset owes nothing in is ONE row, marked with why
     and not selectable. `page` moves a window's width earlier (negative) or
     later. `states` is {period: slot_state value}, read by the caller."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     horizon = slots.lookup_horizon()
     try:

@@ -58,7 +58,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Sequence
 
-from qa_tools.common import asset_time, slots as slots_mod
+from asset_model import asset_time, slots as slots_mod
 
 #: Which branch of the rule decided an assignment (REQ-PIPE-062
 #: criterion 9). Recorded with the supply rather than recomputed later,

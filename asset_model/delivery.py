@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, asset_time, assets, delivery_boundary
+from asset_model import arrival_patterns, asset_time, assets, delivery_boundary
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -492,7 +492,7 @@ def dataset_for_filename(filename: str) -> str | None:
     file_arrival.py, bare filenames here - which is exactly the split
     REQ-PIPE-058 criterion 4 exists to end. The pattern now lives in
     the dataset's own configuration as a regular expression, and
-    qa_tools/common/arrival_patterns.py owns the matching.
+    asset_model/arrival_patterns.py owns the matching.
     file_arrival.py's whole-key matcher outlived it until REQ-PIPE-152,
     when the handlers stopped matching keys at all.
     """

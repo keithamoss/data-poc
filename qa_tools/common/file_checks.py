@@ -335,7 +335,7 @@ def _dataset(dataset_id: str):
     the table name when it is given no dataset id (the `mothman cp qa`
     path), and the first full run of the suite with this module in it
     stopped on exactly that: 'cp_clients' is not a dataset."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id)

@@ -326,8 +326,8 @@ def bootstrap(collection: str = "all", force: bool = False,
 
 
 def _collection(short: str):
-    from qa_tools import collections
-    return collections.by_short(short)
+    from asset_model import collections as declared_collections
+    return declared_collections.by_short(short)
 
 
 def with_what_it_reads(names: list[str], say=lambda _m: None) -> list[str]:
@@ -336,7 +336,8 @@ def with_what_it_reads(names: list[str], say=lambda _m: None) -> list[str]:
     automatically, and said). A partial bootstrap of a collection reading
     others would otherwise read every one of their tables as absent and
     record a whole history of could-not-run reds."""
-    from qa_tools.common import hierarchy, run_reads
+    from asset_model import hierarchy
+    from qa_tools.common import run_reads
 
     wanted = set(names)
     why: dict[str, set[str]] = {}
@@ -360,7 +361,8 @@ def reads_others(short: str) -> str | None:
     their tables as absent - a history of could-not-run reds no real run
     records. Replaying the whole receipt-ordered stream from a checkpoint is
     not built."""
-    from qa_tools.common import hierarchy, run_reads
+    from asset_model import hierarchy
+    from qa_tools.common import run_reads
 
     coll = _collection(short)
     others = sorted({_label(_collection_short(hierarchy.dataset_for_table(t).collection_id))
@@ -374,14 +376,14 @@ def reads_others(short: str) -> str | None:
 
 
 def _collection_short(collection_id: str) -> str:
-    from qa_tools import collections
-    return collections.by_id(collection_id).short
+    from asset_model import collections as declared_collections
+    return declared_collections.by_id(collection_id).short
 
 
 def _shorts() -> list[str]:
     """Every collection's short name, hierarchy order (REQ-PIPE-240)."""
-    from qa_tools import collections
-    return [c.short for c in collections.all_collections()]
+    from asset_model import collections as declared_collections
+    return [c.short for c in declared_collections.all_collections()]
 
 
 def _adapter(short: str):
@@ -422,13 +424,13 @@ class StreamRefused(ValueError):
 
 
 def _collection_datasets(short: str) -> list:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.datasets_in_collection(_collection(short).id)
 
 
 def _calendar_name(dataset_id: str) -> str:
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     return schedule.calendar_for_dataset(dataset_id).name
 
@@ -440,7 +442,7 @@ def streams(names: list[str]) -> list[list[str]]:
     no list of collections or calendars is held here. A dataset declared to
     have no calendar joins nothing. Registry order, within and across
     streams."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     calendars: dict[str, set[str]] = {}
     for name in names:
@@ -528,7 +530,7 @@ def targets_agree(names) -> tuple[str, ...]:
 
 
 def _collection_of_dataset(dataset_id: str) -> str | None:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id).collection_id
@@ -610,7 +612,8 @@ def _checkpoint_hook(name: str, before: int, held, say, on_name=None):
     """The after_each that takes the checkpoint, with `before` snapped back
     to where its delivery or receipt instant begins - said aloud when it
     moves, and every arrival named with its delivery (#133 B4)."""
-    from qa_tools.common import arrivals, checkpoints
+    from asset_model import arrivals
+    from qa_tools.common import checkpoints
 
     collection_id = _collection(name).id
     found = arrivals.arrivals_for(collection_id, "")
@@ -656,7 +659,7 @@ def resume(name: str, sequential: bool = False,
         checkpoints.require_synthetic()
         cp = checkpoints.find(name)
         if cp.collection_id:
-            from qa_tools import collections as _c
+            from asset_model import collections as _c
 
             # THE RESUME'S NAME FITS, before anything is regenerated (#346).
             checkpoints.require_names_fit(_c.by_id(cp.collection_id).short, cp.before)
@@ -664,7 +667,7 @@ def resume(name: str, sequential: bool = False,
         return ResumeResult(replayed=False, refused=True, reason=str(exc))
 
     if cp.collection_id:
-        from qa_tools import collections as _colls
+        from asset_model import collections as _colls
 
         reads = reads_others(_colls.by_id(cp.collection_id).short)
         if reads:
@@ -694,9 +697,9 @@ def resume(name: str, sequential: bool = False,
             reason=f"{first.reason}, which is before this checkpoint (arrival {cp.before}) - "
                    f"nothing was copied or replayed. {instead}.")
 
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    short = collections.by_id(cp.collection_id).short
+    short = declared_collections.by_id(cp.collection_id).short
     say("Generating the synthetic data the replay reads")
     # NO TRIAL HERE (post-build-review #157 finding 3): this runs before the
     # resume has a database of its own, so a trial would write - and discard -
@@ -783,7 +786,7 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
     import multiprocessing
     from concurrent.futures import ProcessPoolExecutor
 
-    from qa_tools.common import assets
+    from asset_model import assets
 
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(max_workers=len(names), mp_context=context,

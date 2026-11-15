@@ -86,7 +86,8 @@ class TestTheOneExcuse:
     def test_a_player_built_outside_the_batch_pass_is_not_excused(self, folder):
         """Only orchestrate._begin's Player is excused (REQ-GEN-381 ends it);
         one built anywhere else reading the file is a read."""
-        from qa_tools.common import assets, scripted_decisions
+        from asset_model import assets
+        from qa_tools.common import scripted_decisions
 
         before = assets.use_folder(folder)
         try:

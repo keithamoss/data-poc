@@ -45,7 +45,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from qa_tools.common import arrivals, asset_time, delivery, delivery_log
+from asset_model import arrivals, asset_time, delivery as delivery_tree
+from qa_tools.common import delivery, delivery_log
 
 #: What a hand-filed delivery's directory is called.
 #:
@@ -82,12 +83,12 @@ def check_collection(paths, collection_id: str) -> None:
     """Refuse any file recognition places in ANOTHER collection, naming it -
     before anything is written (REQ-PIPE-086 criterion 5). A file nothing
     places is check()'s to refuse."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     wrong = []
     for path in paths:
         name = Path(path).name
-        dataset = delivery.dataset_for_filename(name)
+        dataset = delivery_tree.dataset_for_filename(name)
         if dataset is None:
             continue
         theirs = hierarchy.dataset(dataset).collection_id
@@ -113,7 +114,7 @@ def check(paths) -> None:
     problems = []
     for path in paths:
         name = Path(path).name
-        dataset = delivery.dataset_for_filename(name)
+        dataset = delivery_tree.dataset_for_filename(name)
         if dataset is None:
             problems.append(
                 f"  {name}\n"
@@ -275,7 +276,7 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     directory = delivery.write_delivery(
         name, files, received_at=received_at,
         deliveries_dir=deliveries_dir, receipts_dir=receipts_dir,
-        received_from=delivery.RECEIVED_FROM_OUR_CLOCK,
+        received_from=delivery_tree.RECEIVED_FROM_OUR_CLOCK,
         stated_original=stated, filed_by=who)
 
     # THE RUN ID COMES BACK FROM RECOGNITION, never from the caller
@@ -290,7 +291,7 @@ def file_supply(paths, collection_id: str, run_id_prefix: str,
     # to become visible is the same gap one step smaller. And it has
     # to be here: a filing links to its delivery record and is refused
     # without one (REQ-PIPE-144 criterion 18).
-    for d in delivery.list_deliveries(deliveries_dir, receipts_dir):
+    for d in delivery_tree.list_deliveries(deliveries_dir, receipts_dir):
         if d.name == name:
             delivery_log.record(d, arrivals.recognise(d))
             break

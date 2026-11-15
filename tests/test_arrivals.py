@@ -22,7 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import arrivals, asset_time, delivery, hierarchy
+from asset_model import arrivals, asset_time, delivery as delivery_tree, hierarchy
+from qa_tools.common import delivery
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -152,7 +153,7 @@ class TestADeliveryIsRecognisedNotLabelled:
     def test_a_spanning_delivery_names_both_collections(self, dirs):
         _write(dirs, "mixed", {_ED_FILE: "presentation_id\n1\n", "cp_clients.csv": "a\n1\n"})
         d, r = dirs
-        [one] = delivery.list_deliveries(d, r)
+        [one] = delivery_tree.list_deliveries(d, r)
         assert arrivals.recognise(one).collections == (
             "child-protection", "emergency-department")
 
@@ -282,7 +283,7 @@ class TestWhatAnArrivalHandsToThePipeline:
                                 "birth_registrations_2026-08-24_part2.csv": "registration_number\n2\n"})
         found = _for(dirs)[0]
         assert len(found.files_by_dataset["birth-registrations"]) == 2
-        with pytest.raises(delivery.DeliveryFormatError, match="matched 2 files"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="matched 2 files"):
             found.path_for("birth-registrations")
 
     def test_an_unmatched_file_is_carried_not_swallowed(self, dirs):

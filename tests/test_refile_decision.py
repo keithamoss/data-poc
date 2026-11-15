@@ -151,7 +151,8 @@ class TestRefusedWithWhatComesFirst:
         from datetime import datetime, timedelta, timezone
 
         import filing_support
-        from qa_tools.common import asset_time, refiling, supply_files
+        from asset_model import asset_time
+        from qa_tools.common import refiling, supply_files
 
         received = datetime(2033, 1, 1, tzinfo=timezone.utc) + timedelta(
             seconds=random.randrange(10_000_000))

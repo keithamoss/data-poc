@@ -46,9 +46,20 @@ from pipeline.dashboard_check_labels import (dashboard_status, display_name, mea
                                              pooled_url_key,
                                              rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
-from qa_tools.common import (agreement, amber_setting, asset_time, assets, build_output, carry_forward, census,
-                             config_yaml, drift_reference, hierarchy, qa_store, root_cause,
-                             schedule_ended, supply_db, supply_status, turned_off)
+from asset_model import collections as declared_collections
+from asset_model import agreement, amber_setting, asset_time, assets, config_yaml, hierarchy
+from qa_tools.common import (
+    build_output,
+    carry_forward,
+    census,
+    drift_reference,
+    qa_store,
+    root_cause,
+    schedule_ended,
+    supply_db,
+    supply_status,
+    turned_off,
+)
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -61,13 +72,13 @@ def reports_root() -> str:
 
 
 def results_path(collection_id: str) -> str:
-    return os.path.join(build_output.reports_dir(reports_root()), collections.by_id(collection_id).results_file)
+    return os.path.join(build_output.reports_dir(reports_root()), declared_collections.by_id(collection_id).results_file)
 
 
 def out_path(collection_id: str) -> str:
     """The collection's dashboard file - in the real `reports/`, or under
     `--out-dir` in the build's own (REQ-TEST-281)."""
-    return os.path.join(build_output.reports_dir(reports_root()), collections.by_id(collection_id).dashboard_file)
+    return os.path.join(build_output.reports_dir(reports_root()), declared_collections.by_id(collection_id).dashboard_file)
 
 
 def _run_date(entry: dict) -> str:
@@ -215,7 +226,7 @@ def _disambiguate_pooled_keys(cards: list[dict]) -> None:
     resolves a key to its first match. Only colliding keys change, so
     every URL that was unambiguous yesterday still works today.
     """
-    from qa_tools.common.check_id import try_parse
+    from asset_model.check_id import try_parse
 
     counts: dict[str, int] = {}
     for card in cards:
@@ -331,7 +342,7 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     """Whether this dataset has declared it has no delivery calendar, and
     which kind (REQ-PIPE-106 criteria 3, 8 and 9) - configuration, so safe
     here. None for every dataset that has a calendar."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     return schedule.no_calendar(dataset_id)
 
@@ -394,7 +405,7 @@ def _left_out_fields(why) -> dict:
     if calendar is None and entry["code"] == unrunnable.CALENDAR_DIFFERS and entry.get("dataset"):
         # WHICH CALENDAR THE DATASET WAS ON, from configuration, for 'Not
         # checked: <dataset> was on the <calendar> calendar for <period>'.
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         try:
             calendar = schedule.calendar_for_dataset(entry["dataset"]).name
@@ -1114,7 +1125,7 @@ def _payload(collection_id: str) -> dict:
 
 def build_datasets(collection_id: str) -> list[dict]:
     """Every dataset the hierarchy declares for the collection, in order."""
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     payload = _payload(collection_id)
     # WHAT EACH RUN IS (REQ-PIPE-279 criteria 16 and 17), refused where the
     # file predates it rather than read as runs that are nothing.
@@ -1199,7 +1210,7 @@ def write(collection_id: str) -> str:
 
 
 if __name__ == "__main__":
-    for _coll in collections.all_collections():
+    for _coll in declared_collections.all_collections():
         print(f"Wrote {write(_coll.id)}")
     # Criterion 16 of REQ-PIPE-081: a WARNING, and the build still publishes.
     for line in census.build_warnings():

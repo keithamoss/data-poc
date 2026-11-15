@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import os
 
-from qa_tools import collections
-from qa_tools.common import asset_time, assets, atomic_file, build_output
+from asset_model import collections
+from asset_model import asset_time, assets
+from qa_tools.common import atomic_file, build_output
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_check_reads,
     read_cross_table_results, read_cross_table_results_reading, read_dataset_stats, read_one, replaced_runs, run_facts,

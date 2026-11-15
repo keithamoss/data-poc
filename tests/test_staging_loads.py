@@ -14,7 +14,7 @@ import pytest
 
 import dbsupport
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.common import load_log, qa_store, supply_db
 from staging_support import stage_bdm
 

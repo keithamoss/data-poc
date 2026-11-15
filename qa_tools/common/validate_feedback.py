@@ -79,7 +79,7 @@ def route_problem(path: str, tree: dict, every_agency=None) -> str | None:
 def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
              data_asset: Path | None = None) -> tuple[list[dict], list[str]]:
     if data_asset is None:
-        from qa_tools.common import assets
+        from asset_model import assets
 
         data_asset = assets.selected().data_asset_yaml
     files = feedback_files(plans_dir)
@@ -93,7 +93,7 @@ def problems(plans_dir: Path = PLANS_DIR, requirements: Path = REQUIREMENTS,
     reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements).read_text()) or {}).get("requirements", [])}
     sprints = road_testing_sprints(files[0].read_text())
     tree = _hierarchy(Path(data_asset))
-    from qa_tools.common import every_asset
+    from asset_model import every_asset
 
     every_agency = every_asset.declared().agencies
     for card in cards:

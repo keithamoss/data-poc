@@ -14,7 +14,8 @@ import pytest
 import yaml
 
 from qa_tools import collections
-from qa_tools.common import hierarchy
+from asset_model import collections as declared_collections
+from asset_model import hierarchy
 from qa_tools.common import validate_collections as gate
 # The fixtures `third_collection` and `without_adapter` come from
 # tests/third_collection.py, made available by tests/conftest.py.
@@ -34,7 +35,7 @@ def _declared() -> list[tuple[dict, dict]]:
 
 #: The real adapter modules, one per collection the real hierarchy declares
 #: (read once, at import, before any fixture adds a collection).
-REAL_MODULES = tuple(c.module_name for c in collections.collections_in(
+REAL_MODULES = tuple(c.module_name for c in declared_collections.collections_in(
     yaml.safe_load(hierarchy.data_asset_yaml().read_text())))
 
 
@@ -42,7 +43,7 @@ class TestTheRegistry:
     """Criteria 1 to 4."""
 
     def test_it_lists_the_hierarchys_collections_in_order(self):
-        got = [(c.id, c.short, c.run_prefix) for c in collections.all_collections()]
+        got = [(c.id, c.short, c.run_prefix) for c in declared_collections.all_collections()]
         assert got == [(c["id"], c["short"], c["run_prefix"]) for _a, c in _declared()]
         # And the two the rest of this suite leans on, as they are written -
         # the quarterly asset's first two since the split.
@@ -51,22 +52,22 @@ class TestTheRegistry:
 
     @pytest.mark.asset("daily")
     def test_the_daily_assets_one_collection_is_birth_registrations(self):
-        got = [(c.id, c.short, c.run_prefix) for c in collections.all_collections()]
+        got = [(c.id, c.short, c.run_prefix) for c in declared_collections.all_collections()]
         assert got == [("civil-registration", "bdm", "run_")]
-        assert collections.by_short("bdm").id == "civil-registration"
-        assert collections.by_run_prefix("run_").id == "civil-registration"
-        assert collections.dataset("birth-registrations").table == "birth_registrations"
+        assert declared_collections.by_short("bdm").id == "civil-registration"
+        assert declared_collections.by_run_prefix("run_").id == "civil-registration"
+        assert declared_collections.dataset("birth-registrations").table == "birth_registrations"
 
     def test_a_collection_resolves_by_id_short_or_run_prefix(self):
         for value in ("child-protection", "cp", "cp_run_"):
-            assert collections.resolve(value).id == "child-protection"
-        assert collections.by_short("ed").id == "emergency-department"
-        assert collections.by_run_prefix("ed_run_").id == "emergency-department"
+            assert declared_collections.resolve(value).id == "child-protection"
+        assert declared_collections.by_short("ed").id == "emergency-department"
+        assert declared_collections.by_run_prefix("ed_run_").id == "emergency-department"
 
     def test_a_collection_names_its_report_files_by_its_agency_short(self):
         """REQ-PIPE-248 criterion 7 (Keith, 2026-10-18: rs and cpfs)."""
         got = [(c.agency_short, c.results_file, c.dashboard_file)
-               for c in collections.all_collections()]
+               for c in declared_collections.all_collections()]
         assert got == [(a["short"], f"results_{a['short']}_{c['id']}.json",
                         f"{a['short']}_{c['id']}_dashboard.json") for a, c in _declared()]
         assert got[:2] == [
@@ -76,25 +77,25 @@ class TestTheRegistry:
              "doh_emergency-department_dashboard.json")]
 
     def test_a_dataset_resolves_through_one_index(self):
-        assert collections.collection_of("cp-carers").id == "child-protection"
-        assert collections.dataset("ed-presentations").table == "ed_presentations"
+        assert declared_collections.collection_of("cp-carers").id == "child-protection"
+        assert declared_collections.dataset("ed-presentations").table == "ed_presentations"
 
     @pytest.mark.parametrize("lookup,value,field", [
-        (collections.by_id, "no-such-collection", "id"),
-        (collections.by_short, "nsc", "short"),
-        (collections.by_run_prefix, "nsc_run_", "run_prefix"),
+        (declared_collections.by_id, "no-such-collection", "id"),
+        (declared_collections.by_short, "nsc", "short"),
+        (declared_collections.by_run_prefix, "nsc_run_", "run_prefix"),
     ])
     def test_an_unknown_value_is_refused_naming_it_and_every_known_one(self, lookup, value,
                                                                        field):
         known = ", ".join(c[field] for _a, c in _declared())
         assert value not in known.split(", ")
-        with pytest.raises(collections.UnknownCollectionError) as raised:
+        with pytest.raises(declared_collections.UnknownCollectionError) as raised:
             lookup(value)
         assert repr(value) in str(raised.value) and known in str(raised.value)
 
     def test_an_unknown_dataset_is_refused_naming_it(self):
         with pytest.raises(hierarchy.UnknownDatasetError, match="'ed-attendances'"):
-            collections.dataset("ed-attendances")
+            declared_collections.dataset("ed-attendances")
 
     def test_adapters_load_only_from_this_package(self):
         adapter = collections.adapter("cp")
@@ -102,10 +103,10 @@ class TestTheRegistry:
         assert type(adapter).__module__ == "qa_tools.collections.base"
 
     def test_an_id_that_is_not_a_hierarchy_id_never_becomes_a_module_name(self):
-        rogue = collections.Collection(id="os.path", name="x", agency_id="a", agency_name="a",
+        rogue = declared_collections.Collection(id="os.path", name="x", agency_id="a", agency_name="a",
                                        short="x", run_prefix="x_", contract="c",
                                        datasets=())
-        with pytest.raises(collections.UnknownCollectionError, match="not a hierarchy id"):
+        with pytest.raises(declared_collections.UnknownCollectionError, match="not a hierarchy id"):
             collections.adapter(rogue)
 
     def test_a_collection_without_an_adapter_is_refused_by_name(self, without_adapter):
@@ -242,7 +243,7 @@ class TestAThirdCollectionAtEverySite:
         from cli.collection_cli import of
         from cli.pipeline import has_target_trial
 
-        trials = [c for c in collections.all_collections()
+        trials = [c for c in declared_collections.all_collections()
                   if c.id not in (FAKE_ID, BARE_ID) and has_target_trial(c.id)]
         assert trials, "no real collection declares a target trial - nothing to stub"
         for c in trials:
@@ -296,7 +297,7 @@ class TestAThirdCollectionAtEverySite:
         # One dataset per real collection, each in its own report file, so
         # the order read back is the hierarchy's.
         expected = []
-        for c in collections.all_collections():
+        for c in declared_collections.all_collections():
             if c.id == FAKE_ID:
                 continue
             first = c.datasets[0]
@@ -721,7 +722,7 @@ class TestTheSharedToolModules:
 
         import pandas as pd
 
-        from qa_tools.common.evidently_common import EvidentlyChecks
+        from asset_model.drift import EvidentlyChecks
         from qa_tools.tools import run_evidently as ev
 
         prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
@@ -862,7 +863,7 @@ class TestTheSharedToolModules:
         (dashboard_json, dashboard_datasets, results_json) are gone from the
         adapter, so one that still declares one fails the gate naming the
         file and the pointer - not with a traceback out of the import."""
-        from qa_tools.common import assets
+        from asset_model import assets
 
         # THE ASSET'S ADAPTER FOLDER, with the stale adapter in it: adapters
         # load by path from there (REQ-PIPE-369 criterion 2).
@@ -998,14 +999,14 @@ class TestTheAdapterLineReport:
         from qa_tools.common import validate_collections as vc
 
         lines = vc.line_report()
-        assert len(lines) == len(collections.all_collections()) > 0
+        assert len(lines) == len(declared_collections.all_collections()) > 0
         assert all("against a budget of 150" in line and "generator provider" in line
                    for line in lines), lines
 
     def test_an_adapter_over_budget_is_reported_and_the_gate_still_passes(self, tmp_path, capsys):
         from qa_tools.common import validate_collections as vc
 
-        for coll in collections.all_collections():
+        for coll in declared_collections.all_collections():
             path = tmp_path / "collections" / f"{coll.module_name}.py"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('"""A docstring is not logic."""\n# nor is a comment\n\n'

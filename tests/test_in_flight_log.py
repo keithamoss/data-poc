@@ -13,7 +13,8 @@ import pytest
 
 import json
 
-from qa_tools.common import delivery, in_flight_log
+from asset_model import delivery
+from qa_tools.common import in_flight_log
 
 
 def _entry(name, files):

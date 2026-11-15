@@ -56,8 +56,8 @@ import yaml
 
 import filing_support
 import rebuild_support
-from qa_tools.common import (agreement, assignment, asset_time, period_schema, qa_store,
-                             supply_db)
+from asset_model import agreement, assignment, asset_time
+from qa_tools.common import period_schema, qa_store, supply_db
 
 PASSWORD = "readers-publisher-password"
 PERTH = timezone(timedelta(hours=8))

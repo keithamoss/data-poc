@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 import yaml
 
-from qa_tools.common import agreement, schedule, slots
+from asset_model import agreement, schedule, slots
 from qa_tools.common.validate_schedule import (NOT_EXPECTED_PLACEHOLDER, Source,
                                                 fall_lines, validate)
 
@@ -150,7 +150,7 @@ class TestASupplyInTheDoublyFedRoundIsHeldForAPerson:
     def _held(contract, monkeypatch):
         from datetime import datetime, timedelta, timezone
 
-        from qa_tools.common import agreement as agreement_mod, assignment
+        from asset_model import agreement as agreement_mod, assignment
 
         _, cal_path = contract(1, 0)
         agr = agreement.load(cal_path)
@@ -231,11 +231,12 @@ def test_draft_correction_prints_a_rises_not_expected_entries(contract, monkeypa
 
     from cli import schedule as schedule_cli
     from qa_tools.common import correction_trial
+    from asset_model import declared_corrections
 
     _, cal_path = contract(0, 1)
     cal = yaml.safe_load(cal_path.read_text())
     asset = yaml.safe_load((cal_path.parent / "data-asset.yaml").read_text())
-    monkeypatch.setattr(correction_trial, "working", lambda: (cal, asset))
+    monkeypatch.setattr(declared_corrections, "working", lambda: (cal, asset))
     monkeypatch.setattr(correction_trial, "draft", lambda *a, **k: [])
     assert correction_trial.rise_entries(), "the working copy's rise was not found"
     got = CliRunner().invoke(schedule_cli.schedule_group, ["draft-correction"])
@@ -272,7 +273,7 @@ def test_a_slot_is_found_when_now_is_29_february(monkeypatch):
     by replace(year=)): on 29 February every look-up from now raised."""
     from datetime import datetime, timedelta, timezone
 
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     monkeypatch.setattr(asset_time, "now",
                         lambda: datetime(2028, 2, 29, 10, tzinfo=timezone(timedelta(hours=8))))

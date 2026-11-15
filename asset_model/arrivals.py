@@ -44,8 +44,8 @@ from datetime import datetime
 from pathlib import Path
 
 
-from qa_tools.common import asset_time, delivery, hierarchy, holds, slots
-from qa_tools.common import assets as _assets
+from asset_model import asset_time, delivery, hierarchy, holds, slots
+from asset_model import assets as _assets
 
 
 @dataclass(frozen=True)
@@ -183,7 +183,7 @@ def recognise(d: delivery.Delivery) -> Recognition:
 
     THE PATTERNS NO LONGER COME FROM THE CONTRACT (REQ-PIPE-058). Each
     dataset declares its own regular expression in
-    contract/data-asset.yaml and qa_tools/common/arrival_patterns.py
+    contract/data-asset.yaml and asset_model/arrival_patterns.py
     owns the match.
     """
     found = delivery.files_by_dataset(d)

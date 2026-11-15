@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from qa_tools.common import amber_setting
+from asset_model import amber_setting
 from qa_tools.common.schemas import REPLACEMENT_SETTINGS
 
 NEVER, GREEN, GREEN_OR_AMBER = REPLACEMENT_SETTINGS

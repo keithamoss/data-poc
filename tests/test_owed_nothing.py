@@ -11,7 +11,7 @@ import pytest
 from datetime import date
 
 from pipeline import owed_nothing
-from qa_tools.common import agreement
+from asset_model import agreement
 from tests.test_collection_defaults import _doc, _entry, _unshare, _versions
 from tests.test_turn_off import _off_for_a_while
 

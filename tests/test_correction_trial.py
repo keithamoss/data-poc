@@ -15,8 +15,8 @@ import pytest
 import yaml
 
 import filing_support
-from qa_tools.common import (agreement, assignment, asset_time, correction_trial, qa_store,
-                             supply_db)
+from asset_model import agreement, assignment, asset_time, declared_corrections
+from qa_tools.common import correction_trial, qa_store, supply_db
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
@@ -150,7 +150,8 @@ class TestWhatCannotMove:
         """By the OPEN CONTEST (REQ-PIPE-194 criteria 7 and 8): two files of
         one delivery for one table, filed as `#1` - and the remedy is where
         the pair is settled."""
-        from qa_tools.common import asset_time, supply_files
+        from asset_model import asset_time
+        from qa_tools.common import supply_files
 
         at = RECEIVED + timedelta(minutes=5)
         pair = f"{DATASET}@{asset_time.arrival_key(at)}#1"
@@ -286,7 +287,7 @@ class TestTheCommands:
         _move_q3(work, "2023-10-20")
         _clients(work)["participation"]["versions"][0]["grace"] = "1h"
         monkeypatch.setattr(correction_trial, "at_ref", lambda ref: (cal, asset))
-        monkeypatch.setattr(correction_trial, "working", lambda: (work, asset))
+        monkeypatch.setattr(declared_corrections, "working", lambda: (work, asset))
 
     def _run(self, *args):
         from click.testing import CliRunner
@@ -513,15 +514,15 @@ class TestCriticFindingsOn169:
         cal, asset = _docs()
         broken = copy.deepcopy(cal)
         _clients(broken)["participation"]["versions"][0]["grace"] = "not a duration"
-        monkeypatch.setattr(correction_trial, "_working_docs", lambda: (broken, asset))
-        with pytest.raises(correction_trial.Unreadable, match="working copy"):
-            correction_trial.working()
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (broken, asset))
+        with pytest.raises(declared_corrections.Unreadable, match="working copy"):
+            declared_corrections.working()
 
     def test_f4_draft_never_gives_an_all_clear_on_an_unreadable_copy(self, monkeypatch):
         cal, asset = _docs()
         broken = copy.deepcopy(cal)
         _clients(broken)["participation"]["versions"][0]["grace"] = "not a duration"
-        monkeypatch.setattr(correction_trial, "_working_docs", lambda: (broken, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (broken, asset))
         monkeypatch.setattr(correction_trial, "at_ref", lambda ref: (cal, asset))
         from click.testing import CliRunner
 
@@ -538,7 +539,7 @@ class TestCriticFindingsOn169:
         cal, asset = _docs()
         broken = copy.deepcopy(cal)
         _clients(broken)["participation"]["versions"][0]["grace"] = "not a duration"
-        monkeypatch.setattr(correction_trial, "_working_docs", lambda: (broken, asset))
+        monkeypatch.setattr(declared_corrections, "load_docs", lambda: (broken, asset))
         answers = iter([DATASET, None])
         # The dataset picker is grouped above common.N_LIST datasets, as the
         # quarterly asset's are since the split (post-build-review #320).
@@ -584,7 +585,7 @@ class TestCriticFindingsOn169:
 
         cal, asset = _docs()
         monkeypatch.setattr(correction_trial, "at_ref", lambda ref: (cal, asset))
-        monkeypatch.setattr(correction_trial, "working", lambda: (cal, asset))
+        monkeypatch.setattr(declared_corrections, "working", lambda: (cal, asset))
 
         def asked(*a, **k):
             raise AssertionError("asked for a reference with nothing to declare")

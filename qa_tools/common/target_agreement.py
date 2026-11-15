@@ -84,7 +84,7 @@ def responsible(dataset_id: str, results: Sequence[dict], target: str,
 def _said(status) -> str:
     """A check's status in the dashboard's words (REQ-TEST-360 criterion 7):
     'Fail', never the stored 'red'; refused where it has none."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(status, "label")
 
@@ -161,7 +161,8 @@ def trial_reads_agree(dataset_id: str, results: Sequence[dict], *, staged: Itera
     evaluated or not evaluated for want of a different table, THEN a
     disagreement naming the supply, the check and the table. None where every
     such read came out as staged."""
-    from qa_tools.common import carried, check_id, promotion
+    from qa_tools.common import carried, promotion
+    from asset_model import check_id
 
     if reads is None:
         reads = promotion._declared_reads()

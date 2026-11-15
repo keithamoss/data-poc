@@ -18,8 +18,8 @@ import pytest
 
 import attempt_support
 from conftest import drop_qa_schema
-from qa_tools.common import check_fingerprint as fp
-from qa_tools.common import check_lifecycle as cl
+from asset_model import check_fingerprint as fp
+from asset_model import check_lifecycle as cl
 from qa_tools.common import qa_store, supply_db
 from qa_tools.common import validate_check_lifecycle as vcl
 
@@ -154,7 +154,7 @@ class TestFrozenDefaults:
 
     def test_the_committed_table_is_a_literal_the_gate_can_read_at_any_ref(self):
         assert vcl.frozen_defaults_at(None) == tuple(
-            __import__("qa_tools.common.frozen_defaults", fromlist=["x"]).FROZEN_DEFAULTS)
+            __import__("asset_model.frozen_defaults", fromlist=["x"]).FROZEN_DEFAULTS)
 
 
 # ---- criterion 16: real checks ----------------------------------------------
@@ -216,7 +216,7 @@ class TestRealChecks:
 
     def test_changing_a_file_checks_definition_moves_it_for_every_dataset_and_no_other(
             self, tmp_path):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         rel = f"{assets.folder_rel()}/file-checks.yaml"
         before = cl.parse_file_check_metadata(ROOT / rel)
@@ -233,7 +233,7 @@ class TestRealChecks:
         assert len(moved) > 1, "every dataset's copy of the one definition moves together"
 
     def test_one_file_check_definition_gives_every_dataset_one_fingerprint(self):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         checks = cl.parse_file_check_metadata(assets.selected().file("file-checks.yaml"))
         by_kind: dict = {}

@@ -1,4 +1,4 @@
-"""qa_tools/common/delivery_boundary.py - what one delivery IS, stated
+"""asset_model/delivery_boundary.py - what one delivery IS, stated
 per source (REQ-PIPE-057 criteria 2 and 3).
 
 The failure this prevents is a guess that looks like a fact. Files
@@ -12,7 +12,7 @@ from __future__ import annotations
 from state_paths import fixed
 import pytest
 
-from qa_tools.common import delivery_boundary, hierarchy
+from asset_model import delivery_boundary, hierarchy
 
 
 def _sources(monkeypatch, mapping: dict[str, str]):
@@ -34,7 +34,7 @@ class TestTheRealConfiguration:
         pytest.param("civil-registration", marks=pytest.mark.asset("daily"))])
     def test_every_source_states_what_a_delivery_is(self, held):
         found = delivery_boundary.check_all()
-        from qa_tools import collections
+        from asset_model import collections
 
         declared = {c.id for c in collections.all_collections()}
         assert held in declared
@@ -82,7 +82,7 @@ class TestNothingIsReadFromASourceThatHasNotSaid:
         """It fails on the CONFIGURATION rather than on whatever
         happened to be on disk, which is what makes the error
         actionable."""
-        from qa_tools.common import delivery
+        from asset_model import delivery
 
         _sources(monkeypatch, {"silent": ""})
         monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "nothing-here"))

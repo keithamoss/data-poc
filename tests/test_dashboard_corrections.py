@@ -7,7 +7,8 @@ import pytest
 
 import test_correction_apply as T
 from pipeline import corrections
-from qa_tools.common import correction_apply, correction_trial
+from qa_tools.common import correction_apply
+from asset_model import declared_corrections as correction_trial
 
 # The confirmation tests' own fixtures, bound by name so pytest finds them.
 conn = T.conn
@@ -75,7 +76,7 @@ class TestCriticFindingsOn172:
 
     def test_2_a_supply_kept_held_is_listed_though_it_has_no_run(self, conn, manager,
                                                                 monkeypatch):
-        from qa_tools.common import assignment
+        from asset_model import assignment
 
         import filing_support
         filing_support.file(assignment.Assignment(

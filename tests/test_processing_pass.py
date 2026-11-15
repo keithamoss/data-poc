@@ -123,7 +123,7 @@ class TestTheGateRecordsEveryRefusal:
 
 def _arrival(table="cp_clients", dataset="cp-clients", when=None, run_id=None):
     when = when or datetime(2099, 1, 1, tzinfo=timezone.utc)
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     key = asset_time.arrival_key(when)
     return SimpleNamespace(run_id=run_id or f"{table}__{key}", received_at=when,

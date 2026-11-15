@@ -79,7 +79,8 @@ def filed_tables(conn, period: str, wanted: Collection[str] | None = None) -> di
     own one file, so matching on the arrival key alone gave both periods
     both files. The supply id is the same walk's, which is how a staged
     table's supply reaches the resolution (REQ-PIPE-279 criterion 2)."""
-    from qa_tools.common import filing, hierarchy, qa_store, supply_files
+    from qa_tools.common import filing, qa_store, supply_files
+    from asset_model import hierarchy
 
     qa_store.ensure_schema(conn)
     filed: dict[str, str] = {}
@@ -255,7 +256,8 @@ def _supplies_held(conn, period: str, out: period_schema.PeriodResolution) -> di
     """The supply the decision log says each table read FROM THE PERIOD
     resolves to (REQ-PIPE-129 criteria 7 and 13) - the plain name says
     nothing, so the log answers."""
-    from qa_tools.common import decision_log, hierarchy
+    from qa_tools.common import decision_log
+    from asset_model import hierarchy
 
     held = {}
     for logical, source in out.source.items():
@@ -292,7 +294,8 @@ def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:
     naming the supply, and unrunnable leaves it alone (criterion 15).
     Returns the tables moved.
     """
-    from qa_tools.common import hierarchy, supply_holds
+    from asset_model import hierarchy
+    from qa_tools.common import supply_holds
 
     if not res.absent:
         return []
@@ -319,7 +322,8 @@ def _open_pair_tables(conn, own_table: str, arrival_key: str) -> tuple[str, ...]
     """Every staged name an OPEN pair in this arrival owns, a refused file's
     included - or () where this arrival's file for the table is no open
     pair. Through the one resolver (REQ-PIPE-193 criterion 13)."""
-    from qa_tools.common import hierarchy, supply_files
+    from asset_model import hierarchy
+    from qa_tools.common import supply_files
 
     try:
         dataset_id = hierarchy.dataset_for_table(own_table).dataset_id
@@ -388,8 +392,8 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str], foreign: Sequence[str
     top, newest version, exactly as the staging-time build does: sample
     data has no arrival or period that matters (REQ-PIPE-106).
     """
-    from qa_tools.common import (filing, hierarchy, load_log, sample_data,
-                                  supply_holds, trial)
+    from qa_tools.common import filing, load_log, sample_data, supply_holds, trial
+    from asset_model import hierarchy
 
     (dataset_id,) = tuple(arrival.files_by_dataset)
     own_table = hierarchy.dataset(dataset_id).table

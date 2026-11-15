@@ -49,7 +49,7 @@ from datetime import datetime, timedelta
 from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common import qa_store, supply_db
 from qa_tools.common import verdict as verdict_mod
-from qa_tools.common.assignment import Assignment
+from asset_model.assignment import Assignment
 
 TABLE = f'"{qa_store.SCHEMA}".filing'
 #: A supply's CURRENT filing - its newest row (REQ-PIPE-141 criterion 2,
@@ -191,7 +191,7 @@ def _slot_named(dataset_id: str, slot_name: str, received_at: datetime):
     """
     from datetime import date as date_cls
 
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     def _find(slots):
         return next((s for s in slots if s.period.name == slot_name), None)
@@ -318,7 +318,7 @@ def period_of(dataset_id: str, received_at) -> str | None:
     nothing was filed for this dataset from that arrival, which is a
     real state: a supply with no confident slot is filed nowhere.
     """
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return period_for_key(dataset_id, asset_time.arrival_key(received_at))
 
@@ -344,7 +344,8 @@ def supply_received_at_key(dataset_id: str, key: str) -> str | None:
     that receipt's key is not the staging key its id carries. The one
     receipt view answers; an id whose staging key matches (its plain form
     or a pair's `#1`) is the fallback for a supply with no receipt row."""
-    from qa_tools.common import asset_time, supply_files
+    from asset_model import asset_time
+    from qa_tools.common import supply_files
 
     with _connect("mothman:filing-read") as conn:
         rows = conn.execute(
@@ -414,8 +415,8 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
     Returns only the assignments this call actually wrote. A supply
     already filed is left alone.
     """
-    from qa_tools.common import assignment as assign_mod
-    from qa_tools.common import slots as slots_mod
+    from asset_model import assignment as assign_mod
+    from asset_model import slots as slots_mod
 
     slots_by_dataset: dict[tuple, list] = {}
     written: list[Assignment] = []
@@ -533,7 +534,8 @@ def _make_due_groups(dataset_id: str, at) -> None:
     makes its inheritances now (REQ-PIPE-323 criterion 3) - so a period nobody
     at that offset owes still carries their datasets forward. After the
     filing, so a group's own first filing names itself, not the clock."""
-    from qa_tools.common import hierarchy, inheritance
+    from asset_model import hierarchy
+    from qa_tools.common import inheritance
 
     if at is None:
         return
@@ -557,7 +559,8 @@ def open_at_filing(conn, *, dataset_id: str, supply_id: str, period: str, at) ->
     filing caused it (REQ-TEST-150 criterion 6). `at` is the supply's
     receipt, the instant the period opens as at (K6). Returns whether this
     call opened it."""
-    from qa_tools.common import hierarchy, inheritance, period_schema
+    from asset_model import hierarchy
+    from qa_tools.common import inheritance, period_schema
 
     # OPENED, OR ITS OFFSET GROUP STILL TO MAKE (REQ-PIPE-323 criterion 1):
     # another group's filing may have opened it a round before.
@@ -588,7 +591,8 @@ def open_on_refile(conn, dataset_id: str, supply_id: str, period: str | None, *,
     and after its entry, so a decision refused there - or rolled back - opens
     nothing. The opening's knock-on cannot settle inside that transaction;
     the caller calls settle_opening() once it has committed."""
-    from qa_tools.common import hierarchy, inheritance, period_schema
+    from asset_model import hierarchy
+    from qa_tools.common import inheritance, period_schema
 
     if not period:
         return False
@@ -665,7 +669,8 @@ def _supersede_earlier(conn, arrival, decided: Assignment) -> None:
     """REQ-PIPE-118 criterion 1: before any check runs over this file, every
     earlier unaccepted version of its table in the same period is
     superseded by it."""
-    from qa_tools.common import hierarchy, supersession
+    from asset_model import hierarchy
+    from qa_tools.common import supersession
 
     entry = hierarchy.dataset(decided.dataset_id)
     gone = supersession.supersede_earlier(
@@ -695,7 +700,7 @@ def final_period_for(dataset_id: str) -> str | None:
 
     THE WHOLE CALENDAR, not the slots filing looked at - those stop at the
     arrival's claim horizon, which is why this is asked separately."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     try:
         if schedule.calendar_for_dataset(dataset_id).current.is_cadence_rule:
@@ -712,7 +717,7 @@ def _supply_id_for(arrival, dataset_id: str) -> str:
     The same identifier REQ-PIPE-034 builds, so a filing and an arrival
     can be joined without a second naming scheme to keep in step.
     """
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     names = arrival.files_by_dataset.get(dataset_id) or ()
     base = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
@@ -777,8 +782,8 @@ def assignment_at(dataset_id: str, supply_id: str, at: datetime) -> Assignment:
     slots, the same filled set and the same rule an arrival is filed by
     (REQ-PIPE-131). A settlement asks it of the chosen file's own receipt
     (REQ-PIPE-193 criteria 10 and 11)."""
-    from qa_tools.common import assignment as assign_mod
-    from qa_tools.common import slots as slots_mod
+    from asset_model import assignment as assign_mod
+    from asset_model import slots as slots_mod
 
     try:
         slots = slots_mod.slots_for_dataset(
@@ -874,7 +879,7 @@ class RecordedArrival:
         that. `awaiting` says which of the two this is, so a caller
         never has to infer it from the number.
         """
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if self.received_at is None:
             return None
@@ -979,7 +984,7 @@ def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None
     well inside Keith's rule that a build may read recorded results and
     never the extract itself.
     """
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     supply = supply_received_at_key(dataset_id, asset_time.arrival_key(received_at))
     return recorded_arrival(dataset_id, supply) if supply else None
@@ -1025,7 +1030,7 @@ def classification_of(dataset_id: str, supply_id: str, arrived_at,
     history, because a design that needed to would stop being usable
     once a daily feed has years behind it.
     """
-    from qa_tools.common import arrival_classification
+    from asset_model import arrival_classification
 
     record = filing_for(dataset_id, supply_id)
     slot = slot_by_name(record["slot"]) if record and record.get("slot") else None
@@ -1071,7 +1076,8 @@ def supplies_of(conn, arrival) -> list[dict]:
     silence. A supply that arrived and staged nothing is a thing
     somebody should hear about.
     """
-    from qa_tools.common import asset_time, hierarchy, supply_db, supply_files
+    from asset_model import asset_time, hierarchy
+    from qa_tools.common import supply_db, supply_files
 
     key = asset_time.arrival_key(arrival.received_at)
     stated = getattr(arrival, "supply_ids", None) or {}

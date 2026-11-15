@@ -27,8 +27,8 @@ from rich.table import Table
 from rich.text import Text
 
 from cli import common
-from qa_tools.common import (asset_time, decision_log, filing_decisions, hierarchy, people,
-                             settlement)
+from asset_model import asset_time, hierarchy
+from qa_tools.common import decision_log, filing_decisions, people, settlement
 
 console = Console()
 
@@ -174,7 +174,7 @@ def _target(dataset_id: str, period: str, filename: str, taken: str | None, *,
     from cli import filing_tui
     from qa_tools.common import refiling
 
-    from qa_tools.common import slots
+    from asset_model import slots
 
     try:
         following = slots.relative_period(dataset_id, period, 1)
@@ -734,8 +734,9 @@ def reader_lines(readers: "_Readers") -> list[str]:
     import re
 
     from cli import filing_tui, lifecycle_report
-    from qa_tools.common import carried, hierarchy, promotion, root_cause, supply_status
-    from qa_tools.common.dataset_status import status_words
+    from qa_tools.common import carried, promotion, root_cause, supply_status
+    from asset_model import hierarchy
+    from asset_model.statuses import status_words
 
     table = hierarchy.dataset(readers.dataset_id).table
     outcomes = []

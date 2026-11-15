@@ -37,7 +37,7 @@ import pytest
 
 from datetime import datetime, timedelta, timezone
 
-from qa_tools.common import assignment, slots as slots_mod
+from asset_model import assignment, slots as slots_mod
 
 
 def _candidates(dataset_id: str, at: datetime):
@@ -157,8 +157,8 @@ class TestTheSlotStaysVisibleOnceFilled:
         quarter it is early for, and the slot list a dashboard is built
         from shows that quarter - for the dataset that filed into it and
         for one that has filed nothing at all."""
-        from qa_tools.common import (arrivals, delivery, delivery_log, filing, qa_store,
-                                     slot_state, supply_db)
+        from asset_model import arrivals, delivery as delivery_tree
+        from qa_tools.common import delivery, delivery_log, filing, qa_store, slot_state, supply_db
 
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         (deliveries / "early").mkdir(parents=True)
@@ -169,7 +169,7 @@ class TestTheSlotStaysVisibleOnceFilled:
         with supply_db.connect(label="test-claim-window") as conn:
             qa_store.ensure_schema(conn)
             conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
-        for d in delivery.list_deliveries(deliveries, receipts):
+        for d in delivery_tree.list_deliveries(deliveries, receipts):
             delivery_log.record(d, arrivals.recognise(d))
         found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries, receipts)
         assert found, "test precondition - the delivery must be an arrival"

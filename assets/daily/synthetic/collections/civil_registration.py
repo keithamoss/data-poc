@@ -73,7 +73,7 @@ from typing import TYPE_CHECKING, Optional
 
 from generator.anchor_date import get_anchor_date
 from generator.collections.base import Job, Plan, Provider
-from qa_tools.common import asset_time, schedule
+from asset_model import asset_time, schedule
 
 if TYPE_CHECKING:  # annotations only - never imported at module level
     import pandas as pd
@@ -991,7 +991,7 @@ class CivilRegistration(Provider):
         return entries
 
     def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
-        from qa_tools.common import slots
+        from asset_model import slots
 
         period = job.period
         injected = plan.injected_by_period.get(period.name)

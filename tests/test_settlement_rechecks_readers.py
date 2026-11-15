@@ -47,7 +47,8 @@ def contested(sc) -> dict:
     """2025-Q1 (first_time: Case Workers, Carers, Investigations v1 and
     Placements v1 in the warehouse) and a zip of two Client Register files
     and Notifications v2. Returns {label: supply}."""
-    from qa_tools.common import asset_time, delivery
+    from asset_model import asset_time
+    from qa_tools.common import delivery
 
     got = first_time(sc)
     at = asset_time.parse_instant("2024-11-03T10:00:00+08:00", "test")

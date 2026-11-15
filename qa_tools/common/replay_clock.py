@@ -34,8 +34,8 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
-from qa_tools.common import asset_time
-from qa_tools.common import config_yaml
+from asset_model import asset_time
+from asset_model import config_yaml
 
 
 class SimulatedClockRefused(RuntimeError):

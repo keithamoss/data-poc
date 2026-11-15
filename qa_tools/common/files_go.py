@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from qa_tools.common import hierarchy, schedule
+from asset_model import hierarchy, schedule
 
 
 def value_words(value: int) -> str:
@@ -32,7 +32,7 @@ def round_words(on: date) -> str:
 
 
 def _first_round_on_or_after(dataset_id: str, when: date, agr) -> date | None:
-    from qa_tools.common import slots
+    from asset_model import slots
 
     for period in slots._calendar_periods(dataset_id, None, agr):
         if period.date >= when:
@@ -46,7 +46,7 @@ def describe(dataset_id: str, on: date, agreement=None) -> str | None:
     'Files go into the next period (set for Child Protection, since the 1
     February 2015 round)'. None where the dataset's calendar is a cadence
     rule (REQ-DASH-326 criterion 3) or no version is in force."""
-    from qa_tools.common import in_force
+    from asset_model import in_force
 
     agr = schedule._agreement(agreement)
     try:
@@ -122,7 +122,7 @@ def held_words(held) -> str:
 def rounds_fill(dataset_id: str, months, on: date, agreement=None) -> str | None:
     """'rounds whose files go into Q2 and Q4' for a participates line, where
     the collection's value is not 0 (REQ-PIPE-327 criterion 8), else None."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     agr = schedule._agreement(agreement)
     value = agr.files_go_to_period_for(dataset_id, on) or 0
@@ -148,7 +148,7 @@ def fall_rounds(dataset_id: str, agreement=None) -> list[tuple[date, str]]:
     """[(round date, doubly-fed period)] for every round whose files would
     fill a period an earlier round already filled - a fall in the value
     (REQ-PIPE-322 criterion 3, REQ-PIPE-327 criterion 7)."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     agr = schedule._agreement(agreement)
     # A CADENCE RULE HAS NO END to walk, and no files_go_to_period other

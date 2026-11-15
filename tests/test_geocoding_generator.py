@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 
 from collection_modules import provider_module
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 # BY PATH, as the driver loads it (REQ-PIPE-369 criterion 5).
 lp = provider_module("linkage-products")
@@ -79,7 +79,7 @@ class TestTheStreams:
         [entry] = lp.PROVIDER.entries(plan, job, lp.PROVIDER.slot(plan, job), 0)
         assert entry["run_id"].endswith(f"{lp.GEO_STREAM}_001") and entry["run_index"] == 1
         assert set(entry["planned"]) <= set(GEO)
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         assert set(entry["row_counts"]) == {hierarchy.dataset(d).table for d in entry["planned"]}
 
@@ -228,7 +228,7 @@ class TestGeocodeRowsByConstruction:
 
 class TestThePlannedVerdict:
     def test_banded_by_the_share_checks_own_bands(self):
-        from qa_tools.common import check_bands
+        from asset_model import check_bands
 
         cat = check_bands.catalogue()
 
@@ -240,7 +240,7 @@ class TestThePlannedVerdict:
         assert lp.planned_verdict("geo-ed-presentations", rows(0, 0), cat) == "green"
 
     def test_every_file_records_the_verdict_its_own_rows_plan(self, plan):
-        from qa_tools.common import check_bands
+        from asset_model import check_bands
 
         cat = check_bands.catalogue()
         for job in _geo_jobs(plan):
@@ -282,7 +282,7 @@ def test_two_plans_build_the_same_geocodes(plan):
 
 
 def test_the_received_window_is_inside_the_due_time_and_grace(plan):
-    from qa_tools.common import slots
+    from asset_model import slots
 
     job = next(j for j in _geo_jobs(plan) if _files(plan, j))
     at = plan.state["geocoding"][job.slot_id][0]

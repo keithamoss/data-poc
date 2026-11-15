@@ -25,12 +25,16 @@ from __future__ import annotations
 
 import psycopg
 
-from qa_tools import collections
-from qa_tools.common import (asked_for, drift_reference, evidently_common, hierarchy, left_out,
-                             supply_db)
-from qa_tools.common.evidently_common import (
-    ENGINE_TAG, NO_REFERENCE, collection_checks, compute_psi, frame_from_value_counts,
-    recorded_row_counts, reference_value_counts, status_for,
+from asset_model import collections
+from qa_tools.common import asked_for, drift_reference, left_out, supply_db
+from asset_model import drift as evidently_common, hierarchy
+from qa_tools.common.evidently_common import ENGINE_TAG, recorded_row_counts, reference_value_counts
+from asset_model.drift import (
+    NO_REFERENCE,
+    collection_checks,
+    compute_psi,
+    frame_from_value_counts,
+    status_for,
 )
 from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 

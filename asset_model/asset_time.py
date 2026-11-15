@@ -32,7 +32,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from qa_tools.common import assets, config_yaml, in_force
+from asset_model import assets, config_yaml, in_force
 
 
 def data_asset_yaml() -> Path:

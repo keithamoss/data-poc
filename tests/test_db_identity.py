@@ -10,7 +10,8 @@ import psycopg
 import pytest
 from click.testing import CliRunner
 
-from qa_tools.common import db_identity, hierarchy, supply_db
+from qa_tools.common import db_identity, supply_db
+from asset_model import hierarchy
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -117,8 +118,9 @@ class TestEachAssetIsRefusedTheOthersDatabase:
     @pytest.mark.parametrize("owner", _OWNERS)
     def test_every_route_refuses_and_leaves_it_as_found(self, owner, supply_dsn, monkeypatch):
         from cli.app import cli
-        from qa_tools import collections
-        from qa_tools.common import assets, datacontract_common, dbt_common
+        from asset_model import collections
+        from asset_model import assets
+        from qa_tools.common import datacontract_common, dbt_common
 
         assert _recorded(supply_dsn) == db_identity.Identity(owner, "test")
         planted = "qa_planted_by_the_wrong_asset_test"
@@ -172,7 +174,7 @@ class TestARemarkReachesPooledConnections:
     tests of different assets."""
 
     def test_a_connection_pooled_before_a_remark_is_not_handed_out(self, unmarked_dsn):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         mine = hierarchy.data_asset_id()
         other = next(n for n in assets.names() if n != mine)
@@ -274,7 +276,7 @@ class TestMarking:
 
         assert _mark("--confirm", _typed("sandbox"), env="sandbox").exit_code == 0
         monkeypatch.setattr(common, "require_tty", lambda hint: None)
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         asset_id = hierarchy.data_asset_id()  # the asset's own id (the asset split)
         answers = iter([f"{asset_id}/local"])

@@ -17,10 +17,19 @@ import pytest
 import baseline_periods
 import yaml
 
-from qa_tools.common import (amber_setting, decision_log as dl, filing_decisions as fd,
-                             filing_queue, hierarchy, people, promotion, qa_store,
-                             slot_state, supply_db)
-from qa_tools.common.schemas import AMBER_SETTINGS, DataAsset
+from asset_model import amber_setting, hierarchy
+from qa_tools.common import (
+    decision_log as dl,
+    filing_decisions as fd,
+    filing_queue,
+    people,
+    promotion,
+    qa_store,
+    slot_state,
+    supply_db,
+)
+from asset_model.amber_setting import AMBER_SETTINGS
+from qa_tools.common.schemas import DataAsset
 
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 WHEN = "2026-09-29T09:00:00+08:00"
@@ -336,7 +345,7 @@ class TestAmberWaitingAfterAnEmptiedSlot:
     def test_it_still_reads_amber_waiting(self, conn):
         from datetime import datetime, timedelta, timezone
 
-        from qa_tools.common import slots
+        from asset_model import slots
 
         period = "2024-Q2"
         rejected, _ = _staged(conn)

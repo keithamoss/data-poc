@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 import pytest
 
 import equiv_support
-from qa_tools.common import asset_time, replay_clock
+from asset_model import asset_time
+from qa_tools.common import replay_clock
 from generator import driver
 
 FIRST_TWO = ("run_001", "run_002")

@@ -81,7 +81,7 @@ class TestTheHandedText:
 def _quiet(monkeypatch, request):
     """The staged runs of each collection the selected asset holds (the
     asset split: one asset's database holds one asset's supplies)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     held = {c.id for c in collections.all_collections()}
     staged = [name for cid, name in (("child-protection", "cp_duckdb_dir"),

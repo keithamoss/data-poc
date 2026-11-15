@@ -144,7 +144,7 @@ def test_a_link_to_another_assets_agency_is_left_to_that_assets_pass(repo, tmp_p
     declares is not a typo - its pass checks the rest of the route.
     HERMETIC (#315 L4): the assets it reads are this test's own, injected,
     so it holds whatever the repository's assets declare."""
-    from qa_tools.common import assets, every_asset
+    from asset_model import assets, every_asset
 
     root = tmp_path / "assets"
     for name, ag in (("ours", "ag"), ("theirs", "ag-theirs")):

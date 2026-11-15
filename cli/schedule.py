@@ -96,12 +96,12 @@ def _unwrap(exc: Exception) -> str:
 
 
 def _datasets() -> list[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
     return sorted(d.dataset_id for d in hierarchy.all_datasets())
 
 
 def _calendars() -> list[str]:
-    from qa_tools.common import schedule
+    from asset_model import schedule
     return sorted(c.name for c in schedule.calendars())
 
 
@@ -134,7 +134,7 @@ def show_command(dataset: str | None, until, show_all: bool, on) -> None:
     list is thousands of rows and the question is almost always "what
     is next?". Use --all for everything.
     """
-    from qa_tools.common import hierarchy, schedule
+    from asset_model import hierarchy, schedule
 
     if dataset:
         # ORDINARY WRONG INPUT IS NOT A CRASH. A mistyped dataset id, or
@@ -207,8 +207,8 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     console.print(f"  calendar: {cal.name}")
     # Said in the file's own words - the key is `participates` since
     # REQ-PIPE-110, and a subset carries the reason its version states.
-    from qa_tools.common import agreement as agreement_mod
-    from qa_tools.common import asset_time as _at
+    from asset_model import agreement as agreement_mod
+    from asset_model import asset_time as _at
     in_force = agreement_mod.current().participation_on(dataset, _at.local_date(_at.now()))
     # THE PERIODS ITS ROUNDS FILL, where its collection's files go ahead
     # (REQ-PIPE-327 criterion 8) - 'February, August - rounds whose files go
@@ -228,7 +228,8 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
                    f"before each slot's due instant [dim](opens early; closes when the next "
                    f"round's claim window opens)[/dim]")
 
-    from qa_tools.common import asset_time, participation_view
+    from asset_model import asset_time
+    from qa_tools.common import participation_view
     today = asset_time.local_date(asset_time.now())
     # EACH VALUE AND WHERE IT CAME FROM (REQ-PIPE-181 criterion 13), on
     # --on or today - the renderer the Calendar entry shares.
@@ -250,7 +251,7 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     # somebody editing a calendar most needs - the deadline - off the
     # page. Keyed by period name, because a not-expected period has no
     # slot at all and that difference is the point.
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
     by_period = {s.name: s for s in slots_mod.slots_for_dataset(dataset, until=stop)}
 
     shown, hidden = _window(periods, today, show_all or until is not None, by_period)
@@ -336,7 +337,7 @@ def _due_date(period, by_period) -> date:
     where it has no slot. A following-period slot (REQ-PIPE-167) is due
     weeks before its period's date, so "next" and "around today" are
     measured by this, not the period's date (post-build-review #142)."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     slot = by_period.get(period.name)
     return asset_time.local_date(slot.due_at) if slot else period.date
@@ -396,7 +397,7 @@ def candidate_dates_command(calendar_name: str, year: int, as_yaml: bool) -> Non
     Copy what you want into assets/<asset>/calendar.yaml, as a NEW version
     with its own effective_from and changelog entry.
     """
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     cal = schedule.calendar(calendar_name)
     version = cal.current
@@ -530,7 +531,8 @@ def check_agreement_command(dataset_id: str | None) -> None:
     """
     # REQ-PIPE-173: the backstop's own report, the same computation the
     # pass and the dashboard build make.
-    from qa_tools.common import agreement_drift, hierarchy, supply_db
+    from qa_tools.common import agreement_drift, supply_db
+    from asset_model import hierarchy
 
     known = {d.dataset_id for d in hierarchy.all_datasets()}
     if dataset_id and dataset_id not in known:
@@ -599,10 +601,11 @@ def _preview(ref) -> str:
     import psycopg
 
     from qa_tools.common import correction_trial, supply_db
+    from asset_model import declared_corrections
 
     try:
         text = correction_trial.preview(ref)
-    except correction_trial.Unreadable as exc:
+    except declared_corrections.Unreadable as exc:
         console.print(f"Nothing was compared: {exc}", style="red", markup=False)
         raise SystemExit(2) from exc
     except (supply_db.SupplyDbError, psycopg.Error) as exc:
@@ -650,6 +653,7 @@ def _draft(ref, *, reference=None, reason=None, approver=None, author=None,
     """Print the correction entries - the command's body and the Calendar
     entry's, so the two cannot differ."""
     from qa_tools.common import correction_trial
+    from asset_model import declared_corrections
 
     try:
         # ONLY ASK WHERE SOMETHING NEEDS DECLARING (delivery-critic on 169,
@@ -670,7 +674,7 @@ def _draft(ref, *, reference=None, reason=None, approver=None, author=None,
         entries = correction_trial.draft(ref, reference=reference or None,
                                          reason=reason or None, approver=approver or None,
                                          author=author or None)
-    except correction_trial.Unreadable as exc:
+    except declared_corrections.Unreadable as exc:
         console.print(f"Nothing was compared: {exc}", style="red", markup=False)
         raise SystemExit(2) from exc
     # A RISE IS DRAFTED COMPLETE (REQ-PIPE-322 criterion 11): the not_expected
@@ -696,7 +700,8 @@ def calendar_menu() -> None:
     and whether each is applied, and the impact preview and draft entry for
     the working copy. VIEWING AND PREVIEWING ONLY - configuration is edited
     in git, where it is reviewed and the schedule gate runs."""
-    from qa_tools.common import agreement, asset_time, correction_trial, hierarchy, supply_db
+    from asset_model import agreement, asset_time, declared_corrections, hierarchy
+    from qa_tools.common import correction_trial, supply_db
 
     while True:
         every = hierarchy.all_datasets()
@@ -724,12 +729,12 @@ def calendar_menu() -> None:
             # THE WORKING COPY, read fresh (F9), and built from that one read,
             # so the preview and the values beside it answer for the same
             # version of the file mid-edit (an unreadable copy is said below).
-            fresh = agreement.from_doc(correction_trial.working()[0])
+            fresh = agreement.from_doc(declared_corrections.working()[0])
             _show_in_force(correction_trial.in_force(dataset_id, on, fresh))
             from qa_tools.common import participation_view
 
             _show_values(participation_view.view(dataset_id, on, fresh))
-        except correction_trial.Unreadable as exc:
+        except declared_corrections.Unreadable as exc:
             # F4: part-way through an edit, said - not a crashed session.
             console.print(str(exc), style="red", markup=False)
             return

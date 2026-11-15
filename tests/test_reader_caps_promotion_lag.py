@@ -24,7 +24,8 @@ LP_AT = datetime(2026, 5, 1, 10, 15, tzinfo=UTC)
 
 @pytest.fixture
 def world(monkeypatch):
-    from qa_tools.common import arrivals, filing, supply_db
+    from asset_model import arrivals
+    from qa_tools.common import filing, supply_db
 
     class _C:
         def execute(self, *a):
@@ -54,7 +55,7 @@ def _arrival(dataset_id, at):
 
 
 def test_a_readers_delivery_for_the_same_period_caps_the_lag(world, monkeypatch):
-    from qa_tools.common import slots
+    from asset_model import slots
 
     monkeypatch.setattr(slots, "period_claimed_at",
                         lambda ds, at, agreement=None: "2026-Q2")
@@ -62,7 +63,7 @@ def test_a_readers_delivery_for_the_same_period_caps_the_lag(world, monkeypatch)
 
 
 def test_a_readers_delivery_for_another_period_caps_nothing(world, monkeypatch):
-    from qa_tools.common import slots
+    from asset_model import slots
 
     monkeypatch.setattr(slots, "period_claimed_at",
                         lambda ds, at, agreement=None: "2026-Q1")
@@ -70,7 +71,7 @@ def test_a_readers_delivery_for_another_period_caps_nothing(world, monkeypatch):
 
 
 def test_the_lag_ends_before_the_readers_receipt(world, monkeypatch):
-    from qa_tools.common import slots
+    from asset_model import slots
 
     monkeypatch.setattr(slots, "period_claimed_at",
                         lambda ds, at, agreement=None: "2026-Q2")
@@ -85,12 +86,12 @@ class TestThePeriodAReceiptClaims:
     instant, from configuration."""
 
     def test_a_linkage_receipt_on_a_round_claims_that_rounds_own_period(self):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         assert slots.period_claimed_at("linkage-keys", LP_AT) == "2026-Q2"
 
     def test_a_child_protection_receipt_claims_the_next_period(self):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         assert slots.period_claimed_at("cp-clients", ED_AT) == "2026-Q3"
 

@@ -380,7 +380,7 @@ def trial_recognition(paths) -> None:
     trial."""
     import os
 
-    from qa_tools.common import arrival_patterns
+    from asset_model import arrival_patterns
 
     for path in paths:
         found = arrival_patterns.attribute(os.path.basename(str(path)))

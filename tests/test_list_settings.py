@@ -9,7 +9,8 @@ from datetime import date
 
 import pytest
 
-from qa_tools.common import amber_setting, replacement_setting
+from asset_model import amber_setting
+from qa_tools.common import replacement_setting
 
 PATH = ("list_settings", "census_years")
 
@@ -168,7 +169,7 @@ class TestTheScheduleGateFreezesEveryListSetting:
         import yaml
 
         monkeypatch.setattr(vs, "_content_at", lambda rel, ref: yaml.safe_dump(old))
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         src = vs.Source(asset_path=hierarchy.data_asset_yaml(),
                         contract_dir=hierarchy.data_asset_yaml().parent)
@@ -189,7 +190,7 @@ class TestTheScheduleGateFreezesEveryListSetting:
         assert self._errors(monkeypatch, old, copy.deepcopy(old)) == []
 
     def test_the_committed_census_years(self):
-        from qa_tools.common.amber_setting import _doc as committed
+        from asset_model.amber_setting import _doc as committed
 
         doc = committed()
         assert amber_setting.list_setting_keys(doc) == [PATH]
@@ -215,7 +216,7 @@ class TestCriterionTenEachVersionLandsInItsQuarter:
     ])
     @pytest.mark.parametrize("dataset", ["geo-cp-clients", "geo-ed-presentations"])
     def test_landing(self, dataset, period, round_date, years):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         dp = next(p for p in schedule.periods_for_dataset(dataset) if p.name == period)
         assert dp.round_date == round_date

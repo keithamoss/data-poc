@@ -13,7 +13,7 @@ import pytest
 
 from state_paths import fixed
 import qa_tools.tools.run_evidently as run_evidently
-from qa_tools.common.evidently_common import collection_checks
+from asset_model.drift import collection_checks
 
 _CHECKS = collection_checks("civil-registration")
 
@@ -46,7 +46,7 @@ def _patch(monkeypatch, bdm_delivery_dirs):
     otherwise - so a test that does not redirect it is comparing the
     fixture's dirty run against 42 real deliveries, or (more likely)
     finding no previous run at all and silently losing the check."""
-    from qa_tools.common import delivery
+    from asset_model import delivery
 
     deliveries, receipts = bdm_delivery_dirs
     monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))

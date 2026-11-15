@@ -198,7 +198,7 @@ def test_an_adapter_loaded_by_path_from_the_generator_fails(repo, capsys):
 
 def test_loads_on_their_own_sides_pass(repo, capsys):
     _write(repo, "qa_tools/common/thing.py",
-           "import qa_tools.common.assets\nqa_tools.common.assets.load('adapter', 'x')\n")
+           "import asset_model.assets\nasset_model.assets.load('adapter', 'x')\n")
     _write(repo, "generator/thing.py",
            "from asset_model import assets\nassets.load(kind='provider', module='x')\n")
     assert _run(repo, capsys)[0] == 0
@@ -207,7 +207,7 @@ def test_loads_on_their_own_sides_pass(repo, capsys):
 def test_a_loader_kind_that_is_not_a_literal_fails_naming_the_call(repo, capsys):
     _write(repo, "generator/thing.py",
            "from qa_tools.common import assets\n\ndef f(kind):\n    return assets.load(kind, 'x')\n")
-    _allow(repo, {"file": "generator/thing.py", "imports": "qa_tools.common.assets",
+    _allow(repo, {"file": "generator/thing.py", "imports": "asset_model.assets",
                   "removed_by": "REQ-PIPE-380"})
     code, out = _run(repo, capsys)
     assert code == 1

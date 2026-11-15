@@ -30,11 +30,11 @@ qa.supply_receipt, qa.verdict and the decision log - never a schema holding
 supply rows.
 """
 from __future__ import annotations
-
-from asset_model import declared_corrections
 import contextlib
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
+
+from asset_model import declared_corrections
 
 #: The instants of a slot a correction can move, in the order a reader
 #: thinks in, with the dashboard's words for them (NFR 1).
@@ -180,7 +180,7 @@ def configured(cal_doc: dict, asset_doc: dict):
     files' zones would show a timezone correction as moving nothing. Scoped,
     and restored however the block ends; mothman is single-threaded.
     """
-    from qa_tools.common import agreement, asset_time
+    from asset_model import agreement, asset_time
 
     zones = asset_time.parse_timezone_versions(asset_doc or {})
     agr = agreement.from_doc(cal_doc)
@@ -279,7 +279,7 @@ def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> st
     """The turn-off's reason where `agr` turns `period` off for this dataset
     - the period one of its slots before the correction, standing turned off
     after it - else None. An empty reason reads 'turned off'."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     slot = next((s for s in slots_before if s.name == period), None)
     if slot is None:
@@ -292,7 +292,7 @@ def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> st
 
 
 def _slots(dataset_id: str, until: date, agr) -> list:
-    from qa_tools.common import slots
+    from asset_model import slots
 
     return slots.slots_for_dataset(dataset_id, until=until, agreement=agr)
 
@@ -311,7 +311,8 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
     reads. Computed and returned; nothing is written (criterion 10)."""
     from datetime import UTC
 
-    from qa_tools.common import assignment, asset_time, hierarchy, verdict
+    from asset_model import assignment, asset_time, hierarchy
+    from qa_tools.common import verdict
 
     at = at or datetime.now(UTC)
     changes = frozen_changes(base, work, at)
@@ -408,7 +409,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
 # ---- the report ------------------------------------------------------------
 
 def _when(value: datetime | None) -> str:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     if value is None:
         return "never"
@@ -533,7 +534,8 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
 
 def at_ref(ref: str) -> tuple[dict, dict]:
     """The configuration at a git ref, as REQ-PIPE-111's gate reads it."""
-    from qa_tools.common import agreement_freeze, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import declared_corrections, config_yaml
     from qa_tools.common.validate_schedule import _content_at
 
     docs = []
@@ -576,7 +578,8 @@ def draft(ref: str | None = None, **given) -> list[str]:
     text, with whatever the person gave filled in."""
     from datetime import UTC
 
-    from qa_tools.common import agreement_freeze, asset_time, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import declared_corrections, asset_time, config_yaml
     from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
@@ -605,7 +608,8 @@ def rise_entries() -> list[str]:
 def may_approve(ref: str | None = None) -> list[str]:
     """Who the gate will accept as approver of a calendar correction, at the
     base - offered when the terminal asks (criterion 14)."""
-    from qa_tools.common import agreement_freeze, config_yaml
+    from qa_tools.common import agreement_freeze
+    from asset_model import config_yaml
     from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
@@ -652,7 +656,8 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     alone: its calendar, which periods it owes and why not the others, and
     - for the next period owed - its due date and time, grace, claim window
     and days before, as resolved (REQ-PIPE-168's own resolution)."""
-    from qa_tools.common import asset_time, schedule, slots, verdict
+    from asset_model import asset_time, schedule, slots
+    from qa_tools.common import verdict
 
     agreement = schedule._agreement(agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
@@ -718,7 +723,8 @@ def declared(conn=None, cal_doc: dict | None = None,
     marked applied where a recorded verdict names its reference (REQ-PIPE-168)
     - pending otherwise, which is what REQ-PIPE-170's confirmation settles.
     Without `conn`, nothing can be known applied, so all read pending."""
-    from qa_tools.common import agreement_freeze, verdict
+    from qa_tools.common import verdict
+    from asset_model import declared_corrections
 
     if cal_doc is None or asset_doc is None:
         cal_doc, asset_doc = declared_corrections.working()
@@ -728,11 +734,11 @@ def declared(conn=None, cal_doc: dict | None = None,
             f"SELECT DISTINCT correction_ref FROM {verdict.TABLE} "
             "WHERE correction_ref IS NOT NULL").fetchall()}
     out = []
-    for owner, entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).items():
+    for owner, entries in declared_corrections.corrections_by_owner(cal_doc, asset_doc).items():
         for corr in entries:
             corr = corr or {}
             ref = str(corr.get("change_reference") or "")
-            out.append(Declared(agreement_freeze._owner_label(owner), ref,
+            out.append(Declared(declared_corrections.owner_label(owner), ref,
                                 str(corr.get("date") or ""), str(corr.get("reason") or ""),
                                 tuple(str((c or {}).get("item")) for c in corr.get("changes")
                                       or []), ref in applied))

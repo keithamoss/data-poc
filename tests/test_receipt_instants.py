@@ -12,7 +12,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from generator import receipt_instants as ri
-from qa_tools.common import arrivals, delivery
+from asset_model import arrivals, delivery as delivery_tree
+from qa_tools.common import delivery
 
 FIRST = datetime(2026, 2, 1, 1, tzinfo=timezone.utc)
 SIX = [f"{t}.csv" for t in ("cp_carers", "cp_case_workers", "cp_clients",
@@ -63,7 +64,7 @@ class TestOneReceiptPerFile:
 
         assert sorted(p.name for p in (receipts / "trickle").iterdir()) == [
             "cp_carers.csv.json", "cp_clients.csv.json"]
-        d = delivery.read_delivery("trickle", deliveries, receipts)
+        d = delivery_tree.read_delivery("trickle", deliveries, receipts)
         assert d.received_at == FIRST, "a delivery arrived when its FIRST file did"
         found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries, receipts)
         assert [(a.run_id, a.received_at) for a in found] == [
@@ -81,7 +82,7 @@ class TestOneReceiptPerFile:
 
     def test_a_file_with_no_instant_is_refused(self, dirs):
         deliveries, receipts = dirs
-        with pytest.raises(delivery.DeliveryFormatError, match="no receipt instant"):
+        with pytest.raises(delivery_tree.DeliveryFormatError, match="no receipt instant"):
             delivery.write_delivery("half", {"a.csv": "x", "b.csv": "y"},
                                      received_at={"a.csv": FIRST},
                                      deliveries_dir=deliveries, receipts_dir=receipts)
@@ -92,8 +93,8 @@ class TestOneReceiptPerFile:
         (deliveries / "old" / "cp_clients.csv").write_text("a\n1\n")
         receipts.mkdir(parents=True)
         (receipts / "old.json").write_text('{"received_at": "2026-02-01T01:00:00+00:00", "sequence": 1}')
-        with pytest.raises(delivery.ReceiptOrderError, match="regenerate"):
-            delivery.read_delivery("old", deliveries, receipts)
+        with pytest.raises(delivery_tree.ReceiptOrderError, match="regenerate"):
+            delivery_tree.read_delivery("old", deliveries, receipts)
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

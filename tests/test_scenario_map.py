@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets
+from asset_model import assets
 from qa_tools.common import scenario_map as sm
 from qa_tools.common import scenarios as sc
 

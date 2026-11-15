@@ -15,7 +15,8 @@ from datetime import date, datetime, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import agreement, asset_time, in_force, period_overlap, schedule, slots
+from asset_model import agreement, asset_time, in_force, schedule, slots
+from qa_tools.common import period_overlap
 from tests import before_growth
 
 def _real():
@@ -298,7 +299,7 @@ class TestAFollowingPeriodDataset:
 
     def test_it_files_to_the_period_it_is_for_with_the_slot_already_open(self, early):
         """Criteria 1 and 2, through the unchanged open-slot rule (3)."""
-        from qa_tools.common import assignment
+        from asset_model import assignment
 
         arrived = _perth(2025, 6, 1, 10, 0)
         until = slots.claimable_until("cp-clients", arrived.date(), early)

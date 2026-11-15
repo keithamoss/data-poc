@@ -43,7 +43,7 @@ class OneTableCLI(CollectionCLI):
         generator's bookkeeping. A CONTESTED arrival - two files for the
         dataset - is not pickable: nothing may choose between its files
         (REQ-PIPE-105 criterion 6)."""
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         return [a.as_entry() | {"csv_path": str(a.path_for(self.dataset_id))}
                 for a in arrivals.arrivals_for(self.collection_id, self.run_prefix)
@@ -54,7 +54,7 @@ class OneTableCLI(CollectionCLI):
         and MARKED 'recorded' where its QA already is (REQ-PIPE-086 criterion
         6): picking one runs a trial, said before it starts."""
         from cli import common
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         recorded = common.recorded_runs(e["run_id"] for e in manifest)
         return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
@@ -74,7 +74,7 @@ class OneTableCLI(CollectionCLI):
         criterion 4): `None` lets the orchestrator resolve it from what was
         recorded."""
         from cli import common
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
         from qa_tools.common import trial as trial_mod
         from qa_tools.tools import orchestrate, stage
 
@@ -128,7 +128,8 @@ class OneTableCLI(CollectionCLI):
         to a trial only, and the reference is always a trial: filing it would
         record an arrival that never happened. Returns (results, filed)."""
         from cli import common
-        from qa_tools.common import asset_time, hand_filing
+        from asset_model import asset_time
+        from qa_tools.common import hand_filing
         from qa_tools.tools import orchestrate, stage
 
         run_date = run_date or asset_time.now().date().isoformat()

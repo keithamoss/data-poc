@@ -215,7 +215,7 @@ def _asset_passes(label: str) -> list[dict]:
     found, each run told its asset; with one selected, once, for it - told it
     too, so its output is named for it like any other pass (REQ-PIPE-364
     criterion 1)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     if label in _REPOSITORY_WIDE:
         return [{}]
@@ -226,7 +226,7 @@ def _asset_passes(label: str) -> list[dict]:
 
 
 def _asset_of(extra: dict) -> str | None:
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return extra.get(assets.ASSET_ENV)
 

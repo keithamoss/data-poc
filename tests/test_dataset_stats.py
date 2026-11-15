@@ -12,7 +12,7 @@ import collection_modules
 
 import duckdb
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.tools import dataset_stats
 
 BDM, CP = "civil-registration", "child-protection"

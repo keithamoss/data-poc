@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from qa_tools.common import bootstrap, schedule
+from qa_tools.common import bootstrap
+from asset_model import schedule
 
 
 @dataclass(frozen=True)

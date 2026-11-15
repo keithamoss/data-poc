@@ -50,7 +50,8 @@ def owe(conn: supply_db.SupplyConnection, moves: list[tuple[int, str, str]]) -> 
     """Owe one re-evaluation per period this transaction moved a table in or
     out of, caused by the latest decision that did. `moves` is
     [(decision id, dataset id, period)]. Returns the owed ids."""
-    from qa_tools.common import hierarchy, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import recheck
 
     by_period: dict[str, dict] = {}
     for decision_id, dataset_id, period in moves:
@@ -88,7 +89,8 @@ class Reader:
 def _now_holds(conn, table: str, period: str) -> str | None:
     """The supply the period's `table` now reads as - promoted or
     substituted there - or None."""
-    from qa_tools.common import decision_log, hierarchy
+    from qa_tools.common import decision_log
+    from asset_model import hierarchy
 
     h = decision_log.held(conn, hierarchy.dataset_for_table(table).dataset_id, period)
     # INHERITED TOO (#116, D6): an inherited period reads the earlier supply
@@ -182,7 +184,8 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     failing, and clear it. A failure leaves it owed and reported (criterion
     14): the promotion that caused it stands, and each waiting reader keeps
     its earlier verdict."""
-    from qa_tools.common import decision_log, hierarchy, promotion, recheck
+    from qa_tools.common import decision_log, promotion, recheck
+    from asset_model import hierarchy
 
     period, tables = item.period, list(item.tables or [])
     reads = promotion._declared_reads()
@@ -373,7 +376,7 @@ def _regated(touched, outcomes: dict, period: str) -> tuple:
     with what its re-gating did, each promoted one 'still promoted'
     (criterion 6: never demoted)."""
     from qa_tools.common import supply_status
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     out = []
     with supply_db.connect(read_only=True, label="mothman:knock-on") as conn:
@@ -436,7 +439,8 @@ def _shout(conn, item, period: str, failing: list[tuple[str, str, str]], *,
     supply it holds back (criterion 12; REQ-PIPE-278 criterion 4), with the
     rule as actor - `still-failing`, which the terminal shows at full
     prominence (criterion 13)."""
-    from qa_tools.common import decision_log, hierarchy
+    from qa_tools.common import decision_log
+    from asset_model import hierarchy
 
     cause = conn.execute(
         f"SELECT action, dataset_id, supply FROM {decision_log.TABLE} WHERE id = ?",
@@ -471,7 +475,7 @@ def follow_up_stream(collection_id: str, *, run_by: str | None = None, on_step=N
     owes can belong to another collection. The streams a bootstrap replays
     together are exactly these (REQ-PIPE-262), so they are asked rather
     than worked out again."""
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.common import bootstrap
 
     short = collections.by_id(collection_id).short

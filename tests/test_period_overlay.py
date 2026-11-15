@@ -196,7 +196,7 @@ class TestThePromotionGateSeesOnlyTheArrivalsOwnContest:
         from datetime import datetime, timedelta, timezone
         from types import SimpleNamespace
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         base = datetime(2099, 1, 1, 1, tzinfo=timezone.utc) + timedelta(
             seconds=random.randint(0, 10**7))
@@ -216,7 +216,7 @@ class TestThePromotionGateSeesOnlyTheArrivalsOwnContest:
         from datetime import datetime, timedelta, timezone
         from types import SimpleNamespace
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         at = datetime(2099, 6, 1, 1, tzinfo=timezone.utc) + timedelta(
             seconds=random.randint(0, 10**7))

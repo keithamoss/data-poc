@@ -43,8 +43,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from qa_tools.common import hierarchy, schedule
-from qa_tools.common import assets as _assets
+from asset_model import hierarchy, schedule
+from asset_model import assets as _assets
 
 # How few future slots left before we say so. A year of quarterly
 # supplies, which is the smallest window in which "ask the agency for
@@ -229,7 +229,7 @@ def off_for_good(dataset_id: str, on: date, agreement=None) -> bool:
     ahead does not count (post-build-review #190 D1, PROVISIONAL, J3): until
     its effective_to the dataset owes, so a schedule ending before then is
     exhausted like any other."""
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
@@ -268,8 +268,8 @@ def schedule_ends_on(dataset_id: str) -> date | None:
     NOT the last period's own date, which is what this used to read: the
     last slot stays open about one more period after it, so the page said
     "cannot be processed" while supplies were still being filed normally."""
-    from qa_tools.common import asset_time
-    from qa_tools.common import slots as slots_mod
+    from asset_model import asset_time
+    from asset_model import slots as slots_mod
 
     found = slots_mod.slots_for_dataset(dataset_id)
     if not found or found[-1].closes_at is None:

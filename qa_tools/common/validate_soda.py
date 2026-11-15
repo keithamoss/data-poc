@@ -49,16 +49,17 @@ def declared_sample_keys() -> dict[tuple[str, str], list[str]]:
     collections may name a table alike, and each file is held to its own
     collection's key, never another's."""
     from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    return {(c.id, table): cols for c in collections.all_collections()
+    return {(c.id, table): cols for c in declared_collections.all_collections()
             for table, cols in collections.adapter(c).sample_key.items()}
 
 
 def _collection_of_files() -> dict[str, str]:
     """Each registered collection's live Soda file, by path, to its id."""
-    from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    return {_resolved(c.check_file("soda")): c.id for c in collections.all_collections()}
+    return {_resolved(c.check_file("soda")): c.id for c in declared_collections.all_collections()}
 
 
 def _resolved(path) -> str:

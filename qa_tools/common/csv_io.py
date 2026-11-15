@@ -29,7 +29,7 @@ as opposed to a source-format parsing accident) needs representing.
 from __future__ import annotations
 
 import pandas as pd
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 # DuckDB's own read_csv_auto/read_csv only ever sees an already-pandas-
 # written intermediate CSV in this pipeline (every read_csv_auto call

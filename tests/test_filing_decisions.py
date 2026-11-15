@@ -20,9 +20,17 @@ import pytest
 import baseline_periods
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (filing_decisions as fd, hierarchy, inheritance,
-                              people, period_schema, promotion, qa_store,
-                              schedule, substitution, supply_db)
+from qa_tools.common import (
+    filing_decisions as fd,
+    inheritance,
+    people,
+    period_schema,
+    promotion,
+    qa_store,
+    substitution,
+    supply_db,
+)
+from asset_model import hierarchy, schedule
 
 WHEN = "2026-09-29T09:00:00+08:00"
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
@@ -676,7 +684,8 @@ class TestTheQueueListsWhatCouldNotBeLoaded:
 
     def _failed(self, conn, dataset, *, filed_to=None):
         import filing_support
-        from qa_tools.common import assignment, load_log
+        from asset_model import assignment
+        from qa_tools.common import load_log
 
         arrival = f"t{uuid.uuid4().hex[:10]}"
         load_log.record(f"probe-{arrival}", dataset.dataset_id, f"{dataset.table}__{arrival}",

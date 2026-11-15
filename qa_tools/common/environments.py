@@ -34,8 +34,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ENVIRONMENTS_PATH = ROOT / "assets" / "environments.yaml"
@@ -170,7 +170,7 @@ def ticket_repository() -> str | None:
     about the data asset, one per deployment (REQ-PIPE-093 criterion 12).
     Never GITHUB_REPOSITORY, which names whichever repository a workflow
     happens to run in."""
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     repo = str(doc.get("ticket_repository") or "").strip()

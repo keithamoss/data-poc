@@ -4,7 +4,7 @@ view schema, and the gates over the checks that read it (REQ-QAC-297 criteria
 
 GENERIC. A set-member check names a LIST SETTING (its member_setting), never a
 set: the setting is resolved for each of the collection's datasets by the one
-mechanism (qa_tools/common/amber_setting.py), on the ROUND DATE of the round
+mechanism (asset_model/amber_setting.py), on the ROUND DATE of the round
 whose slot fills the run's period (REQ-QAC-300 criterion 4), and written as
 rows of one relation, RELATION, which the tests read through dbt's source().
 Nothing here names a setting, a dataset or a collection.
@@ -71,7 +71,7 @@ class InForce:
 
 
 def _round_date(dataset_id: str, period: str) -> date | None:
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     try:
         found = next((p for p in schedule.periods_for_dataset(dataset_id) if p.name == period),
@@ -85,7 +85,7 @@ def in_force(dataset_id: str, period: str, *, doc: dict | None = None) -> list[I
     """Every list setting resolved for a dataset on its period's round date,
     with the members its version added to the one before it (none for the
     first). Empty where the dataset does not owe the period."""
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     doc = doc if doc is not None else amber_setting._doc()
     on = _round_date(dataset_id, period)
@@ -107,7 +107,7 @@ def in_force(dataset_id: str, period: str, *, doc: dict | None = None) -> list[I
 def rows_for(tables, period: str, *, doc: dict | None = None) -> list[tuple]:
     """(table_name, setting, ordinal, member, version, added) for every list
     setting in force for each table's dataset in `period`."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     rows = []
     for table in tables:

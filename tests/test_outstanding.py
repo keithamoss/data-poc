@@ -457,7 +457,7 @@ class TestSuppliesAwaitingADecisionAreWaitingForAPerson:
     def test_one_item_per_dataset_counting_its_supplies(self, tmp_path, monkeypatch):
         import filing_support
         from qa_tools.common import slot_state as ss
-        from qa_tools.common.assignment import Assignment
+        from asset_model.assignment import Assignment
 
         # Something filed, or the producer has nothing to look at.
         filing_support.file(Assignment(dataset_id="cp-carers", supply_id="cp-carers@1",

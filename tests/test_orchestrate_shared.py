@@ -99,7 +99,7 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
         assert stats["check_aggregates"][f"{FAKE_TABLE}.things"]["total_invalid"] == 1
 
     def test_the_claim_window_is_the_shortest_of_the_datasets_carried(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         on = date(2026, 1, 1)
         received = "2026-01-01T01:00:00+08:00"
@@ -117,7 +117,7 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
 
     @pytest.mark.asset("daily")  # Birth Registrations' own claim window, on its asset
     def test_the_claim_window_of_a_birth_registrations_arrival_is_its_datasets(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         on = date(2026, 1, 1)
         bdm = SimpleNamespace(received_at="2026-01-01T01:00:00+08:00",

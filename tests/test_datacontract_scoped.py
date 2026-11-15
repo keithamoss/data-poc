@@ -17,7 +17,8 @@ import pytest
 import asset_params
 
 from fixture_ids import BDM_DIRTY_RUN_ID, CP_DIRTY_RUN_ID
-from qa_tools.common import asked_for, check_lifecycle, config_yaml, left_out
+from qa_tools.common import asked_for, left_out
+from asset_model import check_lifecycle, config_yaml
 from qa_tools.common import qa_results_writer, supply_db
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -69,7 +70,7 @@ class TestEveryRuleHasAnId:
         doc = config_yaml.parse((ROOT / CONTRACTS[0]).read_text())
         _, rule = next(iter(_rules(doc)))
         with_id = check_lifecycle._parse_contract_quality_rule(dict(rule), "x", "y")[0]
-        from qa_tools.common import check_fingerprint
+        from asset_model import check_fingerprint
 
         assert with_id.config_hash == check_fingerprint.fingerprint(
             "datacontract", rule.get("type"),
@@ -82,7 +83,7 @@ def _quiet(monkeypatch, request):
     Protection's on the quarterly asset, Birth Registrations' on the daily
     (the asset split: one asset's database holds one asset's supplies)."""
     import qa_tools.tools.run_datacontract as shared
-    from qa_tools import collections
+    from asset_model import collections
 
     held = {c.id for c in collections.all_collections()}
     staged = [name for cid, name in (("child-protection", "cp_duckdb_dir"),

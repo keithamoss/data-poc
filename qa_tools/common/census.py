@@ -55,7 +55,7 @@ def compare(conn: supply_db.SupplyConnection,
             periods: list[str] | None = None) -> list[Discrepancy]:
     """What the log names against what the warehouse holds, now. Scoped to
     `periods` where given, else every period."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     expected: dict[tuple[str, str], tuple[str, str, str, str | None]] = {}
     for dataset_id, slot, held_as, holder in conn.execute(
@@ -231,7 +231,7 @@ def for_datasets(dataset_ids: set[str]) -> list[dict]:
 def build_warnings() -> list[str]:
     """The dashboard build's WARNING lines (criterion 16), asset-wide, from
     the recorded census - one call on every build path."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return warn(for_datasets({d.dataset_id for d in hierarchy.all_datasets()}))
 

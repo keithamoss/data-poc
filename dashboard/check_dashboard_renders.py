@@ -81,7 +81,7 @@ def _check_embedded_json(page: Path | None = None) -> list[str]:
     page's data" is, and a missing file, or one whose SHA-256 differs from
     the page's list, fails here before any browser is started."""
     from dashboard import data_files
-    from qa_tools import collections
+    from asset_model import collections
 
     page = page or DASHBOARD_PATH
     found = data_files.read_page(page.read_text(), page.parent)

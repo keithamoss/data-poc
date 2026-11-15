@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path.cwd()))
 
 def main(out: str) -> None:
     from cli import pipeline
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.tools import orchestrate
 
     import thirty_linked_datasets as fixture

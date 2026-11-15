@@ -306,7 +306,7 @@ class TestRegeneratingToCompare:
     under data/ is touched in doing so."""
 
     def test_regenerating_matches_the_real_tree_and_leaves_it_alone(self, tmp_path):
-        from qa_tools.common import delivery
+        from asset_model import delivery
 
         real = Path(delivery.default_deliveries_dir())
         before = sorted(p.name for p in real.iterdir()) if real.exists() else None

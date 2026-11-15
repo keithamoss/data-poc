@@ -25,16 +25,16 @@ whether a slot is open or closed.
 
 A dataset's expected time of day, grace allowance and claim window come
 from its participation in the asset's calendar.yaml, read through the one
-loader (qa_tools/common/agreement.py, REQ-PIPE-110).
+loader (asset_model/agreement.py, REQ-PIPE-110).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, hierarchy, schedule
-from qa_tools.common import assets as _assets
-from qa_tools.common.schedule import Period
+from asset_model import asset_time, hierarchy, schedule
+from asset_model import assets as _assets
+from asset_model.schedule import Period
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,7 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
     after a slot is what that slot closes against (REQ-PIPE-131) - so it
     takes the first version, the only one that could describe it.
     """
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:

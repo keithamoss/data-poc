@@ -297,7 +297,7 @@ def validate_hierarchy_agreement(check_ids) -> list[str]:
     Imported lazily so this module stays importable without config
     present, which its own tests rely on.
     """
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     errors = []
     expected_asset = hierarchy.data_asset_id()

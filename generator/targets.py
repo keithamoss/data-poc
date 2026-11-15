@@ -20,7 +20,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from qa_tools.common import asset_time, delivery
+from asset_model import asset_time, delivery as delivery_tree
+from qa_tools.common import delivery
 
 
 @dataclass(frozen=True)
@@ -153,7 +154,7 @@ def _planned(dataset_id: str, book: dict, placed: list[dict]) -> list[Built]:
     its own file, its slot's period, whether it is tried at generation, the
     source supply the warehouse holds when it arrives, and as its reference the
     dataset's last supply before it planned green."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     table = hierarchy.dataset(dataset_id).table
     named = {(p.get("dataset"), p.get("period")): p["scenario_id"] for p in placed
@@ -291,7 +292,7 @@ def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
     criterion 12), else the one file the dataset's own name recognises, else
     the delivery's one file. Refused by name where the delivery holds no file
     for the dataset."""
-    folder = Path(deliveries_dir or delivery.default_deliveries_dir(), delivery_name)
+    folder = Path(deliveries_dir or delivery_tree.default_deliveries_dir(), delivery_name)
     if filename is not None:
         path = folder / filename
         if not path.is_file():
@@ -299,7 +300,7 @@ def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
         return path
     if dataset_id is not None:
         mine = sorted(p for p in folder.glob("*.csv")
-                      if delivery.dataset_for_filename(p.name) == dataset_id)
+                      if delivery_tree.dataset_for_filename(p.name) == dataset_id)
         if len(mine) != 1:
             raise ValueError(f"delivery {delivery_name} holds {len(mine)} files for "
                              f"{dataset_id}, not one")

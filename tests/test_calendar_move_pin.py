@@ -24,7 +24,7 @@ def test_every_dataset_computes_what_it_did_before_the_move(asset):
     import yaml
 
     import asset_folders
-    from qa_tools.common import assets, hierarchy
+    from asset_model import assets, hierarchy
 
     pinned = json.loads(PIN.read_text())
     assert pinned, "the pin holds no dataset - the comparison would prove nothing"
@@ -130,7 +130,7 @@ def _without_rounds_filling_nothing(dataset_id: str, pinned, now):
     calendar's end - opens no slot and owes no period (REQ-PIPE-321
     criterion 8), so it cannot compare. Each one left out is checked to be
     exactly that, and no other."""
-    from qa_tools.common import agreement, schedule
+    from asset_model import agreement, schedule
 
     if not pinned or now is None:
         return pinned

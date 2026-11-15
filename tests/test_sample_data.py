@@ -18,7 +18,8 @@ from __future__ import annotations
 import pytest
 
 import agreement_split
-from qa_tools.common import qa_store, sample_data, schedule, supply_db
+from qa_tools.common import qa_store, sample_data, supply_db
+from asset_model import schedule
 from qa_tools.common.qa_results_writer import write_qa_result
 from staging_support import stage_bdm, stage_cp
 

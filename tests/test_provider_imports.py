@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets
+from asset_model import assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -132,11 +132,11 @@ class TestTheRule:
         ("def _p():\n    return __import__('mothman_provider_quarterly_child_protection')",
          "__import__("),
         # THE CRITIC'S ROUTES ROUND THE GATE (2026-11-15), each one refused.
-        ("from qa_tools.common.assets import load as L",
-         "from qa_tools.common.assets import load as L"),
-        ("import qa_tools.common.assets\n"
-         "def _p():\n    return qa_tools.common.assets.load('provider', 'child_protection')",
-         "qa_tools.common.assets.load('provider', 'child_protection')"),
+        ("from asset_model.assets import load as L",
+         "from asset_model.assets import load as L"),
+        ("import asset_model.assets\n"
+         "def _p():\n    return asset_model.assets.load('provider', 'child_protection')",
+         "asset_model.assets.load('provider', 'child_protection')"),
         ("from qa_tools.common import assets\n"
          "def _p():\n    return getattr(assets, 'load')('provider', 'child_protection')",
          "getattr(assets, 'load')"),

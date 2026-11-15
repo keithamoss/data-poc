@@ -20,7 +20,7 @@ import yaml
 import pytest
 
 import agreement_split
-from qa_tools.common import schedule
+from asset_model import schedule
 
 
 def _asset_with(datasets: list[dict], tmp_path, monkeypatch, *, baseline: bool = True):
@@ -146,7 +146,7 @@ class TestItOwesNoSupply:
     on somebody's dashboard."""
 
     def test_it_owes_nothing(self, tmp_path, monkeypatch):
-        from qa_tools.common import slots
+        from asset_model import slots
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert slots.is_owed_supplies("cp-referrals") is False

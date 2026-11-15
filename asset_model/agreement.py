@@ -29,8 +29,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from types import MappingProxyType
 
-from qa_tools.common import assets, config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import assets, config_yaml
+from asset_model import assets as _assets
 
 
 def calendar_yaml() -> Path:
@@ -176,7 +176,7 @@ class Agreement:
         (REQ-PIPE-320 criterion 2) - the round the files arrive in, never the
         period they go into - or None where no version is in force, which the
         schedule gate refuses (criterion 4) and nothing here defaults."""
-        from qa_tools.common import in_force
+        from asset_model import in_force
 
         version = in_force.version_on(self.offsets.get(collection_id, ()), on)
         return None if version is None else version.value
@@ -194,13 +194,13 @@ class Agreement:
         dataset or its collection (REQ-PIPE-345 criterion 2) - or None where
         the asset declares none. Never a calendar named on a collection or a
         dataset, which the schedule gate refuses and nothing reads."""
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         base = schedule.baseline(self)
         return base.name if base is not None else None
 
     def collection_of(self, dataset_id: str) -> str | None:
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         try:
             return hierarchy.dataset(dataset_id).collection_id
@@ -256,7 +256,7 @@ class Agreement:
         that dataset alone back (criterion 6). A later collection version
         never ends a dataset's own turn-off, because only the dataset's own
         latest version is read for it."""
-        from qa_tools.common import in_force
+        from asset_model import in_force
 
         entry = self.dataset(dataset_id)
         if entry is None:
@@ -327,7 +327,7 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
     started, so only values fall through, one at a time. `reason` travels
     with `participates` from whichever level gave the months (criterion
     18), so a list is never read without its reason."""
-    from qa_tools.common import in_force
+    from asset_model import in_force
 
     mine = in_force.version_on(own, on)
     if mine is None:
@@ -384,7 +384,7 @@ def _turns_off_logged(raw) -> tuple[date, ...]:
 
 
 def _changelog(raw, where: str) -> tuple[tuple[str, str, str], ...]:
-    from qa_tools.common.schedule import ScheduleConfigError
+    from asset_model.schedule import ScheduleConfigError
 
     out = []
     for entry in raw or []:
@@ -397,7 +397,7 @@ def _changelog(raw, where: str) -> tuple[tuple[str, str, str], ...]:
 
 
 def _participation_version(raw: dict, where: str) -> ParticipationVersion:
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     stated = frozenset(k for k in (PARTICIPATES, "reason", "expected_time", "grace", "claim_window",
                                    "days_before") if k in raw)
@@ -448,7 +448,7 @@ def _offset_versions(block, where: str) -> tuple[OffsetVersion, ...]:
     """A collection's files_go_to_period versions, oldest first. The value is
     a whole number of periods, 0 or more (REQ-PIPE-320 criterion 6); the
     rest of the rules are the schedule gate's (validate_schedule)."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     raw = block.get("versions") if isinstance(block, dict) else None
     if not raw:
@@ -485,7 +485,7 @@ def from_doc(doc: dict, path: Path | str = "assets/<asset>/calendar.yaml") -> Ag
     """An `Agreement` from an already-parsed calendar.yaml document - what
     REQ-PIPE-111's freeze gate needs for the file as it stood at an earlier
     commit, which is text from git rather than a path."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     calendars: dict = {}
     for raw in doc.get("calendars") or []:
@@ -578,7 +578,7 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
     REQ-DASH-182's: pipeline/owed_nothing.sla_timeline() gives one of these
     per participation version, and this stays the fallback.
     """
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     agreement = agreement or current()
     cal = schedule.calendar_for_dataset(dataset_id, agreement)

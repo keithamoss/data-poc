@@ -111,7 +111,7 @@ def defaults_for(tool: str, kind: str | None, scheme: str,
     """{setting path: frozen value} for one tool and check kind under
     `scheme` - every entry introduced at or before it, a later entry for the
     same path replacing an earlier one (criterion 10)."""
-    from qa_tools.common import frozen_defaults
+    from asset_model import frozen_defaults
 
     rank = {s: i for i, s in enumerate(SCHEMES)}
     if scheme not in rank:

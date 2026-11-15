@@ -22,7 +22,7 @@ from generator.daily_batch import (
     _draw_arrival_base_offset_hours,
     generate_daily_batch,
 )
-from qa_tools.common import agreement, asset_time
+from asset_model import agreement, asset_time
 
 
 def test_arrival_offset_distribution_matches_the_real_calibration_target():

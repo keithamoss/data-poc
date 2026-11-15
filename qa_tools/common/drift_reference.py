@@ -36,7 +36,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qa_tools.common import decision_log, schedule, supply_db
+from qa_tools.common import decision_log, supply_db
+from asset_model import schedule
 
 #: (A period holds a real supply where qa.slot_holds says it is held as
 #: PROMOTED; a substitution or an inheritance puts a view there, which is
@@ -137,7 +138,8 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
     #110, H1) - the earlier claim here that no table was read by more
     than one run was wrong for Child Protection.
     """
-    from qa_tools.common import hierarchy, qa_store
+    from asset_model import hierarchy
+    from qa_tools.common import qa_store
 
     if "@" not in (supply or ""):
         return None
@@ -303,7 +305,7 @@ def _owed_earlier(conn, dataset_id: str, current_period: str, as_at, *,
     reference. NOT YET OVERDUE IS NOT A GAP (criterion 11): a slot whose
     due time and grace have not passed is simply not due.
     """
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     current_date = schedule.round_of(current_period, dataset_id)  # by round (REQ-PIPE-321 c2)
     try:
@@ -364,7 +366,8 @@ def assess_arrival(dataset_id: str, received_at, period: str | None = None
     `period` WHERE THE RUN STATES IT (a re-check, about one supply): a
     settled pair's supply has its own file's receipt, whose key matches
     no filing (REQ-PIPE-193 criterion 13)."""
-    from qa_tools.common import asset_time, filing
+    from asset_model import asset_time
+    from qa_tools.common import filing
 
     period = period or filing.period_of(dataset_id, received_at)
     if not period:

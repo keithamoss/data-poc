@@ -17,7 +17,8 @@ import yaml
 from click.testing import CliRunner
 
 from cli import schedule as schedule_cli
-from qa_tools.common import agreement, files_go
+from asset_model import agreement
+from qa_tools.common import files_go
 
 REAL = asset_folders.SelectedFolder()
 

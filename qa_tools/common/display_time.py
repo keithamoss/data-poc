@@ -41,7 +41,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 _WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
              "Saturday", "Sunday")

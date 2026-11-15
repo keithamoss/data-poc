@@ -17,9 +17,17 @@ import yaml
 
 import filing_support
 from datetime import datetime
-from qa_tools.common import (agreement, agreement_freeze, assignment, asset_time,
-                             correction_apply, decision_log, filing, hierarchy, people,
-                             qa_store, supply_db, supply_holds)
+from asset_model import agreement, assignment, asset_time, hierarchy
+from qa_tools.common import (
+    agreement_freeze,
+    correction_apply,
+    decision_log,
+    filing,
+    people,
+    qa_store,
+    supply_db,
+    supply_holds,
+)
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
@@ -283,10 +291,10 @@ class TestTheCommands:
 
     @pytest.fixture
     def declared(self, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
         docs = _corrected(_move_q3)
-        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        monkeypatch.setattr(declared_corrections, "working", lambda: docs)
         return docs
 
     def _run(self, *args, input=None):
@@ -301,9 +309,9 @@ class TestTheCommands:
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: person)
 
     def test_none_pending_says_so(self, conn, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
-        monkeypatch.setattr(correction_trial, "working", _docs)
+        monkeypatch.setattr(declared_corrections, "working", _docs)
         got = self._run("corrections")
         assert got.exit_code == 0 and "No corrections are waiting" in got.output
 
@@ -354,10 +362,10 @@ class TestTheTerminal:
 
     @pytest.fixture
     def declared(self, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
         docs = _corrected(_move_q3)
-        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        monkeypatch.setattr(declared_corrections, "working", lambda: docs)
         return docs
 
     def _answers(self, monkeypatch, selects, texts=()):
@@ -416,10 +424,11 @@ class TestThePassNotesIt:
     applied record alone, and gone once applied."""
 
     def test_a_pending_correction_needs_action_until_applied(self, conn, monkeypatch, manager):
-        from qa_tools.common import correction_trial, outstanding
+        from qa_tools.common import outstanding
+        from asset_model import declared_corrections
 
         docs = _corrected(_move_q3)
-        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        monkeypatch.setattr(declared_corrections, "working", lambda: docs)
         [item] = [i for i in outstanding._from_pending_corrections(conn)]
         assert item.kind == outstanding.PENDING_CORRECTION
         assert item.severity == outstanding.NEEDS_ACTION and "CAB-1" in item.headline
@@ -469,7 +478,8 @@ class TestScenarioRegister:
         on 5 January, after the turn-off, still files to 2022-Q1, whose slot
         is open; one arriving in March, with no owed slot open, is held as
         turned off; and 2022-Q4's slot takes its own supply again."""
-        from qa_tools.common import asset_time, turned_off
+        from asset_model import asset_time
+        from qa_tools.common import turned_off
 
         late = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 1, 5), "10:00"))
         assert late.covered_by == "2022-Q1" and late.label == turned_off.PLAIN
@@ -690,7 +700,8 @@ class TestCriticFindingsOn170:
         """The re-file and its plan resolve slots through agreement.current(),
         the files on disk - which hold every merged correction, a later
         pending one included. Inside configured() they read the state given."""
-        from qa_tools.common import agreement as agreement_mod, correction_trial, slots
+        from asset_model import agreement as agreement_mod, slots
+        from qa_tools.common import correction_trial
 
         cal, asset = _docs()
         _move_q3(cal, asset, "2023-10-20")
@@ -853,11 +864,11 @@ class TestParkedMovesOnEveryRoute:
 
     @pytest.fixture
     def parked_one(self, conn, manager, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
         _pair(7)
         docs = _corrected(_move_q3)
-        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        monkeypatch.setattr(declared_corrections, "working", lambda: docs)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         return docs
 
@@ -1020,7 +1031,7 @@ class TestCriticFindingsOn152TheCommand:
         return CliRunner().invoke(supply_cli.supply_group, list(args))
 
     def test_5_an_applied_reference_shows_its_parked_moves(self, conn, manager, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
         from test_correction_replay import _declare
 
         c5_pair = _pair(19)
@@ -1028,19 +1039,19 @@ class TestCriticFindingsOn152TheCommand:
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         later = _declare(docs, _grace, "CAB-2", asset_time.local_date(
             asset_time.now()).isoformat())
-        monkeypatch.setattr(correction_trial, "working", lambda: later)
+        monkeypatch.setattr(declared_corrections, "working", lambda: later)
         got = self._run("corrections", "--reference", "CAB-1")
         assert got.exit_code == 0, got.output
         assert c5_pair in got.output
 
     def test_5_an_unknown_reference_is_refused_even_with_nothing_pending(
             self, conn, manager, monkeypatch):
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
         _pair(20)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
-        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        monkeypatch.setattr(declared_corrections, "working", lambda: docs)
         got = self._run("corrections", "--reference", "BOGUS")
         assert got.exit_code != 0 and "BOGUS" in got.output
 

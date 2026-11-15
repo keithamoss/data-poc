@@ -29,8 +29,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import filing_support
-from qa_tools.common import arrival_classification as classify_mod
-from qa_tools.common import assignment, filing
+from asset_model import arrival_classification as classify_mod
+from asset_model import assignment
+from qa_tools.common import filing
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -157,7 +158,7 @@ class TestItFollowsAReFile:
         early, is promoted the better part of a year later, and still
         reads early - while the promotion itself is visibly recorded."""
         from qa_tools.common import decision_log
-        from qa_tools import collections
+        from asset_model import collections
 
         cp = collections.by_id("child-protection")
         _file(supply_id="promoted-late")
@@ -237,7 +238,7 @@ class TestTheRealFilingPathRecordsIt:
         """Driven through every branch of the real function, because the
         bug was some branches being right and one wrong being just as
         broken as all of them."""
-        from qa_tools.common import slots as slots_mod
+        from asset_model import slots as slots_mod
 
         got = assignment.assign(
             DATASET, f"{DATASET}@{at:%Y%m%d%H}00000000", at,

@@ -31,7 +31,7 @@ def _patch_delivery_dirs(monkeypatch, delivery_dirs):
     """Point arrival recognition at an isolated tree (REQ-GEN-043) -
     see tests/test_cli_bdm.py's identical helper for why patching the
     raw dir alone is no longer enough."""
-    from qa_tools.common import delivery
+    from asset_model import delivery
     monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(delivery_dirs[0]))
     monkeypatch.setattr(delivery, "default_receipts_dir", fixed(delivery_dirs[1]))
 
@@ -61,7 +61,7 @@ def test_arrival_path_is_resolved_live_not_frozen_at_import(monkeypatch, tmp_pat
     be a module constant, and is now whichever delivery recognition
     matches - so it has to be read at call time, not bound once.
     """
-    from qa_tools.common import arrivals
+    from asset_model import arrivals
 
     class _Arrival:
         run_id = "cp_run_001"

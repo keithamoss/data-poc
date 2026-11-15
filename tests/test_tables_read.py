@@ -129,14 +129,14 @@ class TestTheDeclarationsInThisRepo:
         # The field is excluded from the hash BY CONSTRUCTION - it is
         # part of _lifecycle_fields, from which _NON_CONFIG_FIELDS is
         # derived - so this asserts the derivation, not a snapshot.
-        from qa_tools.common import check_lifecycle as cl
+        from asset_model import check_lifecycle as cl
         assert "reads_tables" in cl._NON_CONFIG_FIELDS
 
     def test_a_bare_string_declaration_is_accepted_and_wrapped(self):
         """The single-table case is the common one, and refusing the
         obvious shortcut would mean a silently undeclared check the
         first time somebody took it."""
-        from qa_tools.common import check_lifecycle as cl
+        from asset_model import check_lifecycle as cl
 
         assert cl._table_list({"reads_tables": "cp_clients"}, "reads_tables") == ["cp_clients"]
         assert cl._table_list({}, "reads_tables") == []
@@ -348,7 +348,7 @@ class TestTheReservedScope:
     """
 
     def test_no_real_dataset_id_begins_with_the_reserved_prefix(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         taken = [d.dataset_id for d in hierarchy.all_datasets()
                   if tr.is_reserved_scope(d.dataset_id)]
@@ -360,7 +360,7 @@ class TestTheReservedScope:
         collection or agency taking the prefix would not collide
         today - but it would make the tree unreadable in the same way,
         and the cost of widening the rule is nothing."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         ids = {d.collection_id for d in hierarchy.all_datasets()}
         ids |= {d.agency_id for d in hierarchy.all_datasets()}
@@ -391,7 +391,8 @@ class TestTheGateRefusesAReservedDatasetId:
         assert "_cross-table" in errors[0]
 
     def test_it_accepts_the_real_tree(self):
-        from qa_tools.common import hierarchy, validate_hierarchy
+        from asset_model import hierarchy
+        from qa_tools.common import validate_hierarchy
 
         real = [(d.agency_id, d.collection_id, d.dataset_id)
                  for d in hierarchy.all_datasets()]
@@ -404,7 +405,8 @@ class TestTheGateRefusesAReservedDatasetId:
         with one dataset renamed into the reserved prefix."""
         import dataclasses
 
-        from qa_tools.common import hierarchy, validate_hierarchy
+        from asset_model import hierarchy
+        from qa_tools.common import validate_hierarchy
 
         real = hierarchy.all_datasets()
         renamed = [dataclasses.replace(real[0], dataset_id="_cross-table"), *real[1:]]

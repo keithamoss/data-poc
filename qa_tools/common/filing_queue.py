@@ -128,7 +128,8 @@ def could_not_load(conn: supply_db.SupplyConnection,
     (criterion 12): the decision log has no slot to record a rejection
     against.
     """
-    from qa_tools.common import dataset_blockers, filing, hierarchy, load_log
+    from qa_tools.common import dataset_blockers, filing, load_log
+    from asset_model import hierarchy
 
     # A REFUSED FILE OF A CONTESTED PAIR is the contest's to report
     # (REQ-PIPE-115 criterion 27), here as in the outstanding items.
@@ -214,7 +215,7 @@ def rechecked_worse_heading(verdict: str) -> str:
     """'Promoted, then failing on re-check' (REQ-PIPE-164 criterion 15 as
     REQ-DOCS-362 A28 amends it; SETTLED by Keith 2026-11-01) - worded from
     the verdict VALUE, which status_words refuses if it does not know."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return f"Promoted, then {status_words(verdict, 'verb')} on re-check"
 
@@ -226,7 +227,7 @@ def rechecked_worse_reason(w) -> str:
     <date>, and the re-check recorded <instant> (decision <id>) came back
     failing. ...' (SETTLED by Keith 2026-11-01)."""
     from qa_tools.common import display_time
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     on = f" on {display_time.format_day(w.promoted_at)}" if w.promoted_at else ""
     return (f"{rechecked_worse_heading(w.now)}: {w.supply} in {w.period} was promoted "
@@ -353,8 +354,8 @@ def supplies_in(conn: supply_db.SupplyConnection,
     the load log knows (could not be loaded), and only then whether it is
     the slot's own supply or waiting beside it.
     """
-    from qa_tools.common import (decision_log, display_time, hierarchy, promotion,
-                                 supersession, supply_files)
+    from qa_tools.common import decision_log, display_time, promotion, supersession, supply_files
+    from asset_model import hierarchy
 
     ds, period = slot.dataset_id, slot.period
     rows = conn.execute(
@@ -656,7 +657,7 @@ class TurnedOffGroup:
 
     @property
     def line(self) -> str:
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         dated = [r.received_at for r in self.rows if r.received_at is not None]
         earliest = (f", earliest {asset_time.localise(min(dated)).strftime('%-d %B %Y')}"
@@ -688,7 +689,8 @@ def held_operations(row: HeldRow) -> tuple[str, ...]:
 def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRow]:
     """Every supply the assignment rule holds in this collection, oldest
     receipt first. One row per supply - a pair held whole is one supply."""
-    from qa_tools.common import display_time, hierarchy, supersession, supply_files
+    from qa_tools.common import display_time, supersession, supply_files
+    from asset_model import hierarchy
     from qa_tools.common import supply_holds
 
     datasets = {d.dataset_id: d for d in hierarchy.datasets_in_collection(collection_id)}

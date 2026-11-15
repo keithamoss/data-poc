@@ -15,7 +15,7 @@ import pytest
 
 import pandas as pd
 
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 from qa_tools.tools import run_evidently
 
 
@@ -120,7 +120,7 @@ class TestACollectionWithNoEvidentlyCheck:
         assert got == [] and written == {"verified": []}
 
     def test_a_file_with_checks_but_no_drift_check_is_still_refused(self, tmp_path, monkeypatch):
-        from qa_tools.common import check_lifecycle, evidently_common
+        from asset_model import check_lifecycle, drift as evidently_common
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {
             "quarterly.department-of-health.linkage-products.linkage-keys.row_drop_evidently":

@@ -203,7 +203,7 @@ class TestAgainstTheRealCommittedCheckDefinitions:
         comparing without trimming would have printed the literal word
         into a ticket."""
         import qa_tools.common.validate_check_lifecycle as v
-        from qa_tools.common.check_lifecycle import SELF_EVIDENT, is_self_evident
+        from asset_model.check_lifecycle import SELF_EVIDENT, is_self_evident
 
         sentinels = [c for c in v.collect_checks(None) if is_self_evident(c.failure_indicates)]
         assert sentinels, "expected some checks to declare their failure cause self-evident"

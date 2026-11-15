@@ -10,7 +10,8 @@ from datetime import timedelta
 
 import pytest
 
-from qa_tools.common import period_overlap, schedule, slots, validate_schedule
+from qa_tools.common import period_overlap, validate_schedule
+from asset_model import schedule, slots
 
 
 class TestTodaysConfiguration:

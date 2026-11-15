@@ -64,7 +64,7 @@ def plan(*, table: str, period: str, reads: Mapping[str, list[str]]) -> Plan:
 
 
 def _dataset_of_table(table: str) -> str | None:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset_for_table(table).dataset_id
@@ -78,7 +78,7 @@ def reading_checks(*, table: str, period: str, reads: Mapping[str, list[str]]) -
     declare only the OTHER tables they read, their own being implicit
     (post-build-review #161: the second kind was missed, so a supply such a
     check had turned red was never re-evaluated when this table arrived)."""
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
 
     own = _dataset_of_table(table)
     filed_here = set()
@@ -95,7 +95,7 @@ def counts_toward(check_id: str, *, table: str, reads: Mapping[str, list[str]]) 
     rule promotion.status_of uses ("a referential check ... belongs to
     both") - except `table`'s own dataset, whose supplies are what arrived
     or left, not readers of it."""
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
 
     out = set()
     parsed = check_id_mod.try_parse(check_id)

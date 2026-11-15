@@ -57,7 +57,7 @@ def declared(root: Path = REPO) -> list[SetMemberCheck]:
     edit inside one clock tick keeps, so it could answer for what the file
     used to say. REQ-PIPE-254 criterion 15 forbids that, and REQ-PIPE-401
     keyed it on the content instead."""
-    from qa_tools import collections
+    from asset_model import collections
 
     out = []
     for coll in collections.all_collections():
@@ -111,7 +111,7 @@ def _build_checks(path: Path, text: str, tables: dict) -> tuple[SetMemberCheck, 
 
 def problems(root: Path = REPO) -> list[str]:
     """Each gate's refusals, naming the dataset, the check or the period."""
-    from qa_tools.common import amber_setting, linked_datasets
+    from asset_model import amber_setting, linked_datasets
 
     doc = amber_setting._doc(linked_datasets._asset_folder(root) / "data-asset.yaml")
     checks = declared(root)
@@ -125,7 +125,7 @@ def _declaration_problems(checks, doc, root) -> list[str]:
     GEOCODING DATASET - a linked product with one source and no code
     (REQ-QAC-294 decision 8) - has all three set-member checks, a value-share
     check and both identifier checks."""
-    from qa_tools.common import amber_setting, linked_datasets
+    from asset_model import amber_setting, linked_datasets
 
     names = {k[-1] for k in amber_setting.list_setting_keys(doc)}
     out = []
@@ -156,7 +156,7 @@ def _declaration_problems(checks, doc, root) -> list[str]:
 
 
 def _soda_checks(root, coll, ds):
-    from qa_tools.common import linked_datasets
+    from asset_model import linked_datasets
 
     folder, _, name = str(coll.get("contract", "")).rpartition("/")
     stem = name.removesuffix("-contract.yaml")
@@ -168,7 +168,7 @@ def _coverage_problems(checks, doc) -> list[str]:
     """REQ-QAC-300 criterion 5: no period a reader of a list setting owes may
     lack a version - refused, naming the dataset and the period, never
     answered by the nearest version."""
-    from qa_tools.common import amber_setting, schedule
+    from asset_model import amber_setting, schedule
 
     out = []
     for dataset_id, setting in sorted({(c.dataset_id, c.member_setting) for c in checks
@@ -191,7 +191,7 @@ def _breaking_entry_problems(checks, doc) -> list[str]:
     breaking changelog entry, dated its effective_from, on every set-member
     check whose set it changes - the set is no part of a check's definition
     fingerprint, so no other gate would notice."""
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     out = []
     for c in checks:

@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from qa_tools.common import assets
+from asset_model import assets
+from qa_tools.common import dbt_common
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -207,7 +208,7 @@ class TestARunWithoutThemIsRefused:
 
         invoked = []
         monkeypatch.setattr(dbt_worker, "invoke", lambda *a, **k: invoked.append(a))
-        with pytest.raises(assets.DbtPackagesMissing) as exc:
+        with pytest.raises(dbt_common.DbtPackagesMissing) as exc:
             run_dbt.test_names_by_check_id("child-protection")
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
@@ -221,11 +222,11 @@ class TestARunWithoutThemIsRefused:
         from qa_tools.tools import run_dbt
 
         assert _dbt_deps().exit_code == 0
-        assert assets.dbt_project_ready() == an_asset, "precondition: installed and current"
+        assert dbt_common.dbt_project_ready() == an_asset, "precondition: installed and current"
         _another_package(tmp_path, an_asset)
         invoked = []
         monkeypatch.setattr(dbt_worker, "invoke", lambda *a, **k: invoked.append(a))
-        with pytest.raises(assets.DbtPackagesMissing) as exc:
+        with pytest.raises(dbt_common.DbtPackagesMissing) as exc:
             run_dbt.test_names_by_check_id("child-protection")
         assert invoked == []
         assert "'one'" in str(exc.value) and "mothman env dbt-deps" in str(exc.value)
@@ -240,8 +241,8 @@ class TestARunWithoutThemIsRefused:
         installed[0].unlink() if installed[0].is_symlink() else shutil.rmtree(installed[0])
         (an_asset / "dbt_packages" / "leftover").mkdir()
         (an_asset / "dbt_packages" / "leftover" / "x").write_text("")
-        with pytest.raises(assets.DbtPackagesMissing):
-            assets.dbt_project_ready()
+        with pytest.raises(dbt_common.DbtPackagesMissing):
+            dbt_common.dbt_project_ready()
 
 
 REAL_ASSETS = sorted(p.parent.parent.name for p in (ROOT / "assets").glob("*/dbt/dbt_project.yml"))

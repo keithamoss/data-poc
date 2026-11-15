@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets, every_asset
+from asset_model import assets, every_asset
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def _ids(name: str) -> tuple[set, set, set]:
-    from qa_tools.common import config_yaml
+    from asset_model import config_yaml
 
     doc = config_yaml.parse((ROOT / "assets" / name / "data-asset.yaml").read_text())
     agencies, collections, datasets = set(), set(), set()

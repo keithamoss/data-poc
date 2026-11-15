@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, hierarchy, schedule
+from asset_model import asset_time, hierarchy, schedule
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ def horizon(today: date | None = None) -> date:
 def overlaps_for(dataset_id: str, until: date | None = None,
                  agreement=None) -> list[Overlap]:
     """Every overlapping pair of consecutive periods for one dataset."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     try:
         calendar = schedule.calendar_for_dataset(dataset_id, agreement)

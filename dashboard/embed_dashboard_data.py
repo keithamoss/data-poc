@@ -16,7 +16,7 @@ whenever the pipeline is regenerated.
 removed entirely 2026-09-17 (plans/qa-pipeline.md Phase 5j), replaced
 by real per-dataset cadence config - each dataset's participation in
 contract/calendar.yaml since REQ-PIPE-110 (the contracts' `slaProperties:`
-before it), read by qa_tools/common/agreement.py's cadence() and already
+before it), read by asset_model/agreement.py's cadence() and already
 folded into each COLLECTION_DATA dataset's own `sla.cadence` field
 by the two build_*_dashboard_data.py scripts above - nothing left for
 this script to separately embed).
@@ -187,15 +187,15 @@ from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import feedback_data, parse_plans
 from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
-from qa_tools.common import asset_time
-from qa_tools.common import assets
+from asset_model import asset_time
+from asset_model import assets
 from qa_tools.common import build_output
 from qa_tools.common import environments
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 from qa_tools.common import outstanding
 from qa_tools.common import scenario_map
 from qa_tools.common import runway
-from qa_tools.common import schedule
+from asset_model import schedule
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.leaderboard import build_leaderboard
@@ -240,7 +240,7 @@ def collection_targets() -> list[tuple[str, str]]:
     """(collection id, its dashboard file) for every registered collection,
     in hierarchy order - from the registry (REQ-DASH-244 criterion 9)."""
     from pipeline import build_dashboard_data
-    from qa_tools import collections
+    from asset_model import collections
 
     return [(c.id, build_dashboard_data.out_path(c.id)) for c in collections.all_collections()]
 
@@ -326,7 +326,7 @@ def github_links_or_none(sha: str) -> tuple[dict, str | None]:
     leaving its GitHub links out, since a link is a repository path GitHub has
     never seen (C7, REQ-PIPE-342 decision 18). REJECTED refusing the build.
     The page already draws no 'View on GitHub' where it has no link."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     try:
         return {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}, None
@@ -360,7 +360,7 @@ def _slots_by_dataset() -> dict:
     """Every dataset's slots to a year past today - configuration only."""
     from datetime import timedelta
 
-    from qa_tools.common import asset_time, hierarchy, schedule, slots
+    from asset_model import asset_time, hierarchy, schedule, slots
 
     until = asset_time.local_date(asset_time.now()) + timedelta(days=366)
     out = {}
@@ -375,9 +375,9 @@ def _slots_by_dataset() -> dict:
 def _slot_due_dates(by_dataset: dict) -> dict:
     """{dataset: {period date: due date}} for the slots due on a day other
     than their period's date, read on the asset clock."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
-    from qa_tools.common import hierarchy, schedule
+    from asset_model import hierarchy, schedule
 
     out: dict = {}
     for dataset_id, found in by_dataset.items():
@@ -567,7 +567,7 @@ def embed() -> None:
     # The file a person edits to add dates - supply_holds' one constant,
     # contract/calendar.yaml since REQ-PIPE-110, never a second copy.
     from qa_tools.common import supply_holds
-    from qa_tools.common import assets as _assets
+    from asset_model import assets as _assets
     schedule_runway = {"configFile": supply_holds.schedule_file(),
                         # The asset's configuration folder, for every other
                         # file the page names (critic finding 7, the split).

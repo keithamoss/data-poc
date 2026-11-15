@@ -18,7 +18,8 @@ import shutil
 import pytest
 import yaml
 
-from qa_tools.common import agreement, assets, schedule, validate_schedule
+from asset_model import agreement, assets, schedule
+from qa_tools.common import validate_schedule
 from qa_tools.common.validate_schedule import Source, validate
 
 pytestmark = pytest.mark.asset("quarterly")
@@ -154,7 +155,7 @@ class TestEveryDatasetIsOnTheBaseline:
         agr = agreement.current()
         base = schedule.baseline(agr)
         assert base is not None and list(agr.calendars) == [base.name]
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         on = [d.dataset_id for d in hierarchy.all_datasets()
               if schedule.no_calendar(d.dataset_id) is None]

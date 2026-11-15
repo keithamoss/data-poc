@@ -47,7 +47,7 @@ def spec_of(one, written_to) -> dict:
     file or None (criterion 12 - from the supply's own record, never from the
     command's one dataset)."""
     from generator import targets
-    from qa_tools.common import asset_time, hierarchy
+    from asset_model import asset_time, hierarchy
 
     from datetime import date
 
@@ -86,7 +86,8 @@ def try_in_period(collection_id: str, spec: dict) -> list:
     """One trial in its slot's period (criteria 10 and 11). Returns its
     disagreements - none where the real tools read it as built."""
     from cli import common
-    from qa_tools.common import asset_time, hierarchy, period_overlay, run_reads
+    from asset_model import asset_time, hierarchy
+    from qa_tools.common import period_overlay, run_reads
     from qa_tools.common import supply_db, target_agreement, trial
     from qa_tools.tools import orchestrate, stage
 
@@ -166,7 +167,7 @@ def try_all(collection_id: str, specs: list[dict], say=None) -> tuple[list, floa
     import multiprocessing
     from concurrent.futures import ProcessPoolExecutor
 
-    from qa_tools.common import assets
+    from asset_model import assets
 
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(max_workers=workers, mp_context=context,

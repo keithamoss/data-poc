@@ -69,7 +69,7 @@ class TestTheNextReceiptIsKnownInAReplay:
 
     def test_an_unrecorded_next_arrival_in_the_tree_caps_the_lag(
             self, tmp_path, monkeypatch, clean_delivery_log):
-        from qa_tools.common import arrivals, delivery
+        from asset_model import arrivals, delivery
 
         self._tree(tmp_path, [("Extract A", "2023-04-03T09:00:00+00:00"),
                               ("Extract B", "2023-04-03T09:00:30+00:00")])
@@ -108,7 +108,8 @@ class TestWithinTheClaimWindowInAReplay:
     @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
     def test_both_collections_pass_it_on_every_route(self, collection_id, replaying,
                                                       monkeypatch):
-        from qa_tools.common import replay_clock, schedule
+        from qa_tools.common import replay_clock
+        from asset_model import schedule
 
         seen = {}
         real = promotion.effective_at_for

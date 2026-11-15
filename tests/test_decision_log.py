@@ -688,7 +688,7 @@ class TestWhenWorkFollowingADecisionTakesEffect:
     def test_live_it_is_when_the_work_ran(self, conn, dataset, monkeypatch):
         from datetime import datetime, timedelta, timezone
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         decided = datetime.now(timezone.utc).replace(microsecond=0)
         did, recorded = self._decision(conn, dataset, effective_at=decided)
@@ -700,7 +700,7 @@ class TestWhenWorkFollowingADecisionTakesEffect:
     def test_in_a_replay_it_is_the_causes_instant(self, conn, dataset, monkeypatch):
         from datetime import datetime, timedelta, timezone
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         effective = datetime(2023, 4, 2, 10, 0, tzinfo=timezone.utc)
         did, recorded = self._decision(conn, dataset, effective_at=effective)
@@ -714,7 +714,7 @@ class TestWhenWorkFollowingADecisionTakesEffect:
         later than the moment it ran - min(now, ...), as effective_at_for."""
         from datetime import timedelta
 
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         did, recorded = self._decision(conn, dataset,
                                        effective_at=asset_time.now() + timedelta(days=30))
@@ -722,7 +722,7 @@ class TestWhenWorkFollowingADecisionTakesEffect:
         assert took <= asset_time.now()
 
     def test_with_no_cause_it_is_now(self, conn):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         assert asset_time.parse_instant(dl.follows(conn, None), "t") <= asset_time.now()
 

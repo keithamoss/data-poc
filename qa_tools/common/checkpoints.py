@@ -50,7 +50,8 @@ from pathlib import Path
 import psycopg
 from psycopg import sql
 
-from qa_tools.common import config_yaml, replay_inputs, supply_db
+from asset_model import config_yaml
+from qa_tools.common import replay_inputs, supply_db
 
 #: Every checkpoint database's name starts with this, and every resume's with
 #: RESUME_PREFIX - so both can be found and cleared on a cluster that already
@@ -73,7 +74,7 @@ class CheckpointRefused(RuntimeError):
 
 def require_synthetic() -> None:
     """Criterion 6: never on an asset that has not declared itself synthetic."""
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     # `is True`, NOT TRUTHINESS, as the reset command and the replay clock read
@@ -135,7 +136,7 @@ _MAX_NAME = 63
 
 def _asset() -> str:
     """The selected asset - refused, as every reader refuses, without one."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.selected().name
 
@@ -199,7 +200,7 @@ def _admin(dsn: str | None = None):
     REQ-PIPE-343 criterion 5): a checkpoint is a copy of one asset's supply
     database, so this connection is claimed for that asset before it opens,
     as supply_db.connect() claims its own."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     assets.claim_for_connection(assets.selected().name)
     return psycopg.connect(_with_dbname(dsn or supply_db.supply_db_dsn(), "postgres"),
@@ -236,7 +237,7 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
     # checks nothing, so a process that lost its DSN would otherwise copy -
     # and prune the checkpoints of - another environment's supply_<asset>.
     supply_db.connect(dsn=dsn, read_only=True, label="mothman:checkpoints").close()
-    from qa_tools import collections
+    from asset_model import collections
 
     short = collections.by_id(collection_id).short
     name = _named_for(PREFIX, short, before)
@@ -296,13 +297,13 @@ def arrivals_of(collection_id: str) -> list:
     import warnings
 
     from cli.pipeline import generated_into
-    from qa_tools.common import arrivals
+    from asset_model import arrivals as arrival_tree
 
     with tempfile.TemporaryDirectory(prefix="mothman-ckpt-") as tmp, \
             contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         with generated_into(Path(tmp)) as root:
-            return arrivals.arrivals_for(collection_id, "", root / "deliveries",
+            return arrival_tree.arrivals_for(collection_id, "", root / "deliveries",
                                          root / "receipts")
 
 
@@ -360,7 +361,7 @@ def prune(keep_n: int, dsn: str | None = None, *, source: str) -> list[str]:
 def copy_for_resume(cp: Checkpoint, dsn: str | None = None) -> str:
     """Criterion 2: a database of the resume's own, copied from the
     checkpoint, which is left unchanged. Returns its DSN."""
-    from qa_tools import collections
+    from asset_model import collections
 
     short = collections.by_id(cp.collection_id).short
     name = _named_for(RESUME_PREFIX, short, cp.before)

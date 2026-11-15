@@ -30,7 +30,7 @@ class RunReads:
 
 
 def _collection_of_check(check_id: str) -> str | None:
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
 
     parsed = check_id_mod.try_parse(check_id)
     return parsed.collection if parsed is not None else None
@@ -39,8 +39,9 @@ def _collection_of_check(check_id: str) -> str | None:
 def reads_for(collection_id: str) -> RunReads:
     """The tables a run of `collection_id` reads: its own, then every other
     collection's table one of its checks declares, sorted."""
-    from qa_tools import collections
-    from qa_tools.common import hierarchy, promotion
+    from asset_model import collections
+    from asset_model import hierarchy
+    from qa_tools.common import promotion
 
     own = tuple(d.table for d in collections.by_id(collection_id).datasets)
     known = {d.table for d in hierarchy.all_datasets()}
@@ -56,7 +57,8 @@ def foreign_readers(table: str) -> list[str]:
     """Every collection one of whose checks declares a read of `table`, a
     table of another collection - the readers a move of `table`'s supply
     re-evaluates (criterion 5)."""
-    from qa_tools.common import hierarchy, promotion
+    from asset_model import hierarchy
+    from qa_tools.common import promotion
 
     try:
         owner = hierarchy.dataset_for_table(table).collection_id
@@ -83,8 +85,9 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
     period in which they could differ (the not-applicable case of the same
     criterion has nothing to record until a dataset's calendar is itself
     versioned)."""
-    from qa_tools.common import check_id as check_id_mod
-    from qa_tools.common import hierarchy, promotion, schedule
+    from asset_model import check_id as check_id_mod
+    from asset_model import hierarchy, schedule
+    from qa_tools.common import promotion
 
     if declared is None:
         declared = promotion._declared_reads()
@@ -105,7 +108,7 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
             if table not in owners:
                 # Naming the asset folder checked, and never looking in
                 # another asset's (REQ-PIPE-364 criterion 4).
-                from qa_tools.common import assets
+                from asset_model import assets
 
                 out.append(f"{check_id} declares a read of {table!r}, which no dataset in "
                            f"the hierarchy owns ({assets.config_dir()}/data-asset.yaml; "

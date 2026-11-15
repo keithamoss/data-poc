@@ -115,7 +115,7 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
 
     try:
         with processing_pass.pass_lock("run"):
-            from qa_tools import collections
+            from asset_model import collections
 
             chosen = [c.short for c in collections.all_collections()
                       if collection in (c.short, "all")]
@@ -361,7 +361,7 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
 
 
 def provider_collection(collection_id: str):
-    from qa_tools import collections
+    from asset_model import collections
 
     return collections.by_id(collection_id)
 
@@ -511,7 +511,7 @@ def checkpoint_list_command() -> None:
     """This asset's checkpoints on this server, oldest first, then its
     resumes' databases - never another asset's (REQ-PIPE-365) - then any
     made before the asset split, which belong to no asset."""
-    from qa_tools.common import assets as _assets
+    from asset_model import assets as _assets
     from qa_tools.common import checkpoints
 
     found = checkpoints.listed()
@@ -552,7 +552,7 @@ def checkpoint_list_command() -> None:
 def checkpoint_arrivals_command(collection: str) -> None:
     """The arrival numbers `--checkpoint-before N` counts, with the delivery
     and receipt instant of each - from a regeneration, never data/."""
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.common import checkpoints
 
     found = checkpoints.arrivals_of(collections.by_short(collection).id)
@@ -620,7 +620,7 @@ def resume_command(name: str, sequential: bool) -> None:
 
 def _on_asset_clock(value) -> str:
     """An instant on the asset's own clock, as a person reads it (#133 B13)."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return asset_time.localise(value).strftime("%Y-%m-%d %H:%M %Z")
 

@@ -11,8 +11,9 @@ import pytest
 
 import asset_params
 
-from qa_tools import collections
-from qa_tools.common import evidently_common, supply_db
+from asset_model import collections
+from asset_model import drift as evidently_common
+from qa_tools.common import supply_db
 from qa_tools.tools import run_evidently
 
 COLLECTIONS = ["civil-registration", "child-protection"]

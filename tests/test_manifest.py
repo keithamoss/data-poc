@@ -10,8 +10,8 @@ import pytest
 import baseline_periods
 
 import test_supersession as _base
-from qa_tools.common import (amber_setting, decision_log as dl, period_schema, promotion,
-                             substitution, supply_db)
+from asset_model import amber_setting
+from qa_tools.common import decision_log as dl, period_schema, promotion, substitution, supply_db
 from qa_tools.common.validate_hierarchy import reserved_table_errors
 from test_supersession import DS, REAL_PERSON, TABLE, WHEN, _filed
 
@@ -192,7 +192,7 @@ class TestParityWithThePipeline:
     agrees with what the pipeline itself resolves that period to."""
 
     def test_every_period(self, deployment_history):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         with supply_db.connect(read_only=True, label="test-manifest-parity") as conn:
             # BY AUTHORED NAME, from the record of each period's opening:

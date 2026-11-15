@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from qa_tools.common import arrivals, s3_arrival
+from asset_model import arrivals as arrival_tree
 
 LANDED = datetime(2031, 6, 7, 1, 2, 3, tzinfo=timezone.utc)
 
@@ -29,7 +30,7 @@ class TestTheSameArrivalsAsTheTree:
         pytest.param("civil-registration", "run_", marks=pytest.mark.asset("daily")),
         pytest.param("child-protection", "cp_run_", marks=pytest.mark.asset("quarterly"))])
     def test_identical(self, deployment_history, collection_id, prefix):
-        from_tree = arrivals.arrivals_for(collection_id, prefix)
+        from_tree = arrival_tree.arrivals_for(collection_id, prefix)
         from_rows = arrivals.arrivals_from_records(collection_id)
         assert from_tree, "the deployment holds no arrivals - bootstrap first"
         assert _comparable(from_rows) == from_tree
@@ -65,7 +66,7 @@ class TestAnObjectRecordedFromS3IsAnArrival:
         assert local.run_id == found.run_id
 
     def test_a_local_arrival_is_left_where_it_is(self, tmp_path):
-        local = arrivals.Arrival(run_id="r", run_index=1, collection_id="c", delivery_name="d",
+        local = arrival_tree.Arrival(run_id="r", run_index=1, collection_id="c", delivery_name="d",
                                  path=tmp_path, received_at=LANDED, sequence=1,
                                  files_by_dataset={}, unmatched=(), anomalies=())
         assert s3_arrival.materialise(local) is local
@@ -78,12 +79,13 @@ class TestALocalRecordWhoseDirectoryIsGoneIsNotAnArrival:
     def test_it_is_not_offered(self, supply_dsn, tmp_path):
         import uuid
 
-        from qa_tools.common import delivery, delivery_log
+        from asset_model import delivery
+        from qa_tools.common import delivery_log
 
         name = f"gone-{uuid.uuid4().hex[:8]}"
         d = delivery.Delivery(name=name, path=tmp_path / name, received_at=LANDED,
                               files=("cp_clients.csv",), anomalies=(), sequence=1)
-        delivery_log.record(d, arrivals.recognise(d))
+        delivery_log.record(d, arrival_tree.recognise(d))
         offered = {a.delivery_name for a in arrivals.arrivals_from_records(
             "child-protection", tmp_path)}
         assert name not in offered

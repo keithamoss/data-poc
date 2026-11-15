@@ -36,9 +36,10 @@ import os
 from types import MappingProxyType
 
 from qa_tools import collections
-from qa_tools.common import (asked_for, config_yaml, hierarchy, left_out, list_setting_members,
-                             sample_keys, supply_db)
-from qa_tools.common.check_lifecycle import dbt_check_id_lookup
+from asset_model import collections as declared_collections
+from qa_tools.common import asked_for, left_out, list_setting_members, sample_keys, supply_db
+from asset_model import config_yaml, hierarchy
+from asset_model.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, failing_sample_keys_direct,
     failing_sample_keys_via_values, names_by_check_id, parse_threshold, parsed_test_nodes,
@@ -55,7 +56,7 @@ def _project_dir() -> str:
     """The selected asset's dbt project, resolved now and refused before dbt
     is invoked when its packages are not installed (REQ-QAC-368 criteria 3
     and 6). It was the import-time constant DBT_PROJECT_DIR."""
-    from qa_tools.common import assets
+    from qa_tools.common import dbt_common as assets
 
     return str(assets.dbt_project_ready())
 
@@ -130,7 +131,7 @@ def _check_id_for(coll, spec, node: dict) -> str | None:
 def test_names_by_check_id(collection_id: str) -> dict[str, list[str]]:
     """check id -> this collection's test node names, from the parsed project
     through `_check_id_for` (REQ-PIPE-189 NFR 1)."""
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     spec = collections.adapter(coll).dbt
     return names_by_check_id(parsed_test_nodes(PROFILES_DIR, _project_dir()),
                              lambda node: _check_id_for(coll, spec, node))
@@ -242,7 +243,7 @@ def _not_evaluated_for_want_of_a_period(coll, spec, run_id: str, run_timestamp: 
 
 
 def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     adapter = collections.adapter(coll)
     spec = adapter.dbt
     models = _models(coll)

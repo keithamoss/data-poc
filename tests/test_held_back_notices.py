@@ -11,7 +11,7 @@ import pytest
 from pipeline import cross_table_grid as g
 from pipeline import cross_table_notices as ctn
 from pipeline import held_back_notices as hb
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 I2 = "cp-investigations@202408051000000800"
 N2 = "cp-notifications@202408051000000800"

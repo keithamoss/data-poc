@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qa_tools.common import assets
+from asset_model import assets
 
 
 def complete(folder: Path) -> Path:
@@ -64,7 +64,7 @@ def replace(name: str, text: str) -> Path:
     """Write `name` into the folder the resolver points at now, as a file of
     its own - never through a link into the real asset folder, and never into
     the real folder itself."""
-    from qa_tools.common import assets as _assets
+    from asset_model import assets as _assets
 
     folder = _assets.selected().folder
     real = _assets._DEFAULT.asset(_assets.selected().name).folder

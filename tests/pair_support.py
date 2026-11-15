@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from qa_tools.common import asset_time, filing, qa_store, settlement, supply_db, supply_files
+from asset_model import asset_time
+from qa_tools.common import filing, qa_store, settlement, supply_db, supply_files
 from qa_tools.common import filing_decisions as fd
 
 DS = "birth-registrations"

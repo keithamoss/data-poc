@@ -41,9 +41,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from qa_tools.common import (decision_log, hierarchy, period_schema, qa_store, schedule,
-                             supply_db)
-from qa_tools.common import assets as _assets
+from qa_tools.common import decision_log, period_schema, qa_store, supply_db
+from asset_model import hierarchy, schedule
+from asset_model import assets as _assets
 
 #: What a rule records as its own name in the decision log.
 RULE_ACTOR = "inheritance rule"
@@ -177,7 +177,7 @@ def _calendar_period_names(dataset_id: str) -> frozenset[str]:
 
 def _slot_names(dataset_id: str) -> frozenset[str]:
     """The periods this dataset's own schedule owes a supply for."""
-    from qa_tools.common import slots as slots_mod
+    from asset_model import slots as slots_mod
 
     return frozenset(s.name for s in slots_mod.slots_for_dataset(dataset_id))
 
@@ -673,7 +673,7 @@ def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]
     at another offset sees what is promoted now. From configuration alone, so the
     merged stream decides it identically in parallel and in sequence. Empty
     where the calendar's collections share one offset (criterion 4)."""
-    from qa_tools.common import asset_time, slots
+    from asset_model import asset_time, slots
 
     agr = schedule._agreement(None)
     members = [d for d in hierarchy.all_datasets() if d.collection_id == collection_id]

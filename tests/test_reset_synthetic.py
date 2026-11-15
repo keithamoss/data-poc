@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def _history(conn) -> None:
     import filing_support
-    from qa_tools.common.assignment import Assignment
+    from asset_model.assignment import Assignment
 
     filing_support.file(Assignment(dataset_id="cp-clients", supply_id="cp-clients@x",
                                    slot="2026-Q1", branch="open-slot-unfilled",

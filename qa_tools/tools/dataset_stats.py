@@ -29,6 +29,7 @@ from typing import Any
 
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 from qa_tools import collections
+from asset_model import collections as declared_collections
 
 __all__ = ["arrival_record", "compute_dataset_stats"]
 
@@ -57,7 +58,7 @@ def _value_counts(conn, table: str, column: str, known: list[str]) -> list[list]
     that falls to zero shows as a 0 rather than vanishing from the chart -
     folded by evidently_common.fold_value_counts, which the generator's
     drift planning shares."""
-    from qa_tools.common.evidently_common import fold_value_counts
+    from asset_model.drift import fold_value_counts
 
     return fold_value_counts(conn.execute(
         f"SELECT {column}, COUNT(*) FROM {table} GROUP BY {column}").fetchall(), known)
@@ -70,7 +71,7 @@ def _count(conn, table: str) -> int:
 def _own_table(entry: dict) -> str | None:
     """The table the run is for: its arrival's dataset, else what its id says
     (run_owner) - None for a fixture's or a trial's run naming none."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
     from qa_tools.common.qa_results_writer import run_owner
 
     try:
@@ -86,7 +87,7 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, An
     """`conn` has this run's own view schema on its search path, which holds
     exactly the arrival's rows - so nothing here scopes by a row column. A
     re-check's view resolves to the same supply (REQ-PIPE-140)."""
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     spec = collections.adapter(coll).stats
     tables = [d.table for d in coll.datasets]
     readable = _readable(conn)

@@ -237,7 +237,7 @@ class TestEachSuppliesStateOverTime:
     def test_each_entry_says_when_it_was_recorded(self, clean, dataset):
         """REQ-PIPE-081 criterion 6: the page names a decision recorded
         after the date on show, so it needs when each was recorded."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
         _decide(clean, dataset, decision_log.REJECT, supply="s5",
                 at="2026-02-01T09:00:00+08:00", from_slot="2026-Q1")
         [entry] = slot_timeline.supply_states(dataset, conn=clean)["s5"]

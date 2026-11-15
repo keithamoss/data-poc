@@ -208,7 +208,7 @@ class TestAKeptSyntheticArrivalIsReportedToo:
                                               interactive):
         from cli import filing_tui
         from cli.collection_cli import of as _cli_of
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         mod = _cli_of(module)
         mine = _arrival()
@@ -239,7 +239,7 @@ class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
 
     @pytest.mark.asset("daily")
     def test_the_keep_branch_names_the_run(self, monkeypatch):
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: [])
         with pytest.raises(common.click.ClickException, match="run_404"):

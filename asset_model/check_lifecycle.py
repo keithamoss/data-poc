@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -231,7 +231,7 @@ def _definition(tool: str, kind: str | None, settings: dict, check_id: str) -> d
     fingerprint - THE ONE WRITER, check_fingerprint.fingerprint, which the
     changelog gate compares and every recorded result carries (REQ-QAC-176
     criterion 2) - and the settings it hashed, kept beside it."""
-    from qa_tools.common import check_fingerprint
+    from asset_model import check_fingerprint
 
     hashed = check_fingerprint.normalise(settings, check_id=check_id)
     return {"config_hash": check_fingerprint.fingerprint(tool, kind, hashed, check_id=check_id),
@@ -742,7 +742,7 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
     older ref's file: an id derived for a dataset that has since been
     removed is a disappearance the hierarchy gate already reports.
     """
-    from qa_tools.common import file_checks, hierarchy
+    from asset_model import file_check_definitions as file_checks, hierarchy
 
     with open(file_checks_yaml_path) as f:
         doc = config_yaml.parse(f) or {}
@@ -885,7 +885,7 @@ def find_duplicate_check_ids(checks: list[CheckMetadata]) -> list[str]:
 # REQ-QAC-039 is that rule's one approved exception (Keith, 2026-09-22),
 # and this is where it is spent. The grammar gained a `collection`
 # segment and lost the `table` one, so all 258 ids changed in one
-# commit - see qa_tools/common/check_id.py's own header for what changed
+# commit - see asset_model/check_id.py's own header for what changed
 # and why, and REQ-QAC-039's `decisions:` for the exception itself.
 #
 # It is deliberately a TRANSFORM, not a hand-listed dict of 258 pairs:
@@ -913,7 +913,7 @@ def migrate_pre_039_check_id(check_id: str) -> str:
     Returns the input untouched when the dataset it names is not in the
     hierarchy, rather than guessing - an id that cannot be placed is
     exactly the case the permanence rule should still catch."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     m = _PRE_039_ID.match(check_id)
     if not m:
@@ -999,7 +999,7 @@ def contract_columns(paths=None) -> dict[str, set[str]]:
     spelling a reads_columns entry may use (Keith, 2026-10-11). `paths`
     defaults to every collection's contract, from the registry
     (REQ-QAC-241 criterion 8)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     root = Path(__file__).resolve().parent.parent
     out: dict[str, set[str]] = {}

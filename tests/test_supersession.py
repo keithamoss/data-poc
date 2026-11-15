@@ -39,7 +39,7 @@ def _filed(conn, period, received, *, staged=True, dataset=DS):
     """A supply of cp-carers - or of `dataset`, its table read from the
     registry - filed to `period`, received at `received`, with its table in
     staging."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     table = TABLE if dataset == DS else hierarchy.dataset(dataset).table
     key = _key()

@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/slots.py (REQ-PIPE-052).
+"""Tests for asset_model/slots.py (REQ-PIPE-052).
 
 The thing these are really defending is the requirement's own story: a
 collection of six tables where one is late should show as ONE late
@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import agreement_split
-from qa_tools.common import schedule, slots
+from asset_model import schedule, slots
 
 PERTH = timezone(timedelta(hours=8))
 CP_DATASETS = ["cp-clients", "cp-notifications", "cp-investigations",

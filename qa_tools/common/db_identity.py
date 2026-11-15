@@ -101,7 +101,8 @@ def parse(recorded) -> Identity | None:
 def expected() -> Identity:
     """What this checkout is configured for: the asset from
     contract/data-asset.yaml, the environment as stated (REQ-PIPE-093)."""
-    from qa_tools.common import environments, hierarchy
+    from qa_tools.common import environments
+    from asset_model import hierarchy
 
     return Identity(hierarchy.data_asset_id(), environments.current().id)
 

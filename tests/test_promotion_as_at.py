@@ -15,7 +15,8 @@ import pytest
 import baseline_periods
 
 import filing_support
-from qa_tools.common import assignment, promotion_state, qa_store, schedule, supply_db
+from asset_model import assignment, schedule
+from qa_tools.common import promotion_state, qa_store, supply_db
 
 AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"
@@ -222,7 +223,7 @@ class TestAnOpenContestIsItsOwnReason:
 
 
 def _key(at):
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
     return asset_time.arrival_key(at)
 
 

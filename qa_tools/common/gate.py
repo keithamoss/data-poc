@@ -202,7 +202,8 @@ def package_of(conn, dataset_id: str, supply: str) -> Package | None:
     """The package this supply belongs to, from the record: every supply of
     its collection filed from its delivery at its receipt instant to the same
     period (criterion 1). None for a supply filed to no period."""
-    from qa_tools.common import filing, hierarchy
+    from qa_tools.common import filing
+    from asset_model import hierarchy
 
     s = qa_store.SCHEMA
     rows = conn.execute(
@@ -219,7 +220,8 @@ def package_of(conn, dataset_id: str, supply: str) -> Package | None:
 
 def package_at(conn, collection_id: str, period: str, delivery: str, received) -> Package:
     """The package at (period, delivery, receipt instant)."""
-    from qa_tools.common import filing, hierarchy
+    from qa_tools.common import filing
+    from asset_model import hierarchy
 
     s = qa_store.SCHEMA
     members = []
@@ -445,7 +447,7 @@ class Member:
 
     @property
     def table(self) -> str:
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         return hierarchy.dataset(self.dataset_id).table
 
@@ -627,7 +629,8 @@ def _warehouse(conn, period: str, members) -> dict[str, str | None]:
     the one resolver), as the application saw it - what the re-confirmation
     compares against. Without the second, a result that read another
     collection's supply could never qualify to count."""
-    from qa_tools.common import decision_log, hierarchy, run_reads
+    from qa_tools.common import decision_log, run_reads
+    from asset_model import hierarchy
 
     tables: dict[str, str | None] = {}
     seen = set()
@@ -654,7 +657,7 @@ def _join(conn, members: dict, period: str) -> None:
     through recorded cross-table verdicts, transitively (criterion 2)."""
     from qa_tools.common import supply_status
 
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     frontier = list(members.values())
     seen = set(members)
@@ -794,7 +797,8 @@ def _status(m: Member, verdicts, reads):
 
 
 def _judge(conn, m: Member, status, reads, barred, effective_at, *, record: bool):
-    from qa_tools.common import hierarchy, promotion
+    from asset_model import hierarchy
+    from qa_tools.common import promotion
 
     ds = hierarchy.dataset(m.dataset_id)
     return promotion.judge(conn, m.item, status, results=m.shown, reads=reads,
@@ -924,7 +928,7 @@ def _reevaluations_owed(members, warehouse) -> dict:
                 continue
             declared = supply_status.declared_on(newest)
             if declared != m.dataset_id:
-                from qa_tools.common import hierarchy
+                from asset_model import hierarchy
 
                 try:
                     home = hierarchy.dataset(declared).table
@@ -967,8 +971,8 @@ def _from_the_warehouse(y: Member, members, warehouse) -> list[str]:
     """The tables a re-evaluation of `y` reads from the warehouse: every
     table with no supply still promoting with it - the period as it will
     stand."""
-    from qa_tools import collections
-    from qa_tools.common import hierarchy
+    from asset_model import collections
+    from asset_model import hierarchy
 
     promoting = _promoting(members)
     coll = collections.by_id(hierarchy.dataset(y.dataset_id).collection_id)
@@ -991,7 +995,8 @@ def _reevaluate(y: Member, checks: set, causes: dict, members, warehouse, applic
     application, caused by the hold-back it re-checks for - the lowest
     decision id where several - reading the period as it will stand, and
     never re-running `y`'s own table and column checks."""
-    from qa_tools.common import hierarchy, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import recheck
 
     reads = _check_reads(checks)
     moved = sorted({t for c in checks for t in reads.get(c, ())} - {y.table}
@@ -1028,7 +1033,7 @@ def _reevaluate(y: Member, checks: set, causes: dict, members, warehouse, applic
 
 
 def _home(check: str) -> str | None:
-    from qa_tools.common import check_id as cid, hierarchy
+    from asset_model import check_id as cid, hierarchy
 
     parsed = cid.try_parse(check)
     try:
@@ -1109,7 +1114,8 @@ def _record_final_holdbacks(conn, application: int, members, effective_at: str) 
 
 
 def _record_holdback(conn, application: int, m: Member, members, effective_at: str) -> None:
-    from qa_tools.common import decision_log, hierarchy, promotion
+    from qa_tools.common import decision_log, promotion
+    from asset_model import hierarchy
 
     kind, detail = m.out
     ds = hierarchy.dataset(m.dataset_id)
@@ -1213,7 +1219,7 @@ def _red_only_for_want_of(m: Member) -> list[str]:
 
 def _absent_words(tables: list[str]) -> str:
     """The withheld note for a supply red only for want of other tables."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     def name(table: str) -> str:
         try:
@@ -1231,7 +1237,7 @@ def retry_tables(m: Member, cause: Cause) -> list[str]:
     """The tables a NOT JUDGED supply's retry is owed for: every table its
     uncounted checks read - the one each is declared on included - but its
     own (D2)."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     reads = _check_reads(cause.not_counted)
     tables = set()
@@ -1257,7 +1263,8 @@ def _owe_not_judged(conn, m: Member, cause: Cause, entry_id: int) -> None:
     an uncleared item already covering those tables (the knock-on now
     retrying it) is the retry, and that item stays owed while the supply is
     still not judged (knock_on.complete)."""
-    from qa_tools.common import hierarchy, knock_on, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import knock_on, recheck
 
     period = m.item.get("period")
     tables = retry_tables(m, cause)
@@ -1299,7 +1306,8 @@ def _same_holdback(conn, m: Member, cause: Cause) -> int | None:
 
 def held_back_words(conn, m: Member, cause: Cause) -> str:
     """REQ-PIPE-267 criterion 13's wording, from the structured fields."""
-    from qa_tools.common import display_time, hierarchy, promotion
+    from qa_tools.common import display_time, promotion
+    from asset_model import hierarchy
 
     def name(dataset_id: str) -> str:
         try:
@@ -1346,7 +1354,8 @@ def held_back_words(conn, m: Member, cause: Cause) -> str:
 def _check_words(check: str) -> str:
     """'the Notifications -> Client Register check on cp_client_id': one
     check, whichever tools ran it (REQ-DASH-264 criterion 2's naming)."""
-    from qa_tools.common import check_id as cid, hierarchy, promotion, supply_status
+    from asset_model import check_id as cid, hierarchy
+    from qa_tools.common import promotion, supply_status
 
     parsed = cid.try_parse(check)
     if parsed is None:
@@ -1365,7 +1374,7 @@ def _check_words(check: str) -> str:
 
 
 def _amber(dataset_id: str, effective_at: str):
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     try:
         return amber_setting.resolve(dataset_id, effective_at)
@@ -1486,7 +1495,7 @@ def _instant_of(value):
 
 
 def _agency(m: Member) -> str:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(m.dataset_id).agency_id
 
@@ -1506,7 +1515,7 @@ def _reconfirm(conn, period: str, members, work, warehouse) -> None:
     for table, held in warehouse.items():
         if table in promoting_tables:
             continue
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         ds = hierarchy.dataset_for_table(table).dataset_id
         h = decision_log.held(conn, ds, period)
@@ -1586,7 +1595,8 @@ def run_owed(item) -> "Applied":
     """An owed 'gate' item (REQ-PIPE-266 criterion 3): its package, gated
     once every file of it is checked - from recorded results, never by
     re-running tools. Still waiting leaves it owed."""
-    from qa_tools.common import decision_log, hierarchy, recheck
+    from qa_tools.common import decision_log, recheck
+    from asset_model import hierarchy
 
     with supply_db.connect(label="mothman:gate") as conn:
         collection_id = hierarchy.dataset(item.dataset_id).collection_id
@@ -1636,7 +1646,8 @@ def _completing_instant(conn, package: Package) -> str:
     knock-on's readers are gated against the promotion that caused it, so
     they take effect after it (decision_log.follows), not at their own
     arrival's earlier instant."""
-    from qa_tools.common import arrivals, asset_time, decision_log, replay_clock
+    from qa_tools.common import arrivals, decision_log, replay_clock
+    from asset_model import asset_time
     from qa_tools.tools import orchestrate
 
     rows = conn.execute(
@@ -1692,7 +1703,7 @@ def _only(arrival, items):
 
 
 def _agency_of(collection_id: str) -> str:
-    from qa_tools import collections
+    from asset_model import collections
 
     return collections.by_id(collection_id).agency_id
 

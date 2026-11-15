@@ -65,7 +65,7 @@ os.environ["PY_COLORS"] = "0"
 # (REQ-PIPE-363 criterion 9). SUITE_ASSET below is only the asset the SESSION
 # starts under - the CLI's first import and the worker database's first mark -
 # and never stands in for a test's own.
-from qa_tools.common import assets as _assets  # noqa: E402
+from asset_model import assets as _assets  # noqa: E402
 
 SUITE_ASSET = "quarterly"
 if SUITE_ASSET not in _assets.names():
@@ -77,7 +77,8 @@ os.environ[_assets.ASSET_ENV] = TEST_ASSET
 
 import fixture_ids
 from generator.daily_batch import generate_daily_batch
-from qa_tools.common import asset_time, delivery
+from asset_model import asset_time
+from qa_tools.common import delivery
 from generator.dirty import apply_birth_registrations_presets
 
 
@@ -426,7 +427,8 @@ def mark_test_database(admin_conn, name: str) -> None:
     # it - test infrastructure belongs with the tests.
     import psycopg
 
-    from qa_tools.common import db_identity, hierarchy
+    from qa_tools.common import db_identity
+    from asset_model import hierarchy
 
     info = psycopg.conninfo.conninfo_to_dict(admin_conn.info.dsn)
     info["dbname"] = name
@@ -642,6 +644,7 @@ def _no_test_files_a_real_delivery():
     from pathlib import Path
 
     from qa_tools.common import delivery
+    from asset_model import delivery as delivery_tree
 
     real = delivery.write_delivery
     # THE REAL PATH IS CAPTURED HERE, once, BEFORE any test has run - and
@@ -652,7 +655,7 @@ def _no_test_files_a_real_delivery():
     # fired on thirteen tests that were already doing the right thing.
     # Caught by the gate, which is where a guard this broad should be
     # caught.
-    real_tree = Path(delivery.default_deliveries_dir()).resolve()
+    real_tree = Path(delivery_tree.default_deliveries_dir()).resolve()
 
     # BOUND THROUGH THE REAL SIGNATURE rather than picking `deliveries_dir`
     # out of **kwargs, which is the second thing this guard got wrong:
@@ -667,7 +670,7 @@ def _no_test_files_a_real_delivery():
         bound = signature.bind(*args, **kwargs)
         bound.apply_defaults()
         named = bound.arguments.get("deliveries_dir")
-        target = Path(named or delivery.default_deliveries_dir()).resolve()
+        target = Path(named or delivery_tree.default_deliveries_dir()).resolve()
         if target == real_tree:
             raise AssertionError(
                 f"a test tried to file delivery "
@@ -684,16 +687,16 @@ def _no_test_files_a_real_delivery():
     real_remove = delivery.remove_deliveries
     remove_signature = inspect.signature(real_remove)
 
-    real_receipts = Path(delivery.default_receipts_dir()).resolve()
+    real_receipts = Path(delivery_tree.default_receipts_dir()).resolve()
 
     @functools.wraps(real_remove)
     def guarded_remove(*args, **kwargs):
         bound = remove_signature.bind(*args, **kwargs)
         bound.apply_defaults()
-        target = Path(bound.arguments.get("deliveries_dir") or delivery.default_deliveries_dir()).resolve()
+        target = Path(bound.arguments.get("deliveries_dir") or delivery_tree.default_deliveries_dir()).resolve()
         # THE RECEIPTS TOO (post-build-review #232): a clear redirecting only
         # the deliveries would still delete real receipts.
-        receipts = Path(bound.arguments.get("receipts_dir") or delivery.default_receipts_dir()).resolve()
+        receipts = Path(bound.arguments.get("receipts_dir") or delivery_tree.default_receipts_dir()).resolve()
         if receipts == real_receipts:
             raise AssertionError(
                 f"a test tried to clear receipts from this repo's real {real_receipts} - point "
@@ -1177,12 +1180,14 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
     reading its own.
     """
 
-    from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
-    from qa_tools.common import asset_time, qa_store, supply_db
-    from qa_tools import collections as _collections
+    from asset_model import arrivals
+    from qa_tools.common import decision_log, filing, period_overlay, promotion
+    from asset_model import asset_time
+    from qa_tools.common import qa_store, supply_db
+    from asset_model import collections as _collections
     TABLES = [d.table for d in _collections.by_id("child-protection").datasets]
 
-    from qa_tools.common import delivery as delivery_mod
+    from asset_model import delivery as delivery_mod
     from qa_tools.common import delivery_log
 
     found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)

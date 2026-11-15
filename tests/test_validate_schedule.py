@@ -292,7 +292,7 @@ class TestHowItReports:
             for dataset in _datasets(doc):
                 dataset["delivery_months"] = ["Febuary"]
         errors = _run(mutate)
-        from qa_tools.common import hierarchy, schedule
+        from asset_model import hierarchy, schedule
 
         named = {e.scope for e in errors if e.scope}
         every = {f"dataset {d.dataset_id!r}" for d in hierarchy.all_datasets()
@@ -408,7 +408,7 @@ class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
     """
 
     def _run_past_the_last_authored_date(self, monkeypatch, capsys):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         # Past the quarterly calendar's last authored period, so the
         # real exhausted warning fires against the REAL committed
@@ -631,7 +631,7 @@ class TestTheGateAndTheRuntimeReadAMonthTheSameWay:
               "Febuary", "Feb", "2", "", "Smarch"]
 
     def test_every_spelling_reads_the_same_in_both(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
         from qa_tools.common import validate_schedule as mod
 
         for value in self.CASES:

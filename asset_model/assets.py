@@ -313,7 +313,7 @@ def names() -> list[str]:
 def every() -> list[Asset]:
     """Every asset folder found, as the resolver lays it out now - for the
     configuration-only reads that must tell another asset's name from a typo
-    (qa_tools/common/every_asset.py; Keith, 2026-11-03, morning report 12 Q6
+    (asset_model/every_asset.py; Keith, 2026-11-03, morning report 12 Q6
     and Q8). Selects nothing, and opens no database."""
     return [_layout.asset(n) for n in names()]
 

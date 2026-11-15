@@ -4,7 +4,7 @@ criterion 6).
 
 AN ARCHITECTURE RULE, SO IT READS SOURCE (tests rule 1): there is no
 behaviour to observe for "no module builds data/ itself" short of moving the
-tree, which is the move's job. The resolver (qa_tools/common/assets.py) is
+tree, which is the move's job. The resolver (asset_model/assets.py) is
 the one place today's layout - contract/, data/, reports/ - is written down;
 anything else naming one of them is a reader the move would leave behind,
 and one computing a resolver path at import keeps the folder of whichever
@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PRODUCT = ("qa_tools", "pipeline", "generator", "dashboard", "cli", "synthetic_data_generator")
 
 #: The resolver itself, where the layout is written down.
-RESOLVER = "qa_tools/common/assets.py"
+RESOLVER = "asset_model/assets.py"
 
 STATE_ROOTS = ("data", "reports", "contract")
 _PREFIX = re.compile(r"^(data|reports|contract)/")
@@ -197,7 +197,7 @@ class TestNoProductModuleBuildsAnAssetPathItself:
                     offenders.append(f"{rel}:{line} {value!r}")
         assert offenders == [], (
             "a product module builds a contract/, data/ or reports/ path itself - ask the "
-            "resolver (qa_tools/common/assets.py) at call time instead (REQ-PIPE-342 "
+            "resolver (asset_model/assets.py) at call time instead (REQ-PIPE-342 "
             "criterion 6):\n  " + "\n  ".join(offenders))
 
     def test_no_resolver_lookup_at_import_time(self):

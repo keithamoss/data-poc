@@ -27,7 +27,7 @@ def conn(supply_dsn):
 
 
 def _slot(dataset_id, period):
-    from qa_tools.common import slots
+    from asset_model import slots
 
     return next(s for s in slots.slots_for_dataset(dataset_id, until=LATER.date())
                 if s.name == period)
@@ -353,7 +353,7 @@ class TestALateDayStillOpenIsNamed:
 
     def test_a_slot_filed_on_time_was_never_late(self, conn):
         from pipeline import closed_slots
-        from qa_tools.common import slots
+        from asset_model import slots
 
         slot = next(s for s in slots.slots_for_dataset("cp-carers", until=LATER.date())
                     if s.name == "2025-Q2")

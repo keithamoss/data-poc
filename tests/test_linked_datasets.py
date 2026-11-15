@@ -4,7 +4,7 @@ contract folder, changes one thing, and asks the gate - the collections gate
 calls the same function. The real files are untouched."""
 from __future__ import annotations
 
-from qa_tools.common import assets
+from asset_model import assets
 
 import asset_folders
 import shutil
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from qa_tools.common import linked_datasets
+from asset_model import linked_datasets
 
 REAL = Path(__file__).resolve().parent.parent
 
@@ -50,7 +50,7 @@ def test_the_real_configuration_passes():
 
 def test_the_linked_list_is_the_hierarchys():
     """Criterion 5: the one place - read through the hierarchy."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     linked = hierarchy.dataset("linkage-keys").linked
     assert ("cp-clients", "DOC_CLIENTS", ("cp_client_id",)) in linked

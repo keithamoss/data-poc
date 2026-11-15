@@ -162,7 +162,8 @@ class TestTheValuesTheWideningFoundFollowTheirFile:
     def test_ticket_syncs_dataset_scope_follows_the_hierarchy(self, monkeypatch):
         from types import SimpleNamespace
 
-        from qa_tools.common import hierarchy, ticket_sync
+        from asset_model import hierarchy
+        from qa_tools.common import ticket_sync
 
         assert ticket_sync.DATASET_SCOPE, "precondition - the real hierarchy has datasets"
         planted = [SimpleNamespace(dataset_id="planted-ds", agency_id="planted-agency",
@@ -176,7 +177,7 @@ class TestTheValuesTheWideningFoundFollowTheirFile:
         from types import SimpleNamespace
 
         cp = collection_modules.provider_module("child-protection")
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         assert "cp_clients" in cp.TABLES, "precondition - the real hierarchy's tables"
         monkeypatch.setattr(hierarchy, "datasets_in_collection",

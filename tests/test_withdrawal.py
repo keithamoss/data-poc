@@ -9,7 +9,8 @@ import pytest
 import test_door_flag_parity as parity
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing_decisions as fd
-from qa_tools.common import people, slot_state, slots
+from qa_tools.common import people, slot_state
+from asset_model import slots
 from test_door_flag_parity import (DS, _actor, _forget_its_filings, _iso, _now, _person,
                                    minted, quiet)
 

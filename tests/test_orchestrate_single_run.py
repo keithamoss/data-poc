@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 import os
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.common import supply_db, trial
 from qa_tools.tools import orchestrate
 import qa_tools.tools.run_datacontract as run_datacontract

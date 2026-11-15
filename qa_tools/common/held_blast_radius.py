@@ -35,7 +35,7 @@ produce nothing, and the hold itself is what the queue shows.
 """
 from __future__ import annotations
 
-from qa_tools.common import check_id as check_id_mod
+from asset_model import check_id as check_id_mod
 
 #: A check that could not be evaluated reads RED. Not "error" and not a
 #: fourth status: the promotion gate treats anything that is not green
@@ -133,7 +133,7 @@ def results_for(*, held: dict[str, str], reads: dict[str, list[str]],
 
 
 def _table_of(dataset_id: str) -> str | None:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id).table

@@ -31,7 +31,8 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence
 
-from qa_tools.common import hierarchy, qa_store, schedule, supply_db
+from asset_model import hierarchy, schedule
+from qa_tools.common import qa_store, supply_db
 
 #: Where this data lands. Named here as well as in supply_db so a reader
 #: of this module does not have to go and look - it is the same schema.

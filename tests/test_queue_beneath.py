@@ -71,7 +71,8 @@ def _counted_on_the_card(dataset_id: str) -> int:
 def _pair_with(sc, readers: dict) -> dict:
     """first_time's 2025-Q1, then one zip: two Client Register files and the
     readers named ({table: label})."""
-    from qa_tools.common import asset_time, delivery
+    from asset_model import asset_time
+    from qa_tools.common import delivery
 
     got = first_time(sc)
     at = asset_time.parse_instant("2024-11-03T10:00:00+08:00", "test")

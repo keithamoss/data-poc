@@ -13,9 +13,9 @@ import pytest
 
 from datetime import datetime, timedelta, timezone
 
-from qa_tools.common import arrival_classification as classify_mod
-from qa_tools.common.schedule import Period
-from qa_tools.common.slots import Slot
+from asset_model import arrival_classification as classify_mod
+from asset_model.schedule import Period
+from asset_model.slots import Slot
 
 PERTH = timezone(timedelta(hours=8))
 

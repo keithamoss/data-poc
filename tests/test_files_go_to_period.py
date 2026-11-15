@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import agreement, asset_time, assignment, schedule, slots
+from asset_model import agreement, asset_time, assignment, schedule, slots
 
 REAL = asset_folders.SelectedFolder("calendar.yaml")
 

@@ -39,9 +39,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from qa_tools.common import (
-    arrival_patterns, delivery_log, hierarchy, slots, supply_db)
-from qa_tools.common import assets as _assets
+from asset_model import arrival_patterns, hierarchy, slots
+from qa_tools.common import delivery_log, supply_db
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 

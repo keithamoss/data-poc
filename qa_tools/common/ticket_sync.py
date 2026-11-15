@@ -72,11 +72,11 @@ import os
 import subprocess
 from dataclasses import dataclass
 
-from qa_tools.common import assets, hierarchy
+from asset_model import assets, hierarchy
 from qa_tools.common.dataset_status import dataset_status
 from qa_tools.common.people import github_usernames_for, parse_people_config, people_yaml
 from qa_tools.common.ticket_check_summary import build_check_summary
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
@@ -138,10 +138,11 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
     order, each collection's datasets in its own file's own order (never
     re-sorted)."""
     from qa_tools import collections
+    from asset_model import collections as declared_collections
 
     scopes: list[tuple[DatasetScope, dict]] = []
     for adapter in collections.adapters():
-        dashboard_file = collections.by_id(adapter.collection_id).dashboard_file
+        dashboard_file = declared_collections.by_id(adapter.collection_id).dashboard_file
         with open(os.path.join(reports_dir(), dashboard_file)) as f:
             doc = json.load(f)
         for ds in doc["datasets"]:
@@ -257,13 +258,13 @@ def _label(status: str) -> str:
     (REQ-TEST-360 criterion 10). The ticket duplicate this causes once is
     accepted (SETTLED by Keith 2026-11-01): _already_said compares worded
     bodies, so each open ticket may get one repeat 'Still failing' comment."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(status, "label")
 
 
 def _verb(status: str) -> str:
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(status, "verb")
 

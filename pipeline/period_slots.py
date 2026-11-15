@@ -3,7 +3,7 @@ page never stands a period's date in for a round or a due date
 (REQ-DASH-326 criterion 8, the architect's S3).
 
 THE ANSWERS TRAVEL, NOT THE RULE: every value comes from the one
-slot-instants function filing uses (qa_tools.common.slots). The page picks
+slot-instants function filing uses (asset_model.slots). The page picks
 the slot whose claim window most recently opened on the date on show
 (criterion 5) and reads its period, round and due instant off it.
 
@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from qa_tools.common import asset_time, files_go, schedule, slots
+from asset_model import asset_time, schedule, slots
+from qa_tools.common import files_go
 
 
 def _iso(instant) -> str | None:
@@ -31,7 +32,7 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
     first, or None for a cadence-rule calendar or a dataset with none."""
     now = now or asset_time.now()
     today = asset_time.local_date(now)
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         cal = schedule.calendar_for_dataset(dataset_id)

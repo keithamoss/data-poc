@@ -13,7 +13,7 @@ import pytest
 import asset_params
 
 import rebuild_support
-from qa_tools.common import assets
+from asset_model import assets
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import qa_results_writer as writer
 from qa_tools.common import tables_read as tr

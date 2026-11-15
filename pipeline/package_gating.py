@@ -58,7 +58,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from qa_tools.common import asset_time, decision_log, display_time, hierarchy, qa_store
+from asset_model import asset_time, hierarchy
+from qa_tools.common import decision_log, display_time, qa_store
 
 UNCHECKED, WAITING, GATING = "unchecked", "waiting", "gating"
 

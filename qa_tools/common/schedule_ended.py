@@ -88,8 +88,8 @@ def _on_calendar(dataset_id: str, period: str) -> bool:
 def _covering_slot(dataset_id: str, received_at, agreement=None):
     """The slot open at this receipt under the dataset's calendar as it
     stands now - or under `agreement`, where given - or None."""
-    from qa_tools.common import assignment
-    from qa_tools.common import slots as slots_mod
+    from asset_model import assignment
+    from asset_model import slots as slots_mod
 
     try:
         found = slots_mod.slots_for_dataset(
@@ -115,9 +115,10 @@ def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], tuple[dict, dict
     covered, ahead of that correction's confirmation (REQ-PIPE-170). BOTH
     DOCUMENTS (post-build-review #199 F2): a timezone correction is reverted
     in the asset document, so the caller reads slots under both."""
-    from qa_tools.common import agreement_freeze, correction_apply, correction_trial
+    from asset_model import declared_corrections as agreement_freeze, declared_corrections
+    from qa_tools.common import correction_apply
 
-    docs = correction_trial.working()
+    docs = declared_corrections.working()
     pending = correction_apply.pending(conn, docs)
     if not pending:
         return {}, None
@@ -166,8 +167,8 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
     one's receipt, oldest receipt first, as a rule re-file owing a re-check -
     the one loop both a schedule-ended hold (REQ-PIPE-154) and a hold on a
     refused dataset (REQ-PIPE-173) are drained by once their cause is gone."""
-    from qa_tools.common import (decision_log, filing, hierarchy, placing, qa_store,
-                                 replay_clock, supply_files)
+    from qa_tools.common import decision_log, filing, placing, qa_store, replay_clock, supply_files
+    from asset_model import hierarchy
 
     done: list[tuple[str, str, str]] = []
     with supply_db.connect(label="mothman:refile-holds") as conn:
@@ -175,11 +176,11 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
         held = select(conn)
         if not held:
             return done
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections
 
         try:
             waiting, confirmed = _awaiting_confirmation(conn)
-        except (correction_trial.Unreadable, ValueError) as exc:
+        except (declared_corrections.Unreadable, ValueError) as exc:
             # NOTHING IS RE-FILED ON A GUESS (post-build-review #199 F4): which
             # corrections are still unconfirmed cannot be told, so every hold
             # stays held this pass rather than the pass failing.

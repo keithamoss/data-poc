@@ -9,7 +9,8 @@ import pytest
 
 import baseline_periods
 
-from qa_tools.common import assignment, qa_store, schedule, slots, supply_db, supply_holds
+from asset_model import assignment, schedule, slots
+from qa_tools.common import qa_store, supply_db, supply_holds
 
 UTC = timezone.utc
 
@@ -91,7 +92,7 @@ class TestTheHoldSaysWhatToEdit:
     def test_it_names_the_file_and_the_command(self, conn):
         """Criterion 3."""
         said = self._held(conn).describe()
-        from qa_tools.common import assets
+        from asset_model import assets
 
         # The asset's own calendar by repository path (REQ-PIPE-110; the asset split).
         assert f"{assets.folder_rel()}/calendar.yaml" in said
@@ -269,7 +270,8 @@ class TestItWaitsForACorrectionsConfirmation:
         file's zone is back."""
         import copy
 
-        from qa_tools.common import asset_time, correction_trial, schedule_ended
+        from asset_model import asset_time, declared_corrections as correction_trial
+        from qa_tools.common import schedule_ended
 
         cal, asset = correction_trial.working()
         confirmed_asset = copy.deepcopy(asset)
@@ -289,7 +291,8 @@ class TestItWaitsForACorrectionsConfirmation:
     def test_unreadable_corrections_leave_every_hold_held(self, conn, monkeypatch):
         """#199 F4: a working copy that cannot be read is said, and nothing
         is re-filed this pass - never an exception out of the pass."""
-        from qa_tools.common import correction_trial, schedule_ended
+        from asset_model import declared_corrections as correction_trial
+        from qa_tools.common import schedule_ended
 
         supply = f"cp-carers@{AFTER:%Y%m%d}u"
         self._held(conn, supply, AFTER)
@@ -359,7 +362,7 @@ class TestTheNoticeReadsHoldRecords:
                                 reason=supply_holds.reason_for(decided), raised_by="r",
                                 delivery="pytest-cp-carers-cp-carers@n1")
         got = schedule_ended.for_dataset("cp-carers", conn=conn)
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
         assert len(got) == 1 and got[0]["resolvedAt"] is None
         assert asset_time.parse_instant(got[0]["receivedAt"], "x") == AFTER
 
@@ -370,8 +373,9 @@ class TestExhaustedFromWhenTheLastSlotCloses:
     about a period early."""
 
     def test_not_exhausted_while_the_last_slot_is_still_open(self):
-        from qa_tools.common import asset_time, runway, schedule, slots as slots_mod
-        from qa_tools.common import hierarchy
+        from asset_model import asset_time, schedule, slots as slots_mod
+        from qa_tools.common import runway
+        from asset_model import hierarchy
 
         checked = 0
         for entry in hierarchy.all_datasets():

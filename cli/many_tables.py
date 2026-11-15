@@ -47,7 +47,7 @@ class ManyTablesCLI(CollectionCLI):
         """Where this run's files actually arrived - the delivery itself
         (REQ-PIPE-102). Raises rather than returning a path that is not there,
         because every caller is about to open the files in it."""
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         for arrival in arrivals.arrivals_for(self.collection_id, self.run_prefix):
             if arrival.run_id == run_id:
@@ -66,7 +66,7 @@ class ManyTablesCLI(CollectionCLI):
         """Every arrival, RECOGNISED FROM DISK (REQ-GEN-043). A CONTESTED
         table's files travel with the entry (REQ-PIPE-202 criterion 13): the
         picker marks it and picking it is refused, naming both."""
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         return [a.as_entry()
                 | {"contested": {ds: sorted(a.files_by_dataset.get(ds, ())) for ds in a.contested}}
@@ -90,7 +90,7 @@ class ManyTablesCLI(CollectionCLI):
         criterion 13): listed, so it does not vanish, and refused when
         picked."""
         from cli import common
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         recorded = common.recorded_runs(e["run_id"] for e in manifest)
         return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
@@ -114,7 +114,8 @@ class ManyTablesCLI(CollectionCLI):
         claim is contested and nothing here may choose (REQ-PIPE-059), so it is
         refused naming both files and where the pair is settled. Checked
         BEFORE anything is filed (REQ-PIPE-103)."""
-        from qa_tools.common import delivery, hierarchy, supply_files
+        from asset_model import delivery, hierarchy
+        from qa_tools.common import supply_files
 
         found: dict[str, list[str]] = {}
         for path in self._files_in(folder):
@@ -176,7 +177,8 @@ class ManyTablesCLI(CollectionCLI):
         its promoted version (decision 17 as CHANGED by Keith 2026-11-02,
         morning report B1). One the period holds none of stays absent and is
         recorded no data, as any table a trial cannot read is."""
-        from qa_tools.common import filing, hierarchy, period_schema, supply_db
+        from qa_tools.common import filing, period_schema, supply_db
+        from asset_model import hierarchy
 
         missing = [t for t in self.tables if t not in present]
         if not missing:
@@ -195,7 +197,8 @@ class ManyTablesCLI(CollectionCLI):
     def _refuse_a_contested_arrival(self, entry: dict) -> None:
         """Refuse an arrival whose table two files claim, naming both and
         where the pair is settled (REQ-PIPE-202 criterion 13)."""
-        from qa_tools.common import hierarchy, supply_files
+        from asset_model import hierarchy
+        from qa_tools.common import supply_files
 
         contested = entry.get("contested") or {}
         if not contested:
@@ -285,7 +288,7 @@ class ManyTablesCLI(CollectionCLI):
         folder holds, the rest read from the warehouse (REQ-PIPE-202 criterion
         8 as amended 2026-11-01, Keith), and needs a reference."""
         from cli import common
-        from qa_tools.common import asset_time, delivery
+        from asset_model import asset_time, delivery
         from qa_tools.tools import orchestrate
 
         run_date = run_date or asset_time.now().date().isoformat()
@@ -387,7 +390,8 @@ class ManyTablesCLI(CollectionCLI):
         views, never re-staged - staging them under this arrival would record
         them as having arrived in a delivery that carried one."""
         from cli import common
-        from qa_tools.common import asset_time, delivery, hierarchy, supply_db
+        from asset_model import asset_time, delivery, hierarchy
+        from qa_tools.common import supply_db
         from qa_tools.tools import orchestrate, stage
 
         run_date = run_date or asset_time.now().date().isoformat()

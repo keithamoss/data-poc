@@ -23,8 +23,8 @@ import pytest
 import baseline_periods
 
 from qa_tools.common import decision_log as dl
-from qa_tools.common import (hierarchy, inheritance, period_schema, promotion,
-                             qa_store, schedule, supply_db)
+from asset_model import hierarchy, schedule
+from qa_tools.common import inheritance, period_schema, promotion, qa_store, supply_db
 
 WHEN = "2026-09-29T09:00:00+08:00"
 REASON = "carers are supplied annually, so no quarterly file is due"
@@ -71,7 +71,7 @@ def narrow(monkeypatch, entries) -> None:
     """The datasets the INHERITANCE RULE walks, narrowed for this module
     alone (post-build-review #267, T7): `inheritance.hierarchy` is the
     hierarchy module itself, so patching its `all_datasets` narrowed the
-    whole worker - and `qa_tools.collections._load` caches what it builds
+    whole worker - and `asset_model.collections._load` caches what it builds
     from that function, so the first module to load the registry while it
     was narrowed left every collection one dataset short for the worker's
     life. A namespace of the module's own names, swapped in for

@@ -27,7 +27,7 @@ from generator import collections as providers
 from generator import driver
 from generator.collections.base import Job, Plan, Provider
 from generator.output import redirect
-from qa_tools import collections as registry
+from asset_model import collections as registry
 from third_collection import FAKE_DATASET, FAKE_ID, FAKE_PREFIX, PROVIDER_MODULE
 
 
@@ -64,13 +64,13 @@ class _Writing(Provider):
                 for n, _ in enumerate(deliveries, start=1)]
 
     def received_at(self, plan, job, n, delivery_obj, entry):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         i = self.days.index(job.period.date)
         return asset_time.isoformat(asset_time.wall_clock(delivery_obj.received_date, self.at[i]))
 
     def files(self, plan, job, n, delivery_obj, entry, name):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         return ({f"fake_things_{job.period.name}.csv": "fake_id,things\nF1,a\n"},
                 asset_time.parse_instant(entry["received_at"], entry["run_id"]))
@@ -132,7 +132,7 @@ class TestOneDriverForEveryCollection:
         """REQ-GEN-334 criterion 13: two deliveries of DIFFERENT providers at
         one receipt instant are refused naming both, before anything is
         written - receipt order decides what a run can read."""
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         _provider, out = writing
         at = asset_time.isoformat(asset_time.wall_clock(date(2026, 1, 5), "09:00"))
@@ -159,9 +159,9 @@ class TestTheSeedSchedule:
 
     def test_the_real_providers_derive_only_seeds_they_declare(self):
         found = providers.providers()
-        from qa_tools import collections
+        from asset_model import collections as declared_collections
 
-        assert [p.collection_id for p in found] == [c.id for c in collections.all_collections()]
+        assert [p.collection_id for p in found] == [c.id for c in declared_collections.all_collections()]
         for provider in found:
             assert provider.seed_schedule(), provider.collection_id
             provider.check_seeds()
@@ -410,7 +410,7 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         assets/<asset>/synthetic/collections/, and the message named the
         pre-split generator/collections/ path, a file that does not exist."""
         from generator import validate_providers
-        from qa_tools.common import assets
+        from asset_model import assets
 
         monkeypatch.setattr(providers.provider("child-protection"), "dataset_id", "nonsense")
         [problem] = [p for p in validate_providers.declaration_problems() if "nonsense" in p]
@@ -440,7 +440,7 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         assert validate_providers.problems() == []
 
     def test_a_provider_module_naming_no_collection_fails(self, tmp_path):
-        from qa_tools import collections as registry
+        from asset_model import collections as registry
         from generator import validate_providers
 
         # The selected asset's own providers, and one misspelt (the asset split).
@@ -456,7 +456,7 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         """The asset split: providers moved to assets/<asset>/synthetic/
         collections/, so a scan of generator/collections/ - which holds only
         the shared base now - would pass a misspelt provider in silence."""
-        from qa_tools.common import assets
+        from asset_model import assets
         from generator import validate_providers
 
         real = assets.selected()
@@ -509,7 +509,7 @@ def _every_assets_providers():
     asset split): listed from each asset's providers folder through the
     resolver's layout, since this module is imported under one asset and its
     registry would name only that asset's collections."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     out = []
     for name in assets.names():
@@ -547,7 +547,7 @@ class TestEverySeedDrawnIsOneItsProviderDeclares:
 
         monkeypatch.setattr(correction_claims, "check_all", lambda *a, **k: None)
 
-        from qa_tools.common import assets
+        from asset_model import assets
 
         real_rng = np.random.default_rng
         drawn: set[int] = set()

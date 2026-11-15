@@ -28,8 +28,8 @@ import baseline_periods
 import test_supersession as _base
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing_decisions as fd
-from qa_tools.common import (filing_queue, people, schedule, slot_state, slots,
-                             supply_holds)
+from qa_tools.common import filing_queue, people, slot_state, supply_holds
+from asset_model import schedule, slots
 from test_supersession import DS, REAL_PERSON, TABLE, _filed
 
 conn = _base.conn
@@ -112,7 +112,7 @@ def _forget_its_filings(supply_dsn):
 @pytest.fixture
 def minted(monkeypatch):
     """{period: Slot} made part of cp-carers' calendar for this test."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     registry: dict[str, slots.Slot] = {}
     real = slots.slots_for_dataset
@@ -177,7 +177,8 @@ def _state(conn, mint_now, slot, *, filed=None, ever=True):
 
 
 def _promote(conn, supply, table, period, *, amber=None, dataset=DS):
-    from qa_tools.common import hierarchy, promotion
+    from asset_model import hierarchy
+    from qa_tools.common import promotion
 
     entry = hierarchy.dataset(dataset)
     promotion.promote(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
@@ -188,7 +189,7 @@ def _promote(conn, supply, table, period, *, amber=None, dataset=DS):
 
 
 def _now():
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return asset_time.now()
 
@@ -240,7 +241,8 @@ def ex_awaiting_decision(conn, mint):
 
 
 def ex_amber_waiting(conn, mint):
-    from qa_tools.common import amber_setting, promotion
+    from asset_model import amber_setting
+    from qa_tools.common import promotion
 
     s = mint("due")
     supply, _ = _filed(conn, s.name, _received_late(s))
@@ -259,7 +261,7 @@ def ex_promoted(conn, mint):
 
 
 def ex_awaiting_acknowledgement(conn, mint):
-    from qa_tools.common import amber_setting
+    from asset_model import amber_setting
 
     s = mint("due")
     supply, table = _filed(conn, s.name, _received_late(s))
@@ -313,7 +315,8 @@ def ex_carries_nothing(conn, mint):
     """An opened period the dataset owes nothing for, whose inheritance was
     refused - listed in the period door beside the slots (REQ-PIPE-280
     criterion 1), never a slot itself."""
-    from qa_tools.common import hierarchy, inheritance, period_schema
+    from asset_model import hierarchy
+    from qa_tools.common import inheritance, period_schema
 
     s = mint("nothing")
     period_schema.ensure_period_schema(conn, s.name)
@@ -361,7 +364,8 @@ def ex_rechecked_worse(conn, mint):
 
 def ex_could_not_load(conn, mint):
     import filing_support
-    from qa_tools.common import assignment, load_log
+    from asset_model import assignment
+    from qa_tools.common import load_log
 
     s = mint("due")
     arrival = f"t{uuid.uuid4().hex[:10]}"
@@ -444,7 +448,7 @@ EXAMPLES = {
 def ov_late(conn, mint):
     """Awaiting a decision, recorded LATE - so excuse-lateness applies."""
     import filing_support
-    from qa_tools.common import assignment
+    from asset_model import assignment
 
     s = mint("due")
     supply = f"{DS}@late{uuid.uuid4().hex[:10]}"
@@ -503,7 +507,8 @@ OVERLAYS = {
 
 def _good_then_failed(conn, mint):
     import filing_support
-    from qa_tools.common import assignment, load_log
+    from asset_model import assignment
+    from qa_tools.common import load_log
 
     s = mint("due")
     good, _ = _filed(conn, s.name, _received_late(s))

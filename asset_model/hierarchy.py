@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
-from qa_tools.common import assets, config_yaml
+from asset_model import assets, config_yaml
 
 
 def data_asset_yaml() -> Path:
@@ -190,7 +190,7 @@ def all_datasets() -> list[Dataset]:
 def datasets_declared_in(path: Path) -> list[Dataset]:
     """Every dataset ONE data-asset.yaml declares, in its order - for a
     configuration-only read of an asset that need not be the selected one
-    (qa_tools/common/every_asset.py; post-build-review #315 L3). The same
+    (asset_model/every_asset.py; post-build-review #315 L3). The same
     build, keyed on the file's content, as the selected asset's tree."""
     return list(_from_text(path, config_yaml.read(path))[1].values())
 

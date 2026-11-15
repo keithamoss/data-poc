@@ -9,7 +9,7 @@ declares no adapter at all, for the refusal half of the criterion.
 """
 from __future__ import annotations
 
-from qa_tools.common import assets
+from asset_model import assets
 
 import shutil
 import types
@@ -17,9 +17,9 @@ import types
 import pytest
 import yaml
 
-from qa_tools import collections
+from asset_model import collections
 from qa_tools.collections.base import CollectionAdapter, DatacontractSpec
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 
 import collection_modules
 
@@ -75,7 +75,7 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
     # ITS ENTRY in calendar.yaml, as a real collection has one. It names no
     # calendar: it is on the asset's baseline (REQ-PIPE-345), so it replays in
     # Child Protection's stream (REQ-PIPE-262 criterion 9).
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     cal = yaml.safe_load(agreement.calendar_yaml().read_text())
     for cid in [FAKE_ID] + ([BARE_ID] if bare else []):

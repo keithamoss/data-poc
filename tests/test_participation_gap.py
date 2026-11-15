@@ -15,7 +15,8 @@ import asset_folders
 
 import yaml
 
-from qa_tools.common import agreement, inheritance
+from asset_model import agreement
+from qa_tools.common import inheritance
 
 ED = "ed-presentations"
 

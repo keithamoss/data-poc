@@ -29,7 +29,8 @@ REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 def pair(supply_dsn, tmp_path, monkeypatch):
     from generator.daily_batch import generate_daily_batch
     from qa_tools.tools import orchestrate
-    from qa_tools.common import arrivals, delivery, delivery_log, promotion
+    from asset_model import arrivals, delivery as delivery_tree
+    from qa_tools.common import delivery, delivery_log, promotion
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
     monkeypatch.setattr(promotion, "report", lambda outcome: None)
@@ -49,7 +50,7 @@ def pair(supply_dsn, tmp_path, monkeypatch):
                             received_at={chosen: received, spare: received + timedelta(
                                 minutes=10)},
                             deliveries_dir=deliveries, receipts_dir=receipts)
-    for d in delivery.list_deliveries(deliveries, receipts):
+    for d in delivery_tree.list_deliveries(deliveries, receipts):
         delivery_log.record(d, arrivals.recognise(d))
     (arrival,) = [a for a in arrivals.arrivals_for("civil-registration", "run_",
                                                    deliveries, receipts)
@@ -64,7 +65,8 @@ def test_each_settled_supply_is_checked_on_its_own_file(pair):
     """TS-69's shape - file two re-filed to the next day - so BOTH files stay
     in staging: each supply's run must read its own file and only it, which
     a run resolving the arrival's tables by key alone cannot do."""
-    from qa_tools.common import people, slots
+    from qa_tools.common import people
+    from asset_model import slots
 
     supply, period, chosen, spare = pair
     nxt = slots.relative_period(DS, period, 1)

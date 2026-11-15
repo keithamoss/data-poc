@@ -57,7 +57,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from qa_tools.common import asset_time, hierarchy, in_force
+from asset_model import asset_time, hierarchy, in_force
 
 
 # Full month names, lower-cased for comparison. Full names ONLY: an
@@ -351,7 +351,7 @@ def _agreement(agreement=None):
     (REQ-PIPE-110 criterion 31 - every reader takes it as an argument)."""
     if agreement is not None:
         return agreement
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     return agreement_mod.current()
 
@@ -364,7 +364,7 @@ def _load(agreement=None) -> dict[str, Calendar]:
 def _calendar_file_rel() -> str:
     """The selected asset's calendar file by repository path, for a refusal
     to point at (the asset split: it was contract/calendar.yaml)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return f"{assets.config_dir()}/calendar.yaml"
 
@@ -700,7 +700,7 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     Periods the dataset declares not-expected are RETURNED, flagged,
     never dropped - see DatasetPeriod.
     """
-    from qa_tools.common.agreement import TURNED_OFF
+    from asset_model.agreement import TURNED_OFF
 
     cal = calendar_for_dataset(dataset_id, agreement)
     agreement = _agreement(agreement)
@@ -803,7 +803,7 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     period's window opens (REQ-PIPE-131). What it prevents is claiming
     FORWARD into a slot that is not yet claimable; read as a closing
     deadline it would instead make a late supply unfileable, from the
-    same number. qa_tools/common/slots.py is what applies it.
+    same number. asset_model/slots.py is what applies it.
 
     The CALENDAR carries the default - a quarterly window is measured in
     days and a daily one in hours - and a dataset's participation version

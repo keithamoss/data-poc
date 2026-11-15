@@ -5,7 +5,7 @@ previous git commit. Uses a real temp git repo (not a mocked
 subprocess) since the git-history-reading mechanism (`git show
 HEAD~1:<path>`, including "the path didn't exist at that ref yet") is
 exactly the part worth testing for real, not the already-covered
-parsing logic in qa_tools/common/check_lifecycle.py itself."""
+parsing logic in asset_model/check_lifecycle.py itself."""
 from __future__ import annotations
 
 import pytest
@@ -13,7 +13,7 @@ import pytest
 import subprocess
 import textwrap
 
-from qa_tools.common import assets
+from asset_model import assets
 from qa_tools.common import validate_check_lifecycle as vcl
 
 
@@ -663,8 +663,8 @@ def test_every_real_evidently_check_carries_its_whole_definition():
     """REQ-QAC-223 criterion 3: an Evidently check's column, method and
     warn/fail bands are literals in its own entry in its collection's check
     file - where the definition hash sees them - not shared constants."""
-    from qa_tools import collections
-    from qa_tools.common import evidently_common as ec
+    from asset_model import collections
+    from asset_model import drift as ec
     entries = {}
     for c in collections.all_collections():
         entries.update(ec.collection_checks(c.id).checks)
@@ -679,7 +679,7 @@ def test_every_real_evidently_check_carries_its_whole_definition():
 def test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry():
     """...and the runners read them from there by check_id, so the band the
     hash covers is the band a verdict is judged by."""
-    from qa_tools.common import evidently_common as ec
+    from asset_model import drift as ec
     entry = {"method": "psi", "column": "sex", "warn_threshold": 0.2, "fail_threshold": 0.4}
     assert ec.status_for(0.3, entry) == "warn"
     assert ec.status_for(0.5, entry) == "fail"
@@ -696,7 +696,7 @@ def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
     hash covers its SQL, and named the file by its path, so filing the test
     under tests/<collection-id>/ read as an undocumented change."""
     repo = _dbt_repo(tmp_path, monkeypatch)
-    from qa_tools import collections
+    from asset_model import collections
 
     folder = collections.all_collections()[0].id  # the selected asset's first collection
     (repo / assets.dbt_rel() / "tests" / folder).mkdir()

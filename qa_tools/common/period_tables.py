@@ -45,7 +45,7 @@ def stamped_name(logical: str, supply: str, conn=None) -> str:
         # Only a pair's file carries an ordinal; any other supply's name is
         # its id's key, with no round trip.
         if conn is not None and supply_files.ordinal_of(supply):
-            from qa_tools.common import hierarchy
+            from asset_model import hierarchy
 
             try:
                 dataset_id = hierarchy.dataset_for_table(logical).dataset_id

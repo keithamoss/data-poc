@@ -47,7 +47,7 @@ def _every_assets_modules() -> tuple[set[str], set[str]]:
     """(adapter stems, provider stems) across every asset - a provider of one
     asset reaching another asset's module is refused as surely as a
     sibling."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     adapters, providers = set(), set()
     for asset in assets.every():
@@ -74,7 +74,7 @@ def _reaches_another_module(name: str, adapters: set[str],
 #: named or reached (an alias, its dotted name, getattr), so json.load and a
 #: provider's own helpers stay allowed.
 _PATH_LOADS = frozenset({"load", "module_file"})
-_RESOLVER = "qa_tools.common.assets"
+_RESOLVER = "asset_model.assets"
 #: Standard-library modules whose purpose is loading or running code by path
 #: or by name (the critic's routes round the gate, 2026-11-15).
 _LOADER_MODULES = frozenset({"importlib", "runpy", "pkgutil"})
@@ -99,7 +99,7 @@ def _dotted(node) -> str | None:
 
 def _resolver_names(tree: ast.AST) -> set[str]:
     """The local and dotted names a provider reaches the resolver module
-    (qa_tools.common.assets) by."""
+    (asset_model.assets) by."""
     names = {"assets", _RESOLVER}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module == "qa_tools.common":
@@ -165,7 +165,7 @@ def provider_import_problems(package: Path | None = None) -> list[str]:
     back another provider's whole module, is refused. Reaching an adapter
     through qa_tools.collections needs an import the imports gate refuses
     (REQ-TEST-384)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     package = Path(package) if package is not None else assets.selected().providers
     adapters, providers = _every_assets_modules()
@@ -218,8 +218,8 @@ def declaration_problems() -> list[str]:
     dataset's rules)."""
     from generator import collections
     from generator.collections.base import CLIENT_POSTCODES, NULL_RATE
-    from qa_tools import collections as registry
-    from qa_tools.common import assets
+    from asset_model import collections as registry
+    from asset_model import assets
 
     out: list[str] = []
     levers: dict[str, str] = {}
@@ -267,8 +267,8 @@ def orphan_problems(package: Path | None = None) -> list[str]:
     asset split: providers live in assets/<asset>/synthetic/collections/;
     generator/collections/ holds only the shared base), each named by its
     path from the repository root - or in full, outside it."""
-    from qa_tools import collections as registry
-    from qa_tools.common import assets
+    from asset_model import collections as registry
+    from asset_model import assets
 
     package = Path(package) if package is not None else assets.selected().providers
     declared = {c.module_name for c in registry.all_collections()}
@@ -282,8 +282,8 @@ def _unimportable() -> list[tuple[str, str]]:
     cannot be imported (post-build-review #336: it used to raise out of the
     gate as a traceback)."""
     from generator import collections
-    from qa_tools import collections as registry
-    from qa_tools.common import assets
+    from asset_model import collections as registry
+    from asset_model import assets
 
     out = []
     for coll in registry.all_collections():

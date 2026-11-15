@@ -30,8 +30,8 @@ import tempfile
 from pathlib import Path
 
 from asset_model import assets, check_sources
-from qa_tools.common import check_id as cid
-from qa_tools.common import check_lifecycle as cl
+from asset_model import check_id as cid
+from asset_model import check_lifecycle as cl
 from qa_tools.common.diff_base import diff_base
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -82,7 +82,7 @@ def sources_fingerprint() -> str:
     never parsed."""
     import hashlib
 
-    from qa_tools import collections
+    from asset_model import collections
 
     digest = hashlib.sha256(str(ROOT).encode())
     yaml_sources, evidently = _sources(None)
@@ -315,7 +315,7 @@ def _by_source_file(errors: list[str], old_checks, new_checks, base) -> list[str
 
 #: The frozen-defaults table (REQ-QAC-176 criterion 10), read as text at
 #: either ref so the gate can compare the two sides without importing either.
-FROZEN_DEFAULTS_FILE = "qa_tools/common/frozen_defaults.py"
+FROZEN_DEFAULTS_FILE = "asset_model/frozen_defaults.py"
 
 
 def frozen_defaults_at(ref: str | None) -> tuple[dict, ...]:
@@ -356,7 +356,7 @@ def frozen_default_errors(old_table, new_table, old_checks) -> list[str]:
     existing entry changed or removed, except as a new entry under a new
     scheme version; and a new entry naming a setting some check at the diff
     base writes at that same value, naming each check it would move."""
-    from qa_tools.common import check_fingerprint as fp
+    from asset_model import check_fingerprint as fp
 
     errors: list[str] = []
     for i, entry in enumerate(new_table):

@@ -88,7 +88,7 @@ ALLOWED = {
 
 #: The asset resolver's path loader, where it lives today and where REQ-PIPE-380
 #: moves it, and which side each kind it loads is on (criterion 5).
-LOADER_MODULES = frozenset({"qa_tools.common.assets", "asset_model.assets"})
+LOADER_MODULES = frozenset({"asset_model.assets", "asset_model.assets"})
 LOADER = "load"
 LOADED_SIDES = {"adapter": "pipeline", "provider": "generator"}
 

@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 
 #: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
@@ -125,7 +125,7 @@ class Resolved:
 
 
 def _doc(path: Path | None = None) -> dict:
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     with open(path or data_asset_yaml()) as f:
         return config_yaml.parse(f) or {}
@@ -235,7 +235,7 @@ def resolve(dataset_id: str, at: datetime | str, *, doc: dict | None = None,
             label: str = "warn setting") -> Resolved:
     """The setting for `dataset_id` as at the instant `at` - the instant
     the decision about a supply takes effect (criterion 4)."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     instant = at if isinstance(at, datetime) else asset_time.parse_instant(at, "at")
     on = asset_time.local_date(instant)

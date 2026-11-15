@@ -42,8 +42,9 @@ from pathlib import Path
 from typing import Sequence
 
 from generator.targeting import Target
-from qa_tools.common import assets, scenario_map
-from qa_tools.common import assets as _assets
+from asset_model import assets
+from qa_tools.common import scenario_map
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -232,9 +233,12 @@ def correction_event(change_reference: str) -> str:
 
 def _correction_date(change_reference: str) -> date | None:
     """The date a declared correction counts from, or None if undeclared."""
-    from qa_tools.common import correction_apply, correction_trial
+    from asset_model import (
+        declared_corrections as correction_apply,
+        declared_corrections as correction_trial,
+    )
 
-    for p in correction_apply._declared(*correction_trial.working()):
+    for p in correction_apply.declared(*correction_trial.working()):
         if p.reference == change_reference:
             return date.fromisoformat(p.date[:10])
     return None
@@ -627,7 +631,7 @@ def carries(shape: str | None, table: str) -> bool:
 def supply_arrivals(placement) -> list[dict]:
     """The placement's arrivals that carry its own dataset's file, in order -
     what a script's `supply N` and a link's `arrival N` index."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         table = hierarchy.dataset(placement.dataset).table
@@ -860,7 +864,7 @@ def _refuse_outside_hold(injection: Injection, anchor_day: date) -> None:
     themselves."""
     if not injection.hold_days:
         return
-    from qa_tools.common import amber_setting, asset_time
+    from asset_model import amber_setting, asset_time
 
     outside = [anchor_day + timedelta(days=k) for k in injection.hold_days
                if amber_setting.resolve(injection.dataset_id, asset_time.start_of_day(
@@ -886,7 +890,8 @@ def link_dates(injection: Injection, placement: Placement,
     for a period-scoped one, plus `after_hours` - or, for one timed at a wall
     clock, its `at` on the day `day_offset` after the placement's.
     """
-    from qa_tools.common import asset_time, scripted_decisions
+    from asset_model import asset_time
+    from qa_tools.common import scripted_decisions
 
     if scripts is None:
         scripts = scripted_decisions.load()
@@ -1027,7 +1032,7 @@ def this_assets_injections() -> tuple["Injection", ...]:
     run."""
     import warnings
 
-    from qa_tools.common import assets, hierarchy
+    from asset_model import assets, hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
     unknown = _naming_no_assets_dataset()
@@ -1044,7 +1049,7 @@ def this_assets_injections() -> tuple["Injection", ...]:
 
 def _naming_no_assets_dataset() -> list["Injection"]:
     """The injections whose dataset no asset declares (every_asset)."""
-    from qa_tools.common import every_asset
+    from asset_model import every_asset
 
     everyone = every_asset.declared().datasets
     return [i for i in INJECTIONS if i.dataset_id not in everyone]
@@ -1065,7 +1070,7 @@ def this_assets_scenarios() -> set[str]:
     declares - one half of its map's membership (REQ-PIPE-352 criterion 3);
     the other half is what its own asset placed (scenario_map). Read from
     this asset's own hierarchy alone."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
     return {sid for sid, named in _datasets_named().items() if named & mine}
@@ -1076,7 +1081,7 @@ def mixed_asset_problems() -> list[str]:
     asset holds and one it does not, named with the asset - each asset's pass
     reading only its own hierarchy, so a dataset outside it may be the other
     asset's or no asset's."""
-    from qa_tools.common import assets, hierarchy
+    from asset_model import assets, hierarchy
 
     mine = {d.dataset_id for d in hierarchy.all_datasets()}
     asset = assets.selected().name
@@ -1266,7 +1271,7 @@ def filed_early_into(injection: Injection, placement: Placement,
     days early and files into the quarter before its own; a scenario placed
     there would have TS-67's whole delivery land in it, and keying the check
     on TS-67's anchor alone did not catch it."""
-    from qa_tools.common import asset_time, slots
+    from asset_model import asset_time, slots
 
     names = [p.name for p in periods]
     index = names.index(placement.period)
@@ -1298,7 +1303,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     original fifteen quarters; the caller passes those fifteen (REQ-GEN-207). Each is in place on the MIDDLE of its quarter: the inheritance is
     recorded when the period is first processed after it falls due, which on
     this history is within two weeks of the quarter's date."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     if len(periods) < 2:
         raise CannotPlace("TS-79: the generated history is too short to hold an "
@@ -1412,7 +1417,7 @@ def _lands_in(dataset_id: str, day: str, received_at) -> bool:
     the evening before, so the calendar day of receipt names the wrong period.
     On authored dates, the calendar day, as before. Asked of the baseline's
     kind, never its name (REQ-PIPE-345 criterion 6)."""
-    from qa_tools.common import hierarchy, schedule, slots
+    from asset_model import hierarchy, schedule, slots
 
     received = (received_at if isinstance(received_at, datetime)
                 else datetime.fromisoformat(str(received_at)))

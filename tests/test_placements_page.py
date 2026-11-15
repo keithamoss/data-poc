@@ -119,7 +119,7 @@ class TestThePromotionTimelineSaysPlaced:
 
         supply, _ = _held(conn, period)
         _place(conn, supply, target)
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         # THE DAY'S DECISIONS, as a change point carries them. Asked of the
         # day itself rather than of `points`, which only holds days on which

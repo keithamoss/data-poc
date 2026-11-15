@@ -47,7 +47,7 @@ def test_the_table_names_every_status_it_is_run_over():
 @pytest.mark.parametrize("value", STATUSES)
 @pytest.mark.parametrize("form", ["label", "verb", "count"])
 def test_status_words(value, form):
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     _clean(status_words(value, form), f"status_words({value!r}, {form!r})")
 
@@ -55,7 +55,7 @@ def test_status_words(value, form):
 @pytest.mark.parametrize("value", STATUSES)
 def test_the_outcome_lines(value):
     from cli import lifecycle_report
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     lines = lifecycle_report.outcome_lines(
         [lifecycle_report.ReGated("cp-clients", value, status_words(value, "verb"),
@@ -129,7 +129,7 @@ def test_the_gate_refuses_a_status_it_has_no_word_for():
     """REQ-QAC-047: refused, never passed through raw (the earlier critic's
     finding on promotion._status_label)."""
     from qa_tools.common import promotion
-    from qa_tools.common.dataset_status import UnknownStatusError
+    from asset_model.statuses import UnknownStatusError
 
     with pytest.raises(UnknownStatusError):
         promotion.should_promote(status="purple", slot_filled=False, held_without_slot=False,
@@ -171,7 +171,8 @@ def test_the_scenario_maps_built_to():
 def test_a_replacement_settings_value_is_said_in_words():
     """REQ-DASH-359 criterion 12: 'never', 'when passing', 'when passing or
     warning' - never the raw green or green-or-amber."""
-    from qa_tools.common import amber_setting, replacement_setting
+    from asset_model import amber_setting
+    from qa_tools.common import replacement_setting
 
     assert replacement_setting.WORDS == {"never": "never", "green": "when passing",
                                          "green-or-amber": "when passing or warning"}

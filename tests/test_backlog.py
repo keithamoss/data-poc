@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import pytest
 
 from qa_tools.common import backlog, delivery
+from asset_model import delivery as delivery_tree
 
 def _receipt(receipts, name):
     """The one per-file receipt of a one-file delivery (REQ-GEN-044
@@ -55,7 +56,7 @@ class TestReceiptOrderIsTheOnlyOrder:
                                ("mike", "2026-02-01T09:00:00+08:00")):
             delivery.write_delivery(name, {"birth_registrations_x.csv": "a\n1\n"},
                                      instant, deliveries, receipts)
-        got = [d.name for d in delivery.list_deliveries(deliveries, receipts)]
+        got = [d.name for d in delivery_tree.list_deliveries(deliveries, receipts)]
         assert got == ["alpha", "mike", "zulu"], (
             "ordered by OUR receipt instant, never by the supplier's own naming habits")
 
@@ -74,7 +75,7 @@ class TestReceiptOrderIsTheOnlyOrder:
         for name in ("zulu", "alpha"):
             delivery.write_delivery(name, {"birth_registrations_x.csv": "a\n1\n"},
                                      instant, deliveries, receipts)
-        got = [d.name for d in delivery.list_deliveries(deliveries, receipts)]
+        got = [d.name for d in delivery_tree.list_deliveries(deliveries, receipts)]
         assert got == ["zulu", "alpha"], (
             "the tie must break on the order the RECEIPTS were written - 'alpha' first would "
             "mean the order came from the directory listing")
@@ -101,8 +102,8 @@ class TestReceiptOrderIsTheOnlyOrder:
         record = json.loads(path.read_text())
         del record["sequence"]
         path.write_text(json.dumps(record))
-        with pytest.raises(delivery.ReceiptOrderError, match="sequence"):
-            delivery.read_delivery("drop", deliveries, receipts)
+        with pytest.raises(delivery_tree.ReceiptOrderError, match="sequence"):
+            delivery_tree.read_delivery("drop", deliveries, receipts)
 
     @pytest.mark.asset("daily")
     def test_that_refusal_is_not_reported_as_still_in_flight(self, tmp_path):
@@ -119,8 +120,8 @@ class TestReceiptOrderIsTheOnlyOrder:
         record = json.loads(path.read_text())
         del record["sequence"]
         path.write_text(json.dumps(record))
-        with pytest.raises(delivery.ReceiptOrderError):
-            delivery.survey(deliveries, receipts)
+        with pytest.raises(delivery_tree.ReceiptOrderError):
+            delivery_tree.survey(deliveries, receipts)
 
 
 class TestTheOrderDoesNotDependOnPresentationOrder:
@@ -172,7 +173,7 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
 
     @pytest.mark.asset("quarterly")
     def test_an_arrival_is_recognised_whatever_the_schedule_says(self, tmp_path, monkeypatch):
-        from qa_tools.common import arrivals, slots
+        from asset_model import arrivals as arrival_tree, slots
 
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("drop", {"cp_clients.csv": "a\n1\n"},
@@ -182,7 +183,7 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
         # failure looks like from the filing layer's side.
         monkeypatch.setattr(slots, "is_owed_supplies", lambda dataset_id: False)
 
-        found = arrivals.recognise(delivery.read_delivery("drop", deliveries, receipts))
+        found = arrival_tree.recognise(delivery_tree.read_delivery("drop", deliveries, receipts))
         assert found.by_dataset.get("cp-clients") == ("cp_clients.csv",), (
             "recognition must not consult the schedule - an arrival nothing can FILE yet is "
             "still an arrival, and refusing to record it is how the backlog stops being "
@@ -191,16 +192,17 @@ class TestAnExhaustedScheduleStillAcceptsSupplies:
     @pytest.mark.asset("quarterly")
     def test_it_is_still_written_to_the_delivery_log(
             self, tmp_path, monkeypatch, clean_delivery_log):
-        from qa_tools.common import arrivals, delivery_log, slots
+        from qa_tools.common import delivery_log
+        from asset_model import arrivals as arrival_tree, slots
 
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         delivery.write_delivery("drop", {"cp_clients.csv": "a\n1\n"},
                                  "2026-02-01T09:00:00+08:00", deliveries, receipts)
         monkeypatch.setattr(slots, "is_owed_supplies", lambda dataset_id: False)
 
-        d = delivery.read_delivery("drop", deliveries, receipts)
+        d = delivery_tree.read_delivery("drop", deliveries, receipts)
         assert delivery_log.record(
-            d, arrivals.recognise(d), conn=clean_delivery_log) is not None
+            d, arrival_tree.recognise(d), conn=clean_delivery_log) is not None
         written = delivery_log.records(clean_delivery_log)
         assert [r["delivery"] for r in written] == ["drop"]
         assert written[0]["files"][0]["dataset_id"] == "cp-clients", (
@@ -221,13 +223,13 @@ class TestAPositionCannotBeInventedFromAMissingField:
 
     @pytest.mark.asset("quarterly")
     def test_an_arrival_carries_its_receipts_sequence(self, tmp_path):
-        from qa_tools.common import arrivals
+        from asset_model import arrivals as arrival_tree
 
         deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
         for name in ("first", "second"):
             delivery.write_delivery(name, {"cp_clients.csv": "a\n1\n"},
                                      "2026-02-01T09:00:00+08:00", deliveries, receipts)
-        found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries, receipts)
+        found = arrival_tree.arrivals_for("child-protection", "cp_run_", deliveries, receipts)
         assert [a.sequence for a in found] == [1, 2], (
             "an Arrival without its receipt's sequence cannot be ordered, and defaulting it "
             "gives every arrival the same position")

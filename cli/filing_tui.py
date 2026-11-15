@@ -62,11 +62,21 @@ from rich.table import Table
 from rich.text import Text
 
 from cli import common
-from qa_tools.common.dataset_status import status_words
-from qa_tools.common import (asset_time, decision_log, filing_decisions,
-                             filing_queue, git_identity, hierarchy, inheritance, people,
-                             qa_store, slot_state, substitution, supply_db)
-from qa_tools.common import assets as _assets
+from asset_model.statuses import status_words
+from asset_model import asset_time, hierarchy
+from qa_tools.common import (
+    decision_log,
+    filing_decisions,
+    filing_queue,
+    git_identity,
+    inheritance,
+    people,
+    qa_store,
+    slot_state,
+    substitution,
+    supply_db,
+)
+from asset_model import assets as _assets
 
 console = Console()
 
@@ -2242,7 +2252,8 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
 def _round_and_slot(dataset_id: str, period: str) -> tuple[str, str]:
     """(the round's date, 'For <period> · due <instant>') for one slot - the
     period alone where its slot cannot be resolved."""
-    from qa_tools.common import files_go, slots
+    from qa_tools.common import files_go
+    from asset_model import slots
 
     try:
         slot = slots.slot_named(dataset_id, period)
@@ -2257,7 +2268,8 @@ def _print_files_go(dataset_ids: list[str]) -> None:
     """Which period each dataset's files go into, once below the table
     (REQ-PIPE-327 criterion 2) - one line where they all share it, in the
     shape _print_amber_settings uses."""
-    from qa_tools.common import asset_time, files_go
+    from asset_model import asset_time
+    from qa_tools.common import files_go
 
     today = asset_time.local_date(asset_time.now())
     said = {ds: files_go.describe(ds, today) for ds in dataset_ids}
@@ -2275,7 +2287,7 @@ def _print_files_go(dataset_ids: list[str]) -> None:
 def _print_amber_settings(dataset_ids: list[str]) -> None:
     """What an amber supply does for each dataset shown, and where that
     was set (REQ-PIPE-122 NFR 1) - one line where they all share it."""
-    from qa_tools.common import amber_setting, asset_time
+    from asset_model import amber_setting, asset_time
 
     today = asset_time.local_date(asset_time.now())
     said = {}
@@ -2316,7 +2328,7 @@ def filing_menu() -> None:
     # word that finds it in one menu finds it in the next, and an asset that
     # grows past N_LIST does not see the order flip. It listed collections by
     # their own names, sorted by id, until then.
-    from qa_tools import collections as registry
+    from asset_model import collections as registry
 
     # THE POINTER'S COUNT TOO (supply_files.filing_collections; #315 L1).
     from qa_tools.common import supply_files
@@ -2495,7 +2507,7 @@ def corrections_flow(waiting: list) -> None:
         p = labels[choice]
     actor = actor_at_the_keyboard()
     with supply_db.connect(label="mothman:confirm-correction") as conn:
-        from qa_tools.common import correction_trial
+        from asset_model import declared_corrections as correction_trial
 
         try:
             p, t = correction_apply.trial_for(conn, p.reference)

@@ -11,7 +11,8 @@ import re
 
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
-from qa_tools.common import config_yaml, sample_keys
+from asset_model import config_yaml
+from qa_tools.common import sample_keys
 
 def _defuse_sodas_dotenv_reload() -> None:
     """Build Soda's EnvHelper now, and put the environment back.
@@ -76,7 +77,7 @@ SODA_SAMPLES_LIMIT = 100
 def soda_check_files() -> list[str]:
     """Every collection's live Soda checks file, from the registry
     (REQ-QAC-241 criterion 8)."""
-    from qa_tools import collections
+    from asset_model import collections
 
     return collections.check_files("soda")
 

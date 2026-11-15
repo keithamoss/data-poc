@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/schedule.py - delivery calendars
+"""Tests for asset_model/schedule.py - delivery calendars
 (REQ-PIPE-049).
 
 Against the REAL contract/data-asset.yaml wherever the real config is
@@ -21,7 +21,7 @@ from datetime import date, timedelta
 import pytest
 
 import agreement_split
-from qa_tools.common import asset_time, hierarchy, schedule, slots
+from asset_model import asset_time, hierarchy, schedule, slots
 
 
 def _repoint(tmp_path, monkeypatch, doc):
@@ -158,7 +158,7 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         """The consequence, asserted through the real assignment rule
         rather than through the slot count - a count can look wrong and
         be harmless, and this is the thing that is actually harmful."""
-        from qa_tools.common import assignment
+        from asset_model import assignment
 
         first = self._generator_first_period()
         # Twenty days in, past REQ-GEN-044's evening-before era (the first
@@ -527,7 +527,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         ARE the agreement. A calendar library predicts what was probably
         agreed; it does not constitute it."""
         import yaml as _yaml
-        from qa_tools.common import agreement
+        from asset_model import agreement
         raw = _yaml.safe_load(agreement.calendar_yaml().read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
@@ -548,7 +548,7 @@ class TestAnUnknownCalendarNamesTheAssetsFile:
     contract/calendar.yaml, which no longer exists."""
 
     def test_it_names_the_selected_assets_calendar_file(self):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         with pytest.raises(schedule.UnknownCalendarError) as e:
             schedule.calendar("nowhere")

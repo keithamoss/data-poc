@@ -522,7 +522,7 @@ class TestAPersonsOperationGoesThroughTheSamePass:
         that needs somebody gets its ticket.
         """
         from qa_tools.common import qa_store, supply_db
-        from qa_tools.common import slots as slots_mod
+        from asset_model import slots as slots_mod
 
         svc = FakeTickets()
         monkeypatch.setattr(tr, "service_from_env", lambda: svc)

@@ -19,8 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 #: Fields a confirmation must not carry: it is timed by the replay, not by
 #: an offset from a supply (criterion 5).
@@ -82,7 +82,7 @@ def problems(confirmations: list[Confirmation], *, declared: set[str],
     """Criterion 5, from configuration alone. Each names the entry and the
     fault. `injections` is the generator's injection table, handed in by the
     caller (cli/), since no QA module may import the generator."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     by_scenario = {}
     for inj in injections:

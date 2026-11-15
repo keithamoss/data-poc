@@ -79,8 +79,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from qa_tools.common import (dataset_status, delivery_log, display_time, hierarchy,
-                             in_flight_log)
+from asset_model import statuses as dataset_status, hierarchy
+from qa_tools.common import delivery_log, display_time, in_flight_log
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -733,7 +733,7 @@ def _from_pending_corrections(conn=None) -> list[Item]:
     try:
         with delivery_log._db(conn) as db:
             found = correction_apply.pending(db)
-            from qa_tools.common import correction_trial
+            from asset_model import declared_corrections as correction_trial
 
             cal = correction_trial.working()[0]
             affected = {p.reference: correction_apply.affected_datasets(p, cal) for p in found}

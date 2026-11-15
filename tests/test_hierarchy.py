@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/hierarchy.py (REQ-QAC-039).
+"""Tests for asset_model/hierarchy.py (REQ-QAC-039).
 
 Deliberately tested against the REAL contract/data-asset.yaml rather
 than a fixture built to match it. The whole point of this module is
@@ -19,7 +19,7 @@ import asset_folders
 import pytest
 import yaml
 
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 
 
 class TestAgainstTheRealConfig:

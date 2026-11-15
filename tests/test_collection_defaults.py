@@ -18,7 +18,7 @@ from datetime import date, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import agreement, schedule, slots
+from asset_model import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
 from tests import before_growth
 
@@ -46,7 +46,7 @@ def _per_dataset(doc: dict) -> dict:
     due time and grace only as defaults, so removing them without moving
     them onto its datasets would leave those datasets stating none - a
     calendar no real file has ever been, refused for that reason."""
-    from qa_tools import collections
+    from asset_model import collections
 
     stated = {}
     for coll in doc["collections"]:
@@ -446,11 +446,11 @@ class TestACollectionsDefaultsFreeze:
         assert found == [], "\n".join(f"{f.scope} | {f.problem} | {f.fix}" for f in found)
 
     def test_a_collection_correction_reverts(self):
-        from qa_tools.common import agreement_freeze as freeze
+        from asset_model import declared_corrections
 
         doc = _unshare(_doc())
         _defaults(doc, {"effective_from": "2023-01-01", "claim_window": "7d", "changelog": LOG})
-        before, _asset = freeze.revert(doc, {}, [(
+        before, _asset = declared_corrections.revert(doc, {}, [(
             "collection child-protection participation_defaults 2023-01-01",
             {"claim_window": "21d"}, {"claim_window": "7d"})])
         assert _collection(before)["participation_defaults"]["versions"][0]["claim_window"] \
@@ -678,9 +678,10 @@ class TestCriticFindingsOn181:
         """Every dataset is on the baseline (REQ-PIPE-345), so none is left out
         as on a calendar of its own."""
         from qa_tools.common import correction_apply
+        from asset_model import declared_corrections as asset_model_declared_corrections
 
         doc = _unshare(_doc())
-        p = correction_apply.Pending(
+        p = asset_model_declared_corrections.Pending(
             reference="CAB-2", owner=("collection", "child-protection"), label="l",
             date="2026-10-11", reason="r", approver="a",
             changes=(("collection child-protection participation_defaults 2023-01-01", None,

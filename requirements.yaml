@@ -619,11 +619,11 @@ requirements:
       - >
         check_ids are tool-qualified by default rather than only where a collision happened, so the scheme does not depend on noticing collisions.
     implemented_by:
-      - qa_tools/common/check_lifecycle.py::CheckMetadata
-      - qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata
-      - qa_tools/common/check_lifecycle.py::parse_soda_check_metadata
-      - qa_tools/common/check_lifecycle.py::parse_contract_check_metadata
-      - qa_tools/common/check_lifecycle.py::parse_evidently_check_metadata
+      - asset_model/check_lifecycle.py::CheckMetadata
+      - asset_model/check_lifecycle.py::parse_dbt_check_metadata
+      - asset_model/check_lifecycle.py::parse_soda_check_metadata
+      - asset_model/check_lifecycle.py::parse_contract_check_metadata
+      - asset_model/check_lifecycle.py::parse_evidently_check_metadata
       - qa_tools/common/validate_check_lifecycle.py::collect_checks
 
   - id: REQ-PIPE-007
@@ -665,8 +665,8 @@ requirements:
       - >
         Replaced by per-dataset cadence declared in each dataset's own ODCS contract, so 'no data' means nothing has landed in the CURRENT expected cycle rather than the last delivery being more than N days old.
     implemented_by:
-      - qa_tools/common/agreement.py::cadence
-      - qa_tools/common/schedule.py::periods_for_calendar
+      - asset_model/agreement.py::cadence
+      - asset_model/schedule.py::periods_for_calendar
       - pipeline/recorded_arrival.py::for_run
       - assets/daily/data-asset.yaml
       - assets/quarterly/data-asset.yaml
@@ -1941,12 +1941,12 @@ requirements:
       - tests/test_run_datacontract_bdm.py::test_every_sql_rule_has_its_own_authored_name
       - tests/test_run_datacontract_bdm.py::test_sql_rules_get_their_shared_label_from_structure_not_prose
     implemented_by:
-      - qa_tools/common/check_id.py::parse
-      - qa_tools/common/check_id.py::validate_grammar
-      - qa_tools/common/check_id.py::validate_column_matches
-      - qa_tools/common/check_id.py::validate_tail_uniqueness
-      - qa_tools/common/check_lifecycle.py::contract_rule_attachments
-      - qa_tools/common/check_lifecycle.py::name_by_check_id
+      - asset_model/check_id.py::parse
+      - asset_model/check_id.py::validate_grammar
+      - asset_model/check_id.py::validate_column_matches
+      - asset_model/check_id.py::validate_tail_uniqueness
+      - asset_model/check_lifecycle.py::contract_rule_attachments
+      - asset_model/check_lifecycle.py::name_by_check_id
       - qa_tools/common/validate_check_lifecycle.py::_check_id_errors
       - qa_tools/tools/run_datacontract.py::evaluate
       - assets/quarterly/child-protection-family-support/child-protection-contract.yaml
@@ -2311,8 +2311,8 @@ requirements:
     dependencies: [REQ-QAC-023]
     implemented_by:
       - docs/check-authoring-rules.md
-      - qa_tools/common/check_lifecycle.py::is_self_evident
-      - qa_tools/common/check_lifecycle.py::_lifecycle_fields
+      - asset_model/check_lifecycle.py::is_self_evident
+      - asset_model/check_lifecycle.py::_lifecycle_fields
       - qa_tools/common/validate_check_lifecycle.py::_explanation_errors
       - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
       - pipeline/build_dashboard_data.py::build
@@ -2421,7 +2421,7 @@ requirements:
     implemented_by:
       - qa_tools/common/validate_check_lifecycle.py::_explanation_errors
       - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
-      - qa_tools/common/check_lifecycle.py::is_self_evident
+      - asset_model/check_lifecycle.py::is_self_evident
       - cli/dashboard.py::validate_check_lifecycle_command
       - .github/workflows/validate-config.yml
     linked_tests:
@@ -2720,7 +2720,7 @@ requirements:
       - qa_tools/common/ticket_check_summary.py::build_check_summary
       - qa_tools/common/ticket_check_summary.py::check_url
       - qa_tools/common/ticket_sync.py::_check_section
-      - qa_tools/common/check_lifecycle.py::_authored
+      - asset_model/check_lifecycle.py::_authored
     evidence:
       - >
         2026-09-20: cp-placements, the worst real dataset, renders 17
@@ -3011,7 +3011,7 @@ requirements:
       - qa_tools/common/arrival_history.py::delivery_companions
       - qa_tools/common/arrival_history.py::load_outcome
       - qa_tools/common/delivery_log.py::records_carrying
-      - qa_tools/common/asset_time.py::arrival_key
+      - asset_model/asset_time.py::arrival_key
       - cli/supply.py::history_command
     unmet_criteria:
       - criterion: >-
@@ -3719,7 +3719,7 @@ requirements:
       - qa_tools/common/qa_results_reader.py::run_is_complete
       - qa_tools/common/qa_results_reader.py::incomplete_runs
       - qa_tools/tools/orchestrate.py::_run_step
-      - qa_tools/common/check_lifecycle.py::_table_list
+      - asset_model/check_lifecycle.py::_table_list
     evidence:
       - >
         2026-09-25: criterion 10 is DECLARED rather than derived, and
@@ -4893,16 +4893,16 @@ requirements:
       - tests/test_check_lifecycle.py
       - tests/test_dashboard_e2e.py::TestTheRenderedTreeComesFromTheHierarchy
     implemented_by:
-      - qa_tools/common/hierarchy.py::Dataset
-      - qa_tools/common/hierarchy.py::all_datasets
-      - qa_tools/common/hierarchy.py::dataset
-      - qa_tools/common/hierarchy.py::dataset_for_table
-      - qa_tools/common/hierarchy.py::datasets_in_collection
+      - asset_model/hierarchy.py::Dataset
+      - asset_model/hierarchy.py::all_datasets
+      - asset_model/hierarchy.py::dataset
+      - asset_model/hierarchy.py::dataset_for_table
+      - asset_model/hierarchy.py::datasets_in_collection
       - qa_tools/common/validate_hierarchy.py::validate
-      - qa_tools/common/check_id.py::validate_hierarchy_agreement
-      - qa_tools/common/check_id.py::validate_tail_uniqueness
-      - qa_tools/common/check_lifecycle.py::migrate_pre_039_check_id
-      - qa_tools/collections/__init__.py::by_id
+      - asset_model/check_id.py::validate_hierarchy_agreement
+      - asset_model/check_id.py::validate_tail_uniqueness
+      - asset_model/check_lifecycle.py::migrate_pre_039_check_id
+      - asset_model/collections.py::by_id
       - assets/daily/data-asset.yaml
       - assets/quarterly/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
@@ -6024,7 +6024,7 @@ requirements:
       - assets/daily/synthetic/collections/civil_registration.py::_received_at
       - assets/quarterly/synthetic/collections/child_protection.py::_cp_manifest_entries_for_slot
       - assets/quarterly/synthetic/collections/child_protection.py::_cp_received_at
-      - qa_tools/common/asset_time.py::local_date
+      - asset_model/asset_time.py::local_date
       - pipeline/build_dashboard_data.py::_run_date
       - pipeline/build_dashboard_data.py::_run_date
     evidence:
@@ -6399,13 +6399,13 @@ requirements:
     implemented_by:
       - docs/delivery-format.md
       - qa_tools/common/delivery.py::write_delivery
-      - qa_tools/common/delivery.py::read_delivery
-      - qa_tools/common/delivery.py::list_deliveries
-      - qa_tools/common/delivery.py::files_by_dataset
-      - qa_tools/common/arrivals.py::recognise
-      - qa_tools/common/arrivals.py::arrivals_for
-      - qa_tools/common/arrivals.py::unplaceable
-      - qa_tools/common/arrivals.py::Arrival
+      - asset_model/delivery.py::read_delivery
+      - asset_model/delivery.py::list_deliveries
+      - asset_model/delivery.py::files_by_dataset
+      - asset_model/arrivals.py::recognise
+      - asset_model/arrivals.py::arrivals_for
+      - asset_model/arrivals.py::unplaceable
+      - asset_model/arrivals.py::Arrival
       - generator/delivery_names.py::delivery_name
       - generator/driver.py::write_bookkeeping
       - qa_tools/tools/dataset_stats.py::arrival_record
@@ -7418,7 +7418,7 @@ requirements:
       - tests-js/status-parity.test.js
       - tests-js/schedule-runway.test.js
     implemented_by:
-      - qa_tools/common/dataset_status.py::UnknownStatusError
+      - asset_model/statuses.py::UnknownStatusError
       - qa_tools/common/dataset_status.py::recognised_status
       - qa_tools/common/dataset_status.py::worst_of
       - qa_tools/common/dataset_status.py::is_retired
@@ -7531,15 +7531,15 @@ requirements:
       - tests/test_dataset_stats.py
       - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
     implemented_by:
-      - qa_tools/common/asset_time.py::timezone_versions
-      - qa_tools/common/asset_time.py::zone_on
-      - qa_tools/common/asset_time.py::zone_at
-      - qa_tools/common/asset_time.py::parse_instant
-      - qa_tools/common/asset_time.py::record_source_instant
-      - qa_tools/common/asset_time.py::now
-      - qa_tools/common/asset_time.py::wall_clock
-      - qa_tools/common/asset_time.py::end_of_day
-      - qa_tools/common/arrival_classification.py::classify
+      - asset_model/asset_time.py::timezone_versions
+      - asset_model/asset_time.py::zone_on
+      - asset_model/asset_time.py::zone_at
+      - asset_model/asset_time.py::parse_instant
+      - asset_model/asset_time.py::record_source_instant
+      - asset_model/asset_time.py::now
+      - asset_model/asset_time.py::wall_clock
+      - asset_model/asset_time.py::end_of_day
+      - asset_model/arrival_classification.py::classify
       - assets/daily/data-asset.yaml
       - assets/quarterly/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
@@ -7756,16 +7756,16 @@ requirements:
       - tests/test_agreement.py
       - tests/test_daily_batch.py
     implemented_by:
-      - qa_tools/common/schedule.py::calendar_for_dataset
-      - qa_tools/common/schedule.py::periods_for_dataset
-      - qa_tools/common/schedule.py::delivery_months
-      - qa_tools/common/schedule.py::not_expected_periods
-      - qa_tools/common/schedule.py::claim_window
-      - qa_tools/common/schedule.py::parse_duration
-      - qa_tools/common/schedule.py::parse_month_name
-      - qa_tools/common/schedule.py::candidate_dates
-      - qa_tools/common/schedule.py::Calendar::version_in_force
-      - qa_tools/common/agreement.py::load
+      - asset_model/schedule.py::calendar_for_dataset
+      - asset_model/schedule.py::periods_for_dataset
+      - asset_model/schedule.py::delivery_months
+      - asset_model/schedule.py::not_expected_periods
+      - asset_model/schedule.py::claim_window
+      - asset_model/schedule.py::parse_duration
+      - asset_model/schedule.py::parse_month_name
+      - asset_model/schedule.py::candidate_dates
+      - asset_model/schedule.py::Calendar::version_in_force
+      - asset_model/agreement.py::load
       - cli/schedule.py::show_command
       - cli/schedule.py::candidate_dates_command
       - assets/daily/data-asset.yaml
@@ -8274,11 +8274,11 @@ requirements:
       - tests/test_schedule.py
       - tests/test_slots.py
     implemented_by:
-      - qa_tools/common/schedule.py::periods_for_calendar
-      - qa_tools/common/schedule.py::periods_for_dataset
-      - qa_tools/common/schedule.py::schema_name
-      - qa_tools/common/schedule.py::_effect_windows
-      - qa_tools/common/schedule.py::Period
+      - asset_model/schedule.py::periods_for_calendar
+      - asset_model/schedule.py::periods_for_dataset
+      - asset_model/schedule.py::schema_name
+      - asset_model/schedule.py::_effect_windows
+      - asset_model/schedule.py::Period
     evidence:
       - >
         2026-09-23: the version bug was reproduced before being fixed -
@@ -8509,13 +8509,13 @@ requirements:
       - tests/test_schedule.py
       - tests/test_cli_schedule.py
     implemented_by:
-      - qa_tools/common/slots.py::Slot
-      - qa_tools/common/slots.py::slots_for_dataset
-      - qa_tools/common/slots.py::claimable_until
-      - qa_tools/common/slots.py::claim_window
-      - qa_tools/common/slots.py::is_open
-      - qa_tools/common/slots.py::is_closed
-      - qa_tools/common/slots.py::is_overdue
+      - asset_model/slots.py::Slot
+      - asset_model/slots.py::slots_for_dataset
+      - asset_model/slots.py::claimable_until
+      - asset_model/slots.py::claim_window
+      - asset_model/slots.py::is_open
+      - asset_model/slots.py::is_closed
+      - asset_model/slots.py::is_overdue
       - cli/schedule.py::_show_dataset
     evidence:
       - >
@@ -9709,12 +9709,12 @@ requirements:
     - tests/test_in_flight_log.py
     - tests/test_arrival_is_one_file.py
     implemented_by:
-    - qa_tools/common/arrivals.py::recognise
-    - qa_tools/common/delivery.py::survey
-    - qa_tools/common/delivery_boundary.py::check_all
+    - asset_model/arrivals.py::recognise
+    - asset_model/delivery.py::survey
+    - asset_model/delivery_boundary.py::check_all
     - qa_tools/common/in_flight_log.py::record
-    - qa_tools/common/slots.py::is_owed_supplies
-    - qa_tools/common/arrivals.py::arrivals_for
+    - asset_model/slots.py::is_owed_supplies
+    - asset_model/arrivals.py::arrivals_for
     - qa_tools/common/arrivals.py::arrivals_from_records
     evidence:
     - '2026-09-25: criterion 19''s guard was checked against the REAL committed
@@ -10010,11 +10010,11 @@ requirements:
       - tests/test_arrivals.py
       - tests/test_delivery.py
     implemented_by:
-      - qa_tools/common/arrival_patterns.py::attribute
-      - qa_tools/common/arrival_patterns.py::compiled_patterns
+      - asset_model/arrival_patterns.py::attribute
+      - asset_model/arrival_patterns.py::compiled_patterns
       - qa_tools/common/validate_arrival_patterns.py::validate
-      - qa_tools/common/delivery.py::files_by_dataset
-      - qa_tools/common/arrivals.py::recognise
+      - asset_model/delivery.py::files_by_dataset
+      - asset_model/arrivals.py::recognise
     evidence:
       - >-
         2026-09-25: Child Protection moved OFF a hardcoded filename loop
@@ -10201,9 +10201,9 @@ requirements:
       - tests/test_delivery_log.py
       - tests/test_arrivals.py
     implemented_by:
-      - qa_tools/common/holds.py::holds_in
-      - qa_tools/common/holds.py::held_datasets
-      - qa_tools/common/arrivals.py::Arrival
+      - asset_model/holds.py::holds_in
+      - asset_model/holds.py::held_datasets
+      - asset_model/arrivals.py::Arrival
       - qa_tools/common/supply_db.py::staged_table
       - qa_tools/common/delivery_log.py::record
     evidence:
@@ -10260,7 +10260,7 @@ requirements:
       - qa_tools/common/load_log.py::record_load
       - qa_tools/common/load_log.py::loaded_tables
       - qa_tools/common/load_log.py::delivery_is_processed
-      - qa_tools/common/asset_time.py::arrival_key
+      - asset_model/asset_time.py::arrival_key
       - qa_tools/common/supply_db.py::staged_table
       - qa_tools/common/supply_db.py::candidates_in
       - qa_tools/common/supply_db.py::expected_tables
@@ -10714,11 +10714,11 @@ requirements:
       - tests/test_cli_pipeline.py
     implemented_by:
       - qa_tools/common/delivery.py::next_sequence
-      - qa_tools/common/delivery.py::read_receipt_record
-      - qa_tools/common/delivery.py::survey
+      - asset_model/delivery.py::read_receipt_record
+      - asset_model/delivery.py::survey
       - qa_tools/common/backlog.py::Position
       - qa_tools/common/processing_pass.py::unprocessed
-      - qa_tools/common/arrivals.py::Arrival
+      - asset_model/arrivals.py::Arrival
     evidence:
       - >
         2026-09-25: criterion 3 was a LIVE bug, not a precaution, and the test was
@@ -10955,10 +10955,10 @@ requirements:
       - tests/test_filing.py
       - tests/test_cli_supply.py
     implemented_by:
-      - qa_tools/common/assignment.py::assign
-      - qa_tools/common/assignment.py::current_slot
-      - qa_tools/common/assignment.py::open_slot
-      - qa_tools/common/assignment.py::Assignment
+      - asset_model/assignment.py::assign
+      - asset_model/assignment.py::current_slot
+      - asset_model/assignment.py::open_slot
+      - asset_model/assignment.py::Assignment
       - qa_tools/common/filing.py::record
       - qa_tools/common/filing.py::filing_for
       - qa_tools/common/filing.py::filled_slots
@@ -11133,9 +11133,9 @@ requirements:
     linked_tests:
       - tests/test_assignment.py
     implemented_by:
-      - qa_tools/common/assignment.py::closed_by_monotonic_filling
-      - qa_tools/common/assignment.py::oldest_claimable_unfilled
-      - qa_tools/common/assignment.py::assign
+      - asset_model/assignment.py::closed_by_monotonic_filling
+      - asset_model/assignment.py::oldest_claimable_unfilled
+      - asset_model/assignment.py::assign
     evidence:
       - >
         2026-09-25: the scenario is traced end to end as a real sequence, and
@@ -11230,8 +11230,8 @@ requirements:
       - qa_tools/common/supply_holds.py::holds_in
       - qa_tools/common/supply_holds.py::Holds
       - qa_tools/common/supply_holds.py::HeldSupply
-      - qa_tools/common/assignment.py::_why_unavailable
-      - qa_tools/common/assignment.py::Assignment
+      - asset_model/assignment.py::_why_unavailable
+      - asset_model/assignment.py::Assignment
       - cli/supply.py::holds_command
     unmet_criteria:
       - criterion: >-
@@ -11370,8 +11370,8 @@ requirements:
       - qa_tools/common/landed_on_accepted.py::report
       - qa_tools/common/landed_on_accepted.py::may_auto_promote
       - qa_tools/common/landed_on_accepted.py::LandedOnAccepted
-      - qa_tools/common/assignment.py::assign
-      - qa_tools/common/assignment.py::Assignment
+      - asset_model/assignment.py::assign
+      - asset_model/assignment.py::Assignment
     unmet_criteria:
       - criterion: >-
           Criterion 8, in part - reporting an arrival into a filled slot as
@@ -11480,8 +11480,8 @@ requirements:
       - tests/test_build_dashboard_data.py
       - tests/test_build_dashboard_child_protection.py
     implemented_by:
-      - qa_tools/common/arrival_classification.py::classify
-      - qa_tools/common/arrival_classification.py::describe
+      - asset_model/arrival_classification.py::classify
+      - asset_model/arrival_classification.py::describe
     unmet_criteria:
       - criterion: >-
           Criterion 9, in part - recording the classification with the supply
@@ -11663,7 +11663,7 @@ requirements:
     implemented_by:
       - qa_tools/common/filing.py::refile
       - qa_tools/common/filing.py::classification_of
-      - qa_tools/common/arrival_classification.py::classify
+      - asset_model/arrival_classification.py::classify
     unmet_criteria:
       - criterion: >-
           Criterion 4, in part - presenting the classification current for a
@@ -14607,7 +14607,7 @@ requirements:
       - qa_tools/common/filing.py::recorded_arrival_at
       - qa_tools/common/filing.py::RecordedArrival
       - qa_tools/common/filing.py::_judged_for
-      - qa_tools/common/assignment.py::assign
+      - asset_model/assignment.py::assign
       - pipeline/recorded_arrival.py::for_run
       - "dashboard/qa-reporting-dashboard.template.html::builtWaitSeconds"
     evidence:
@@ -20190,11 +20190,11 @@ requirements:
     - qa_tools/common/file_checks.py::evaluate
     - qa_tools/common/file_checks.py::screen
     - qa_tools/common/file_checks.py::record
-    - qa_tools/common/file_checks.py::check_id_for
+    - asset_model/file_check_definitions.py::check_id_for
     - assets/daily/file-checks.yaml
     - assets/quarterly/file-checks.yaml
-    - qa_tools/common/check_id.py::parse
-    - qa_tools/common/check_lifecycle.py::parse_file_check_metadata
+    - asset_model/check_id.py::parse
+    - asset_model/check_lifecycle.py::parse_file_check_metadata
     - qa_tools/common/qa_store.py::record_file_results
     - qa_tools/common/qa_store.py::register_run_if_absent
     - qa_tools/common/qa_results_reader.py::read_file_results
@@ -20397,7 +20397,7 @@ requirements:
       - qa_tools/common/inheritance.py::Refused
       - qa_tools/common/period_schema.py::open_period
       - qa_tools/common/period_schema.py::opened
-      - qa_tools/common/schedule.py::date_of
+      - asset_model/schedule.py::date_of
       - qa_tools/common/decision_log.py::INHERIT
       - qa_tools/common/decision_log.py::INHERIT_REFUSED
       - qa_tools/common/outstanding.py::INHERITANCE_REFUSED
@@ -22224,7 +22224,7 @@ requirements:
       - tests/test_build_dashboard_child_protection.py
       - tests-js/not-evaluated.test.js
     implemented_by:
-      - qa_tools/common/arrivals.py::arrivals_for
+      - asset_model/arrivals.py::arrivals_for
       - qa_tools/common/delivery.py::write_delivery
       - qa_tools/common/period_overlay.py::build
       - qa_tools/tools/orchestrate.py::file_and_overlay
@@ -23143,10 +23143,10 @@ requirements:
       - qa_tools/common/sample_data.py::state_for_participants
       - qa_tools/common/sample_data.py::ensure_schema_for_table
       - qa_tools/common/sample_data.py::discard
-      - qa_tools/common/schedule.py::no_calendar
-      - qa_tools/common/schedule.py::will_graduate
-      - qa_tools/common/schedule.py::owes_from
-      - qa_tools/common/schedule.py::calendar_for_dataset
+      - asset_model/schedule.py::no_calendar
+      - asset_model/schedule.py::will_graduate
+      - asset_model/schedule.py::owes_from
+      - asset_model/schedule.py::calendar_for_dataset
       - qa_tools/common/supply_db.py::add_run_views
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_one
@@ -23681,7 +23681,7 @@ requirements:
     - qa_tools/common/drift_reference.py::reference_run_for_arrival
     - qa_tools/common/drift_reference.py::reference_for
     - qa_tools/common/filing.py::period_of
-    - qa_tools/common/evidently_common.py::status_for
+    - asset_model/drift.py::status_for
     - qa_tools/common/evidently_common.py::recorded_row_counts
     - qa_tools/tools/run_evidently.py::_volume_per_table
     - qa_tools/tools/run_evidently.py::evaluate
@@ -24242,14 +24242,14 @@ requirements:
     - '2026-10-11: full `mothman check` 4019 passed with 2 failures, both this change''s and both fixed (a hold-message test asserting the old file name; plans/INDEX.md stale after the deletions), each rerun green, plus one defect found by the run''s review and fixed test-first (the exhausted-schedule notice named contract/data-asset.yaml - tests/test_embed_dashboard_data.py''s new test failed before the fix); `npm test` 581 passed; tests/test_agreement.py 27 passed.'
     - '2026-10-11: delivery-critic findings fixed test-first (plans/post-build-review.md #137) - tests/test_agreement.py TestCriticFindingsOn110, ten tests failing before the fixes: a duplicate dataset, collection or not_expected period is refused; criterion 7 is checked per participation version against every calendar version it overlaps, at the gate and at runtime; a hierarchy dataset on a calendar with no entry is refused; an older version''s month typo and an impossible expected time are gate errors, not tracebacks; criterion 29''s message names the periods and where it looked; criterion 18''s names both files. Criteria 11 and 37 gained tests.'
     implemented_by:
-    - qa_tools/common/agreement.py::load
-    - qa_tools/common/agreement.py::current
-    - qa_tools/common/agreement.py::Agreement
-    - qa_tools/common/agreement.py::cadence
-    - qa_tools/common/schedule.py::periods_for_dataset
-    - qa_tools/common/schedule.py::owes_from
-    - qa_tools/common/schedule.py::claim_window
-    - qa_tools/common/slots.py::slots_for_dataset
+    - asset_model/agreement.py::load
+    - asset_model/agreement.py::current
+    - asset_model/agreement.py::Agreement
+    - asset_model/agreement.py::cadence
+    - asset_model/schedule.py::periods_for_dataset
+    - asset_model/schedule.py::owes_from
+    - asset_model/schedule.py::claim_window
+    - asset_model/slots.py::slots_for_dataset
     - qa_tools/common/period_overlap.py::overlaps_for
     - qa_tools/common/validate_schedule.py::_participation_errors
     - qa_tools/common/validate_schedule.py::_retired_key_errors
@@ -25233,13 +25233,13 @@ requirements:
     - 'tests/test_agreement_drift.py::TestATurnOffOverAJudgedPeriod'
     - 'tests-js/blocked-dataset.test.js'
     implemented_by:
-    - 'qa_tools/common/agreement.py::Agreement::standing_on'
+    - 'asset_model/agreement.py::Agreement::standing_on'
     - 'qa_tools/common/schedule_ended.py::_awaiting_confirmation'
     - 'qa_tools/common/correction_trial.py::_turned_off_by'
-    - 'qa_tools/common/agreement.py::Agreement::timing_on'
-    - 'qa_tools/common/agreement.py::Agreement::ever_turned_off'
-    - 'qa_tools/common/agreement.py::resolve'
-    - 'qa_tools/common/agreement.py::_participation_version'
+    - 'asset_model/agreement.py::Agreement::timing_on'
+    - 'asset_model/agreement.py::Agreement::ever_turned_off'
+    - 'asset_model/agreement.py::resolve'
+    - 'asset_model/agreement.py::_participation_version'
     - 'qa_tools/common/turned_off.py::gap_at'
     - 'qa_tools/common/turned_off.py::label_at'
     - 'qa_tools/common/turned_off.py::refusal'
@@ -25247,9 +25247,9 @@ requirements:
     - 'qa_tools/common/schemas.py::ParticipationVersionConfig'
     - 'qa_tools/common/schemas.py::AgreementChangelogEntry'
     - 'qa_tools/common/validate_schedule.py::_turn_off_errors'
-    - 'qa_tools/common/schedule.py::periods_for_dataset'
-    - 'qa_tools/common/schedule.py::claim_window'
-    - 'qa_tools/common/slots.py::_participation_for'
+    - 'asset_model/schedule.py::periods_for_dataset'
+    - 'asset_model/schedule.py::claim_window'
+    - 'asset_model/slots.py::_participation_for'
     - 'qa_tools/common/filing.py::held_as_turned_off'
     - 'qa_tools/common/supply_holds.py::reason_for'
     - 'qa_tools/common/supply_holds.py::Held::label'
@@ -25264,7 +25264,7 @@ requirements:
     - 'qa_tools/common/agreement_freeze.py::flatten'
     - 'qa_tools/common/agreement_freeze.py::_flipped'
     - 'qa_tools/common/agreement_freeze.py::_counts_on'
-    - 'qa_tools/common/agreement_freeze.py::revert'
+    - 'asset_model/declared_corrections.py::revert'
     - 'qa_tools/common/correction_trial.py::trial'
     - 'qa_tools/common/correction_apply.py::why_not_confirmable'
     - 'qa_tools/common/correction_apply.py::keep_parked'
@@ -25666,10 +25666,10 @@ requirements:
     linked_tests:
     - tests/test_collection_defaults.py
     implemented_by:
-    - qa_tools/common/agreement.py::resolve
-    - qa_tools/common/agreement.py::Agreement::participation_on
-    - qa_tools/common/agreement.py::Agreement::resolved_versions
-    - qa_tools/common/agreement.py::describe_source
+    - asset_model/agreement.py::resolve
+    - asset_model/agreement.py::Agreement::participation_on
+    - asset_model/agreement.py::Agreement::resolved_versions
+    - asset_model/agreement.py::describe_source
     - qa_tools/common/validate_schedule.py::_defaults_errors
     - qa_tools/common/validate_schedule.py::_participation_errors
     - qa_tools/common/participation_view.py::view
@@ -25913,7 +25913,7 @@ requirements:
     - qa_tools/common/validate_schedule.py::_freeze_errors
     - qa_tools/common/validate_schedule.py::_version_added_on
     - qa_tools/common/schemas.py::Correction
-    - qa_tools/common/agreement.py::from_doc
+    - asset_model/agreement.py::from_doc
     - qa_tools/common/diff_base.py::diff_base
     linked_tests:
     - tests/test_agreement_freeze.py
@@ -26144,18 +26144,18 @@ requirements:
     - '2026-10-11: full Python suite 4003 passed with 2 failures, both this change''s and both fixed (a guard keeping Intl.DateTimeFormat to two callers - the offset arithmetic now goes through assetParts; an e2e test reading the old ASSET_TIMEZONE constant), each rerun green; `npm test` 581 passed - the implementation commit 7328977 said 582, a number added up rather than run, corrected here; the dashboard e2e test of today''s zone 5 passed.'
     - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 13''s second half - a timezone correction is re-judged (tests/test_verdict_record.py test_a_timezone_correction_rejudges_the_supply, added today: UTC+14 makes the 12:00 supply late), previewed (tests/test_correction_trial.py test_a_changed_timezone_moves_every_instant) and backstopped (tests/test_agreement_drift.py test_a_changed_timezone_is_refused_too). The re-judgement test passed on first run - the behaviour came with REQ-PIPE-168, only the test was missing.'
     implemented_by:
-    - qa_tools/common/asset_time.py::parse_timezone_versions
-    - qa_tools/common/asset_time.py::timezone_versions
-    - qa_tools/common/asset_time.py::zone_on
-    - qa_tools/common/asset_time.py::zone_at
-    - qa_tools/common/asset_time.py::zone_now
-    - qa_tools/common/asset_time.py::wall_clock
-    - qa_tools/common/asset_time.py::wall_clock_problem
-    - qa_tools/common/asset_time.py::ZoneVersion
-    - qa_tools/common/asset_time.py::NoTimezoneVersion
+    - asset_model/asset_time.py::parse_timezone_versions
+    - asset_model/asset_time.py::timezone_versions
+    - asset_model/asset_time.py::zone_on
+    - asset_model/asset_time.py::zone_at
+    - asset_model/asset_time.py::zone_now
+    - asset_model/asset_time.py::wall_clock
+    - asset_model/asset_time.py::wall_clock_problem
+    - asset_model/asset_time.py::ZoneVersion
+    - asset_model/asset_time.py::NoTimezoneVersion
     - qa_tools/common/validate_schedule.py::_daylight_saving_errors
-    - qa_tools/common/amber_setting.py::normalised_changelog
-    - qa_tools/common/amber_setting.py::past_change_problems
+    - asset_model/amber_setting.py::normalised_changelog
+    - asset_model/amber_setting.py::past_change_problems
     - qa_tools/common/schemas.py::TimezoneConfig
     - qa_tools/common/schemas.py::ConfigChangelogEntry
     - qa_tools/common/hand_filing.py::resolve_original
@@ -26322,14 +26322,14 @@ requirements:
     - '2026-10-11 (overnight #3): tests/test_slot_instants.py 19 passed - two participation eras give earlier slots the old due time and grace and later ones the new (criteria 2, 3); an override of the claim window from a later version applies only from its date; the last slot before the boundary closes on the next period''s own new inputs (criterion 4); days_before 1 at 22:00 puts the due instant on the evening before and opens the claim window from it (criteria 1, 5); widening the claim window moves no due instant (criterion 6); a non-whole days_before is refused; the claim reach and the overlap horizon both add the largest days_before (criterion 11); the overlap gate''s instants equal filing''s (criterion 10); nothing under data/ is opened (criterion 8). tests/test_agreement.py adds the gate refusals for days_before and its restate rule.'
     - '2026-10-11: the behaviour pin (tests/test_calendar_move_pin.py, every slot''s instants to 2028) passed unchanged, so per-period resolution changes nothing for today''s one-version agreement. Full `mothman check` 4044 passed with 2 failures - two e2e tests still asserting contract/data-asset.yaml in the schedule-ended notice, left over from REQ-PIPE-110''s configFile fix - both corrected and the class rerun green (11 passed); `npm test` 581 passed.'
     implemented_by:
-    - qa_tools/common/slots.py::slot_instants
-    - qa_tools/common/slots.py::_participation_for
-    - qa_tools/common/slots.py::max_days_before
-    - qa_tools/common/slots.py::slots_for_dataset
-    - qa_tools/common/slots.py::claimable_until
-    - qa_tools/common/in_force.py::version_on
-    - qa_tools/common/agreement.py::Agreement
-    - qa_tools/common/agreement.py::ParticipationVersion
+    - asset_model/slots.py::slot_instants
+    - asset_model/slots.py::_participation_for
+    - asset_model/slots.py::max_days_before
+    - asset_model/slots.py::slots_for_dataset
+    - asset_model/slots.py::claimable_until
+    - asset_model/in_force.py::version_on
+    - asset_model/agreement.py::Agreement
+    - asset_model/agreement.py::ParticipationVersion
     - qa_tools/common/period_overlap.py::overlaps_for
     - qa_tools/common/validate_schedule.py::_daylight_saving_errors
     - qa_tools/common/schemas.py::ParticipationVersionConfig
@@ -26906,17 +26906,17 @@ requirements:
     - "tests/test_check_fingerprint.py::TestOneMapPerAttempt"
     - "tests/test_check_lifecycle.py"
     implemented_by:
-    - "qa_tools/common/check_fingerprint.py::fingerprint"
-    - "qa_tools/common/check_fingerprint.py::fingerprint_under"
-    - "qa_tools/common/check_fingerprint.py::normalise"
-    - "qa_tools/common/check_fingerprint.py::drop_defaults"
-    - "qa_tools/common/check_fingerprint.py::defaults_for"
-    - "qa_tools/common/check_fingerprint.py::canonical"
-    - "qa_tools/common/check_fingerprint.py::differs"
-    - "qa_tools/common/check_fingerprint.py::stamp"
-    - "qa_tools/common/frozen_defaults.py::FROZEN_DEFAULTS"
-    - "qa_tools/common/check_lifecycle.py::_definition"
-    - "qa_tools/common/check_lifecycle.py::CheckMetadata"
+    - "asset_model/check_fingerprint.py::fingerprint"
+    - "asset_model/check_fingerprint.py::fingerprint_under"
+    - "asset_model/check_fingerprint.py::normalise"
+    - "asset_model/check_fingerprint.py::drop_defaults"
+    - "asset_model/check_fingerprint.py::defaults_for"
+    - "asset_model/check_fingerprint.py::canonical"
+    - "asset_model/check_fingerprint.py::differs"
+    - "asset_model/check_fingerprint.py::stamp"
+    - "asset_model/frozen_defaults.py::FROZEN_DEFAULTS"
+    - "asset_model/check_lifecycle.py::_definition"
+    - "asset_model/check_lifecycle.py::CheckMetadata"
     - "qa_tools/common/validate_check_lifecycle.py::frozen_default_errors"
     - "qa_tools/common/validate_check_lifecycle.py::frozen_defaults_at"
     - "qa_tools/common/qa_store.py::record_results"
@@ -27463,8 +27463,8 @@ requirements:
     evidence:
     - '2026-10-11 (overnight #3): tests/test_slot_instants.py TestAFollowingPeriodDataset 4 passed - with days_before 60 a supply arriving 1 June 2025 finds 2025-Q3''s slot already open through the unchanged assignment.open_slot rule, inside its window and before its due instant (criteria 1-3); sixty days early does not overlap and the overlap gate checks it through the same instants, while a version moving due instants 80 days earlier from 2025-06-01 is caught as an overlap at 2025-Q3 (4); a February-and-August dataset due 60 days early still participates in February and August, its 2026-Q1 slot due in December (6). Criterion 5: tests-js/slot-due-dates.test.js 2 passed (the cycle heading shows the slot''s due date where it differs, and is unchanged where it does not) and tests/test_embed_dashboard_data.py''s two SLOT_DUE_DATES tests passed (the embed carries only differing due dates; for today''s asset, none).'
     implemented_by:
-    - qa_tools/common/slots.py::slot_instants
-    - qa_tools/common/slots.py::claimable_until
+    - asset_model/slots.py::slot_instants
+    - asset_model/slots.py::claimable_until
     - dashboard/embed_dashboard_data.py::_slot_due_dates
     - dashboard/embed_dashboard_data.py::embed
     linked_tests:
@@ -27886,13 +27886,13 @@ requirements:
     - qa_tools/common/correction_apply.py::trial_for
     - qa_tools/common/correction_apply.py::confirm
     - qa_tools/common/correction_apply.py::summary
-    - qa_tools/common/agreement_freeze.py::revert
+    - asset_model/declared_corrections.py::revert
     - qa_tools/common/outstanding.py::_from_pending_corrections
     - cli/supply.py::corrections_command
     - cli/supply.py::confirm_correction_command
     - cli/filing_tui.py::corrections_flow
     - qa_tools/common/correction_apply.py::parked
-    - qa_tools/common/correction_replay.py::docs_at
+    - asset_model/declared_corrections.py::docs_at
     - qa_tools/common/correction_replay.py::confirm_due
     - qa_tools/common/correction_replay.py::history_end
     - qa_tools/common/arrival_lifecycle.py::process_all
@@ -29151,8 +29151,8 @@ requirements:
       show`. `mothman supply amber-setting` lists all seven datasets as ''promote
       (set for the whole data asset, since 1 Jan 2023)''.'
     implemented_by:
-    - qa_tools/common/amber_setting.py::resolve
-    - qa_tools/common/amber_setting.py::past_change_problems
+    - asset_model/amber_setting.py::resolve
+    - asset_model/amber_setting.py::past_change_problems
     - qa_tools/common/schemas.py::AmberSetting
     - qa_tools/common/validate_schedule.py::_amber_setting_errors
     - qa_tools/common/promotion.py::should_promote
@@ -29166,8 +29166,8 @@ requirements:
     - qa_tools/common/filing_queue.py::operations_for
     - pipeline/acknowledgements.py::for_dataset
     - dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge
-    - qa_tools/common/amber_setting.py::timeline
-    - qa_tools/common/amber_setting.py::describe
+    - asset_model/amber_setting.py::timeline
+    - asset_model/amber_setting.py::describe
     - cli/app.py::_config_refusal
     - cli/supply.py::amber_setting_command
     - cli/filing_tui.py::_print_amber_settings
@@ -29299,7 +29299,7 @@ requirements:
     - qa_tools/common/replacement_setting.py::resolve
     - qa_tools/common/replacement_setting.py::permits
     - qa_tools/common/replacement_setting.py::conflicts
-    - qa_tools/common/amber_setting.py::resolve
+    - asset_model/amber_setting.py::resolve
     - qa_tools/common/promotion.py::after_run
     - qa_tools/common/promotion.py::_refuse_what_the_slot_forbids
     - qa_tools/common/promotion.py::_record_withheld
@@ -29944,15 +29944,15 @@ requirements:
     - tests/test_cli_schedule.py
     - tests/test_calendar_end_closes.py
     implemented_by:
-    - qa_tools/common/assignment.py::assign
-    - qa_tools/common/assignment.py::open_slot
-    - qa_tools/common/assignment.py::current_slot
-    - qa_tools/common/assignment.py::_why_unavailable
-    - qa_tools/common/slots.py::Slot
-    - qa_tools/common/slots.py::slots_for_dataset
-    - qa_tools/common/slots.py::_calendar_periods
-    - qa_tools/common/slots.py::is_open
-    - qa_tools/common/slots.py::is_closed
+    - asset_model/assignment.py::assign
+    - asset_model/assignment.py::open_slot
+    - asset_model/assignment.py::current_slot
+    - asset_model/assignment.py::_why_unavailable
+    - asset_model/slots.py::Slot
+    - asset_model/slots.py::slots_for_dataset
+    - asset_model/slots.py::_calendar_periods
+    - asset_model/slots.py::is_open
+    - asset_model/slots.py::is_closed
     - qa_tools/common/promotion.py::should_promote
     - qa_tools/common/outstanding.py::survey
     - qa_tools/common/unrunnable.py::results_for
@@ -31252,7 +31252,7 @@ requirements:
     implemented_by:
     - qa_tools/common/delivery.py::filed_by_person
     - qa_tools/common/delivery.py::write_receipts
-    - qa_tools/common/delivery.py::read_delivery
+    - asset_model/delivery.py::read_delivery
     - qa_tools/common/delivery_log.py::record
     - qa_tools/common/hand_filing.py::file_supply
     - qa_tools/common/people.py::display_name
@@ -32061,9 +32061,9 @@ requirements:
       hold behaviour, held by test_held_not_checked.py and confirmed on the sandbox
       database: every held supply has its 6 file checks and no data checks.'
     implemented_by:
-    - qa_tools/common/assignment.py::schedule_ended
-    - qa_tools/common/assignment.py::assign
-    - qa_tools/common/assignment.py::_why_unavailable
+    - asset_model/assignment.py::schedule_ended
+    - asset_model/assignment.py::assign
+    - asset_model/assignment.py::_why_unavailable
     - qa_tools/common/supply_holds.py::reason_for
     - qa_tools/common/supply_holds.py::tally
     - qa_tools/common/schedule_ended.py::refile_covered
@@ -32249,11 +32249,11 @@ requirements:
       also caught REQ-PIPE-154''s defect (post-build-review #127), fixed before
       the second.'
     implemented_by:
-    - qa_tools/common/config_yaml.py::parse
-    - qa_tools/common/config_yaml.py::load
-    - qa_tools/common/config_yaml.py::clear
-    - qa_tools/common/agreement.py::load
-    - qa_tools/common/schedule.py::claim_window
+    - asset_model/config_yaml.py::parse
+    - asset_model/config_yaml.py::load
+    - asset_model/config_yaml.py::clear
+    - asset_model/agreement.py::load
+    - asset_model/schedule.py::claim_window
     - qa_tools/common/postgres_version.py::_declared_value
     - qa_tools/common/environments.py::_load
     linked_tests:
@@ -32903,17 +32903,17 @@ requirements:
     - tests/test_reads_columns.py
     - tests/test_check_bands.py
     implemented_by:
-    - qa_tools/common/check_bands.py::soda_reference_reads
-    - qa_tools/common/check_bands.py::Catalogue
+    - asset_model/check_bands.py::soda_reference_reads
+    - asset_model/check_bands.py::Catalogue
     - cli/dashboard.py::validate_reads_columns_command
-    - qa_tools/common/check_bands.py::catalogue
-    - qa_tools/common/check_bands.py::Rule
-    - qa_tools/common/check_bands.py::soda_bounds
-    - qa_tools/common/check_bands.py::dbt_bounds
-    - qa_tools/common/check_bands.py::contract_bounds
-    - qa_tools/common/check_bands.py::evidently_bounds
-    - qa_tools/common/check_lifecycle.py::reads_columns_errors
-    - qa_tools/common/check_lifecycle.py::contract_columns
+    - asset_model/check_bands.py::catalogue
+    - asset_model/check_bands.py::Rule
+    - asset_model/check_bands.py::soda_bounds
+    - asset_model/check_bands.py::dbt_bounds
+    - asset_model/check_bands.py::contract_bounds
+    - asset_model/check_bands.py::evidently_bounds
+    - asset_model/check_lifecycle.py::reads_columns_errors
+    - asset_model/check_lifecycle.py::contract_columns
     - qa_tools/common/validate_reads_columns.py::main
     - cli/scenarios.py::bands_command
     - cli/check.py::_GATES
@@ -33368,7 +33368,7 @@ requirements:
     implemented_by:
       - qa_tools/common/datacontract_common.py::selection_for
       - qa_tools/common/datacontract_common.py::run_against_warehouse
-      - qa_tools/common/check_lifecycle.py::odcs_quality_id
+      - asset_model/check_lifecycle.py::odcs_quality_id
       - qa_tools/tools/run_datacontract.py::evaluate
     evidence:
       - "2026-10-12: tests/test_datacontract_scoped.py - all 89 quality rules carry their id (c1); a missing or different id fails the lifecycle parse naming the rule (c2); scoped by quality_ids, narrowed by schema_name where every rule sits on one model, with identical records to the whole contract for three Child Protection tables and Birth Registrations (c3); neither option for a run naming no table (c5); the contract handed is the committed one plus the server (c6); an unknown id refuses (c7); a rule over an unreadable table is left out and reported (c8)."
@@ -34239,7 +34239,7 @@ requirements:
     - qa_tools/common/scripted_decisions.py::_timed_by_period
     - qa_tools/common/scripted_decisions.py::_due_at
     - qa_tools/common/scripted_decisions.py::_apply
-    - qa_tools/common/slots.py::relative_period
+    - asset_model/slots.py::relative_period
     evidence:
     - '2026-10-13: a bootstrap from empty after the change (mothman env reset-synthetic, then mothman pipeline bootstrap, 4m42s) played all nine committed scripts - six TS-67, TS-43, TS-47, TS-45 - each changing something, and ran the five re-checks they owed; none was refused. That is criterion 10 and the no-op rule below on the real history.
 
@@ -36446,14 +36446,14 @@ requirements:
     - 'tests/test_evidently_reads_its_entry.py'
     - 'tests/test_validate_check_lifecycle.py::test_a_macro_in_a_subfolder_is_still_covered'
     implemented_by:
-    - 'qa_tools/common/check_lifecycle.py::_with_definition'
-    - 'qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata'
-    - 'qa_tools/common/check_lifecycle.py::_parse_soda_check'
+    - 'asset_model/check_lifecycle.py::_with_definition'
+    - 'asset_model/check_lifecycle.py::parse_dbt_check_metadata'
+    - 'asset_model/check_lifecycle.py::_parse_soda_check'
     - 'qa_tools/common/validate_check_lifecycle.py::_old_file_content'
     - 'qa_tools/common/validate_check_lifecycle.py::dbt_definitions'
     - 'qa_tools/common/validate_check_lifecycle.py::_by_source_file'
-    - 'qa_tools/common/evidently_common.py::status_for'
-    - 'qa_tools/common/check_bands.py::evidently_bounds'
+    - 'asset_model/drift.py::status_for'
+    - 'asset_model/check_bands.py::evidently_bounds'
     - 'qa_tools/tools/run_evidently.py::evaluate'
     - 'qa_tools/tools/run_evidently.py::evaluate'
     - 'qa_tools/tools/run_evidently.py::_volume_per_table'
@@ -36538,7 +36538,7 @@ requirements:
     - 'qa_tools/common/validate_feedback.py::route_problem'
     - 'qa_tools/common/validate_feedback.py::main'
     - 'cli/dashboard.py::validate_feedback_command'
-    - 'qa_tools/common/every_asset.py::declared'
+    - 'asset_model/every_asset.py::declared'
     evidence:
     - 'tests/test_validate_feedback.py (28 tests, run 2026-10-14): a well-formed card parses with its first label, date and three kinds of evidence; an entry with no card fails naming it; ''What we heard'' is required; labels come once each and in order with exactly one first label; a card with nothing built needs no placeholder; a build claim needs evidence; absolute, javascript:, bare and req= items are refused (req= naming the bare id), as is a malformed in-place-on date, and a well-formed past date is accepted; the shared parser itself refuses a non-relative target; unknown and retired requirements (naming the replacement), unlisted sprints and routes the hierarchy does not hold are refused; Card status values and their rules; a missing or empty file fails; the committed file passes with 21 cards.'
     - '`mothman dashboard validate-feedback` passes on the committed plans/road-testing.md (21 cards: 10 current, 11 restored) and runs as the ''feedback'' gate of `mothman check` and a step of validate-config.yml.'
@@ -37219,7 +37219,7 @@ requirements:
     linked_tests:
       - tests/test_pinned_now.py
     implemented_by:
-      - qa_tools/common/asset_time.py::now
+      - asset_model/asset_time.py::now
       - tests/conftest.py::pytest_collection_modifyitems
     evidence:
       - "2026-10-16, THE SELF-CHECK (criterion 5), recorded before any other requirement uses the harness: two full captures of 66efd5d, `mothman debug equivalence compare self-check-a self-check-b` - S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0. Bootstrap A 1756s (Birth Registrations 562s, Child Protection 1645s), B 1935s (674s, 1811s), difference +179s; B ran alongside this session's test and gate runs for part of its span."
@@ -37292,8 +37292,8 @@ requirements:
       - tests/test_recheck.py
       - tests/test_ticket_sync.py
     implemented_by:
-      - qa_tools/collections/__init__.py::all_collections
-      - qa_tools/collections/__init__.py::resolve
+      - asset_model/collections.py::all_collections
+      - asset_model/collections.py::resolve
       - qa_tools/collections/__init__.py::adapter
       - qa_tools/collections/base.py::CollectionAdapter
       - assets/daily/collections/civil_registration.py::ADAPTER
@@ -37397,14 +37397,14 @@ requirements:
       - qa_tools/common/validate_check_lifecycle.py::_sources
       - qa_tools/common/validate_check_lifecycle.py::sources_fingerprint
       - qa_tools/common/validate_check_lifecycle.py::dbt_definitions
-      - qa_tools/common/check_lifecycle.py::evidently_checks_from_text
-      - qa_tools/common/check_lifecycle.py::contract_columns
-      - qa_tools/common/evidently_common.py::collection_checks
+      - asset_model/check_lifecycle.py::evidently_checks_from_text
+      - asset_model/check_lifecycle.py::contract_columns
+      - asset_model/drift.py::collection_checks
       - qa_tools/common/validate_collections.py::check_file_problems
       - qa_tools/common/tables_read.py::real_sources
       - qa_tools/common/soda_common.py::soda_check_files
-      - qa_tools/common/check_bands.py::evidently_bounds
-      - qa_tools/collections/__init__.py::Collection
+      - asset_model/check_bands.py::evidently_bounds
+      - asset_model/collections.py::Collection
       - assets/daily/registry-services/bdm-birth-registrations-evidently-checks.yml
       - assets/quarterly/child-protection-family-support/child-protection-evidently-checks.yml
     evidence:
@@ -38061,8 +38061,8 @@ requirements:
       - cli/pipeline.py::generate_collection
       - cli/pipeline.py::target_datasets
       - 'generator/scenario_injection.py::this_assets_injections'
-      - 'qa_tools/common/every_asset.py::declared'
-      - 'qa_tools/common/assets.py::every'
+      - 'asset_model/every_asset.py::declared'
+      - 'asset_model/assets.py::every'
     open_questions: []
 
   - id: REQ-QAC-247
@@ -38177,7 +38177,7 @@ requirements:
       - qa_tools/tools/stage.py::stage_table
       - qa_tools/tools/orchestrate.py::entry_for
       - pipeline/build_dashboard_data.py::build
-      - qa_tools/collections/__init__.py::Collection
+      - asset_model/collections.py::Collection
       - qa_tools/common/validate_collections.py::config_problems
       - assets/daily/dbt/models/civil-registration/stg_birth_registrations.sql
     evidence:
@@ -38323,14 +38323,14 @@ requirements:
       - tests/test_sample_data.py
       - tests/test_build_warehouses_rebuild.py
     implemented_by:
-      - qa_tools/common/config_yaml.py::read
-      - qa_tools/common/config_yaml.py::Built
-      - qa_tools/common/hierarchy.py::_load
-      - qa_tools/common/hierarchy.py::by_table
-      - qa_tools/collections/__init__.py::_load
-      - qa_tools/common/asset_time.py::timezone_versions
-      - qa_tools/common/arrival_patterns.py::compiled_patterns
-      - qa_tools/common/agreement.py::current
+      - asset_model/config_yaml.py::read
+      - asset_model/config_yaml.py::Built
+      - asset_model/hierarchy.py::_load
+      - asset_model/hierarchy.py::by_table
+      - asset_model/collections.py::_load
+      - asset_model/asset_time.py::timezone_versions
+      - asset_model/arrival_patterns.py::compiled_patterns
+      - asset_model/agreement.py::current
       - qa_tools/tools/run_dbt.py::_check_ids
       - qa_tools/tools/run_datacontract.py::_authored_names
       - qa_tools/common/presentation.py::_load
@@ -39103,7 +39103,7 @@ requirements:
       - "assets/quarterly/dbt/models/emergency-department/schema.yml"
       - "assets/quarterly/dbt/models/emergency-department/sources.yml"
       - "assets/quarterly/dbt/models/emergency-department/stg_ed_presentations.sql"
-      - "qa_tools/common/evidently_common.py::collection_checks"
+      - "asset_model/drift.py::collection_checks"
       - "qa_tools/tools/run_evidently.py::evaluate"
       - "qa_tools/common/agreement_freeze.py::check"
     evidence:
@@ -40470,8 +40470,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::recheckNote
     - dashboard/qa-reporting-dashboard.template.html::pointSourceTitle
     - dashboard/qa-reporting-dashboard.template.html::byRankThenSeen
-    - qa_tools/common/arrivals.py::Arrival::dataset_id
-    - qa_tools/common/arrivals.py::Arrival::as_entry
+    - asset_model/arrivals.py::Arrival::dataset_id
+    - asset_model/arrivals.py::Arrival::as_entry
     - qa_tools/common/qa_results_writer.py::_arrival_purpose
     - qa_tools/common/qa_store.py::record_file_results
     evidence:
@@ -44984,9 +44984,9 @@ requirements:
     - 'A VALUE THAT IS NOT A WHOLE NUMBER IS REFUSED NAMING THE COLLECTION AND THE VERSION (post-build-review #286 item 10), never a schema path of indices; TWO VERSIONS ON ONE effective_from ARE REFUSED, which would otherwise leave which is in force to the order they are written in.'
     open_questions: []
     implemented_by:
-    - qa_tools/common/agreement.py::Agreement::files_go_to_period
-    - qa_tools/common/agreement.py::Agreement::files_go_to_period_for
-    - qa_tools/common/agreement.py::_offset_versions
+    - asset_model/agreement.py::Agreement::files_go_to_period
+    - asset_model/agreement.py::Agreement::files_go_to_period_for
+    - asset_model/agreement.py::_offset_versions
     - qa_tools/common/validate_schedule.py::_files_go_to_period_errors
     - assets/daily/calendar.yaml
     - assets/quarterly/calendar.yaml
@@ -45105,10 +45105,10 @@ requirements:
     - 'round_of PREFERS A ROUND THE DATASET TAKES PART IN (post-build-review #286 item 2): after a fall, the earliest round reaching the period that the dataset supplies in, as its slots count; the calendar''s earliest only where it supplies in none, which is the round a not-owed reason names.'
     - 'THE PERIOD A VERDICT''S SLOT FILLS IS RECORDED AS inputs.fills (post-build-review #286 item 8), beside period_date, which holds the round''s date - only at a value other than 0, so every verdict recorded at 0 reads exactly as before.'
     implemented_by:
-    - qa_tools/common/schedule.py::round_of
-    - qa_tools/common/schedule.py::period_filled_by
-    - qa_tools/common/slots.py::slot_instants
-    - qa_tools/common/slots.py::slots_for_dataset
+    - asset_model/schedule.py::round_of
+    - asset_model/schedule.py::period_filled_by
+    - asset_model/slots.py::slot_instants
+    - asset_model/slots.py::slots_for_dataset
     - qa_tools/common/inheritance.py::offset_group
     linked_tests:
     - tests/test_files_go_to_period_change.py::TestTheRoundFillingAPeriodAgreesWithTheSlotsAfterAFall::test_round_of_is_the_round_its_slot_is_on
@@ -45178,7 +45178,7 @@ requirements:
     implemented_by:
     - qa_tools/common/validate_schedule.py::_rise_errors
     - qa_tools/common/validate_schedule.py::fall_lines
-    - qa_tools/common/slots.py::fall_hold
+    - asset_model/slots.py::fall_hold
     - qa_tools/common/supply_holds.py::Held::doubly_fed
     - qa_tools/common/correction_trial.py::rise_entries
     linked_tests:
@@ -45346,7 +45346,7 @@ requirements:
     open_questions: []
     implemented_by:
     - assets/quarterly/synthetic/collections/child_protection.py::generated_periods
-    - qa_tools/common/schedule.py::round_of
+    - asset_model/schedule.py::round_of
     linked_tests:
     - tests/test_scripted_decisions.py::TestThePeriodsDueInstantIsTheCalendars::test_due_at_is_the_slots_due_instant_not_its_claim_opening
     - tests/test_files_go_to_period.py::TestARoundsSlotFillsThePeriodAfterIt::test_february_and_august_rounds_owe_q2_and_q4
@@ -45538,9 +45538,9 @@ requirements:
       by: Keith
       date: '2026-10-30'
     implemented_by:
-    - "qa_tools/common/linked_datasets.py::problems"
+    - "asset_model/linked_datasets.py::problems"
     - "qa_tools/common/schemas.py::LinkedDataset"
-    - "qa_tools/common/hierarchy.py::Dataset"
+    - "asset_model/hierarchy.py::Dataset"
     - "qa_tools/common/validate_collections.py::main"
     - "assets/quarterly/collections/linkage_products.py::ADAPTER"
     - "assets/quarterly/department-of-health/linkage-products-contract.yaml"
@@ -45782,7 +45782,7 @@ requirements:
     - "qa_tools/common/distribution.py::bins"
     - "qa_tools/common/distribution.py::declared"
     - "qa_tools/tools/run_soda.py::evaluate"
-    - "qa_tools/common/check_bands.py::soda_bounds"
+    - "asset_model/check_bands.py::soda_bounds"
     linked_tests:
     - "tests/test_check_bands.py::TestAUserDefinedMetricsBandIsRead::test_large_key_groups"
     - "tests/test_check_bands.py::TestAUserDefinedMetricsBandIsRead::test_a_metric_named_after_a_table_with_a_digit"
@@ -45878,7 +45878,7 @@ requirements:
     - "assets/quarterly/synthetic/collections/linkage_products.py::LinkageProducts"
     - "generator/collections/base.py::generated_supplies"
     - "qa_tools/common/promotion.py::_readers_next_receipts"
-    - "qa_tools/common/slots.py::period_claimed_at"
+    - "asset_model/slots.py::period_claimed_at"
     - "generator/correction_claims.py::check"
     linked_tests:
     - "tests/test_generator_providers.py::TestOneDriverForEveryCollection::test_an_arrival_at_another_collections_instant_is_refused_before_writing"
@@ -46028,7 +46028,7 @@ requirements:
     - "assets/quarterly/collections/linkage_products.py::ADAPTER"
     - "qa_tools/common/bootstrap.py::with_what_it_reads"
     - "qa_tools/common/bootstrap.py::reads_others"
-    - "qa_tools/common/evidently_common.py::collection_checks"
+    - "asset_model/drift.py::collection_checks"
     linked_tests:
     - "tests/test_bootstrap_carries_what_it_reads.py::test_linkage_alone_brings_the_collections_it_links"
     - "tests/test_bootstrap_carries_what_it_reads.py::test_a_collection_reading_only_itself_is_unchanged"
@@ -46265,11 +46265,11 @@ requirements:
     - assets/daily/presentation.yaml
     - assets/quarterly/presentation.yaml
     - qa_tools/common/schemas.py::LinkedDataset
-    - qa_tools/common/hierarchy.py::Dataset
-    - qa_tools/common/linked_datasets.py::problems
-    - qa_tools/common/linked_datasets.py::participation_problems
-    - qa_tools/common/linked_datasets.py::_check_problems
-    - qa_tools/common/linked_datasets.py::_query_problems
+    - asset_model/hierarchy.py::Dataset
+    - asset_model/linked_datasets.py::problems
+    - asset_model/linked_datasets.py::participation_problems
+    - asset_model/linked_datasets.py::_check_problems
+    - asset_model/linked_datasets.py::_query_problems
     - qa_tools/common/validate_collections.py::ASSET_WIDE
     - generator/synthetic_inputs.py::problems
     - generator/synthetic_inputs.py::placings
@@ -46386,9 +46386,9 @@ requirements:
     - cli/collection_cli.py::CollectionCLI::try_targets
     - assets/daily/synthetic/scripted_decisions.yaml
     - assets/quarterly/synthetic/scripted_decisions.yaml
-    - 'qa_tools/common/evidently_common.py::psi_of_counts'
+    - 'asset_model/drift.py::psi_of_counts'
     - 'assets/quarterly/synthetic/collections/linkage_products.py::drift_verdict'
-    - 'qa_tools/common/evidently_common.py::fold_value_counts'
+    - 'asset_model/drift.py::fold_value_counts'
     linked_tests:
     - tests/test_geocoding_generator.py::TestTheStreams
     - tests/test_geocoding_generator.py::TestWhenAndFromWhat
@@ -46557,10 +46557,10 @@ requirements:
     - qa_tools/tools/run_dbt.py::_not_evaluated_for_want_of_a_period
     - qa_tools/common/list_setting_members.py::create
     - qa_tools/common/list_setting_members.py::rows_for
-    - qa_tools/common/list_setting_members.py::_declaration_problems
+    - asset_model/set_member_checks.py::_declaration_problems
     - qa_tools/common/period_overlay.py::rebuild_for_arrival
     - qa_tools/tools/run_evidently.py::_excluding
-    - qa_tools/common/evidently_common.py::collection_checks
+    - asset_model/drift.py::collection_checks
     - pipeline/dashboard_check_labels.py::MEASURES
     - assets/quarterly/department-of-health/linkage-products-soda-checks.yml
     - assets/quarterly/department-of-health/linkage-products-evidently-checks.yml
@@ -46839,8 +46839,8 @@ requirements:
     - "pipeline/dashboard_check_labels.py::measures_phrase"
     - "pipeline/dashboard_check_labels.py::measure"
     - "pipeline/dashboard_check_labels.py::MEASURES"
-    - "qa_tools/common/check_lifecycle.py::CheckMetadata"
-    - "qa_tools/common/check_lifecycle.py::_lifecycle_fields"
+    - "asset_model/check_lifecycle.py::CheckMetadata"
+    - "asset_model/check_lifecycle.py::_lifecycle_fields"
     - "pipeline/build_dashboard_data.py::_member_set"
     - "pipeline/build_dashboard_data.py::_left_out_between"
     - "pipeline/build_dashboard_data.py::build_one_table"
@@ -46850,7 +46850,7 @@ requirements:
     - "qa_tools/common/presentation.py::_tile_word_problems"
     - "qa_tools/common/dataset_status.py::LEFT_OUT_STATUSES"
     - "qa_tools/common/dataset_status.py::UNORDERED_STATUSES"
-    - "qa_tools/common/dataset_status.py::STATUS_WORDS"
+    - "asset_model/statuses.py::STATUS_WORDS"
     - "qa_tools/common/dataset_status.py::recognised_status"
     - "qa_tools/common/dataset_status.py::_QUIET_PRECEDENCE"
     - "dashboard/qa-reporting-dashboard.template.html::sampleParts"
@@ -46974,20 +46974,20 @@ requirements:
     - 'requires_asset_value IS A FUNCTION OF THE KEY (build): True for any top-level setting, False for anything under list_settings - the signed flag, with no per-setting declaration to keep in step.'
     - 'timeline() DEFECT CLOSED (plans/post-build-review.md #293 as proposed): timeline reads version dates from the key it is given.'
     implemented_by:
-    - qa_tools/common/amber_setting.py::LIST_SETTINGS
-    - qa_tools/common/amber_setting.py::resolve_on_date
-    - qa_tools/common/amber_setting.py::timeline
-    - qa_tools/common/amber_setting.py::describe
-    - qa_tools/common/amber_setting.py::requires_asset_value
-    - qa_tools/common/amber_setting.py::list_setting_keys
-    - qa_tools/common/amber_setting.py::standing_problems
-    - qa_tools/common/amber_setting.py::_settings
+    - asset_model/amber_setting.py::LIST_SETTINGS
+    - asset_model/amber_setting.py::resolve_on_date
+    - asset_model/amber_setting.py::timeline
+    - asset_model/amber_setting.py::describe
+    - asset_model/amber_setting.py::requires_asset_value
+    - asset_model/amber_setting.py::list_setting_keys
+    - asset_model/amber_setting.py::standing_problems
+    - asset_model/amber_setting.py::_settings
     - qa_tools/common/schemas.py::ListSetting
     - qa_tools/common/schemas.py::ListSettingVersion
     - qa_tools/common/validate_schedule.py::_list_setting_errors
     - qa_tools/common/list_setting_members.py::in_force
-    - qa_tools/common/list_setting_members.py::_coverage_problems
-    - qa_tools/common/list_setting_members.py::_breaking_entry_problems
+    - asset_model/set_member_checks.py::_coverage_problems
+    - asset_model/set_member_checks.py::_breaking_entry_problems
     - qa_tools/common/list_setting_members.py::InForce
     - qa_tools/tools/run_dbt.py::_set_judged_against
     - assets/daily/data-asset.yaml
@@ -47066,8 +47066,8 @@ requirements:
     - 'THE ORPHAN CHECK''S SAMPLE IS id_1 AND census_year (build): the geocoding table''s key, so an orphan names its record and each year it was released for.'
     implemented_by:
     - assets/quarterly/department-of-health/linkage-products-soda-checks.yml
-    - qa_tools/common/linked_datasets.py::_check_problems
-    - qa_tools/common/linked_datasets.py::_query_problems
+    - asset_model/linked_datasets.py::_check_problems
+    - asset_model/linked_datasets.py::_query_problems
     - assets/quarterly/collections/linkage_products.py::ADAPTER
     linked_tests:
     - tests/test_geocoding_checks.py::TestTheShareAndThePairOnRealSoda
@@ -47454,8 +47454,8 @@ requirements:
     - 'tests/test_replacement_setting.py'
     - 'tests/test_generate_to_target.py'
     implemented_by:
-    - 'qa_tools/common/dataset_status.py::status_words'
-    - 'qa_tools/common/dataset_status.py::STATUS_WORDS'
+    - 'asset_model/statuses.py::status_words'
+    - 'asset_model/statuses.py::STATUS_WORDS'
     - 'qa_tools/common/promotion.py::Refusal'
     - 'qa_tools/common/promotion.py::refusal_kind'
     - 'qa_tools/common/promotion.py::_status_label'
@@ -47664,13 +47664,13 @@ requirements:
     - tests/test_github_links.py::test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository
     implemented_by:
     - cli/dashboard.py::validate_layout_command
-    - qa_tools/common/assets.py::_Assets::names
-    - qa_tools/common/assets.py::selected
-    - qa_tools/common/assets.py::data_dir
-    - qa_tools/common/assets.py::reports_dir
-    - qa_tools/common/assets.py::folder_rel
-    - qa_tools/common/assets.py::folder_on_disk
-    - qa_tools/common/every_asset.py::declared
+    - asset_model/assets.py::_Assets::names
+    - asset_model/assets.py::selected
+    - asset_model/assets.py::data_dir
+    - asset_model/assets.py::reports_dir
+    - asset_model/assets.py::folder_rel
+    - asset_model/assets.py::folder_on_disk
+    - asset_model/every_asset.py::declared
     - qa_tools/common/validate_layout.py::assets_top_problems
     - qa_tools/common/validate_layout.py::shared_tree_problems
     - qa_tools/common/validate_collections.py::EXEMPT_DIRS
@@ -47753,9 +47753,9 @@ requirements:
     implemented_by:
     - cli/app.py::_MothmanGroup::resolve_command
     - cli/app.py::cli
-    - qa_tools/common/assets.py::_refusal
-    - qa_tools/common/assets.py::why_not_selected
-    - qa_tools/common/assets.py::selected_or_none
+    - asset_model/assets.py::_refusal
+    - asset_model/assets.py::why_not_selected
+    - asset_model/assets.py::selected_or_none
     - cli/common.py::environment_statement
     - cli/env.py::current_command
     - cli/env.py::list_command
@@ -47819,7 +47819,7 @@ requirements:
     - cli/check.py::_named
     - cli/check.py::_failed_in
     - cli/check.py::_shown
-    - qa_tools/common/check_id.py::validate_hierarchy_agreement
+    - asset_model/check_id.py::validate_hierarchy_agreement
     - qa_tools/common/validate_collections.py::config_problems
     - qa_tools/common/run_reads.py::declaration_problems
     - qa_tools/common/validate_layout.py::assets_top_problems
@@ -47883,8 +47883,8 @@ requirements:
     - qa_tools/common/checkpoints.py::is_legacy
     - qa_tools/common/checkpoints.py::require_names_fit
     - qa_tools/common/bootstrap.py::resume
-    - qa_tools/common/assets.py::data_dir
-    - qa_tools/common/assets.py::reports_dir
+    - asset_model/assets.py::data_dir
+    - asset_model/assets.py::reports_dir
     - qa_tools/common/checkpoints.py::listed
     - qa_tools/common/checkpoints.py::resumes
     - qa_tools/common/checkpoints.py::delete
@@ -47956,12 +47956,12 @@ requirements:
     - tests/test_validate_check_lifecycle.py::test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs
     - tests/test_validate_check_lifecycle.py::test_a_macro_in_a_subfolder_is_still_covered
     implemented_by:
-    - qa_tools/common/assets.py::dbt_project_ready
+    - qa_tools/common/dbt_common.py::dbt_project_ready
     - qa_tools/common/dbt_common.py::packages_installed
     - qa_tools/common/dbt_common.py::install_packages
     - qa_tools/common/dbt_common.py::_project_fingerprint
     - cli/env.py::dbt_deps_command
-    - qa_tools/collections/__init__.py::SHARED_DBT_DIRS
+    - asset_model/collections.py::SHARED_DBT_DIRS
     - qa_tools/common/validate_check_lifecycle.py::dbt_definitions
     - assets/quarterly/dbt/dbt_project.yml
     - assets/daily/dbt/dbt_project.yml
@@ -48029,10 +48029,10 @@ requirements:
     - tests/test_adapter_imports.py::TestTheGate
     - tests/test_cli_check.py::test_coverage_measures_the_asset_folders_wherever_it_is_measured
     implemented_by:
-    - qa_tools/common/assets.py::load
-    - qa_tools/common/assets.py::module_name
-    - qa_tools/common/assets.py::module_file
-    - qa_tools/common/assets.py::adapter_file
+    - asset_model/assets.py::load
+    - asset_model/assets.py::module_name
+    - asset_model/assets.py::module_file
+    - qa_tools/collections/__init__.py::adapter_file
     - qa_tools/common/validate_collections.py::adapter_import_problems
     - cli/check.py::COVERAGE_PACKAGES
     - pyproject.toml
@@ -48134,7 +48134,7 @@ requirements:
     - tests/test_generator_providers.py
     implemented_by:
     - generator/collections/__init__.py::provider_module
-    - qa_tools/common/assets.py::load
+    - asset_model/assets.py::load
     - generator/validate_providers.py::provider_import_problems
     - generator/validate_providers.py::problems
     - generator/validate_providers.py::main
@@ -48248,8 +48248,8 @@ requirements:
     - qa_tools/common/db_identity.py::expected
     - qa_tools/common/db_identity.py::mark
     - cli/env.py::mark_command
-    - qa_tools/common/assets.py::claim_for_connection
-    - qa_tools/common/assets.py::OneAssetPerProcess
+    - asset_model/assets.py::claim_for_connection
+    - asset_model/assets.py::OneAssetPerProcess
     - .claude/hooks/session-start.sh
     - .devcontainer/post-create.sh
     - .github/workflows/test.yml
@@ -48311,8 +48311,8 @@ requirements:
     - tests/test_check_id.py::TestHierarchyAgreement::test_the_former_data_asset_id_is_refused
     - tests/test_validate_check_lifecycle.py
     implemented_by:
-    - qa_tools/common/check_id.py::validate_hierarchy_agreement
-    - qa_tools/common/check_lifecycle.py::find_disappeared_check_ids
+    - asset_model/check_id.py::validate_hierarchy_agreement
+    - asset_model/check_lifecycle.py::find_disappeared_check_ids
     - assets/quarterly/data-asset.yaml
     - assets/daily/data-asset.yaml
     evidence:
@@ -48456,16 +48456,16 @@ requirements:
     - tests/test_calendar_move_pin.py
     - tests/test_agreement_freeze.py
     implemented_by:
-    - qa_tools/common/schedule.py::baseline
-    - qa_tools/common/schedule.py::on_baseline
-    - qa_tools/common/schedule.py::calendar_for_dataset
-    - qa_tools/common/schedule.py::Calendar
-    - qa_tools/common/agreement.py::Agreement
-    - qa_tools/common/agreement.py::from_doc
+    - asset_model/schedule.py::baseline
+    - asset_model/schedule.py::on_baseline
+    - asset_model/schedule.py::calendar_for_dataset
+    - asset_model/schedule.py::Calendar
+    - asset_model/agreement.py::Agreement
+    - asset_model/agreement.py::from_doc
     - qa_tools/common/validate_schedule.py::_baseline_errors
     - qa_tools/common/validate_schedule.py::_merged_view
     - qa_tools/common/period_schema.py::ensure_period_schema
-    - qa_tools/common/agreement_freeze.py::revert
+    - asset_model/declared_corrections.py::revert
     - generator/scenario_injection.py::_lands_in
     evidence:
     - 'c1, c3, c7: tests/test_baseline_calendar.py::TestTheGateRefusesAnythingButOneBaseline - a monthly calendar beside the quarterly baseline, a collection naming it, a dataset with its own dates, and a hierarchy calendar, each refused with criterion 3''s words; seen failing first (16 of 17 against 647861ed).'
@@ -49111,7 +49111,7 @@ requirements:
     - tests/test_calendar_move_pin.py
     - tests/test_asset_time_semantics.py
     implemented_by:
-    - qa_tools/common/assets.py::_Assets
+    - asset_model/assets.py::_Assets
     - cli/env.py::reset_synthetic_command
     - assets/environments.yaml
     evidence:
@@ -50198,7 +50198,7 @@ requirements:
     - tests/equiv_support.py::run_into_fresh_database
     - cli/debug.py::debug_group
     - tests/conftest.py::pytest_collection_modifyitems
-    - qa_tools/common/asset_time.py::now
+    - asset_model/asset_time.py::now
     evidence:
     - '2026-11-15 (Perth), branch wip/b393-deletions: after the deletions, test_replay_clock.py and test_kept_routes_agree.py run with --run-on-demand on the moved helper - green (39 passed across those and test_checkpoints.py''s other tests, with the bootstrap-equivalence and resume-against-full tests erroring at setup). Those errors - KeyError ''birth-registrations'' in the shared corpus fixture - were identical on the unchanged parent ac3a1376, so they predate this change; Keith then retired both tests (criterion 3 as reworded 2026-11-15).'
     - 'CRITERION 5, the depth-1 clone: commit 83b1f16 cloned with --depth 1, 25 git-touching test modules run with -m "not needs_deployment" - 598 passed, 0 skipped - so the two fetch-depth: 0 lines went with nothing rewritten. critical.yml and validate-config.yml keep their own fetch-depth: 0, which the criterion does not name.'
@@ -50530,11 +50530,11 @@ requirements:
     - 'tests/test_geocoding_gates.py::TestTheSchemaParsesAreKeyedOnContent'
     - 'tests/test_geocoding_gates.py::test_the_real_configuration_passes'
     implemented_by:
-    - 'qa_tools/common/list_setting_members.py::declared'
-    - 'qa_tools/common/list_setting_members.py::_build_checks'
-    - 'qa_tools/common/list_setting_members.py::_declaration_problems'
-    - 'qa_tools/common/list_setting_members.py::_breaking_entry_problems'
-    - 'qa_tools/common/assets.py::_Assets'
+    - 'asset_model/set_member_checks.py::declared'
+    - 'asset_model/set_member_checks.py::_build_checks'
+    - 'asset_model/set_member_checks.py::_declaration_problems'
+    - 'asset_model/set_member_checks.py::_breaking_entry_problems'
+    - 'asset_model/assets.py::_Assets'
     evidence:
     - '2026-11-15 (Perth), worktree b396, list_setting_members.py as at ac3a1376: TestTheSchemaParsesAreKeyedOnContent::test_a_same_size_same_mtime_edit_is_seen_by_declared FAILED - after an in-place edit of the Linkage Products schema (census_years -> census_yearz, size and st_mtime_ns restored and asserted equal) declared() still answered {''census_years''} (criteria 2 and 5); the store test failed on a plain dict; test_the_gate_reads_data_asset_yaml_through_config_yaml failed with the raw yaml.safe_load read put back (criterion 3).'
     - '2026-11-15 (Perth), tree cfcb9e02 (worktree b396), after the fix: tests/test_geocoding_gates.py, test_geocoding_checks.py, test_geocoding_trial.py, test_validate_caches.py, test_config_yaml.py, test_assets.py and the ticket modules - 246 passed; tests/test_target_agreement.py and test_adapter_imports.py (Linkage Products generation through member_setting_of) 53 passed, 2 skipped (no generated history in this checkout, pre-existing); ruff clean. declared() costs 65us a call warm on the quarterly asset (2,000 calls), each call reading its three schema files. post-build-review #325.'

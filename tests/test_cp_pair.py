@@ -24,7 +24,7 @@ REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 
 def _free_quarter(conn):
     """A cp-clients quarter nothing in this worker's database has filed to."""
-    from qa_tools.common import asset_time, slots
+    from asset_model import asset_time, slots
 
     from qa_tools.common import period_schema
 
@@ -78,7 +78,8 @@ def cp_pair_one_unloadable(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
 
 def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
     import fixture_ids
-    from qa_tools.common import arrivals, delivery, delivery_log, promotion
+    from asset_model import arrivals, delivery as delivery_tree
+    from qa_tools.common import delivery, delivery_log, promotion
     from qa_tools.tools import orchestrate
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
@@ -96,7 +97,7 @@ def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
                             received_at={n: received + timedelta(minutes=i)
                                          for i, n in enumerate(sorted(files))},
                             deliveries_dir=deliveries, receipts_dir=receipts)
-    for d in delivery.list_deliveries(deliveries, receipts):
+    for d in delivery_tree.list_deliveries(deliveries, receipts):
         delivery_log.record(d, arrivals.recognise(d))
     found = [a for a in arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
                                               receipts) if a.delivery_name == name]
@@ -189,7 +190,7 @@ class TestAContestedClientRegister:
         F1a), not a hand-built entry."""
         from cli.collection_cli import of as _cli_of
         cp = _cli_of('cp')
-        from qa_tools.common import arrivals
+        from asset_model import arrivals
 
         real = arrivals.arrivals_for
         monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: real(
@@ -264,7 +265,8 @@ class TestAPersonSettlesIt:
             self._readers_now_read_the_supply(conn, cp_pair)
 
     def test_this_periods_supply_plus_a_refile(self, cp_pair):
-        from qa_tools.common import knock_on, settlement, slots
+        from qa_tools.common import knock_on, settlement
+        from asset_model import slots
 
         period = cp_pair["slot"].name
         nxt = slots.relative_period(DS, period, 1)
@@ -316,7 +318,8 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     a later arrival's cp_clients file filed to the pair's period supersedes
     both files, and the contest is resolved."""
     import fixture_ids
-    from qa_tools.common import arrivals, delivery, delivery_log, knock_on, supersession
+    from asset_model import arrivals, delivery as delivery_tree
+    from qa_tools.common import delivery, delivery_log, knock_on, supersession
     from qa_tools.tools import orchestrate
 
     later_at = cp_pair["clients"].received_at + timedelta(hours=6)
@@ -326,7 +329,7 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     delivery.write_delivery(name, {"cp_clients.csv": (source / "cp_clients.csv").read_text()},
                             received_at=later_at, deliveries_dir=deliveries,
                             receipts_dir=receipts)
-    for d in delivery.list_deliveries(deliveries, receipts):
+    for d in delivery_tree.list_deliveries(deliveries, receipts):
         delivery_log.record(d, arrivals.recognise(d))
     found = [a for a in arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
                                               receipts) if a.delivery_name == name]

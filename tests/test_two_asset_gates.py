@@ -51,7 +51,8 @@ class TestBothAssetsReuseEveryIdentifierAndPass:
             assert validate_providers.problems() == [], name
 
     def test_linked_datasets_and_reads_pass_for_each(self, repo, monkeypatch):
-        from qa_tools.common import linked_datasets, run_reads
+        from asset_model import linked_datasets
+        from qa_tools.common import run_reads
 
         for name in ta.NAMES:
             ta.acting_for(repo, name, monkeypatch)
@@ -144,7 +145,7 @@ class TestNothingIsLookedUpInTheOtherAsset:
     declaring dataset, the item and the asset folder checked."""
 
     def test_a_linked_dataset_only_the_other_asset_holds(self, repo, monkeypatch):
-        from qa_tools.common import linked_datasets
+        from asset_model import linked_datasets
 
         ta.add_dataset(repo, "two", "two-only", "t_two_only")
         doc = ta.hierarchy_of(repo, "one")

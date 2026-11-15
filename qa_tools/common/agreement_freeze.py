@@ -51,7 +51,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time, assets
+from asset_model import asset_time, assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -258,7 +258,7 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
 # ---- when each one froze --------------------------------------------
 
 def _datasets_on(calendar_name: str, agr) -> list[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     out = []
     for entry in hierarchy.all_datasets():
@@ -274,7 +274,7 @@ def _datasets_on(calendar_name: str, agr) -> list[str]:
 
 
 def _claim_open(dataset_id: str, day: date, agr) -> datetime | None:
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
         return slots.slot_instants(dataset_id, day, agr).claim_opens_at
@@ -283,7 +283,7 @@ def _claim_open(dataset_id: str, day: date, agr) -> datetime | None:
 
 
 def _first_period_on_or_after(dataset_id: str, day: date, end: date | None, agr) -> date | None:
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
         periods = slots._calendar_periods(dataset_id, day + timedelta(days=400), agr)
@@ -298,7 +298,7 @@ def _counts_on(dataset_id: str, day: date, agr) -> bool:
     criterion 30, amending REQ-PIPE-111 criterion 2): always, unless it is
     turned off on that day - then only for the first period of its gap,
     whose opening closes its last owed slot."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     try:
         standing = agr.standing_on(dataset_id, day)
@@ -367,7 +367,7 @@ def freeze_instant(item: Item, agr) -> datetime | None:
                 opens.append(_claim_open(ds, first, agr))
         return _min(asset_time.start_of_day(eff), *opens)
     if item.kind == "not_expected":
-        from qa_tools.common import slots
+        from asset_model import slots
 
         try:
             periods = slots._calendar_periods(c["dataset"], None, agr)
@@ -390,7 +390,7 @@ def freeze_instant(item: Item, agr) -> datetime | None:
     if item.kind == "tz_version":
         from zoneinfo import ZoneInfo
 
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         eff = date.fromisoformat(c["eff"])
         try:
@@ -585,7 +585,7 @@ def old_asset_like(new_asset: dict) -> dict:
 
 def _agreements(old_cal: dict | None, new_cal: dict):
     """(new, old) agreements; raises where the NEW file cannot be read."""
-    from qa_tools.common import agreement
+    from asset_model import agreement
 
     new_agr = agreement.from_doc(new_cal)
     try:
@@ -619,7 +619,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
     (REQ-PIPE-179 criterion 11), computed with criterion 14's inputs. A
     change of the reason alone flips nothing, and freezes with the periods
     it already turned off (criterion 12)."""
-    from qa_tools.common import agreement, slots
+    from asset_model import agreement, slots
 
     tos = [date.fromisoformat(str(v["effective_to"])) for v in (before, after)
            if isinstance(v, dict) and v.get("effective_to")]
@@ -647,7 +647,7 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
                 # opened by the time the change was introduced.
                 # NAMED BY THE PERIOD THE ROUND FILLS (REQ-PIPE-179 criterion 11
                 # as REQ-PIPE-321 amends it), not the round's own name.
-                from qa_tools.common import schedule as schedule_mod
+                from asset_model import schedule as schedule_mod
 
                 filled = schedule_mod.period_filled_by(ds, p, new_agr)
                 out.append((ds, filled.name if filled is not None else p.name, opens))
@@ -1001,7 +1001,7 @@ def _appended_dates_allowed(changes, old_items, old_agr, new_agr) -> set[str]:
     previous date, where - for each dataset on the calendar - the earliest
     claim-opening of the appended entries is no earlier than the closing
     instant that dataset's previous last slot had."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     allowed: set[str] = set()
     by_calendar: dict[str, list[Item]] = {}

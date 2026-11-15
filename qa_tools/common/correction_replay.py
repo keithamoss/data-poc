@@ -29,20 +29,19 @@ Only during a replay (`replay_clock.active()`): the processing pass files
 against the agreement on disk, as a real asset always does.
 """
 from __future__ import annotations
-
-from asset_model import declared_corrections
 import contextlib
 from datetime import datetime
 
-from qa_tools.common import asset_time, correction_apply, correction_trial, decision_log
-from qa_tools.common import assets as _assets
+from asset_model import asset_time, declared_corrections
+from qa_tools.common import correction_apply, correction_trial, decision_log
+from asset_model import assets as _assets
 
 
 def staged(instant: datetime):
     """A context in which the agreement is as it stood at `instant`, or None
     where every declared correction was already merged by then - the common
     case, which then costs nothing."""
-    docs = correction_trial.working()
+    docs = declared_corrections.working()
     if not any(declared_corrections.merge_instant(p) > instant for p in declared_corrections.declared(*docs)):
         return None
     return correction_trial.configured(*declared_corrections.docs_at(instant, docs))

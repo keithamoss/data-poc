@@ -19,7 +19,9 @@ from __future__ import annotations
 import os
 
 from qa_tools import collections
-from qa_tools.common import asked_for, hierarchy, left_out, sample_keys, supply_db
+from asset_model import collections as declared_collections
+from qa_tools.common import asked_for, left_out, sample_keys, supply_db
+from asset_model import hierarchy
 from qa_tools.common.qa_results_writer import write_qa_result
 from qa_tools.common.soda_common import (
     ENGINE_TAG, CaptureSampler, band, check_id_from_resource_attributes, execute_scan,
@@ -41,11 +43,11 @@ _LABEL_BY_METRIC = {
 
 
 def checks_path(collection_id: str) -> str:
-    return os.path.join(ROOT, collections.by_id(collection_id).check_file("soda"))
+    return os.path.join(ROOT, declared_collections.by_id(collection_id).check_file("soda"))
 
 
 def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
-    coll = collections.by_id(collection_id)
+    coll = declared_collections.by_id(collection_id)
     adapter = collections.adapter(coll)
     spec = adapter.soda
     tables = [d.table for d in coll.datasets]

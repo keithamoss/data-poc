@@ -38,7 +38,7 @@ def _tickets(now=None, policy="needs-action") -> FakeTickets:
 
 
 def _instant(text):
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return asset_time.parse_instant(text, "test")
 

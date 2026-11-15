@@ -25,7 +25,7 @@ import shutil
 
 import yaml
 
-from qa_tools.common import agreement, schedule
+from asset_model import agreement, schedule
 from qa_tools.common.validate_schedule import Source, validate
 from tests.test_collection_defaults import (
     CP, LOG, REAL_CONTRACT_DIR, _collection, _defaults, _doc, _lift, _per_dataset, _text,
@@ -368,7 +368,8 @@ class TestNotExpectedInsideAGap:
 
 from datetime import datetime  # noqa: E402
 
-from qa_tools.common import asset_time, slots, turned_off  # noqa: E402
+from asset_model import asset_time, slots
+from qa_tools.common import turned_off  # noqa: E402
 
 
 def _at(day: str, hhmm: str = "09:00") -> datetime:
@@ -648,7 +649,8 @@ class TestCoveredHoldsFileThemselves:
 
 import copy as _copy  # noqa: E402
 
-from qa_tools.common import agreement_freeze as freeze  # noqa: E402
+from qa_tools.common import agreement_freeze as freeze
+from asset_model import declared_corrections  # noqa: E402
 from tests.test_agreement_freeze import CODEOWNERS, KEITH, _correction, _load  # noqa: E402
 
 PERTH = asset_time.wall_clock(date(2026, 10, 14), "23:00").tzinfo
@@ -728,7 +730,7 @@ class TestACorrectionOfATurnOffReverts:
     def test_reverting_puts_the_old_turn_off_back(self):
         new = _load("calendar.yaml")
         _turn_off(_clients_version(new), to="2025-06-30")
-        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [
+        cal, _asset = declared_corrections.revert(new, _load("data-asset.yaml"), [
             (CLIENTS_KEY, {"effective_to": "2025-03-31", "turned_off_reason": "was"}, None)])
         v = _clients_version(cal)
         assert (v["effective_to"], v["turned_off_reason"]) == ("2025-03-31", "was")
@@ -736,13 +738,13 @@ class TestACorrectionOfATurnOffReverts:
     def test_reverting_an_added_one_removes_it(self):
         new = _load("calendar.yaml")
         _turn_off(_clients_version(new))
-        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [(CLIENTS_KEY, None, {})])
+        cal, _asset = declared_corrections.revert(new, _load("data-asset.yaml"), [(CLIENTS_KEY, None, {})])
         assert "effective_to" not in _clients_version(cal)
 
     def test_reverting_the_version_keeps_its_turn_off(self):
         new = _load("calendar.yaml")
         _turn_off(_clients_version(new))
-        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [
+        cal, _asset = declared_corrections.revert(new, _load("data-asset.yaml"), [
             ("dataset cp-clients participation 2023-01-01", {}, {"claim_window": "10d"})])
         assert _clients_version(cal)["effective_to"] == "2025-03-31"
 

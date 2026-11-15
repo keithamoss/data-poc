@@ -16,7 +16,7 @@ from datetime import date
 import pytest
 import yaml
 
-from qa_tools.common import amber_setting, slots
+from asset_model import amber_setting, slots
 from qa_tools.common import validate_schedule as vs
 from qa_tools.common.schemas import DataAsset
 

@@ -31,8 +31,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from qa_tools.common import (asset_time, dataset_blockers, decision_log, filing,
-                              promotion_state, rejection, supply_db)
+from asset_model import asset_time
+from qa_tools.common import (
+    dataset_blockers,
+    decision_log,
+    filing,
+    promotion_state,
+    rejection,
+    supply_db,
+)
 
 PROMOTED, SUBSTITUTED, INHERITED = "promoted", "substituted", "inherited"
 _STANDS = {SUBSTITUTED: promotion_state.SUBSTITUTED, INHERITED: promotion_state.INHERITED}

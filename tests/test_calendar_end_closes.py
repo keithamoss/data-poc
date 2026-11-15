@@ -7,7 +7,7 @@ import pytest
 
 from datetime import date, datetime, timezone
 
-from qa_tools.common import slots
+from asset_model import slots
 
 
 def _last_slot():

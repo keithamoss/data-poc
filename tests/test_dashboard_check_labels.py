@@ -98,7 +98,7 @@ def test_tool_ref_reuses_the_grammars_own_tool_list_rather_than_a_copy():
     could only ever drift out of agreement with the thing enforcing it.
     Asserting on the shared constant means adding a fifth tool in one
     place cannot leave this behind."""
-    from qa_tools.common.check_id import TOOLS
+    from asset_model.check_id import TOOLS
     for tool in TOOLS:
         assert tool_ref(f"data-asset-1.ag.ds.tbl.c.some_check_{tool}") == f"{tool}:some_check"
 

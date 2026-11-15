@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from qa_tools.common import filing, supply_db
-from qa_tools.common.assignment import Assignment
+from asset_model.assignment import Assignment
 
 PERTH = timezone(timedelta(hours=8))
 
@@ -50,7 +50,8 @@ class TestAKeptSupplyLinksToItsDelivery:
 
     @pytest.mark.asset("daily")
     def test_a_hand_filed_supplys_filing_names_its_delivery(self, tmp_path, private_supply_dsn):
-        from qa_tools.common import arrivals, hand_filing, schedule
+        from asset_model import arrivals, schedule
+        from qa_tools.common import hand_filing
 
         day = schedule.calendar("daily").current.effective_from + timedelta(days=3)
         path = tmp_path / f"birth_registrations_{day.isoformat()}.csv"
@@ -74,9 +75,10 @@ class TestATrialWritesNoFiling:
         """Criterion 33: a trial never reaches filing, so no delivery
         record and no filing is written for it."""
         from cli import common
-        from qa_tools.common import delivery, delivery_log
+        from qa_tools.common import delivery_log
+        from asset_model import delivery as delivery_tree
 
-        monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
+        monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "deliveries"))
         path = tmp_path / "anything.csv"
         path.write_text("a\n1\n")
         filed = common.file_or_trial([str(path)], "civil-registration", "run_",

@@ -17,8 +17,8 @@ def rebuild_for_selected() -> None:
     if app is None:
         return
     from cli import collection_cli
-    from qa_tools import collections as registry
-    from qa_tools.common import assets
+    from asset_model import collections as registry
+    from asset_model import assets
 
     asset = assets.selected_or_none()
     built_for = app._ASSET.name if app._ASSET is not None else None

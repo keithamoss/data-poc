@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 import yaml
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -21,7 +21,7 @@ REPO = Path(__file__).resolve().parent.parent
 def _asset_folder(root: Path) -> Path:
     """The selected asset's configuration folder in the checkout at `root`,
     asked of the resolver at call time (REQ-PIPE-342 criterion 6)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return root / assets.folder_on_disk()
 _ID = re.compile(r"^id_(\d+)$")
@@ -231,7 +231,7 @@ def participation_problems(root: Path = REPO) -> list[str]:
     owes exactly the periods its source owes - each side read after its own
     collection's files_go_to_period (REQ-PIPE-321), through the one schedule.
     Names the dataset and the first period they disagree."""
-    from qa_tools.common import agreement, schedule
+    from asset_model import agreement, schedule
 
     asset = _load(_asset_folder(root) / "data-asset.yaml") or {}
     path = _asset_folder(root) / "calendar.yaml"

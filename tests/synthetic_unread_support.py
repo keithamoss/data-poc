@@ -253,7 +253,8 @@ def run_and_build(collection_id: str, tree: Path, folder: Path, out: Path,
     """The batch pass and the dashboard build, under watch, into a fresh
     database; the snapshot of what it recorded, with what was seen."""
     from cli import dashboard as dash
-    from qa_tools.common import assets, build_output, scripted_decisions
+    from asset_model import assets
+    from qa_tools.common import build_output, scripted_decisions
 
     the_scripts = scripted_decisions.script_path
     seen: dict = {}

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import check_lifecycle as cl
+from asset_model import check_lifecycle as cl
 from qa_tools.common import validate_check_lifecycle as vcl
 
 DEFINED = {"birth_registrations": {"date_of_birth", "place_of_birth_facility",

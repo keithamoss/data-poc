@@ -98,7 +98,7 @@ def _when(at) -> str:
     (a mark carries the string; post-build-review #193 F2)."""
     from datetime import datetime
 
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     if isinstance(at, str):
         try:

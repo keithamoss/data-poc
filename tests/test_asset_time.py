@@ -1,4 +1,4 @@
-"""Tests for qa_tools/common/asset_time.py - the asset's own clock
+"""Tests for asset_model/asset_time.py - the asset's own clock
 (REQ-PIPE-048).
 
 Tested against the REAL contract/data-asset.yaml wherever the real
@@ -15,7 +15,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 
 def _repoint(tmp_path, monkeypatch, text):

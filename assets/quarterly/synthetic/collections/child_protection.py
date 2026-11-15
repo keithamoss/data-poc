@@ -99,10 +99,10 @@ import functools
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from qa_tools.common import hierarchy
+from asset_model import hierarchy
 from generator.anchor_date import get_anchor_date
 from generator.collections.base import Job, Plan, Provider
-from qa_tools.common import asset_time, schedule
+from asset_model import asset_time, schedule
 
 if TYPE_CHECKING:  # annotations only - never imported at module level
     import pandas as pd
@@ -1066,7 +1066,7 @@ class ChildProtection(Provider):
         the same file set files() writes: a grown quarter's case workers only
         where owed, then the generic scenario file-shape rule
         (Provider.carries_table)."""
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         period = job.period.name
         if (table == hierarchy.dataset(_CASE_WORKERS).table and period in plan.state["grown_names"]

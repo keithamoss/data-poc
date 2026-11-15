@@ -18,6 +18,7 @@ from cli import common
 from cli.app import cli
 from cli.supply import supply_group
 from qa_tools.common import delivery
+from asset_model import delivery as delivery_tree
 
 WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone.utc)
 
@@ -26,8 +27,8 @@ WHEN = datetime(2026, 8, 25, 6, 0, tzinfo=timezone.utc)
 def dirs(tmp_path, monkeypatch):
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     deliveries.mkdir(); receipts.mkdir()
-    monkeypatch.setattr(delivery, "default_deliveries_dir", fixed(deliveries))
-    monkeypatch.setattr(delivery, "default_receipts_dir", fixed(receipts))
+    monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(deliveries))
+    monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
     return deliveries, receipts
 
 
@@ -177,9 +178,10 @@ class TestWhatWasActuallyLoaded:
             "one - that is the whole of criterion 16")
 
     def test_a_fully_loaded_delivery_shows_as_complete(self, dirs, _log):
-        from qa_tools.common import arrivals, load_log, supply_db
+        from asset_model import arrivals
+        from qa_tools.common import load_log, supply_db
         _drop(dirs, "monday", {"cp_clients.csv": "a\n1\n"})
-        found = arrivals.recognise(delivery.survey().received[0])
+        found = arrivals.recognise(delivery_tree.survey().received[0])
         for physical in supply_db.expected_tables(found, WHEN).values():
             load_log.record("monday", "cp-clients", physical, load_log.LOADED,
                              WHEN.isoformat())
@@ -222,7 +224,8 @@ def _timeline(conn, tmp_path, drops):
     and putting all seven in one delivery - which an earlier version
     of this fixture did - quietly made it six.
     """
-    from qa_tools.common import arrivals, delivery as delivery_mod, delivery_log, hierarchy
+    from asset_model import arrivals, delivery as delivery_tree, hierarchy
+    from qa_tools.common import delivery as delivery_mod, delivery_log
 
     # THE SELECTED ASSET'S FAMILIES ONLY (the asset split): each asset
     # recognises its own datasets' files, Birth Registrations' on the daily
@@ -239,7 +242,7 @@ def _timeline(conn, tmp_path, drops):
         for name, files, _ in [f for f in families if f[2] in held]:
             delivery_mod.write_delivery(
                 name, files, f"{day}T09:00:00+08:00", deliveries, receipts)
-            d = delivery_mod.read_delivery(name, deliveries, receipts)
+            d = delivery_tree.read_delivery(name, deliveries, receipts)
             delivery_log.record(d, arrivals.recognise(d), conn=conn)
 
 

@@ -11,21 +11,22 @@ import pytest
 import yaml
 
 from qa_tools.common import list_setting_members, supply_db
+from asset_model import set_member_checks
 
 REAL = Path(__file__).resolve().parent.parent
 
 
 def _schema() -> Path:
     """Linkage Products' dbt schema, by repository path through the resolver."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return Path(assets.dbt_rel()) / "models" / "linkage-products" / "schema.yml"
 
 
 @pytest.fixture
 def repo(tmp_path):
-    from qa_tools import collections
-    from qa_tools.common import assets
+    from asset_model import collections as declared_collections
+    from asset_model import assets
 
     # The asset's configuration where the gate reads it, by the resolver's
     # repository path (the asset split - it was contract/); its dbt project
@@ -37,7 +38,7 @@ def repo(tmp_path):
     shutil.copy(REAL / _schema(), tmp_path / _schema())
     # The asset's own collections' models, in its own dbt project (the split).
 
-    for c in collections.all_collections():
+    for c in declared_collections.all_collections():
         if c.id == "linkage-products":
             continue
         shutil.copytree(REAL / assets.dbt_rel() / "models" / c.id,
@@ -59,8 +60,8 @@ def _tests(doc, model):
 
 
 def test_the_real_configuration_passes():
-    assert list_setting_members.problems(REAL) == []
-    assert len(list_setting_members.declared(REAL)) == 6
+    assert set_member_checks.problems(REAL) == []
+    assert len(set_member_checks.declared(REAL)) == 6
 
 
 class TestCriterionThirteenThePresenceGate:
@@ -69,7 +70,7 @@ class TestCriterionThirteenThePresenceGate:
         tests = _tests(doc, "stg_geo_ed_presentations")
         tests[:] = [t for t in tests if "duplicated_set_members" not in t]
         _write(repo, doc)
-        assert list_setting_members.problems(repo) == [
+        assert set_member_checks.problems(repo) == [
             "geo-ed-presentations is a geocoding dataset without duplicated_set_members "
             "(REQ-QAC-297 criterion 13)."]
 
@@ -79,33 +80,33 @@ class TestCriterionThirteenThePresenceGate:
         body["key_columns"] = []
         body["member_setting"] = "census_yrs"
         _write(repo, doc)
-        text = "\n".join(list_setting_members.problems(repo))
+        text = "\n".join(set_member_checks.problems(repo))
         assert "geo-cp-clients: missing_set_members declares no key columns." in text
         assert "names the member_setting 'census_yrs', which is no declared list setting" in text
 
     def test_a_geocoding_dataset_lacking_its_share_check(self, repo):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         path = repo / assets.folder_rel() / "department-of-health" / "linkage-products-soda-checks.yml"
         doc = yaml.safe_load(path.read_text())
         block = doc["checks for geo_cp_clients"]
         block[:] = [c for c in block if "geo_cp_clients_not_geocoded_percent" not in c]
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
-        assert list_setting_members.problems(repo) == [
+        assert set_member_checks.problems(repo) == [
             "geo-cp-clients is a geocoding dataset without value_share_soda "
             "(REQ-QAC-297 criterion 13)."]
 
 
 class TestCriterionFiveOfRequirement300Coverage:
     def test_a_period_no_version_covers_is_refused_naming_dataset_and_period(self, repo):
-        from qa_tools.common import assets
+        from asset_model import assets
 
         path = repo / assets.folder_rel() / "data-asset.yaml"
         text = path.read_text()
         assert '- effective_from: "2013-01-01"\n                  value: [2011]' in text
         path.write_text(text.replace('- effective_from: "2013-01-01"\n                  value: [2011]',
                                      '- effective_from: "2016-01-01"\n                  value: [2011]'))
-        problems = list_setting_members.problems(repo)
+        problems = set_member_checks.problems(repo)
         assert ("geo-cp-clients owes 2015-Q2 (round 2015-05-01), which no version of "
                 "census_years covers (REQ-QAC-300 criterion 5).") in problems, problems
         assert any(p.startswith("geo-ed-presentations owes 2013-Q1") for p in problems)
@@ -118,7 +119,7 @@ class TestCriterionSevenOfRequirement300BreakingEntries:
         body["meta"]["changelog"] = [e for e in body["meta"]["changelog"]
                                      if not e["date"].startswith("2022-08-01")]
         _write(repo, doc)
-        assert list_setting_members.problems(repo) == [
+        assert set_member_checks.problems(repo) == [
             "check quarterly.department-of-health.linkage-products.geo-cp-clients.census_year."
             "unexpected_set_members_dbt has no breaking changelog entry dated 2022-08-01 for the "
             "version of census_years it changes to (REQ-QAC-300 criterion 7)."]
@@ -128,10 +129,10 @@ class TestCriterionSevenOfRequirement300BreakingEntries:
         body = _tests(doc, "stg_geo_cp_clients")[0]["missing_set_members"]
         body["meta"]["changelog"][0]["breaking"] = False
         _write(repo, doc)
-        assert any("dated 2017-08-01" in p for p in list_setting_members.problems(repo))
+        assert any("dated 2017-08-01" in p for p in set_member_checks.problems(repo))
 
     def test_three_entries_per_year_check_for_four_versions(self):
-        for check in list_setting_members.declared(REAL):
+        for check in set_member_checks.declared(REAL):
             assert sorted(e["date"][:10] for e in check.changelog if e.get("breaking")) == [
                 "2017-08-01", "2022-08-01", "2027-08-01"], check.check_id
 
@@ -172,9 +173,10 @@ class TestCriterionNineOfRequirement300TheSetIsRecorded:
 class TestCriterionFourNotEvaluatedWithoutAPeriod:
     def test_each_set_member_check_is_recorded_not_evaluated_with_its_reason(self):
         from qa_tools import collections
+        from asset_model import collections as declared_collections
         from qa_tools.tools import run_dbt
 
-        coll = collections.by_id("linkage-products")
+        coll = declared_collections.by_id("linkage-products")
         records = run_dbt._not_evaluated_for_want_of_a_period(
             coll, collections.adapter(coll).dbt, "lp_probe", "2026-11-01T10:00:00+00:00", None)
         assert len(records) == 6
@@ -187,9 +189,10 @@ class TestCriterionFourNotEvaluatedWithoutAPeriod:
 
     def test_only_the_checks_asked_for(self):
         from qa_tools import collections
+        from asset_model import collections as declared_collections
         from qa_tools.tools import run_dbt
 
-        coll = collections.by_id("linkage-products")
+        coll = declared_collections.by_id("linkage-products")
         one = ("quarterly.department-of-health.linkage-products.geo-cp-clients.census_year."
                "missing_set_members_dbt")
         records = run_dbt._not_evaluated_for_want_of_a_period(
@@ -199,8 +202,9 @@ class TestCriterionFourNotEvaluatedWithoutAPeriod:
 
 def test_criterion_fifteen_no_distribution_of_an_area_code_or_an_identifier():
     from qa_tools import collections
+    from asset_model import collections as declared_collections
 
-    stats = collections.adapter(collections.by_id("linkage-products")).stats
+    stats = collections.adapter(declared_collections.by_id("linkage-products")).stats
     assert {col for _t, col in stats.value_counts} == {"match_level"}
     assert not any(col in ("sa2_code", "lga_code") or col.startswith("id_")
                    for _t, col in stats.aggregates)
@@ -213,10 +217,11 @@ class TestATrialsYearChecksSayTrialNotNoPeriod:
 
     def test_a_trial_records_no_data_with_a_trials_reason(self):
         from qa_tools import collections
+        from asset_model import collections as declared_collections
         from qa_tools.common import trial
         from qa_tools.tools import run_dbt
 
-        coll = collections.by_id("linkage-products")
+        coll = declared_collections.by_id("linkage-products")
         records = run_dbt._not_evaluated_for_want_of_a_period(
             coll, collections.adapter(coll).dbt, trial.trial_run_id(),
             "2026-11-01T10:00:00+00:00", None)
@@ -237,7 +242,7 @@ class TestTheSchemaParsesAreKeyedOnContent:
         import os
 
         path = repo / _schema()
-        before = {c.member_setting for c in list_setting_members.declared(repo)}
+        before = {c.member_setting for c in set_member_checks.declared(repo)}
         assert "census_years" in before, "precondition - the real schema names census_years"
         stat = path.stat()
         text = path.read_text()
@@ -247,39 +252,39 @@ class TestTheSchemaParsesAreKeyedOnContent:
         os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
         assert (path.stat().st_size, path.stat().st_mtime_ns) == (stat.st_size, stat.st_mtime_ns)
 
-        after = {c.member_setting for c in list_setting_members.declared(repo)}
+        after = {c.member_setting for c in set_member_checks.declared(repo)}
 
         assert "census_yearz" in after and "census_years" not in after
 
     def test_the_gate_reads_data_asset_yaml_through_config_yaml(self, repo, monkeypatch):
         """REQ-PIPE-401 criterion 3: the presence gate's read of the asset
         file goes through config_yaml, where REQ-PIPE-397's pin will act."""
-        from qa_tools.common import config_yaml
+        from asset_model import config_yaml
 
         loaded = []
         real = config_yaml.load
         monkeypatch.setattr(config_yaml, "load", lambda p: loaded.append(Path(p).name) or real(p))
 
-        assert list_setting_members.problems(repo) == []
+        assert set_member_checks.problems(repo) == []
         assert "data-asset.yaml" in loaded
 
     def test_the_store_is_a_bounded_locked_content_keyed_one(self):
-        from qa_tools.common import config_yaml
+        from asset_model import config_yaml
 
-        assert isinstance(list_setting_members._SCHEMAS, config_yaml.Built)
+        assert isinstance(set_member_checks._SCHEMAS, config_yaml.Built)
 
     def test_an_unchanged_file_is_not_built_again(self, repo, monkeypatch):
-        list_setting_members.declared(repo)
+        set_member_checks.declared(repo)
         built = []
-        real = list_setting_members._build_checks
+        real = set_member_checks._build_checks
 
         def counting(*args):
             built.append(args)
             return real(*args)
 
-        monkeypatch.setattr(list_setting_members, "_build_checks", counting)
-        first = list_setting_members.declared(repo)
-        assert built == [] and first == list_setting_members.declared(repo)
+        monkeypatch.setattr(set_member_checks, "_build_checks", counting)
+        first = set_member_checks.declared(repo)
+        assert built == [] and first == set_member_checks.declared(repo)
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

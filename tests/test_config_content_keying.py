@@ -19,9 +19,9 @@ import pytest
 import yaml
 
 from pipeline import build_dashboard_data
-from qa_tools import collections
-from qa_tools.common import (agreement, arrival_patterns, asset_time, config_yaml, hierarchy,
-                             presentation)
+from asset_model import collections
+from asset_model import agreement, arrival_patterns, asset_time, config_yaml, hierarchy
+from qa_tools.common import presentation
 from qa_tools.tools import run_datacontract, run_dbt
 
 REAL = Path(__file__).resolve().parent.parent

@@ -29,7 +29,8 @@ answer "now" whatever instant was asked for.
 """
 from __future__ import annotations
 
-from qa_tools.common import asset_time, decision_log, qa_store, supply_db
+from asset_model import asset_time
+from qa_tools.common import decision_log, qa_store, supply_db
 
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """Every change to what one dataset's slots held, oldest first.

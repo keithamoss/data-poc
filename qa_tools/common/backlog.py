@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qa_tools.common import asset_time
+from asset_model import asset_time
 
 @dataclass(frozen=True, order=True)
 class Position:

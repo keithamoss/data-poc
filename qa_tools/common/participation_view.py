@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from qa_tools.common import agreement as agreement_mod
+from asset_model import agreement as agreement_mod
 
 #: The values in the order a reader asks about them, with their labels.
 _ONE_DAY = timedelta(days=1)
@@ -71,7 +71,8 @@ def _turn_off_lines(dataset_id: str, on: date,
                     agr) -> tuple[str | None, tuple[str, ...], bool]:
     """REQ-PIPE-179 criteria 28 and 29 - from configuration alone. The third
     value says whether an owed slot is still open on the date."""
-    from qa_tools.common import agreement_freeze, asset_time, slots, turned_off
+    from qa_tools.common import agreement_freeze, turned_off
+    from asset_model import asset_time, slots
 
     if not agr.ever_turned_off(dataset_id):
         return None, (), False
@@ -79,7 +80,7 @@ def _turn_off_lines(dataset_id: str, on: date,
     lines: list[str] = []
     if standing.brought_back:
         # NAMING THE GAP IT CAME BACK INSIDE (post-build-review #190 D9b).
-        from qa_tools.common import in_force
+        from asset_model import in_force
 
         mine = in_force.version_on(agr.dataset(dataset_id).participation, on)
         above = in_force.version_on(agr.defaults_for(dataset_id), on)
@@ -162,13 +163,13 @@ def _authored_by(dataset_id: str, effective_to: date, on: date, agr) -> bool:
 
 
 def _collection(dataset_id: str) -> str:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(dataset_id).collection_name
 
 
 def _text(key: str, version, dataset_id: str, on: date, agr) -> str:
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     value = getattr(version, key)
     if key == "participates":
@@ -196,7 +197,7 @@ def _fallback(key: str) -> str:
 
 
 def view(dataset_id: str, on: date, agreement=None) -> View:
-    from qa_tools.common import hierarchy, schedule
+    from asset_model import hierarchy, schedule
 
     agr = schedule._agreement(agreement)
     entry = agr.dataset(dataset_id)

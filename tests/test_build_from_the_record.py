@@ -24,8 +24,9 @@ import pytest
 
 import rebuild_support
 from pipeline import build_dashboard_data as bdd
-from qa_tools import collections
-from qa_tools.common import hierarchy, qa_results_writer, qa_store, supply_db
+from asset_model import collections
+from asset_model import hierarchy
+from qa_tools.common import qa_results_writer, qa_store, supply_db
 from qa_tools.tools import results_history
 
 CP = "child-protection"

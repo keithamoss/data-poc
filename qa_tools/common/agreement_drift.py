@@ -30,11 +30,10 @@ CONFIGURATION AND RECORDED FACTS ONLY (criterion 6): qa.filing_current,
 qa.verdict and qa.supply_receipt, never a schema holding supply rows.
 """
 from __future__ import annotations
-
-from asset_model import declared_corrections
 from dataclasses import dataclass, field
 from datetime import date
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
+from asset_model import declared_corrections
 
 #: Input fields named when they differ, in the order a reader thinks in.
 _FIELDS = ("period_date", "due_date", "expected_time", "days_before", "grace_seconds",
@@ -109,7 +108,7 @@ class Refusal:
 def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> set[str]:
     """The freeze gate's item keys (agreement_freeze.flatten) a slot's inputs
     come from, under the configuration given."""
-    from qa_tools.common import asset_time, in_force, schedule, slots
+    from asset_model import asset_time, in_force, schedule, slots
 
     keys = {f"dataset {dataset_id} calendar", f"dataset {dataset_id} not_expected {slot}",
             f"dataset {dataset_id} dates period {slot}"}
@@ -142,7 +141,7 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
 def _turn_off_key(dataset_id: str, turn, agreement) -> str:
     """The freeze gate's key for the turn-off a period falls in - the item a
     declared correction of it names (REQ-PIPE-179 criterion 38)."""
-    from qa_tools.common import agreement as agreement_mod
+    from asset_model import agreement as agreement_mod
 
     since = turn.version_from.isoformat()
     if turn.level == agreement_mod.COLLECTION:
@@ -194,10 +193,10 @@ _MISSING_KINDS = {"cal_date", "membership", "not_expected", "cal_version",
 def _declared(cal_doc: dict, asset_doc: dict) -> dict[str, list[tuple[object, date | None]]]:
     """Every declared correction change's (new value, correction date), by
     item key."""
-    from qa_tools.common import agreement_freeze
+    from asset_model import declared_corrections
 
     out: dict[str, list] = {}
-    for entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).values():
+    for entries in declared_corrections.corrections_by_owner(cal_doc, asset_doc).values():
         for corr in entries:
             corr = corr or {}
             when = corr.get("date")
@@ -249,7 +248,8 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
     slot is what REQ-PIPE-168's comparison already does, measured at 15ms
     for Birth Registrations' whole history).
     """
-    from qa_tools.common import agreement, agreement_freeze, asset_time, verdict
+    from asset_model import agreement, declared_corrections, asset_time
+    from qa_tools.common import agreement_freeze, verdict
 
     if cal_doc is None or asset_doc is None:
         cal_doc, asset_doc = declared_corrections.load_docs()
@@ -316,7 +316,8 @@ def refusals(conn=None, dataset_ids=None, *, errors: list | None = None) -> dict
     configuration is not another's refusal - but it is not silently passed
     either (delivery-critic on 173, #9): each is appended to `errors`, where
     given, as (dataset_id, exception), for the caller to report."""
-    from qa_tools.common import hierarchy, supply_db
+    from asset_model import hierarchy
+    from qa_tools.common import supply_db
 
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:agreement-drift") as opened:

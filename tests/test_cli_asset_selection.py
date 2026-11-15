@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import assets
+from asset_model import assets
 
 ROOT = Path(__file__).resolve().parent.parent
 

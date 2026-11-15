@@ -51,8 +51,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from qa_tools.common import config_yaml
-from qa_tools.common import assets as _assets
+from asset_model import config_yaml
+from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -60,7 +60,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 def script_path() -> Path:
     """The selected asset's scripted_decisions.yaml, resolved now (REQ-PIPE-342 criterion
     6; it was the import-time constant SCRIPT_PATH)."""
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.selected().synthetic / "scripted_decisions.yaml"
 
@@ -246,7 +246,8 @@ def problems(scripts: list[Script], *, registered: set[str],
              placement_of: dict[str, str] | None = None) -> list[str]:
     """Criterion 13, against configuration alone: every scenario registered,
     every decision a filing decision, every reason present."""
-    from qa_tools.common import filing_decisions, hierarchy
+    from qa_tools.common import filing_decisions
+    from asset_model import hierarchy
 
     out = []
     for i, s in enumerate(scripts, 1):
@@ -387,7 +388,8 @@ class Player:
 
     def __init__(self, collection_id: str, *, scripts: list[Script] | None = None,
                  placements: dict | None = None):
-        from qa_tools.common import hierarchy, scenario_map
+        from asset_model import hierarchy
+        from qa_tools.common import scenario_map
 
         mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
         self.collection_id = collection_id
@@ -518,7 +520,7 @@ def _timed_chain(s: Script) -> tuple[Timed | None, str]:
 
 
 def _timed_mark(s: Script) -> tuple[Timed | None, str]:
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     on = schedule.date_of(s.period, s.dataset_id)
     if on is None:
@@ -538,7 +540,7 @@ def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
     plus `after_hours`; a substitution's stood-on period is resolved here,
     its SUPPLY only when it is played - what that period holds depends on
     the decisions before it."""
-    from qa_tools.common import slots
+    from asset_model import slots
 
     if placement is None or not placement.period:
         return None, "the scenario has no recorded placement - is it injected?"
@@ -558,7 +560,7 @@ def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
 def _wall_clock_after(s: Script, period: str) -> datetime | None:
     """`at` on the day `day_offset` after the placement period's date, on
     the asset's clock (REQ-GEN-196 criterion 10)."""
-    from qa_tools.common import asset_time, schedule
+    from asset_model import asset_time, schedule
 
     # FROM THE ROUND its slot is due on (REQ-GEN-325 criterion 3).
     on = schedule.round_of(period, s.dataset_id)
@@ -569,7 +571,7 @@ def _wall_clock_after(s: Script, period: str) -> datetime | None:
 def _due_at(dataset_id: str, period: str) -> datetime | None:
     """When this dataset's slot for `period` was due, as the slot schedule
     computes it from configuration (REQ-GEN-200 criterion 1)."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     # THE ROUND the slot is due on (REQ-PIPE-321 criterion 2), never the
     # period's own date.
@@ -605,7 +607,7 @@ def _connect():
 
 def _refuse_unless_synthetic() -> None:
     """Criterion 8: never on an asset that has not declared itself synthetic."""
-    from qa_tools.common.hierarchy import data_asset_yaml
+    from asset_model.hierarchy import data_asset_yaml
 
     doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
     if not doc.get("synthetic"):
@@ -648,7 +650,8 @@ def _apply(t: Timed) -> None:
                 # and each relative re-file counted from the placement.
                 outcomes = ()
                 if s.operation == CHOOSE_FILE:
-                    from qa_tools.common import settlement, slots
+                    from qa_tools.common import settlement
+                    from asset_model import slots
 
                     _delivery, _period, files = settlement.pair_files(conn, s.dataset_id,
                                                                       supply)
@@ -692,7 +695,7 @@ def _apply(t: Timed) -> None:
     # AND THE KNOCK-ON IT OWES, at the same instant, as a person's decision is
     # followed (cli/filing_tui._follow_up; post-build-review #251): TS-80's
     # readers otherwise waited for Child Protection's next arrival.
-    from qa_tools import collections
+    from asset_model import collections
     from qa_tools.common import knock_on
 
     knock_on.follow_up_stream(collections.collection_of(s.dataset_id).id)

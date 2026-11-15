@@ -18,6 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from qa_tools import collections
+from asset_model import collections as declared_collections
 from qa_tools.common import datacontract_common, dbt_common, sample_keys, soda_common, supply_db
 
 KEY = ["dataset", "id_1", "id_2"]
@@ -26,7 +27,7 @@ KEY = ["dataset", "id_1", "id_2"]
 # ---- criterion 1: every adapter declares an ordered list ------------------
 
 def test_every_adapter_declares_each_tables_key_as_a_list():
-    adapters = [collections.adapter(c) for c in collections.all_collections()]
+    adapters = [collections.adapter(c) for c in declared_collections.all_collections()]
     assert adapters, "no collection registered - this would prove nothing"
     for a in adapters:
         assert a.sample_key, a.collection_id
@@ -37,12 +38,12 @@ def test_every_adapter_declares_each_tables_key_as_a_list():
 
 @pytest.mark.asset("daily")  # civil-registration is the daily asset's
 def test_the_existing_one_column_key_of_birth_registrations_is_unchanged():
-    keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
+    keys = {c.id: collections.adapter(c).sample_key for c in declared_collections.all_collections()}
     assert keys["civil-registration"] == {"birth_registrations": ["registration_number"]}
 
 
 def test_the_existing_one_column_keys_are_unchanged():
-    keys = {c.id: collections.adapter(c).sample_key for c in collections.all_collections()}
+    keys = {c.id: collections.adapter(c).sample_key for c in declared_collections.all_collections()}
     assert keys["emergency-department"] == {"ed_presentations": ["presentation_id"]}
     assert keys["child-protection"]["cp_clients"] == ["cp_client_id"]
 
@@ -51,7 +52,7 @@ def test_linkage_keys_is_named_by_its_dataset_and_every_identifier():
     """Criterion 3: dataset and id_1 to id_N, N the contract's id columns."""
     import yaml
 
-    contract = yaml.safe_load(open(collections.by_id("linkage-products").check_file("contract")))
+    contract = yaml.safe_load(open(declared_collections.by_id("linkage-products").check_file("contract")))
     ids = [p["name"] for s in contract["schema"] for p in s["properties"]
            if p["name"].startswith("id_")]
     assert ids, "the contract declares no id columns - this would prove nothing"
@@ -61,7 +62,7 @@ def test_linkage_keys_is_named_by_its_dataset_and_every_identifier():
                                                 if p["name"].startswith("id_")]]
     # A GEOCODING TABLE'S KEY is its source's identifiers and the census year
     # (REQ-QAC-294 criterion 9), never id_2, which its source does not declare.
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     for table in ("geo_cp_clients", "geo_ed_presentations"):
         (_src, _code, cols), = hierarchy.dataset_for_table(table).linked
@@ -279,7 +280,7 @@ def test_every_sampled_contract_rule_can_record_its_tables_key():
     sensitive = {"pii", "personal", "personal_data", "confidential", "restricted",
                  "sensitive", "secret"}
     seen = 0
-    for c in collections.all_collections():
+    for c in declared_collections.all_collections():
         key_by_table = collections.adapter(c).sample_key
         doc = yaml.safe_load(open(c.check_file("contract")))
         for schema in doc.get("schema") or []:
@@ -312,9 +313,10 @@ def test_real_soda_over_the_real_linkage_checks_names_each_failing_row(supply_ds
     from soda.scan import Scan
 
     from qa_tools import collections as registry
+    from asset_model import collections as declared_collections
 
     key = registry.adapter("linkage-products").sample_key["linkage_keys"]
-    path = registry.by_id("linkage-products").check_file("soda")
+    path = declared_collections.by_id("linkage-products").check_file("soda")
     schema = "sample_probe_linkage"
     with supply_db.connect(label="test-linkage-samples") as conn:
         conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")

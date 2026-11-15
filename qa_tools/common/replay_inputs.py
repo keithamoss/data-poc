@@ -75,7 +75,7 @@ def _asset(asset: str | None) -> str:
     without one."""
     if asset:
         return asset
-    from qa_tools.common import assets
+    from asset_model import assets
 
     return assets.selected().name
 
@@ -168,11 +168,11 @@ def deliveries_print(collection_id: str, deliveries_dir: Path | None = None,
                      receipts_dir: Path | None = None) -> list[ArrivalPrint]:
     """Criterion 1: every arrival of the collection, in receipt order, with a
     digest of its file and of its receipt."""
-    from qa_tools.common import arrivals, delivery
+    from asset_model import arrivals as arrival_tree, delivery as delivery_tree
 
-    receipts_dir = Path(receipts_dir or delivery.default_receipts_dir())
+    receipts_dir = Path(receipts_dir or delivery_tree.default_receipts_dir())
     out = []
-    for a in arrivals.arrivals_for(collection_id, "", deliveries_dir, receipts_dir):
+    for a in arrival_tree.arrivals_for(collection_id, "", deliveries_dir, receipts_dir):
         for names in a.files_by_dataset.values():
             for name in names:
                 out.append(ArrivalPrint(

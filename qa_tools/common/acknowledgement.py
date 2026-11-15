@@ -70,7 +70,7 @@ def why_not_owed(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
                     f"to accept it, promote it: `mothman supply decide --operation promote "
                     f"--dataset {dataset_id} --period {slot} --supply {supply} "
                     f"--reason '<why>'`")
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         collection = hierarchy.dataset(dataset_id).collection_id
         return (f"it is not the supply promoted into {slot} - an acknowledgement is "

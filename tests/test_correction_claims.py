@@ -172,14 +172,14 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
         return _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
 
     def test_an_arrival_the_wider_window_takes_changes_its_filing(self, widened):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         at = asset_time.wall_clock(date(2026, 9, 20), "09:00")
         assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) \
             == {"2026-09-19", "2026-09-20"}
 
     def test_an_ordinary_arrival_changes_nothing(self, widened):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         at = asset_time.wall_clock(date(2026, 9, 20), "12:00")
         assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) == set()

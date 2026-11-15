@@ -14,7 +14,8 @@ import asset_folders
 
 import yaml
 
-from qa_tools.common import hierarchy, validate_hierarchy
+from asset_model import hierarchy
+from qa_tools.common import validate_hierarchy
 
 
 def _contract(tmp_path, monkeypatch, filename, doc, describes):

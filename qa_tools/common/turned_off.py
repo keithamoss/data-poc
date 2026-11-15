@@ -26,7 +26,7 @@ import bisect
 from dataclasses import dataclass
 from datetime import datetime
 
-from qa_tools.common import agreement as agreement_mod
+from asset_model import agreement as agreement_mod
 
 #: The three labels a held supply carries (criterion 18).
 TURNED_OFF = "turned off"
@@ -55,7 +55,7 @@ def gap_at(dataset_id: str, at: datetime, agreement=None) -> agreement_mod.TurnO
     BY BISECTION over the calendar's own periods (REQ-PIPE-131 NFR 1), each
     period's claim-opening instant from the one slot-instants function,
     which resolves a turned-off period's inputs as criterion 14 says."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
@@ -76,7 +76,7 @@ def gap_at(dataset_id: str, at: datetime, agreement=None) -> agreement_mod.TurnO
 def label_at(dataset_id: str, at: datetime, agreement=None) -> Label:
     """What a supply received at `at` would be held as now - covered by an
     owed slot, turned off, schedule ended, or the plain hold."""
-    from qa_tools.common import assignment, schedule, slots
+    from asset_model import assignment, schedule, slots
 
     agr = schedule._agreement(agreement)
     try:
@@ -99,7 +99,7 @@ def label_at(dataset_id: str, at: datetime, agreement=None) -> Label:
 def final_period(dataset_id: str, agreement=None) -> str | None:
     """The dataset's last owed period, or None where its calendar never runs
     out - filing.final_period_for, for a given agreement."""
-    from qa_tools.common import schedule
+    from asset_model import schedule
 
     try:
         if schedule.calendar_for_dataset(dataset_id, agreement).current.is_cadence_rule:
@@ -113,7 +113,7 @@ def final_period(dataset_id: str, agreement=None) -> str | None:
 def level_words(turn: agreement_mod.TurnOff, dataset_id: str) -> str:
     """Who it was set for, in the names a reader knows - 'set for Child
     Protection', 'set for Client Register'."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         entry = hierarchy.dataset(dataset_id)
@@ -134,7 +134,7 @@ def as_record(turn: agreement_mod.TurnOff) -> dict:
 def gap_for_period(dataset_id: str, period: str, agreement=None) -> agreement_mod.TurnOff | None:
     """The turn-off a calendar period of this dataset falls inside, or None
     where the period is owed, not yet owing, or not the calendar's."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
@@ -188,14 +188,18 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
     its level and the date it was AUTHORED - the newest declared correction
     that set or moved that effective_to where there is one, else the newest
     changelog entry carrying turns_off: true. Configuration only."""
-    from qa_tools.common import agreement_freeze, agreement_drift, schedule
+    from asset_model import (
+        declared_corrections as agreement_freeze,
+        declared_corrections as agreement_drift,
+        schedule,
+    )
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
         return []
-    cal_doc, asset_doc = docs or agreement_drift._load_docs()
+    cal_doc, asset_doc = docs or agreement_drift.load_docs()
     corrected: dict[str, str] = {}
-    for entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).values():
+    for entries in agreement_freeze.corrections_by_owner(cal_doc, asset_doc).values():
         for corr in entries:
             corr = corr or {}
             for change in corr.get("changes") or []:
@@ -206,7 +210,7 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
                     corrected[key] = max(corrected.get(key, when), when)
     entry = agr.dataset(dataset_id)
     collection = agr.collection_of(dataset_id)
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         collection_name = hierarchy.dataset(dataset_id).collection_name
@@ -244,7 +248,7 @@ def _last_owed(dataset_id: str, effective_to, agr) -> dict | None:
     """The last slot the dataset owes before a turn-off's gap - its period,
     due instant and closing instant (REQ-PIPE-179 criterion 14) - or None
     where it owed nothing before it. Configuration only."""
-    from qa_tools.common import schedule, slots
+    from asset_model import schedule, slots
 
     try:
         found = [s for s in slots.slots_for_dataset(dataset_id, until=effective_to, agreement=agr)

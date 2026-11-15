@@ -17,7 +17,8 @@ own receipt so the page can pick the attempt in force on the date on show.
 """
 from __future__ import annotations
 
-from qa_tools.common import asset_time, dataset_status, file_checks, hierarchy
+from asset_model import asset_time, file_check_definitions as file_checks, hierarchy
+from qa_tools.common import dataset_status
 from qa_tools.common import qa_results_reader as reader
 
 #: The pseudo-column's key in a URL (`/column/_file/check/<key>`). A leading

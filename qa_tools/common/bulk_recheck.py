@@ -114,7 +114,7 @@ class Plan:
         return [(ds, p, n) for (ds, p), n in sorted(counts.items())]
 
     def by_collection(self) -> Counter:
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         return Counter(hierarchy.dataset(c.dataset_id).collection_id for c in self.covered)
 
@@ -135,7 +135,7 @@ def current_checks() -> dict:
 def the_check(check_id: str, checks: dict | None = None):
     """The check a bulk re-check names, or Refused: unknown, retired
     (criterion 4) or a file check (criterion 5)."""
-    from qa_tools.common import file_checks
+    from asset_model import file_check_definitions as file_checks
 
     checks = checks if checks is not None else current_checks()
     check = checks.get(check_id)
@@ -180,8 +180,8 @@ def headline(entry: dict | None) -> str:
 def touched_datasets(check) -> list[str]:
     """Every dataset the check touches: the one it is filed under and each
     one whose table it declares it reads."""
-    from qa_tools.common import check_id as check_id_mod
-    from qa_tools.common import hierarchy
+    from asset_model import check_id as check_id_mod
+    from asset_model import hierarchy
 
     out = set()
     parsed = check_id_mod.try_parse(check.check_id)
@@ -206,8 +206,8 @@ def stale_fingerprints(conn, checks: dict) -> dict[str, set[str]]:
     one index entry per pair - checks times definitions - and never the
     results themselves. A SUPERSET of what any supply's newest result carries:
     results_about decides that for each supply afterwards."""
-    from qa_tools.common import check_fingerprint as fp
-    from qa_tools.common import file_checks
+    from asset_model import check_fingerprint as fp
+    from asset_model import file_check_definitions as file_checks
 
     s = qa_store.SCHEMA
     rows = conn.execute(
@@ -245,7 +245,7 @@ def newest_by_supply(conn, check) -> dict[tuple[str, str], str]:
 
     ONE QUERY PER CHECK rather than results_about once per supply, which on a
     bootstrapped history cost about 0.12s a supply."""
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     s = qa_store.SCHEMA
     rows = conn.execute(
@@ -440,7 +440,7 @@ def _nudges(conn) -> list[Nudge]:
         except Refused:
             continue
         counts = p.by_collection()
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         for x in p.left_out_as("backstop"):
             counts[hierarchy.dataset(x.dataset_id).collection_id] += 1
@@ -489,7 +489,8 @@ def record(conn, check_id: str, *, actor: dict, reason: str, effective_at: str,
     inside the transaction reads no verdicts (the key does not depend on them);
     each covered supply's verdict is carried over from `shown`, the plan the
     person confirmed."""
-    from qa_tools.common import hierarchy, people, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import people, recheck
 
     reason = (reason or "").strip()
     if not reason:
@@ -702,7 +703,7 @@ def summary_lines(s: Summary) -> list[str]:
 def _said(status: str | None) -> str:
     """A verdict in the new words (REQ-TEST-360 criterion 7), never the
     stored value - 'no verdict' where there is none."""
-    from qa_tools.common.dataset_status import status_words
+    from asset_model.statuses import status_words
 
     return status_words(status, "verb") if status else "no verdict"
 
@@ -717,7 +718,7 @@ def estimate(n: int) -> str:
 
 
 def now_iso() -> str:
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     return asset_time.now().isoformat()
 
@@ -810,7 +811,8 @@ def predict(conn, covered: Covered, results: list[dict]) -> tuple[str | None, st
     promotion gate's own plan step, promotion.judge with record=False, which
     is split from the step that applies a judgement and writes nothing
     (criterion 5). From the trial run's own results, which nothing else reads."""
-    from qa_tools.common import agreement_drift, filing, hierarchy, promotion, rechecking
+    from qa_tools.common import agreement_drift, filing, promotion, rechecking
+    from asset_model import hierarchy
     from qa_tools.common import supply_status
 
     reads = promotion.declared_reads()
@@ -851,7 +853,8 @@ def try_one(covered: Covered, *, run_by: str | None = None, on_step=None) -> Tri
     and dbt scratch in schemas of its own, and its run - recorded as a trial,
     with no supply and the arrival scope, so nothing reads it (criterion 7) -
     discarded with them when it ends, Ctrl-C included (NFR 4)."""
-    from qa_tools.common import hierarchy, recheck
+    from asset_model import hierarchy
+    from qa_tools.common import recheck
     from qa_tools.tools import orchestrate
 
     run_id = trial_run_id()

@@ -21,9 +21,19 @@ from click.testing import CliRunner
 import carry_forward_support
 import filing_support
 from carry_forward_support import CASE_WORKERS, KEYS, NAME, entries, promote, view_reads
-from qa_tools.common import (carry_forward, filing, hierarchy, inheritance, knock_on,
-                             period_schema, people, promotion, recheck,
-                             substitution, supply_db)
+from qa_tools.common import (
+    carry_forward,
+    filing,
+    inheritance,
+    knock_on,
+    period_schema,
+    people,
+    promotion,
+    recheck,
+    substitution,
+    supply_db,
+)
+from asset_model import hierarchy
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing_decisions as fd
 
@@ -220,7 +230,7 @@ class TestAFailedOpeningIsRetried:
     def test_the_next_pass_opens_the_period(self, conn, world, monkeypatch):
         from types import SimpleNamespace
 
-        from qa_tools.common import assignment as assign_mod
+        from asset_model import assignment as assign_mod
 
         promote(conn, world.q2, "2099-04-02T09:00:00+08:00")
         at = datetime(2099, 10, 2, 1, 0, tzinfo=timezone.utc)

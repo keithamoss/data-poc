@@ -71,7 +71,7 @@ import subprocess
 
 from qa_tools.common.ticket_sync import TICKET_LABEL
 from qa_tools.common.people import assignees_for
-from qa_tools.common import assets as _assets
+from asset_model import assets as _assets
 
 
 def list_ticket_numbers(owner: str, repo: str) -> list[int]:

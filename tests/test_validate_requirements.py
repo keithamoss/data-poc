@@ -233,8 +233,8 @@ def test_validate_rejects_duplicate_ids():
                  id="test_non_functional_requirements_accepts_real_entries"),
     pytest.param([{"id": "REQ-QAC-001", "dependencies": ["REQ-QAC-002"]}, {"id": "REQ-QAC-002"}],
                  id="test_dependencies_referencing_a_real_id_in_the_same_file_is_fine"),
-    pytest.param([{"implemented_by": ["qa_tools/common/check_lifecycle.py::parse_contract_check_metadata",
-                                      "qa_tools/common/check_lifecycle.py::CheckMetadata"]}],
+    pytest.param([{"implemented_by": ["asset_model/check_lifecycle.py::parse_contract_check_metadata",
+                                      "asset_model/check_lifecycle.py::CheckMetadata"]}],
                  id="test_a_real_python_symbol_resolves"),
     # No AST parser for the template's inline JS on the Python side, so a
     # bare path is allowed there; the JS symbol form is checked by the Node
@@ -463,13 +463,13 @@ class TestARetiredRequirement:
         (REQ-DOCS-143's own decision) - so demanding its implemented_by and
         linked_tests still resolve would force the history to be deleted."""
         reqs = self._pair(status="retired", retired=dict(self._RETIRED),
-                          implemented_by=["qa_tools/common/assignment.py::gone_long_ago"],
+                          implemented_by=["asset_model/assignment.py::gone_long_ago"],
                           linked_tests=["tests/test_never_existed.py"])
         assert validate(reqs) == []
 
     def test_a_live_requirement_still_needs_its_code_to_exist(self):
         """The control: only a RETIRED record is history."""
-        reqs = self._pair(implemented_by=["qa_tools/common/assignment.py::gone_long_ago"])
+        reqs = self._pair(implemented_by=["asset_model/assignment.py::gone_long_ago"])
         assert any("gone_long_ago" in e for e in validate(reqs))
 
     def test_the_successor_must_exist(self):

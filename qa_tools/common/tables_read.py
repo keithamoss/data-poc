@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import yaml
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -161,7 +161,7 @@ def _collected():
 
 
 def _active_by_collection_and_tool(checks: Iterable) -> dict[tuple[str, str], list[str]]:
-    from qa_tools.common import check_id as check_id_mod
+    from asset_model import check_id as check_id_mod
 
     out: dict[tuple[str, str], set[str]] = {}
     for c in checks:
@@ -200,7 +200,7 @@ def _own_table(dataset_id: str | None) -> str | None:
     """
     if not dataset_id:
         return None
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     try:
         return hierarchy.dataset(dataset_id).table
@@ -272,7 +272,7 @@ _SODA_QUERY_KEYS = ("fail query", "warn query", "failed rows query")
 
 
 def _known_tables() -> set[str]:
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return {d.table for d in hierarchy.all_datasets()}
 
@@ -477,7 +477,7 @@ def real_sources() -> tuple[list[Path], list[Path], list[Path]]:
     """The real sources - every collection's dbt schema, Soda checks and
     contract, from the registry (REQ-QAC-241 criterion 8) - so a caller does
     not restate them and drift."""
-    from qa_tools import collections
+    from asset_model import collections
 
     colls = collections.all_collections()
     return ([ROOT / c.dbt_schema for c in colls],

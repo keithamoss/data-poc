@@ -62,7 +62,7 @@ def split_s3_uri(uri: str) -> tuple[str, str]:
 
 def delivery_name_for(bucket: str, key: str, received_at: datetime) -> str:
     """`s3-<bucket>-<key>-<receipt key>`, safe as a path segment."""
-    from qa_tools.common import asset_time
+    from asset_model import asset_time
 
     flat = re.sub(r"[^A-Za-z0-9._-]+", "-", f"{bucket}-{key}").strip("-")
     return f"s3-{flat}-{asset_time.arrival_key(received_at)}"
@@ -71,7 +71,7 @@ def delivery_name_for(bucket: str, key: str, received_at: datetime) -> str:
 def receipt_of(s3_client, bucket: str, key: str) -> tuple[datetime, str]:
     """(instant, which clock) - the object's own LastModified where storage
     gives one (criterion 3), else ours, said so."""
-    from qa_tools.common import asset_time, delivery
+    from asset_model import asset_time, delivery
 
     head = s3_client.head_object(Bucket=bucket, Key=key)
     stamped = head.get("LastModified") if isinstance(head, dict) else None
@@ -83,7 +83,8 @@ def receipt_of(s3_client, bucket: str, key: str) -> tuple[datetime, str]:
 def record_object(s3_client, bucket: str, key: str, *, conn=None) -> RecordedObject:
     """Record one arriving object as a delivery of one file, received
     automatically (criterion 10), and nothing else."""
-    from qa_tools.common import arrivals, delivery, delivery_log, qa_store, supply_db
+    from asset_model import arrivals, delivery
+    from qa_tools.common import delivery_log, qa_store, supply_db
 
     filename = os.path.basename(key.rstrip("/"))
     received_at, source = receipt_of(s3_client, bucket, key)
