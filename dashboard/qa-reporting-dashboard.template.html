@@ -7674,6 +7674,7 @@ function eventSeverityPill(severity, size){
 // loudly; the kind is what a person actually recognises.
 const OUTSTANDING_KIND_LABEL = {
   "held-supply":"Held supply", "failed-load":"Could not be loaded",
+  "could-not-check":"Could not be checked",
   "contested-file":"Contested file", "contested-table":"Two files for one table", "unrecognised-file":"Unrecognised file",
   "in-flight-delivery":"Still arriving",
   "closed-unfilled-slot":"No supply", "awaiting-decision":"Awaiting a decision",
@@ -7710,12 +7711,16 @@ function outstandingKindLabel(kind, item){
 // read on the asset's clock, the same day boundary the as-of picker uses.
 const BLOCKER_LABEL = {held:"Held", contested:"Two files for one table",
   refused:"Could not be loaded",
+  // REQ-DASH-415 criterion 1: OUR CHECK, not the supplier's delivery - never
+  // the 'Not checked' status word, which means 'does not count' (TR5).
+  "could-not-check":"Could not be checked",
   // REQ-PIPE-173: OURS, NOT THE SUPPLIER'S - worded as a configuration problem.
   "agreement-refused":"Refused: the delivery agreement changed"};
 const BLOCKER_SAYS = {
   held:"no open period to file it to; waiting for a person",
   contested:"waiting for a person to say what each file is",
   refused:"its supply arrived and could not be loaded",
+  "could-not-check":"its supply arrived and our check of it did not finish",
   "agreement-refused":"a configuration problem on our side - its recorded judgements no longer match the agreement and no declared correction accounts for it"};
 // One answer per string, kept in _ASSET_DATE_STR (post-build-review #268 L1,
 // declared beside asInstant's own cache because this runs before here is
@@ -9282,10 +9287,195 @@ function amberPromotedTag(datasetId, runId, inPlaceOnDateStr){
 // newest point of its timeline up to that date, and the verdict it arrived
 // with stays beside it whenever the two differ. Any other supply keeps its
 // own verdict.
+// ---- RUN TIMES AND TRIES (REQ-DASH-413, REQ-DASH-414) ---------------------
+// From the build's `runTimes` (REQ-PIPE-411 criterion 2) and each run's
+// bounded `attempts` (criterion 3): how long our check of a supply took,
+// whether it needed another try, and - on the trend - how that has changed.
+// ABOUT OUR CHECK, NEVER THE SUPPLIER'S DELIVERY, and NEVER A STATUS: nothing
+// here is read by a Pass/Warn/Fail, a rollup, a card or the queue (413
+// criteria 8 and 10; REQ-PIPE-412 criterion 6). Only on real datasets - a
+// mock has no runTimes, so no run time is ever made up (413 criterion 8).
+const TRY_ORDINALS = ["first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth"];
+function tryOrdinal(n){
+  if(n >= 1 && n <= TRY_ORDINALS.length) return TRY_ORDINALS[n-1];
+  const s = (n % 100 >= 10 && n % 100 <= 20) ? "th" : ({1:"st",2:"nd",3:"rd"})[n % 10] || "th";
+  return `${n}${s}`;
+}
+// HOW ONE TRY ENDED, in the page's words (414 criterion 1) - never 'attempt',
+// which stays the resupply's word (TA Q8).
+function tryEndedWords(t){
+  if(t.outcome === "TOOL-ERROR") return `failed in ${t.tool}`;
+  return ({"TIMED-OUT":"timed out", "CRASHED":"crashed", "INTERRUPTED":"was stopped",
+    "COMPLETED":"was checked"})[t.outcome] || "crashed";
+}
+// A DATE ON SHOW HAS PASSED AN INSTANT where the instant fell on or before it,
+// on the asset's clock - the as-of picker's own day boundary.
+function endedBy(at, on){ return !!at && (!on || assetDateStrOf(at) <= on); }
+// `given`: a dataset's runTimes handed in (a test), else the real dataset's.
+function runTimesOf(datasetId, given){
+  if(given) return given;
+  const raw = rawRealDatasetById(datasetId);
+  return (raw && raw.runTimes) || [];
+}
+function runTimeEntry(datasetId, runId, given){
+  return runTimesOf(datasetId, given).find(r=> r.run_id === runId) || null;
+}
+// 'Checked in 3m 12s' (413 criterion 2), ' · slow' in bold where REQ-PIPE-412
+// marks it (criterion 4) - shown only once its try had ended by the date on
+// show (criterion 6), and nothing where it has no run time.
+function runTimeText(r, on){
+  if(!r || r.run_time_ms == null || !endedBy(r.ended_at, on)) return "";
+  return `in ${escHtml(fmtElapsed(r.run_time_ms / 1000))}${r.slow ? ` · <b data-slow style="color:var(--ink);">slow</b>` : ""}`;
+}
+// THE TRIES, AS AT THE DATE ON SHOW (414 criterion 5): one not yet begun is
+// not shown; one begun and not ended reads 'began <time>, not finished'; only
+// one that had ended says how.
+function triesAsAt(attempts, on){
+  return ((attempts && attempts.tries) || []).filter(t=> !on || !t.began_at || assetDateStrOf(t.began_at) <= on)
+    .map(t=> endedBy(t.ended_at, on) && t.outcome ? t : {...t, unfinished: true});
+}
+function tryLine(t){
+  if(t.unfinished)
+    return `Try ${t.number}: began ${escHtml(fmtInstant(t.began_at))}, not finished${t.ended_at ? "" : " - its end and its run time are unknown"}`;
+  const took = t.run_time_ms != null ? ` after ${escHtml(fmtElapsed(t.run_time_ms / 1000))}` : "";
+  return `Try ${t.number}: began ${escHtml(fmtInstant(t.began_at))}, ended ${escHtml(fmtInstant(t.ended_at))} - ${escHtml(tryEndedWords(t))}${took}${t.tool && t.outcome !== "TOOL-ERROR" ? ` (${escHtml(t.tool)})` : ""}${t.error_type ? ` · ${escHtml(t.error_type)}` : ""}`;
+}
+// 'Checked on the second try - the first timed out after 45m' (414 criterion
+// 1), the SUMMARY OF A NATIVE DISCLOSURE, closed by default, whose body lists
+// the tries (criterion 2) - muted, never a status colour (criterion 3).
+// Nothing for a run with one try that completed (criterion 7), nor before its
+// completing try had ended on the date on show.
+function triesNote(r, on){
+  const a = r && r.attempts;
+  if(!a || a.count < 2) return "";
+  const tries = triesAsAt(a, on);
+  const newest = tries[tries.length - 1];
+  if(!newest || newest.unfinished || newest.outcome !== "COMPLETED" || newest.number !== a.count) return "";
+  const before = tries[tries.length - 2];
+  const said = !before ? "another try"
+    : before.unfinished || before.run_time_ms == null
+    ? `the ${tryOrdinal(before.number)} did not finish`
+    : `the ${tryOrdinal(before.number)} ${tryEndedWords(before)} after ${fmtElapsed(before.run_time_ms / 1000)}`;
+  const items = tries.map((t, i)=> (i === 1 && a.left_out ? `<li data-tries-left-out>and ${a.left_out} more</li>` : "") + `<li>${tryLine(t)}</li>`).join("");
+  return `<details class="tries-note" data-tries-note title="Our check of this supply needed another try; this is not about the supplier's delivery" style="color:var(--ink-muted); font-size:12px;">
+      <summary>Checked on the ${tryOrdinal(a.count)} try - ${escHtml(said)}</summary>
+      <ol style="margin:4px 0 0 18px; padding:0;">${items}</ol>
+      <div style="margin-top:4px;"><code>mothman supply failures</code> shows each try's full error.</div>
+    </details>`;
+}
+// A ROW'S OWN RUN TIME, its tries and its re-checks' run times (413 criterion
+// 2, 414 criterion 1): the row's ARRIVAL run in its Status cell; each later
+// whole-supply or readers-only run of the same supply in its re-check words.
+function runTimeNotes(datasetId, entry, on, given){
+  const own = runTimeEntry(datasetId, entry.run_id, given);
+  const supply = own ? own.supply_id : null;
+  const parts = [];
+  const took = runTimeText(own, on);
+  if(took) parts.push(`<span class="run-time-note" data-run-time style="color:var(--ink-muted); font-size:12px;">Checked ${took}</span>`);
+  const tries = triesNote(own, on);
+  if(tries) parts.push(tries);
+  if(supply){
+    runTimesOf(datasetId, given).filter(r=> r.supply_id === supply && r.run_id !== entry.run_id
+        && r.scope !== "arrival" && !r.not_checked && (!own || r.rank > own.rank)).forEach(r=>{
+      const t = runTimeText(r, on);
+      if(t) parts.push(`<span class="run-time-note" data-recheck-run-time style="color:var(--ink-muted); font-size:12px;">· re-checked ${escHtml(fmtDay(r.ended_at))} ${t}</span>`);
+      const n = triesNote(r, on);
+      if(n) parts.push(n);
+    });
+  }
+  return parts.length ? " " + parts.join(" ") : "";
+}
+// THE RUN-TIME TREND (413 criteria 1, 3 to 7): one point per whole-supply run,
+// by rank alone, in neutral ink, its height the run time; each failed try of
+// one with a recorded run time a HOLLOW marker labelled in words, not joined
+// to the line; a slow run ringed and labelled. Drawn only from tries that had
+// ended by the date on show. In unitTrendBlock's own frame, with its 'View as
+// table' - local view state, never a route (criterion 9).
+const WHOLE_SUPPLY_SCOPES = ["arrival", "full"];
+function runTimeSeries(datasetId, on, given){
+  return runTimesOf(datasetId, given).filter(r=> WHOLE_SUPPLY_SCOPES.indexOf(r.scope) !== -1)
+    .slice().sort((a, b)=> a.rank - b.rank)
+    .map(r=> ({run: r,
+      time: r.run_time_ms != null && endedBy(r.ended_at, on) ? r.run_time_ms : null,
+      failed: triesAsAt(r.attempts, on).filter(t=> !t.unfinished && t.outcome !== "COMPLETED"
+        && t.run_time_ms != null)}))
+    .filter(p=> p.time != null || p.failed.length);
+}
+function runTimeTrend(datasetId, on, given){
+  const series = runTimeSeries(datasetId, on, given);
+  if(!runTimesOf(datasetId, given).length) return "";
+  const head = `<div class="unit-trend-title">How long our checks took</div>`;
+  if(series.filter(p=> p.time != null).length < 2)
+    return `<div class="unit-trend" data-unit-trend="run-time">${head}<div class="not-green-faint" data-run-time-too-little>Too little history to show a trend yet: fewer than two runs have a run time.</div></div>`;
+  const id = "utrend"+(chartSeq++);
+  const n = series.length;
+  const W=480, H=150, padL=48, padR=12, padT=14, padB=22;
+  const max = Math.max(...series.map(p=> Math.max(p.time || 0, ...p.failed.map(t=> t.run_time_ms))), 1);
+  const x = i=> n===1 ? padL + (W-padL-padR)/2 : padL + i*(W-padL-padR)/(n-1);
+  const y = v=> H-padB - (v/max)*(H-padT-padB);
+  const filled = series.map((p, i)=> p.time != null ? [i, p] : null).filter(Boolean);
+  const line = filled.length > 1 ? `<path d="${filled.map(([i, p], k)=> `${k ? "L" : "M"}${x(i).toFixed(1)},${y(p.time).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--ink-muted)" stroke-width="1.5"/>` : "";
+  const points = filled.map(([i, p])=> `<circle cx="${x(i).toFixed(1)}" cy="${y(p.time).toFixed(1)}" r="3" fill="var(--ink-muted)" data-run-point="${escAttr(p.run.run_id)}"><title>${escHtml(`Checked in ${fmtElapsed(p.time/1000)}${p.run.slow ? " - slow" : ""}`)}</title></circle>`
+    + (p.run.slow ? `<circle cx="${x(i).toFixed(1)}" cy="${y(p.time).toFixed(1)}" r="7" fill="none" stroke="var(--ink)" stroke-width="1.5" data-slow-ring/><text x="${x(i).toFixed(1)}" y="${(y(p.time)-10).toFixed(1)}" font-size="9.5" text-anchor="middle" fill="var(--ink)" font-weight="600">slow</text>` : "")).join("");
+  const hollow = series.flatMap((p, i)=> p.failed.map(t=> {
+    const words = `${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms/1000)}`;
+    return `<circle cx="${(x(i)+5).toFixed(1)}" cy="${y(t.run_time_ms).toFixed(1)}" r="4" fill="var(--paper)" stroke="var(--ink-muted)" stroke-width="1.5" data-failed-try aria-label="${escAttr(words)}"><title>${escHtml(words)}</title></circle>`;
+  })).join("");
+  const yLabels = [0, 0.5, 1].map(f=> `<text x="${padL-6}" y="${(y(max*f)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${escHtml(f ? fmtElapsed(max*f/1000) : "0s")}</text>`).join("");
+  const xLabels = xAxisTicks(n, x, i=> series[i].run.ended_at ? shortDay(assetDateStrOf(series[i].run.ended_at)) : "", H-6);
+  const label = `How long our checks took, ${n} ${pluralize(n, "run")}; the latest ${fmtElapsed((filled[filled.length-1][1].time)/1000)}`;
+  const slowText = r=> r.slow ? `Slow - median ${fmtElapsed(r.median_ms/1000)} over ${r.judged_against} runs`
+    : r.too_few ? "too few earlier runs to judge" : "";
+  const rows = series.slice().reverse().map(p=> `<tr data-run="${escAttr(p.run.run_id)}"><td>${p.run.ended_at ? fmtDay(p.run.ended_at) : "—"}</td><td class="num">${p.time != null ? escHtml(fmtElapsed(p.time/1000)) : "—"}</td><td>${p.failed.map(t=> escHtml(`${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms/1000)}`)).join("; ")}</td><td>${escHtml(p.time != null ? slowText(p.run) : "")}</td></tr>`).join("");
+  return `<div class="unit-trend" data-unit-trend="run-time">
+    ${head}
+    <div class="chart-axis-title">Run time - hollow markers are tries that did not finish</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block; overflow:visible;" role="img" aria-label="${escAttr(label)}">
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${y(0).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+      <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W-padR}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1"/>
+      ${line}${points}${hollow}${yLabels}${xLabels}
+    </svg>
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="trend-scroll" id="${id}-table" hidden>
+      <table class="trend-table" data-run-time-table>
+        <thead><tr><th>Checked</th><th>Run time</th><th>Tries that did not finish</th><th>Slow</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+// 'COULD NOT BE CHECKED', IN WORDS, AS AT THE DATE ON SHOW (REQ-DASH-415
+// criteria 3, 6 and 7): before the newest try had ended - or where it has no
+// recorded end, running or dead alike, since the build reads no locks - 'a
+// check began <time> and has not finished'; after, how it ended, its tool and
+// when; and what is known, what happens next and what a person can do. The
+// error's type is left to the try list (criterion 3).
+function couldNotCheckWords(b, on){
+  const t = b.tries || {};
+  const ended = t.outcome && endedBy(t.endedAt, on);
+  const how = ended
+    ? `its newest try ${tryEndedWords({outcome: t.outcome, tool: t.tool})} on ${fmtInstant(t.endedAt)}`
+    : `a check began ${fmtInstant(t.beganAt)} and has not finished`;
+  const many = ended && t.failed > 1 ? ` It could not be checked on ${t.failed} tries.` : "";
+  return `Could not be checked - ${how}.${many} Nothing is yet known about this supply's data. `
+    + `The next processing pass retries it; a person can reject the supply if it keeps failing.`;
+}
+function blockerReasonOn(b, on){
+  return b && b.kind === "could-not-check" ? escHtml(couldNotCheckWords(b, on)) : null;
+}
 function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
   const h = raw && raw.promotedHealth && raw.promotedHealth[entry.run_id];
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  // A SUPPLY THAT COULD NOT BE CHECKED reads the grey 'No data' on its cycle
+  // row while that is open - never red, never 'Not checked', and never the
+  // verdict it had before - without repeating the reason, which the
+  // 'Waiting for a person' table above it gives (REQ-DASH-415 criteria 2
+  // and 8).
+  const runOf = raw && (raw.runs || []).find(r=> r.run_id === entry.run_id);
+  if(runOf && runOf.supply_id && on && blockersOpenInPlaceOn(datasetId, on).some(b=>
+      b.kind === "could-not-check" && b.supply === runOf.supply_id))
+    return `<span data-could-not-check-row>${pill("nodata", "sm")}</span>`;
   // RE-CHECKED AFTER WE FIXED A CHECK (REQ-DASH-221): its own wording.
   if(recheckEvents(datasetId, entry.run_id).length) return recheckedRowStatus(datasetId, entry, on);
   let shown = entry.status, changed = null;
@@ -9482,7 +9672,12 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = supplyRowStatus(datasetId, e) + " " + acknowledgementBadge(datasetId, e.run_id)
+    // ITS RUN TIME AND ITS TRIES beside its status, muted (REQ-DASH-413
+    // criterion 2, REQ-DASH-414 criterion 1) - never in Timing, which is
+    // about the supplier's arrival.
+    const statusBadge = supplyRowStatus(datasetId, e)
+      + runTimeNotes(datasetId, e, typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null)
+      + " " + acknowledgementBadge(datasetId, e.run_id)
       + " " + redPromotedBadge(datasetId, e.run_id) + " " + amberPromotedTag(datasetId, e.run_id)
       + " " + recheckedAmberTag(datasetId, e.run_id);
     // A resupply (any entry after the first in its chain) has no real
@@ -9555,7 +9750,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
   return `
     <div class="supply-cycle" data-blocker-rows>
       <div class="supply-cycle-label"><b>${anyOpen ? "Waiting for a person" : "Needed a person"}</b>
-        <span style="color:var(--ink-faint);">supplies with no period yet, two files for one table, or a file that could not be loaded</span></div>
+        <span style="color:var(--ink-faint);">supplies with no period yet, two files for one table, a file that could not be loaded, or a supply that could not be checked</span></div>
       <div class="overflow-x">
       <table class="dataset-table supply-cycle-table static-rows">${SUPPLY_BLOCKER_COLS}
         <thead><tr><th>Arrived</th><th>Status</th><th>Why</th></tr></thead>
@@ -9576,7 +9771,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
           return `<tr data-blocker="${b.kind}" data-supply="${escAttr(b.supply || "")}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
-            <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${recordedText(b.reason)}</div></td>
+            <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${blockerReasonOn(b, inPlaceOnDateStr) || recordedText(b.reason)}</div></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
@@ -9816,8 +10011,12 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       && periodShownOn(ds.id, x, CURRENT_IN_PLACE_ON));
     return e ? `<span style="color:var(--ink-faint);" data-owed-nothing-sub>${escHtml(owedNothingLabel(e).label)}</span>` : "";
   };
+  // THE RUN-TIME TREND AT THE HEAD OF THE SECTION (REQ-DASH-413 criterion 1;
+  // TR6), below the page's verdict - on a blocked or could-not-be-checked
+  // page too.
+  const trend = runTimeTrend(ds.id, CURRENT_IN_PLACE_ON);
   if(!cycles.length && !owed.length){
-    return waiting ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${waiting}</div>` : "";
+    return waiting || trend ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${trend}${waiting}</div>` : "";
   }
   // A NULL as-of period MATCHES NOTHING, rather than matching every
   // chain that also has none. Both sides are null for a dataset with no
@@ -9886,6 +10085,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
         <h3>Supply history</h3>
         ${older.length ? `<button class="link-btn" id="supply-history-toggle" type="button">Show all history (${older.length} ${pluralize(older.length, "cycle")})</button>` : ""}
       </div>
+      ${trend}
       ${waiting}
       ${current.length ? current.map(i=> i.html()).join("") : emptyCurrentCycle(ds)}
       ${older.length ? `<div id="supply-history-older" hidden>${older.map(i=> i.html()).join("")}</div>` : ""}
@@ -10228,7 +10428,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
         <b>${escHtml(blockerLabel(ds.blocked))} — this dataset's own supply is not checked ${blockerUntil(ds.blocked)}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          <span data-recorded-text>${withCode(ds.blocked.reason)}</span><br><br>
+          <span data-recorded-text>${blockerReasonOn(ds.blocked, CURRENT_IN_PLACE_ON) || withCode(ds.blocked.reason)}</span><br><br>
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
           period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}
