@@ -15338,3 +15338,23 @@ twice. It deliberately did not re-find the `TypeError`.
        test_orchestrate_reference_run.py, test_datacontract_scoped.py,
        test_run_datacontract_cp.py, test_run_datacontract_bdm.py,
        test_asked_for.py - 129 passed; ruff clean.
+
+380. **[done, 2026-11-16]** **[Data generation]** **A stale delivery split every twin pair, so it also failed the sibling checks.**
+     Found by this builder (REQ-GEN-392, wip/gen-392), not a critic, when the
+     new refusal stopped the test suite's own Birth Registrations generation:
+     a Fail preset asked for five broken twin pairs and the frame held one.
+     `inject_stale_delivery` pushed each row's date_of_birth back by its OWN
+     random 15-45 day lag; twins are matched on date_of_birth, facility and
+     parent 1, so every pair came apart, and every stale supply (about one in
+     twenty) also failed the three multiple-birth sibling checks it is not
+     aimed at. A replayed feed replays a birth event whole.
+     - **Fix** (defect, failing test first): each twin takes the lag of its
+       pair's first row; every other row's draw is unchanged.
+       `tests/test_dirty.py::test_a_stale_delivery_keeps_every_twin_pair_matched`
+       failed before the fix (199 groups where 100 pairs were) and passes now.
+     - **Moves the history**: a stale supply no longer fails the sibling
+       checks (it still fails freshness, so its verdict stays Fail). Carried by
+       REQ-GEN-392 criterion 11's regeneration, recorded in its decisions.
+     - **Ran**: see REQ-GEN-392's evidence (2026-11-16) - the affected modules,
+       617 passed, 2 skipped; and 121 passed, 3 skipped, 5 failed in the
+       deployment-reading Emergency Department class, environmental.
