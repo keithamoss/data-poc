@@ -733,6 +733,32 @@ def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path,
         assert vcl.sources_fingerprint() != before, rel
 
 
+@pytest.mark.asset("quarterly")
+def test_the_fingerprint_reads_nothing_under_synthetic(tmp_path, monkeypatch):
+    """REQ-GEN-370 criterion 3, post-build-review #337: the checks read
+    nothing under an asset's synthetic/ folder. The fingerprint hashed every
+    YAML file of the asset folder, so a scripted decision or a placing input
+    edited moved the key of the check-definition caches - the staging step
+    reading synthetic-only configuration."""
+    import shutil
+
+    for top in ("assets", "dbt_shared"):
+        shutil.copytree(vcl.ROOT / top, tmp_path / top,
+                        ignore=shutil.ignore_patterns("dbt_packages", "target", "logs"))
+    monkeypatch.setattr(vcl, "ROOT", tmp_path)
+    synthetic = tmp_path / assets.folder_rel() / "synthetic"
+    edited = [synthetic / "scripted_decisions.yaml", synthetic / "synthetic_inputs.yaml"]
+    for path in edited:
+        assert path.is_file(), f"precondition: {path.name} exists"
+    before = vcl.sources_fingerprint()
+    for path in edited:
+        path.write_text(path.read_text() + "\n# edited\n")
+    (synthetic / "eras.yaml").write_text("eras: []\n")
+    assert vcl.sources_fingerprint() == before
+    shutil.rmtree(synthetic)
+    assert vcl.sources_fingerprint() == before
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("daily")]

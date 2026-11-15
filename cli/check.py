@@ -89,9 +89,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "only asset folders at the top of assets/, and no collection's file in shared code",
      False),
     # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
-    # would draw the same rows.
+    # would draw the same rows. REQ-GEN-370 criterion 5: and no provider
+    # imports another provider, an adapter or anything under assets/.
     ("providers", ["uv", "run", "python3", "-m", "generator.validate_providers"],
-     "every generator provider's seeds are disjoint from every other's", False),
+     "every generator provider's seeds are disjoint from every other's, and none imports "
+     "another provider or an adapter", False),
     # REQ-PIPE-254 criteria 16 to 18: a value held for the whole process
     # answers an edited or swapped configuration file stale, so a new
     # lru_cache or cache needs a reviewed reason.

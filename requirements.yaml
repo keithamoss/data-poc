@@ -48025,7 +48025,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever would take this to a real deployment, I want everything that exists only to fake an asset's history in one folder per asset, so that deleting that folder leaves an asset that runs on real supplies, and nothing in the real pipeline can come to depend on it.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48079,6 +48079,55 @@ requirements:
       does not exist (REQ-GEN-371, a feature after #134). UNMET c3 - no test that staging, checks, the gate, promotion and the dashboard read nothing under synthetic/; c5 - no gate refuses a provider importing
       another provider (the imports gate sides providers with the generator, so a provider-to-provider import is allowed, and only adapters have an import gate); c9 - of its live tests only the provider-by-path
       one exists (tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_its_assets_folder). Left not_started.'
+    - 'STATUS PASS 2026-11-15 (split T4, branch wip/split-t4 from 647861ed): built with c3 and c1''s eras.yaml remainder unmet. c1 CHECKED: contract/ is gone; generator/collections/ holds base.py only; the four providers and synthetic_inputs.yaml moved at 100% similarity in de009e91; scripted_decisions.yaml was split into the two assets'' files there, every one of the 37 decisions and 2 corrections in exactly one of them (compared entry by entry).'
+    - 'c3 WAITS FOR REQ-GEN-381 (Keith, 2026-11-15): the one synthetic/ read left is the scripted-decision Player the batch pass builds (qa_tools/tools/orchestrate.py _begin), which reads synthetic/scripted_decisions.yaml; REQ-GEN-381 criteria 1 and 4 move it into bootstrap/ and forbid the pipeline importing it. c3 stays unmet, blocked_by REQ-GEN-381, and this requirement is built with that criterion open. REJECTED rewording c3 to exclude the Player. The test excuses that read only when the Player was built by _begin, so any other read fails and the test stays green when it goes.'
+    - 'c5, THE PROVIDER-IMPORT RULE IN THE PROVIDERS GATE (generator/validate_providers.py provider_import_problems, run by problems() so `mothman check --only providers` fails naming the file and the statement): an import - module level, function level or under TYPE_CHECKING - naming another provider (mothman_provider_*, assets.*, generator.collections.<provider>), an adapter (mothman_adapter_*, qa_tools.collections.<adapter>, of any asset) or anything under assets/; any relative import; and any load by path or by name - the resolver''s load or module_file however reached (an alias, the dotted name, a from-import, getattr), generator.collections.provider_module, importlib (but its resources and metadata), runpy, pkgutil, sys.modules, and the builtins __import__, exec, eval and compile (post-build-review #339). Read from the syntax tree before anything loads. The imports gate (REQ-TEST-384) could not say it: it sides every provider with the generator.'
+    - 'THE SHARED REGISTRY IS ALLOWED FOR A LOOKUP BY DATASET ID (Keith, 2026-11-15): a provider may look another up through generator.collections.for_dataset, as Linkage Products reads the collections it declares in depends_on (REQ-GEN-334 criterion 6, held in order by the gate''s order_problems); the gate refuses direct imports and loads only, and provider_module, which hands back another provider''s whole module, is refused as a load (the critic, 2026-11-15). Linkage Products'' one adapter lookup (known_values) needs an import the imports gate refuses, allowlisted until REQ-QAC-389 criterion 9. REJECTED banning provider-to-provider reach and redesigning Linkage''s source lookup.'
+    - 'ANYTHING A PROVIDER RAISES AT IMPORT IS A FINDING (post-build-review #336): the providers gate raised a traceback when a provider failed to import; it now names the file with the error and its type, for any exception, after any forbidden import already named in it.'
+    - 'c3 SHOWN BY AN AUDIT HOOK, NOT A PATCHED READER (the T4 builder; tests/synthetic_unread_support.py): real generated deliveries go through orchestrate.run_pipeline - staged as they arrive, the four tools, the arrival gate, promotion and one played scripted decision - into a fresh database, and the dashboard is built from what was recorded (rebuild-results, build-data, embed), with the asset''s synthetic/ folder present and with it removed, for Birth Registrations (daily) and Emergency Department (quarterly, about 55s a module). It found post-build-review #337 (the check fingerprint listed synthetic/ and read scripted_decisions.yaml during staging), fixed.'
+    - 'WHAT THE HOOK SEES AND DOES NOT (post-build-review #338, the critic on 0d07a178): it sees every open made through Python (open, Path.read_text, os.open, io.open_code), every listing through os.listdir, os.scandir (a descriptor resolved through /proc/self/fd) and glob, and every subprocess.Popen whose executable, arguments (a path inside one too) or working directory is under synthetic/. It does NOT see an os.stat or exists() check (no audit event), a C extension''s own file opens, or what a child process reads without being handed the path (dbt runs as one). A relative path opened against a directory descriptor is unresolvable, but getting the descriptor opens the folder, which is seen. Accepted as the limit of an in-process check; REQ-PIPE-385 criterion 14 blocks the generator side''s imports in a subprocess.'
+    - 'c9 READ AFTER THE 2026-11-15 RETIREMENTS (PROVISIONAL, the T4 builder): of its five tests, three belong to retired criteria and go with them - the folder-removed fixture "passing criterion 8" (REQ-PIPE-385 criteria 1 and 14), population applying one asset''s presets (c6, REQ-GEN-392) and the fold''s byte compare (c4, REQ-GEN-392). The two live ones are built: a provider found by path under each asset (tests/test_assets.py, quarterly and daily) and a provider importing another provider refused (tests/test_provider_imports.py). The folder-removed runs of c3''s tests overlap REQ-PIPE-385 criterion 1 for staging to the dashboard build only; they do not block imports, run the gates or the CLI, which REQ-PIPE-385 criterion 14 does.'
+    linked_tests:
+    - tests/test_provider_imports.py
+    - tests/test_synthetic_folder_unread.py
+    - tests/test_synthetic_folder_unread_quarterly.py
+    - tests/test_synthetic_unread_hook.py
+    - tests/test_assets.py
+    - tests/test_validate_check_lifecycle.py
+    - tests/test_generator_providers.py
+    implemented_by:
+    - generator/collections/__init__.py::provider_module
+    - qa_tools/common/assets.py::load
+    - generator/validate_providers.py::provider_import_problems
+    - generator/validate_providers.py::problems
+    - generator/validate_providers.py::main
+    - qa_tools/common/validate_check_lifecycle.py::sources_fingerprint
+    - cli/check.py::_GATES
+    - assets/daily/synthetic/collections/civil_registration.py::PROVIDER
+    - assets/quarterly/synthetic/collections/child_protection.py::PROVIDER
+    - assets/quarterly/synthetic/collections/emergency_department.py::PROVIDER
+    - assets/quarterly/synthetic/collections/linkage_products.py::PROVIDER
+    - assets/daily/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/scripted_decisions.yaml
+    - assets/quarterly/synthetic/synthetic_inputs.yaml
+    evidence:
+    - '2026-11-15, split T4: tests/test_provider_imports.py seen failing first with the rule absent (23 failed), then the critic''s 14 routes round it and 6 importlib cases (20 failed), and #336''s any-exception case (4 failed) - then 48 passed; `[quarterly]` and `[daily] providers OK` on the real providers.'
+    - '2026-11-15: c3''s tests - tests/test_synthetic_folder_unread.py failed first on the present variant (75 reads under synthetic/ from sources_fingerprint, #337) and again under a mutant undoing that fix; tests/test_synthetic_unread_hook.py 5 failed against the first hook (child processes, a descriptor listing, a Player built outside the batch pass), then 9 passed; the daily module 6 passed (49s) and the quarterly 6 passed (54s), all four tools, a promotion and the played scripted decision recorded in each.'
+    - '2026-11-15: tests/test_validate_check_lifecycle.py::test_the_fingerprint_reads_nothing_under_synthetic failed first (#337), then the module 33 passed.'
+    - '2026-11-15: tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_the_daily_assets_folder_too NOT seen failing first - it was written after the behaviour it tests (REQ-GEN-370 c2, built 2026-11-02) and passed on arrival; it was shown able to fail against a mutant that loaded providers from the adapters folder.'
+    unmet_criteria:
+    - criterion: 'Criterion 1, its eras.yaml half - eras.yaml under assets/<asset>/synthetic/.'
+      why: eras.yaml does not exist yet; REQ-GEN-371 creates it (a feature after #134).
+      owner: REQ-GEN-371
+      blocked_by:
+        requirements:
+        - REQ-GEN-371
+    - criterion: 'Criterion 3 - staging, the checks, the gate, promotion and the dashboard build read nothing under synthetic/.'
+      why: 'The batch pass''s scripted-decision Player (orchestrate._begin) reads synthetic/scripted_decisions.yaml; every other read is gone and the tests excuse only that one (Keith, 2026-11-15: c3 waits for REQ-GEN-381).'
+      owner: REQ-GEN-381, criteria 1 and 4
+      blocked_by:
+        requirements:
+        - REQ-GEN-381
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged
