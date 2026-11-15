@@ -56,7 +56,13 @@ over `daily_batch.py`, `resupply.py`, `dirty.py`, `names_au.py` and
 `presentation.py`, and Child Protection's `child_protection.py`),
 `synthetic_data_generator/` (the separate, population-scale,
 cross-agency-identity-linked generator, `mothman population`, Tier 4/
-exploratory, not currently wired into the real pipeline).
+exploratory, not currently wired into the real pipeline), `bootstrap/` (the
+bootstrap and replay machinery - the bootstrap, checkpoints and resume, the
+replay cache key, target agreement, the synthetic reset, the scripted-decision
+and correction players and the replay clock; REQ-GEN-381, which kept it GEN
+rather than PIPE) and `scenarios/` (what the generator and the bootstrap both
+read of a synthetic history's design - the seeded promotion lag so far,
+REQ-GEN-386 criterion 4).
 
 **In scope:** producing seeded, reproducible synthetic data; dirty-data
 injection (nulls, FK dangling, format drift); resupply/cadence

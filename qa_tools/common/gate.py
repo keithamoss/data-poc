@@ -1636,12 +1636,14 @@ def _found_contended(conn, owed_id: int) -> None:
 
 def _completing_instant(conn, package: Package) -> str:
     """WHEN A RETRIED OR RESUMED PACKAGE GATE TAKES EFFECT - one caused by a
-    load or by the application it retries (post-build-review #274 D1): when
-    its first attempt did, the effective instant of the arrival whose run
-    completed the package (orchestrate.effective_at_of, the rule that
-    attempt used), so a replay stamps the same instant however many attempts
-    it took. It used to be the wall clock, which put a replayed history's
-    promotion today. The replay clock where no arrival can be named.
+    load or by the application it retries: the clock is asked about the
+    arrival whose run completed the package (orchestrate.effective_at_of).
+    On a real asset that answers now, the instant of the retry - REQ-PIPE-382,
+    Keith 2026-11-14, reversing post-build-review #274 D1 for a real asset;
+    in a replay the replay clock answers from that arrival, so a replay still
+    stamps the instant its first attempt did however many attempts it took
+    (#274 D1, where it was found: two bootstraps differing). The clock in
+    force where no arrival can be named.
 
     NEVER BEFORE A DECISION ALREADY IN EFFECT IN ITS PERIOD: a retried
     knock-on's readers are gated against the promotion that caused it, so

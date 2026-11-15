@@ -28,7 +28,7 @@ decisions:
   # gap it opens is closed before the next day's supply is measured. TWENTY
   # HOURS - ten the next morning, before that day's 14:30 supply - so it comes
   # after the rule has held it (a replayed rule decision lands within the
-  # 4-hour claim window, promotion.effective_at_for) and the hold is still
+  # 4-hour claim window, scenarios/promotion_lag.py) and the hold is still
   # what the page shows at the end of its own day (post-build-review #156).
   - scenario: TS-43
     operation: promote

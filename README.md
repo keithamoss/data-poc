@@ -18,8 +18,13 @@ Run it yourself:
 ```bash
 uv sync --dev
 for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-deps; done
-./mothman pipeline run
+./mothman pipeline bootstrap
 ```
+
+`mothman pipeline bootstrap` generates the synthetic history and replays it
+through the real tools. `mothman pipeline run` is the real path: it processes
+whatever has already arrived in the delivery tree and generates nothing
+(CLI A, Keith 2026-11-14).
 
 `mothman env dbt-deps` is a one-time step per asset (re-run only if that
 asset's `assets/<asset>/dbt/packages.yml` changes) that installs `dbt_utils` - both `dbt build` calls
@@ -172,6 +177,17 @@ asset_model/                 the SHARED READING CODE (REQ-PIPE-380) - its charte
                                corrections, the status order and words, and arrival recognition. The
                                real pipeline, the generator and the bootstrap all import it and it
                                imports none of them; `mothman check`'s imports gate holds that
+bootstrap/                   the BOOTSTRAP AND REPLAY MACHINERY (REQ-GEN-381) - everything that exists only
+                               to replay a synthetic history, which a real deployment leaves out:
+                               `mothman pipeline bootstrap`/`resume`/`checkpoint`/`cache-key`, the target
+                               agreement, `mothman env reset-synthetic`, the scripted-decision and
+                               correction players, and the replay clock (REQ-PIPE-382) - the one clock a
+                               replay installs over asset_model's, acting on the neutral events the real
+                               pipeline announces. Refused on an asset not declaring `synthetic: true`;
+                               the real pipeline never imports it
+scenarios/                   what the generator and the bootstrap both read of a synthetic history's
+                               design - so far the seeded promotion lag the replay clock applies
+                               (REQ-GEN-386 moves the register, map and scripted-decision readers in)
 generator/                   a real package (generator/__init__.py) - invoked via `mothman bdm/cp
                                generate-synthetic-data` (`cli/`, never a bare `python3 -m generator.<module>`)
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
@@ -243,8 +259,9 @@ reports/                       generated - results_rs_civil-registration.json, r
                                (not checked in)
 cli/                          `mothman` (plans/tooling.md #1) - the unified CLI/TUI, the only
                                programmatic access point to this repo; run `./mothman` or
-                               `uv run mothman` - `mothman pipeline run` replaces the retired
-                               run_pipeline.sh (runs the whole real-tools pipeline end to end);
+                               `uv run mothman` - `mothman pipeline run` runs the real tools over
+                               every arrival in the delivery tree and builds the dashboard, and
+                               `mothman pipeline bootstrap` generates a synthetic history and replays it;
                                every collection's `mothman <short>` group is built from the
                                registry by collection_cli.py, by its shape: one_table.py for a
                                one-file collection, many_tables.py for a delivery folder
@@ -319,7 +336,8 @@ and it is named in the Development section above rather than discovered.
 
 ## On-demand checks against a file you already have
 
-The manifest-driven batch pipeline above (`mothman pipeline run`,
+The batch pipeline above (`mothman pipeline bootstrap` over a generated
+history, or `mothman pipeline run` over what has arrived;
 `qa_tools/tools/orchestrate.py`) is this repo's own synthetic-data
 demo harness. `mothman`'s **Local files QA source mode** (`plans/tooling.md`
 #1 Phase 2 — originally scoped as a separate CLI pair with Keith 2026-09-19,
@@ -519,13 +537,13 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-./mothman pipeline run --collection cp
+./mothman pipeline bootstrap --collection cp
 ```
 
-(Generates Child Protection's 55 quarterly deliveries, runs the real tools ->
-reports/results_cpfs_child-protection.json, reshapes -> reports/cpfs_child-protection_dashboard.json,
-then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
-the default, does the same for Birth Registrations too in one call.)
+(Generates Child Protection's quarterly deliveries and replays them through the
+real tools into the database, with the other quarterly collections its checks
+read; `mothman dashboard rebuild` then reshapes the recorded results into
+reports/ and embeds them in the dashboard HTML.)
 
 A few things specific to this collection, each found by actually running
 it end to end rather than assumed:

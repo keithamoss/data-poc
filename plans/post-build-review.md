@@ -15189,3 +15189,56 @@ twice. It deliberately did not re-find the `TypeError`.
        one by one to see it fail. Each was rewritten onto the same module
        object the code under test now reads, and the by-value scan above is
        what stands in for that; said here rather than claimed.
+
+355. **[in-progress, 2026-11-15]** **[Pipeline & publishing]** **Under one clock a batch run stamps each arrival as it starts, on every asset.**
+     Found building REQ-PIPE-382 (step 3 of #134), and a change to agreed
+     behaviour, so it is Keith's to confirm. The batch used to stamp every
+     run of a pass with one instant taken at its start (`_begin`'s
+     `run_timestamp`), and a replay replaced it per arrival only because
+     `replay_clock.active()` said so. With that flag gone (criterion 11) and
+     one clock (criterion 2), the pass-wide instant is taken before a
+     replay's first event, so it is the clock beneath the replay - the wall
+     clock - and a replayed history would have stamped every run with today.
+     - **What was built (PROVISIONAL)**: `orchestrate.run_pipeline` and
+       `run_stream` pass no pass-wide instant, so the lifecycle stamps each
+       arrival as it starts on whichever clock is in force: a replay's
+       receipt, a real run's own moment. On a real asset a `pipeline run`'s
+       runs now carry when each started rather than when the pass did, as
+       the hand-filed path and the processing pass already did.
+     - **Shown by**: `tests/test_replay_clock.py::TestAReplayStampsItsOwnTime`
+       (every stamp the replay's, not today's) and
+       `tests/test_one_clock.py`.
+     - **For Keith**: accept per-arrival stamps for a real batch, or ask for a
+       pass-wide instant back - which would need the pipeline to ask the
+       clock for one at the first arrival rather than at `_begin`.
+
+356. **[in-progress, 2026-11-15]** **[Data generation]** **The target trial is handed to the bootstrap by cli/.**
+     Found building REQ-GEN-381 criterion 3: the bootstrap may import the
+     generator's public module and the real pipeline but not `cli/`, and the
+     target trial (`collection_cli.try_targets`, over `cli/target_trial.py`
+     and the collection command's local-file check) runs the real QA tools,
+     which the generator may not import either. So no package the bootstrap
+     may import can hold it as it stands.
+     - **What was built (PROVISIONAL)**: `bootstrap/generation.py` runs
+       generation, then the trial it is handed as `try_targets`, then the
+       scenario map; `mothman pipeline bootstrap`, the terminal's set-up menu
+       and `<short> generate-synthetic-data` hand in `cli.pipeline.try_targets`.
+       A trial asked for with nothing to run it is refused by name.
+     - **Not done**: moving the trial out of `cli/` into the bootstrap
+       package, which would let the bootstrap run it without being handed
+       it. It is a larger move (the collection command's
+       `run_check_local_file` comes with it) and no criterion asks for it.
+
+357. **[done, 2026-11-15]** **[Pipeline & publishing]** **pipeline run no longer compares targets; its test went with the behaviour.**
+     `tests/test_target_agreement.py::TestAPipelineRunComparesToo` held
+     post-build-review #157 finding 2 (Keith, 2026-10-11: compare after a
+     `pipeline run` too). CLI A (Keith, 2026-11-14; REQ-PIPE-385 criterion
+     4) took generation, the target comparison and the correction
+     confirmation out of `pipeline run`, so the test was deleted in the same
+     change (the test rule's point 2) and `tests/test_cli_pipeline.py`'s
+     `TestARunIsTheRealPath` now fails if `pipeline run` reaches any of the
+     three. The bootstrap still compares (`tests/test_target_agreement.py`'s
+     bootstrap tests). REQ-PIPE-385 criterion 4 was built here, ahead of its
+     requirement, because REQ-GEN-381 criterion 5 ("pipeline run needs
+     nothing of the bootstrap package") cannot be met while it calls
+     `targets_agree` and `_confirm_corrections`.

@@ -1397,7 +1397,7 @@ requirements:
       - tests/test_arrival_patterns.py
     implemented_by:
       - qa_tools/common/delivery_log.py::record
-      - qa_tools/common/synthetic_reset.py::reset
+      - bootstrap/synthetic_reset.py::reset
       - qa_tools/common/delivery_log.py::records
       - qa_tools/common/delivery_log.py::sql
       - qa_tools/common/validate_arrival_patterns.py::committed_filenames
@@ -4295,7 +4295,7 @@ requirements:
       - qa_tools/common/qa_results_reader.py::canonical_order
       - qa_tools/common/qa_results_reader.py::read_raw
       - cli/env.py::reset_synthetic_command
-      - qa_tools/common/bootstrap.py::bootstrap
+      - bootstrap/bootstrap.py::bootstrap
     evidence:
       - >
         2026-09-26: regenerated from scratch, both collections, and the
@@ -14810,11 +14810,12 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::setInPlaceOnInUrl
     - dashboard/qa-reporting-dashboard.template.html::renderInPlaceOnPastNotice
     - qa_tools/common/promotion.py::next_receipt
-    - qa_tools/common/promotion.py::effective_at_for
-    - qa_tools/common/replay_clock.py::now
-    - qa_tools/common/replay_clock.py::replaying
-    - qa_tools/common/replay_clock.py::anchor
-    - qa_tools/common/replay_clock.py::advance_to
+    - asset_model/asset_time.py::when_effective
+    - scenarios/promotion_lag.py::effective_at
+    - bootstrap/replay_clock.py::now
+    - bootstrap/replay_clock.py::replaying
+    - bootstrap/replay_clock.py::anchor
+    - bootstrap/replay_clock.py::advance_to
     - qa_tools/common/decision_log.py::_recorded_at
     - qa_tools/common/decision_log.py::follows
     - qa_tools/common/arrival_lifecycle.py::process_all
@@ -14959,7 +14960,7 @@ requirements:
 
       THE FICTION DISAGREED WITH ITSELF rather than being merely thin, which is what made it a defect and not a limitation. The ARRIVALS are backdated properly across 2023-2026; only the decisions were not. So one supply''s record said it arrived in February 2023 and was promoted on 2 October 2026.
 
-      FIXED AS A RULE, NOT A REPLAY FLAG: `promotion.effective_at_for()` returns `min(now, received_at + lag)`. Two things are true of any promotion, synthetic or real - it cannot take effect before the supply arrived, and it cannot take effect in the future - so the same expression is correct in both worlds. In production an arrival is minutes old, the sum is ahead of now, and it returns `now` unchanged. REJECTED plumbing a "we are replaying" flag through both orchestrators: a mode somebody can forget to set is a mode that will be wrong.
+      FIXED AS A RULE, NOT A REPLAY FLAG: `promotion.effective_at_for()` returns `min(now, received_at + lag)`. Two things are true of any promotion, synthetic or real - it cannot take effect before the supply arrived, and it cannot take effect in the future - so the same expression is correct in both worlds. In production an arrival is minutes old, the sum is ahead of now, and it returns `now` unchanged. REJECTED plumbing a "we are replaying" flag through both orchestrators: a mode somebody can forget to set is a mode that will be wrong. REVERSED by Keith, 2026-11-14 (REQ-PIPE-382): the seeded lag now lives with the replay - scenarios/'' lag rule, applied by the bootstrap''s replay clock when the pipeline asks the clock when a decision takes effect - and on a real asset a promotion takes effect at the instant it is made. The pipeline still carries no replaying flag; the clock it asks is what differs.
 
       MEASURED EITHER SIDE: 91 decisions over 1 distinct day became 91 over 30, spanning 2023-02-03 to 2026-09-23.
 
@@ -18186,7 +18187,7 @@ requirements:
       - qa_tools/common/trial.py::discard
       - qa_tools/common/changelog.py::build_changelog
       - cli/env.py::reset_synthetic_command
-      - qa_tools/common/bootstrap.py::bootstrap
+      - bootstrap/bootstrap.py::bootstrap
       - cli/common.py::report_recorded
       - cli/common.py::decide_record
       - .github/workflows/validate-config.yml
@@ -23507,8 +23508,8 @@ requirements:
     - .claude/hooks/session-start.sh
     - .devcontainer/post-create.sh
     - .github/workflows/test.yml
-    - qa_tools/common/synthetic_reset.py::reset
-    - qa_tools/common/synthetic_reset.py::_empty_qa_schema
+    - bootstrap/synthetic_reset.py::reset
+    - bootstrap/synthetic_reset.py::_empty_qa_schema
     linked_tests:
     - tests/test_db_identity.py::TestTheWorkersOwnDatabaseIsChecked
     - tests/test_db_identity.py::TestAnUnmarkedDatabase
@@ -27892,10 +27893,10 @@ requirements:
     - cli/filing_tui.py::corrections_flow
     - qa_tools/common/correction_apply.py::parked
     - asset_model/declared_corrections.py::docs_at
-    - qa_tools/common/correction_replay.py::confirm_due
-    - qa_tools/common/correction_replay.py::history_end
+    - bootstrap/correction_replay.py::confirm_due
+    - bootstrap/correction_replay.py::history_end
     - qa_tools/common/arrival_lifecycle.py::process_all
-    - qa_tools/common/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::bootstrap
     - qa_tools/common/correction_apply.py::drain_parked
     - qa_tools/common/correction_apply.py::keep_parked
     - qa_tools/common/outstanding.py::_from_parked_corrections
@@ -28546,8 +28547,8 @@ requirements:
       - tests/test_bootstrap.py
       - tests/test_tools_beside.py
     implemented_by:
-      - qa_tools/common/bootstrap.py::bootstrap
-      - qa_tools/common/bootstrap.py::_run_concurrently
+      - bootstrap/bootstrap.py::bootstrap
+      - bootstrap/bootstrap.py::_run_concurrently
       - qa_tools/common/parallel_orchestrate.py::beside
       - qa_tools/common/delivery_log.py::record_all
       - qa_tools/tools/orchestrate.py::run_pipeline
@@ -28714,7 +28715,7 @@ requirements:
     - tests/test_ci_bootstrap_cache.py
     - tests/test_replay_inputs.py
     implemented_by:
-    - qa_tools/common/replay_inputs.py::cache_key
+    - bootstrap/replay_inputs.py::cache_key
     - cli/pipeline.py::cache_key_command
     evidence:
     - 'OBSERVED IN CI, 2026-10-11: run 38103354903 (commit c3760c9, which changed contract/calendar.yaml) missed, bootstrapped (5m55s) and saved; run 38106902419 (commit 06cc9f0, docs only - no input in the key changed) restored the dump, skipped "Generate the QA history" entirely, and its deployment half passed against the restored database. tests/test_ci_bootstrap_cache.py (7 tests) pins the workflow''s shape: the key from the one input list, no partial-key fallback, a hit restoring before anything reads the database, a miss bootstrapping and saving, restore and save holding the same paths, nothing in the repository, and the log saying which it was.'
@@ -28762,7 +28763,7 @@ requirements:
     - qa_tools/common/slot_state.py::_rejected
     - qa_tools/common/slot_state.py::filings_by_period
     - qa_tools/common/promotion_state.py::_why_not
-    - qa_tools/common/synthetic_reset.py::schemas_to_drop
+    - bootstrap/synthetic_reset.py::schemas_to_drop
     - pipeline/closed_slots.py::for_dataset
     - qa_tools/common/decision_log.py::_judge
     linked_tests:
@@ -29711,7 +29712,7 @@ requirements:
     - qa_tools/common/rejection.py::demote
     - qa_tools/common/supersession.py::supersede_promoted
     - cli/check.py::check_command
-    - qa_tools/common/synthetic_reset.py::reset
+    - bootstrap/synthetic_reset.py::reset
     - qa_tools/common/substitution.py::substitute
     - qa_tools/common/inheritance.py::_still_stands_on
     - qa_tools/common/rejection.py::_refuse_if_not_there
@@ -30338,7 +30339,7 @@ requirements:
     evidence:
     - '2026-10-05 (sprint 11): tests/test_scripted_decisions.py - 13 tests: the script validated against configuration alone; the synthetic actor refused outside playback, acting inside it, unreachable by GitHub, and the people gate refusing a synthetic entry with a GitHub username, an assignment or a placeholder mark; playback against a real database raising a PERSON''s decision as the synthetic actor at the scripted instant before a later arrival, waiting for an arrival received after it, stopping loudly on a refusal, and refusing a non-synthetic asset; and no writer of the decision log but decision_log itself. `mothman scenarios validate` gates the committed script in `mothman check` and CI.'
     implemented_by:
-    - qa_tools/common/scripted_decisions.py::Player
+    - bootstrap/decision_player.py::Player
     - qa_tools/common/scripted_decisions.py::problems
     - qa_tools/common/scripted_decisions.py::load
     - qa_tools/common/people.py::playback
@@ -30539,7 +30540,7 @@ requirements:
     - assets/daily/synthetic/scripted_decisions.yaml
     - assets/quarterly/synthetic/scripted_decisions.yaml
     - generator/scenario_injection.py::INJECTIONS
-    - qa_tools/common/scripted_decisions.py::Player
+    - bootstrap/decision_player.py::Player
     linked_tests:
     - tests/test_scripted_decisions.py
     - tests/test_scenario_injection.py
@@ -31068,9 +31069,9 @@ requirements:
     - qa_tools/common/delivery_log.py::records
     - qa_tools/common/delivery_log.py::supply_ids
     - qa_tools/common/arrival_history.py::arrivals_of
-    - qa_tools/common/bootstrap.py::holds_history
-    - qa_tools/common/bootstrap.py::bootstrap
-    - qa_tools/common/synthetic_reset.py::reset
+    - qa_tools/common/streams.py::holds_history
+    - bootstrap/bootstrap.py::bootstrap
+    - bootstrap/synthetic_reset.py::reset
     - cli/env.py::reset_synthetic_command
     - cli/pipeline.py::run_command
     evidence:
@@ -31635,7 +31636,7 @@ requirements:
     - qa_tools/common/decision_log.py::apply_decision
     - qa_tools/common/qa_store.py::ensure_schema
     - qa_tools/common/processing_pass.py::unprocessed
-    - qa_tools/common/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::bootstrap
     - qa_tools/tools/stage.py::stage_arrival
     - qa_tools/tools/stage.py::stage_arrival
     - cli/pipeline.py::process_command
@@ -32582,16 +32583,16 @@ requirements:
       a failing test first; and staging per delivery rather than per instant changed
       nothing recorded (only the receipt counter differed between the two builds).'
     implemented_by:
-    - qa_tools/common/checkpoints.py::save
-    - qa_tools/common/checkpoints.py::listed
-    - qa_tools/common/checkpoints.py::delete
-    - qa_tools/common/checkpoints.py::prune
-    - qa_tools/common/checkpoints.py::copy_for_resume
-    - qa_tools/common/checkpoints.py::snapped
-    - qa_tools/common/checkpoints.py::taking_checkpoint
-    - qa_tools/common/checkpoints.py::require_synthetic
-    - qa_tools/common/bootstrap.py::bootstrap
-    - qa_tools/common/bootstrap.py::resume
+    - bootstrap/checkpoints.py::save
+    - bootstrap/checkpoints.py::listed
+    - bootstrap/checkpoints.py::delete
+    - bootstrap/checkpoints.py::prune
+    - bootstrap/checkpoints.py::copy_for_resume
+    - bootstrap/checkpoints.py::snapped
+    - bootstrap/checkpoints.py::taking_checkpoint
+    - bootstrap/checkpoints.py::require_synthetic
+    - bootstrap/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::resume
     - qa_tools/common/arrival_lifecycle.py::process_all
     - qa_tools/common/arrival_lifecycle.py::staged_as_it_arrives
     - qa_tools/common/delivery_log.py::record_arrival
@@ -32710,13 +32711,13 @@ requirements:
       whose inputs were unchanged answered ''Nothing differs from the checkpoint
       - nothing to replay'' and copied nothing (criterion 4).'
     implemented_by:
-    - qa_tools/common/replay_inputs.py::INPUTS
-    - qa_tools/common/replay_inputs.py::input_files
-    - qa_tools/common/replay_inputs.py::cache_key
-    - qa_tools/common/replay_inputs.py::deliveries_print
-    - qa_tools/common/replay_inputs.py::regenerated_print
-    - qa_tools/common/replay_inputs.py::Recorded
-    - qa_tools/common/replay_inputs.py::first_affected
+    - bootstrap/replay_inputs.py::INPUTS
+    - bootstrap/replay_inputs.py::input_files
+    - bootstrap/replay_inputs.py::cache_key
+    - bootstrap/replay_inputs.py::deliveries_print
+    - bootstrap/replay_inputs.py::regenerated_print
+    - bootstrap/replay_inputs.py::Recorded
+    - bootstrap/replay_inputs.py::first_affected
     - generator/output.py::redirect
     - generator/output.py::generated_into
     - cli/pipeline.py::cache_key_command
@@ -33064,7 +33065,8 @@ requirements:
     - assets/daily/synthetic/collections/civil_registration.py::_away_from_suppressed
     - assets/daily/synthetic/collections/civil_registration.py::_plan_injections
     - assets/quarterly/synthetic/collections/child_protection.py::_ordinary_severities
-    - qa_tools/common/promotion.py::effective_at_for
+    - asset_model/asset_time.py::when_effective
+    - scenarios/promotion_lag.py::effective_at
     - qa_tools/tools/orchestrate.py::_claim_window
     - qa_tools/tools/orchestrate.py::_claim_window
     - assets/daily/synthetic/scripted_decisions.yaml
@@ -33135,17 +33137,17 @@ requirements:
     implemented_by:
     - generator/targets.py::written
     - generator/targets.py::just_written
-    - qa_tools/common/target_agreement.py::compare
-    - qa_tools/common/target_agreement.py::after_replay
+    - bootstrap/target_agreement.py::compare
+    - bootstrap/target_agreement.py::after_replay
     - cli/collection_cli.py::CollectionCLI::try_targets
     - cli/collection_cli.py::CollectionCLI::generate_synthetic_data
     - cli/pipeline.py::generated_targets
     - cli/pipeline.py::disagreement_message
     - cli/pipeline.py::run_command
     - cli/app.py::_bootstrap_menu
-    - qa_tools/common/bootstrap.py::targets_agree
-    - qa_tools/common/bootstrap.py::bootstrap
-    - qa_tools/common/bootstrap.py::resume
+    - bootstrap/bootstrap.py::targets_agree
+    - bootstrap/bootstrap.py::bootstrap
+    - bootstrap/bootstrap.py::resume
     evidence:
     - '2026-10-11: tests/test_target_agreement.py - the comparison names a red check against an amber target, a warning against a green one, and, for an amber that warned on nothing, the checks of the rule that was meant to (c2); a gap red reads as its measurement (the gate''s reading); no results is no verdict, never a guess (c4). Through the real trial path on a real generated TS-43: it agrees and records nothing (c1); claimed as built green it fails naming TS-43, the target, the verdict and the facility checks, and every Birth Registrations delivery written is removed (c2); a target with no lead-in is a disagreement, not a crash. --skip-target-trial says so and the trial does not run; the bootstrap passes the flag to both generators (c5). A bootstrap result carrying a disagreement exits non-zero naming it and saying nothing recorded was changed (c3, c6). Against the deployment: every targeted supply agrees and the decision, filing, check_result and run counts are unchanged by the comparison (c3, c6).'
     - '2026-10-11, a bootstrap from empty with this live: all five injected arrivals (TS-43, TS-44, TS-45 and both of TS-46''s) agreed in the trial, and all 26 targeted supplies agreed after replay - the 5 injected arrivals, 9 lead-in and following days, and 8 Birth Registrations and 4 Child Protection ordinary ambers. 10m39s against 9m25s before; a trial alone measured nine seconds.'
@@ -33835,7 +33837,7 @@ requirements:
     - assets/daily/synthetic/collections/civil_registration.py::_pair_delivery
     - assets/daily/synthetic/collections/civil_registration.py::_ordinary_severities
     - generator/targets.py::written
-    - qa_tools/common/target_agreement.py::after_replay
+    - bootstrap/target_agreement.py::after_replay
     - qa_tools/common/scripted_decisions.py::answers_for
     - assets/daily/synthetic/scripted_decisions.yaml
     - assets/quarterly/synthetic/scripted_decisions.yaml
@@ -34235,9 +34237,9 @@ requirements:
     - qa_tools/common/scripted_decisions.py::Script
     - qa_tools/common/scripted_decisions.py::load
     - qa_tools/common/scripted_decisions.py::_scope_problems
-    - qa_tools/common/scripted_decisions.py::_timed_by_period
+    - bootstrap/decision_player.py::_timed_by_period
     - qa_tools/common/scripted_decisions.py::_due_at
-    - qa_tools/common/scripted_decisions.py::_apply
+    - bootstrap/decision_player.py::_apply
     - asset_model/slots.py::relative_period
     evidence:
     - '2026-10-13: a bootstrap from empty after the change (mothman env reset-synthetic, then mothman pipeline bootstrap, 4m42s) played all nine committed scripts - six TS-67, TS-43, TS-47, TS-45 - each changing something, and ran the five re-checks they owed; none was refused. That is criterion 10 and the no-op rule below on the real history.
@@ -34414,7 +34416,7 @@ requirements:
       - assets/quarterly/data-asset.yaml
       - assets/daily/synthetic/scripted_decisions.yaml
       - assets/quarterly/synthetic/scripted_decisions.yaml
-      - qa_tools/common/scripted_decisions.py::_timed_chain
+      - bootstrap/decision_player.py::_timed_chain
     evidence:
       - '2026-10-16: CRITERION 12 - bootstrap from empty on adfe559''s configuration (29m28s, Birth Registrations 593s, Child
         Protection 1642s): the replay played all three chain entries ("scripted: promote cp-carers 2013-Q3" and the two 2014-Q1s),
@@ -37302,8 +37304,8 @@ requirements:
       - qa_tools/common/validate_collections.py::ALLOWLIST
       - qa_tools/common/processing_pass.py::all_arrivals
       - qa_tools/common/recheck.py::execute
-      - qa_tools/common/checkpoints.py::copy_for_resume
-      - qa_tools/common/bootstrap.py::bootstrap
+      - bootstrap/checkpoints.py::copy_for_resume
+      - bootstrap/bootstrap.py::bootstrap
       - qa_tools/common/ticket_sync.py::_load_scopes
       - qa_tools/common/schemas.py::CollectionConfig
       - assets/daily/data-asset.yaml
@@ -37697,7 +37699,7 @@ requirements:
     - qa_tools/tools/legacy.py::KNOWN
     - qa_tools/collections/base.py::StatsSpec
     - qa_tools/collections/base.py::CollectionAdapter
-    - qa_tools/common/bootstrap.py::_run_collection
+    - bootstrap/bootstrap.py::_run_collection
     - qa_tools/common/processing_pass.py::_steps
     - qa_tools/common/recheck.py::execute
     - cli/dashboard.py::_rebuild_results
@@ -39794,8 +39796,8 @@ requirements:
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_wall_clock_is_reported
     - tests/test_inheritance.py::TestAPeriodIsOpenedWholeOrNotAtAll::test_a_failure_partway_leaves_it_unopened_and_nothing_inherited
     implemented_by:
-    - qa_tools/common/bootstrap.py::streams
-    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/common/streams.py::streams
+    - bootstrap/bootstrap.py::bootstrap
     - qa_tools/tools/orchestrate.py::merged_arrivals
     - qa_tools/tools/orchestrate.py::run_stream
     - qa_tools/common/arrival_lifecycle.py::process_stream
@@ -41522,7 +41524,7 @@ requirements:
     - "PROVISIONAL (builder, 2026-10-25) - THE NAMED TESTS DRIVE THE REAL LIFECYCLE WITH A FAKE TOOL EVALUATION: tests/gate_support.py runs the real arrivals, staging, orchestrator, gate, decision log, owed items, knock-on and period overlay against a private database per test, and replaces only the four tools' evaluation with rules over which supplies a check read (own_red, cross_red). Criteria 18 to 29 say 'driving the real Child Protection orchestrator'; the real tools would make each of these ~40 scenarios several minutes long. The real tools run over the same code in the bootstrap (evidence)."
     - "AMENDMENTS (criterion 14) to REQ-PIPE-075 criterion 2 and REQ-PIPE-121 decision 11 were applied at sign-off, 2026-10-23, and stand as built here."
     - "CRITERION 12's PAGE HALF IS A TEST, NOT PAGE CODE (2026-10-25, after the A3 merge with ed-build): the page draws only what the build gives it, and the build reads every result through qa.run_visible, so nothing in the template needed to change. The page test drives the whole chain from a database the test populates through the real lifecycle - built and embedded, not a hand-edited dashboard file - and puts the application in each state the way TestAnApplicationCountsOnlyOnceSettled does (gate.start, gate.abandon, and the run re-pointed at it). It looks at the page on today's date, because a re-evaluation is recorded when it runs, on the real clock, not at the scenario's receipt instants."
-    - 'A RETRIED OR RESUMED PACKAGE GATE TAKES EFFECT WHEN ITS FIRST ATTEMPT DID (post-build-review #274 D1): the instant orchestrate.effective_at_of gives the arrival whose run completed the package, never before the newest decision already recorded in the period (decision_log.follows), the replay clock where no arrival can be named. REJECTED: the wall clock, which promoted a replayed history today and made two bootstraps differ.'
+    - 'A RETRIED OR RESUMED PACKAGE GATE TAKES EFFECT WHEN ITS FIRST ATTEMPT DID (post-build-review #274 D1): the instant orchestrate.effective_at_of gives the arrival whose run completed the package, never before the newest decision already recorded in the period (decision_log.follows), the replay clock where no arrival can be named. REJECTED: the wall clock, which promoted a replayed history today and made two bootstraps differ. REVERSED FOR A REAL ASSET by Keith, 2026-11-14 (REQ-PIPE-382): on a real asset a retried or resumed package gate takes effect at the retry, the instant it is actually made; in a replay it still takes effect when its first attempt did, the replay clock answering from the arrival that completed the package.'
     - 'A FAILED APPLICATION IS OWED FOR EVERY PACKAGE ITS ENTRY CHECKED (post-build-review #274 D6), and a knock-on whose application failed leaves its reevaluate item owed with the failure recorded. REJECTED: the first checked supply''s package only, which left a knock-on''s other readers decided by nothing.'
     - 'A HOLD-BACK REPEAT IS JUDGED ON what it was checked against TOO (post-build-review #274): the same cause and checks against a different warehouse supply is a new hold-back.'
     - "A CHECK WHOSE RE-EVALUATION STILL DOES NOT COUNT HOLDS ITS SUPPLY BACK, NOT JUDGED, UNTIL IT COUNTS (Keith, 2026-10-25, answer 1a; post-build-review #274 D2, which found such a check dropped from the verdict, so Clients v2 promoted without its Notifications -> Client Register check). Once a check of a member is spent in a state - re-evaluated there, still no qualifying result - the member is NOT PROMOTING, and the fixed point goes on from the new state. Its 'promotion-withheld' carries held_back_by (the not-promoting supply the check read) and held_back_detail.not_counted (the checks), and reads 'Held back, not judged: <checks> was re-checked against the warehouse as it will stand, but the re-check recorded no result that counts, because <the package-mate> was held back. It is not promoted without that check, and it is re-checked by the next processing pass.' - could not run is red, as REQ-PIPE-270 says, and it is never promoted without it. IT STAYS OWED AND IS RETRIED: gate._owe_not_judged owes a 'reevaluate' item for the period and the tables the uncounted checks read, caused by the hold-back - REQ-PIPE-121's knock-on, whose application re-evaluates the check afresh; where it still counts nothing, knock_on.complete leaves that item owed (Outcome.not_judged, red, never a failure of the pass or the bootstrap), so it is retried once per run of owed work and never looped within one, and a repeat writes no new entry (_same_holdback compares not_counted too). REJECTED: a 'gate' item, which still_being_gated reads as a package still being gated and would refuse a person's decision on the supply for as long as it stays owed; and a 'recheck' item, which re-runs the supply's whole QA each pass and also refuses a person's promote. While the item is owed the supply raises no ticket of its own (REQ-PIPE-278 criterion 5's owed coverage); its root, the held-back package-mate, is ticketed. TestTheFixedPointEnds pins both halves: a retry that counts promotes WITH the check after the hold-back, and one that never counts stays held back and owed across passes."
@@ -46697,8 +46699,8 @@ requirements:
     - cli/pipeline.py::generate_collection
     - qa_tools/common/period_overlay.py::build
     - qa_tools/common/period_overlay.py::rebuild_for_trial
-    - qa_tools/common/target_agreement.py::trial_reads_agree
-    - qa_tools/common/target_agreement.py::unaimed
+    - bootstrap/target_agreement.py::trial_reads_agree
+    - bootstrap/target_agreement.py::unaimed
     - qa_tools/common/unrunnable.py::results_for_trial
     - qa_tools/tools/run_evidently.py::_psi_result
     - 'assets/quarterly/synthetic/collections/linkage_products.py::drift_verdict'
@@ -47878,19 +47880,19 @@ requirements:
     - tests/test_one_asset_beside_another.py
     - tests/test_state_paths_at_call_time.py
     implemented_by:
-    - qa_tools/common/checkpoints.py::legacy
-    - qa_tools/common/checkpoints.py::is_legacy
-    - qa_tools/common/checkpoints.py::require_names_fit
-    - qa_tools/common/bootstrap.py::resume
+    - bootstrap/checkpoints.py::legacy
+    - bootstrap/checkpoints.py::is_legacy
+    - bootstrap/checkpoints.py::require_names_fit
+    - bootstrap/bootstrap.py::resume
     - asset_model/assets.py::data_dir
     - asset_model/assets.py::reports_dir
-    - qa_tools/common/checkpoints.py::listed
-    - qa_tools/common/checkpoints.py::resumes
-    - qa_tools/common/checkpoints.py::delete
-    - qa_tools/common/checkpoints.py::require_synthetic
-    - qa_tools/common/replay_inputs.py::inputs
-    - qa_tools/common/replay_inputs.py::replay_patterns
-    - qa_tools/common/replay_inputs.py::cache_key
+    - bootstrap/checkpoints.py::listed
+    - bootstrap/checkpoints.py::resumes
+    - bootstrap/checkpoints.py::delete
+    - bootstrap/checkpoints.py::require_synthetic
+    - bootstrap/replay_inputs.py::inputs
+    - bootstrap/replay_inputs.py::replay_patterns
+    - bootstrap/replay_inputs.py::cache_key
     - cli/pipeline.py::cache_key_command
     - cli/pipeline.py::checkpoint_list_command
     - cli/env.py::reset_synthetic_command
@@ -48241,7 +48243,7 @@ requirements:
     - qa_tools/common/supply_db.py::supply_db_dsn
     - qa_tools/common/supply_db.py::on_server
     - qa_tools/common/supply_db.py::asset_database
-    - qa_tools/common/checkpoints.py::save
+    - bootstrap/checkpoints.py::save
     - .devcontainer/create-asset-databases.sh
     - qa_tools/common/db_identity.py::check
     - qa_tools/common/db_identity.py::expected
@@ -48686,8 +48688,8 @@ requirements:
     - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn::test_the_sandbox_hook
     - tests/test_db_identity.py::TestEachAssetIsRefusedTheOthersDatabase
     implemented_by:
-    - qa_tools/common/bootstrap.py::bootstrap
-    - qa_tools/common/bootstrap.py::streams
+    - bootstrap/bootstrap.py::bootstrap
+    - qa_tools/common/streams.py::streams
     - qa_tools/common/scenario_map.py::map_path
     - qa_tools/common/scenario_map.py::write_map
     - generator/scenario_injection.py::mixed_asset_problems
@@ -48771,7 +48773,7 @@ requirements:
     - tests/test_validate_imports.py::test_each_new_package_once_it_exists_is_named_in_every_list
     implemented_by:
     - .github/workflows/test.yml
-    - qa_tools/common/replay_inputs.py::cache_key
+    - bootstrap/replay_inputs.py::cache_key
     - cli/pipeline.py::cache_key_command
     evidence:
     - '2026-11-15 (Perth), split T3, tree f4b2598c: the same targeted run as REQ-PIPE-365''s evidence - 308 passed, 1 skipped (npm not installed), 570s - including tests/test_ci_bootstrap_cache.py (19 tests) and the other workflow-reading tests.'

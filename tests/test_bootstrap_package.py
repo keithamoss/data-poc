@@ -33,12 +33,6 @@ class TestOnePackageOutsideQaTools:
         assert not hasattr(scripted_decisions, "Player")
         assert hasattr(scripted_decisions, "load") and hasattr(scripted_decisions, "Script")
 
-    def test_the_lag_rule_left_shipped_code(self):
-        from qa_tools.common import promotion
-
-        assert not hasattr(promotion, "effective_at_for")
-        assert not hasattr(promotion, "_LAG_MIN")
-
 
 class TestTheBootstrapIsSyntheticOnly:
     """Criterion 2."""

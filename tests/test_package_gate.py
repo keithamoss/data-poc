@@ -895,18 +895,23 @@ class TestOnePeriodOneApplication:
         (owed,) = sc.owed("gate")
         assert owed.caused_by_application is not None
         monkeypatch.setattr(promotion, "promote", real)
+        from asset_model import asset_time
+
+        retried = asset_time.now()
         sc.run_owed()
         assert sc.holder("cp-clients", Q3) == v2["C2"]
         assert sc.holder("cp-notifications", Q3) == v2["N2"]
         with supply_db.connect(read_only=True, label="pytest") as conn:
             assert conn.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".run'
                                 ).fetchone()[0] == runs
-        # THE RETRY TAKES EFFECT WHEN THE FIRST ATTEMPT WOULD HAVE (post-build-
-        # review #274 D1): at the instant the arrival that completed the
-        # package gives - never the wall clock, which made a replayed history
-        # promote "today" and differ between two bootstraps.
-        assert _promotion(sc, v2["C2"])["effective_at"] == _promotion(
-            sc, v2["N2"])["effective_at"] == _first_attempts_instant(sc, v2)
+        # ON A REAL ASSET THE RETRY TAKES EFFECT AT THE RETRY (REQ-PIPE-382,
+        # Keith 2026-11-14, reversing post-build-review #274 D1 for a real
+        # asset): this scenario runs on the wall clock, which answers now, the
+        # instant the decision is actually made. A replay still takes effect
+        # when its first attempt did - tests/test_one_clock.py holds that half.
+        c2, n2 = _promotion(sc, v2["C2"])["effective_at"], _promotion(sc, v2["N2"])["effective_at"]
+        assert c2 == n2, "one application, one instant"
+        assert asset_time.parse_instant(c2, "retry") >= retried
 
     def test_a_failed_move_in_a_knock_on_is_owed_for_every_reader(self, sc, monkeypatch):
         """Post-build-review #274 D6: a knock-on re-gating two waiting readers
@@ -1064,23 +1069,6 @@ class TestAFiledSupplyWithNoReceipt:
         got = gate.after_arrival(CP, arrival, effective_at="2024-08-06T10:00:00+08:00")
         assert "no receipt is recorded" in got.failed["cp-clients"]
         assert v2["C2"] in got.failed["cp-clients"]
-
-
-def _first_attempts_instant(sc, supplies: dict):
-    """The effective instant the gate gives the package `supplies` came in,
-    by the arrival path's own rule, for the arrival processed last."""
-    from asset_model import asset_time
-    from qa_tools.common import promotion
-    from qa_tools.tools import orchestrate
-
-    mine = set(supplies.values())
-    (last,) = [a for a in sorted(sc.arrivals(), key=lambda a: (a.received_at, a.sequence,
-                                                                a.run_id))
-               if f"{next(iter(a.files_by_dataset))}@"
-               f"{asset_time.arrival_key(a.received_at)}" in mine][-1:]
-    return promotion.effective_at_for(
-        last.received_at, seed=last.run_id, before=promotion.next_receipt(last),
-        within=orchestrate._claim_window(CP, last))
 
 
 def _everything_recorded() -> dict:

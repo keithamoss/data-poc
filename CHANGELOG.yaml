@@ -113,8 +113,8 @@ releases:
     summary: >
       New checks keep the code's boundaries, the two assets' dbt packages and
       the assets/ folder in line, ticket sync posts nothing unless your
-      environment turns ticketing on, and five out-of-date developer commands
-      are gone.
+      environment turns ticketing on, pipeline run only processes what has
+      arrived, and five out-of-date developer commands are gone.
     changes:
       - category: New
         items:
@@ -155,6 +155,14 @@ releases:
               the checks. Both now fail, naming the two entries.
       - category: Improved
         items:
+          - headline: Pipeline run only processes
+            components: ["Pipeline & publishing", "Data generation"]
+            description: >
+              mothman pipeline run now processes the deliveries already in the
+              tree and builds the dashboard. It no longer generates synthetic
+              data, plays scripted decisions or compares targets, and its
+              records carry the real time. To start a synthetic history, run
+              mothman pipeline bootstrap.
           - headline: Fewer, truer commands
             components: ["Testing & dev tooling"]
             description: >

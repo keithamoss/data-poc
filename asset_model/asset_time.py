@@ -18,6 +18,11 @@ THREE RULES, and the third is the one that makes the other two safe:
    timestamp this project has ever recorded - the same retroactivity
    problem effective-dating exists to solve elsewhere in this repo.
 
+THE STAMP AND "TODAY" ARE ONE READING (REQ-PIPE-382, B1 SETTLED by Keith
+2026-11-14): `now()` is what a record is stamped with and what "today" is
+judged against. A replay replaces it, by installing a clock; nothing else
+does. See "THE ONE CLOCK" below.
+
 A DATE IS NOT AN INSTANT, and `end_of_day()` is where that gets
 decided. A date means the whole of that day in the asset's own zone, so
 as an instant it is that day's last moment - which is what a comparison

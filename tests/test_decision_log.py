@@ -711,7 +711,7 @@ class TestWhenWorkFollowingADecisionTakesEffect:
     def test_never_after_now(self, conn, dataset, monkeypatch):
         """Keith, 2026-10-06 (post-build-review #122 D3): a decision dated in
         the future, or a recorded_at ahead of this clock, must not stamp work
-        later than the moment it ran - min(now, ...), as effective_at_for."""
+        later than the moment it ran - min(now, ...), as the replay's promotion lag is capped."""
         from datetime import timedelta
 
         from asset_model import asset_time
