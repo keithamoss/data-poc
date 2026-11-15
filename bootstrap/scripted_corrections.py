@@ -12,7 +12,7 @@ no entry here is confirmed as it always was, moving everything it proposes.
 
 Each kept supply is named by scenario, dataset and that scenario's supply
 index, never a generated id, and resolved to its supply id exactly as a
-scripted decision's is (scripted_decisions._supply_of).
+scripted decision's is (decision_player._supply_of).
 """
 from __future__ import annotations
 
@@ -150,6 +150,7 @@ def by_reference(confirmations: list[Confirmation]) -> dict[str, Confirmation]:
 def resolve(c: Confirmation, placements=None) -> dict[tuple[str, str], Keep]:
     """Each kept supply's (dataset, supply id), from where the generator
     recorded the scenario - as scripted decisions resolve theirs."""
+    from bootstrap import decision_player
     from qa_tools.common import scenario_map, scripted_decisions
 
     placements = scenario_map.read_placements() if placements is None else placements
@@ -163,13 +164,14 @@ def resolve(c: Confirmation, placements=None) -> dict[tuple[str, str], Keep]:
                 f"supply {k.supply_index} - regenerate the synthetic history, or put the "
                 f"script right")
         run_id = placement.supplies[k.supply_index]
-        out[(k.dataset_id, scripted_decisions._supply_of(k.dataset_id, run_id))] = k
+        out[(k.dataset_id, decision_player._supply_of(k.dataset_id, run_id))] = k
     return out
 
 
 def describe_moves(moves, placements=None) -> list[str]:
     """A correction's proposed moves, each by scenario, dataset and supply
     index where a scenario names it (criterion 7), else by supply id."""
+    from bootstrap import decision_player
     from qa_tools.common import scenario_map, scripted_decisions
 
     placements = scenario_map.read_placements() if placements is None else placements
@@ -179,7 +181,7 @@ def describe_moves(moves, placements=None) -> list[str]:
         for index, run_id in enumerate(placement.supplies):
             for dataset_id in datasets:
                 try:
-                    supply = scripted_decisions._supply_of(dataset_id, run_id)
+                    supply = decision_player._supply_of(dataset_id, run_id)
                 except scripted_decisions.ScriptRefused:
                     continue
                 named.setdefault((dataset_id, supply), f"{sid} {dataset_id} supply {index}")

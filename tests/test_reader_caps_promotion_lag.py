@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 from qa_tools.common import promotion
+from scenarios import promotion_lag
 
 ED_AT = datetime(2026, 5, 1, 7, 30, tzinfo=UTC)
 LP_AT = datetime(2026, 5, 1, 10, 15, tzinfo=UTC)
@@ -75,8 +76,8 @@ def test_the_lag_ends_before_the_readers_receipt(world, monkeypatch):
 
     monkeypatch.setattr(slots, "period_claimed_at",
                         lambda ds, at, agreement=None: "2026-Q2")
-    took = promotion.effective_at_for(
-        ED_AT, now=datetime(2030, 1, 1, tzinfo=UTC), seed="r",
+    took = promotion_lag.effective_at(
+        ED_AT, cap=datetime(2030, 1, 1, tzinfo=UTC), seed="r",
         before=promotion.next_receipt(_arrival("ed-presentations", ED_AT)))
     assert ED_AT <= took < LP_AT
 

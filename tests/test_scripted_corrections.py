@@ -11,6 +11,7 @@ from datetime import timedelta, timezone
 import pytest
 
 from qa_tools.common import correction_apply, decision_log, scenario_map, scripted_decisions
+from bootstrap import decision_player
 from bootstrap import correction_replay, scripted_corrections
 from asset_model import declared_corrections
 import test_correction_replay as _replay
@@ -117,7 +118,7 @@ def placed(monkeypatch):
         "TS-X": scenario_map.Placement(scenario_id="TS-X", dataset="cp-clients",
                                        supplies=("replay-s",), period="2023-Q3",
                                        in_place_on="2023-08-01")})
-    monkeypatch.setattr(scripted_decisions, "_supply_of", lambda d, r: r)
+    monkeypatch.setattr(decision_player, "_supply_of", lambda d, r: r)
 
 
 class TestTheReplayConfirmsAsScripted:
@@ -236,7 +237,7 @@ class TestAResumeConfirmsAsABootstrapDoes:
         import contextlib
         from types import SimpleNamespace
 
-        import cli.pipeline
+        from generator import public as generator_public
         from qa_tools.common import processing_pass
         from bootstrap import bootstrap, checkpoints, replay_inputs
 
@@ -250,7 +251,7 @@ class TestAResumeConfirmsAsABootstrapDoes:
                             lambda c: "postgresql://u:p@localhost:5432/resumed")
         monkeypatch.setattr(replay_inputs, "first_affected",
                             lambda rec: replay_inputs.FirstAffected(4, "changed from 4"))
-        monkeypatch.setattr(cli.pipeline, "generated_collections", lambda: [])
+        monkeypatch.setattr(generator_public, "generated_collections", lambda: [])
 
         @contextlib.contextmanager
         def lock(_name):

@@ -21,6 +21,7 @@ from cli import scenarios as scenarios_cli
 from generator import scenario_injection as si
 from asset_model import asset_time
 from qa_tools.common import scripted_decisions as sd
+from bootstrap import decision_player
 
 DS = "cp-carers"
 ANCHOR = date(2026, 8, 20)
@@ -356,7 +357,7 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         placed = si.resolve(_injection(), _periods())
         [d] = si.link_dates(_injection(si.Link("TS-75b", 0, "sub", 1)), placed,
                             scripts=[script])
-        timed, _ = sd._timed_by_period(script, SimpleNamespace(period=placed.period))
+        timed, _ = decision_player._timed_by_period(script, SimpleNamespace(period=placed.period))
         assert d.first[1] == timed.at
 
 

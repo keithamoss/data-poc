@@ -1,13 +1,14 @@
 """Tests for cli/pipeline.py - `mothman pipeline run`, the real
 replacement for the retired run_pipeline.sh (plans/tooling.md #1 Phase
-4). This is the real gap Phase 4's own original plan text got wrong:
-the shared orchestrator's own run_pipeline() batch-mode function
-(qa_tools/tools/orchestrate.py; as opposed to run_single(),
-already wrapped by `mothman bdm/cp qa`) had no mothman command until
-this one. Every real call here is monkeypatched - run_pipeline()/
-run_pipeline() writes real, permanent QA history as a side
-effect (same as any other real pipeline run) and must never run for
-real under pytest."""
+4). Every real call here is monkeypatched - the batch writes real,
+permanent QA history as a side effect (same as any other real pipeline
+run) and must never run for real under pytest.
+
+THE REAL PATH ON EVERY ASSET (CLI A, SETTLED by Keith 2026-11-14;
+REQ-PIPE-385 criterion 4; REQ-PIPE-383 criteria 5 and 6): `pipeline run`
+generates nothing, plays no scripted decision, compares no targets and
+confirms no correction - it processes what has arrived, by stream, and builds
+the dashboard. A replayed history is `mothman pipeline bootstrap`'s."""
 from __future__ import annotations
 
 from state_paths import fixed
@@ -16,11 +17,12 @@ from click.testing import CliRunner
 
 import cli.pipeline as pipeline_cli
 from asset_model import collections
+from qa_tools.common import streams
 from qa_tools.tools import orchestrate
 
 _runner = CliRunner()
-#: Every collection the hierarchy declares, by id - a run over the whole
-#: asset generates and runs each of them, not only the first two.
+
+
 class _Shorts:
     """Collection id -> short, for the asset the test runs under (read when
     asked, so a test of either asset gets its own - the asset split)."""
@@ -37,17 +39,23 @@ def _others(short):
     return [c.short for c in collections.all_collections() if c.short != short]
 
 
-def _stub_generation(monkeypatch, record=None):
-    """Stub every registered collection's generation, so none of them
-    reaches the real driver; `record` is called with each one's short."""
+@pytest.fixture(autouse=True)
+def _nothing_synthetic_is_reached(monkeypatch):
+    """CLI A: generating, comparing targets and confirming corrections are the
+    bootstrap's alone, so any of them reached by `pipeline run` fails the test."""
+    from bootstrap import bootstrap as boot
+    from bootstrap import correction_replay
     from cli.collection_cli import of as _cli_of
 
-    shorts = [c.short for c in collections.all_collections()]
-    assert shorts, "the asset holds no collection - nothing to stub"
-    for short in shorts:
-        monkeypatch.setattr(_cli_of(short), "generate_synthetic_data",
-                            lambda _s=short, **_: record and record(_s))
-    return shorts
+    def _never(what):
+        def fail(*_a, **_k):
+            raise AssertionError(f"`pipeline run` reached {what} - CLI A says it never does")
+        return fail
+    for c in collections.all_collections():
+        monkeypatch.setattr(_cli_of(c.short), "generate_synthetic_data", _never("generation"))
+    monkeypatch.setattr("generator.driver.generate", _never("the generator"))
+    monkeypatch.setattr(boot, "targets_agree", _never("the target comparison"))
+    monkeypatch.setattr(correction_replay, "confirm_due", _never("correction confirmation"))
 
 
 @pytest.fixture(autouse=True)
@@ -67,53 +75,66 @@ def _no_history_yet(monkeypatch):
     have already written history into - so `pipeline run` would refuse
     (REQ-PIPE-144 criterion 39). They are about what a run DOES, so they
     run as though on an empty database; the refusal has its own tests."""
-    import bootstrap.bootstrap as boot
-    monkeypatch.setattr(boot, "holds_history", lambda conn: False)
-    # The corrections step after a full replay is its own subject below.
-    monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
-    # Nothing was replayed, so there is no recorded verdict to compare a
-    # target with; REQ-GEN-186's comparison has tests of its own
-    # (tests/test_target_agreement.py).
-    monkeypatch.setattr(boot, "targets_agree", lambda names: ())
+    monkeypatch.setattr(streams, "holds_history", lambda conn: False)
 
 
-class TestCorrectionsAfterAFullRun:
-    """Keith, 2026-10-11, (n): `pipeline run` over both collections confirms
-    each due correction once both are replayed, as a bootstrap does."""
+class TestARunIsTheRealPath:
+    """CLI A and REQ-PIPE-383 criteria 5 and 6."""
 
     def _run(self, monkeypatch, *args):
-        import bootstrap.bootstrap as boot
         calls = []
-        monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
-        monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
-        monkeypatch.setattr(boot, "_confirm_corrections", lambda say: calls.append("confirm"))
+        monkeypatch.setattr(orchestrate, "run_stream",
+                            lambda ids, sequential=False, **k: calls.append(
+                                ("+".join(_SHORT[c] for c in ids), k.get("player"))))
         _patch_dashboard_build_embed(monkeypatch, calls)
         _patch_snapshot(monkeypatch, calls)
         result = _runner.invoke(pipeline_cli.pipeline_group, ["run", *args])
         assert result.exit_code == 0, result.output
-        return calls
+        return calls, result
 
-    def test_after_both(self, monkeypatch):
-        calls = self._run(monkeypatch)
-        shorts = [c.short for c in collections.all_collections()]
-        assert len(shorts) > 1, shorts
-        assert calls.index("confirm") > max(calls.index(s) for s in shorts)
-        assert calls.index("confirm") < calls.index("build-data")
+    def test_it_generates_compares_and_confirms_nothing_and_passes_no_player(
+            self, monkeypatch):
+        calls, _ = self._run(monkeypatch)
+        runs = [c for c in calls if isinstance(c, tuple)]
+        assert runs and all(player is None for _key, player in runs), runs
 
-    @pytest.mark.asset("daily")
-    def test_not_for_one_collection(self, monkeypatch):
-        assert "confirm" not in self._run(monkeypatch, "--collection", "bdm")
+    def test_on_a_synthetic_asset_it_says_it_played_no_scripted_decision(self, monkeypatch):
+        from asset_model import asset_time
+
+        assert asset_time.declared_synthetic(), "the suite's assets are synthetic"
+        _calls, result = self._run(monkeypatch)
+        flat = " ".join(result.output.split())
+        assert ("Scripted decisions are played only by `mothman pipeline bootstrap` - "
+                "this run played none.") in flat
+
+    def test_on_a_real_asset_it_says_nothing_of_scripted_decisions(self, monkeypatch):
+        from asset_model import asset_time
+
+        monkeypatch.setattr(asset_time, "declared_synthetic", lambda: False)
+        _calls, result = self._run(monkeypatch)
+        assert "Scripted decisions" not in result.output
+
+    def test_its_help_says_nothing_of_synthetic_data_manifests_or_targets(self):
+        for args in (["run", "--help"], ["--help"]):
+            got = _runner.invoke(pipeline_cli.pipeline_group, args)
+            assert got.exit_code == 0, got.output
+            if args == ["--help"]:
+                # The group's own help lists every subcommand, the bootstrap's
+                # among them; only its own description is held to CLI A.
+                text = pipeline_cli.pipeline_group.help.lower()
+            else:
+                text = got.output.lower()
+            for word in ("synthetic", "manifest", "regenerat", "target"):
+                assert word not in text, (args, word)
 
 
 class TestARunOverRecordedHistoryIsRefused:
     """REQ-PIPE-144 criterion 39."""
 
     def test_it_refuses_and_runs_nothing(self, monkeypatch):
-        import bootstrap.bootstrap as boot
-        monkeypatch.setattr(boot, "holds_history", lambda conn: True)
+        monkeypatch.setattr(streams, "holds_history", lambda conn: True)
         calls = []
-        monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
-        monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
+        monkeypatch.setattr(orchestrate, "run_stream", lambda ids, **k: calls.append(ids))
         result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
         assert result.exit_code != 0 and calls == []
         flat = " ".join(result.output.split())
@@ -132,17 +153,13 @@ def _patch_snapshot(monkeypatch, calls):
     monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda: calls.append("snapshot") or "/fake.html.gz")
 
 
-def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
-    """Every registered collection, in hierarchy order - Birth
-    Registrations and Child Protection first, then any added since."""
+def test_run_default_dataset_runs_every_stream(monkeypatch):
+    """Every registered collection, by stream in hierarchy order - collections
+    sharing a calendar run as ONE stream (REQ-PIPE-262)."""
     calls = []
-    shorts = _stub_generation(monkeypatch, lambda short: calls.append(f"{short}-generate"))
-    monkeypatch.setattr(orchestrate, "run_pipeline",
-                        lambda collection_id, sequential=False:
-                        calls.append((f"{_SHORT[collection_id]}-run", sequential)))
-    # COLLECTIONS SHARING A CALENDAR RUN AS ONE STREAM (REQ-PIPE-262).
+    shorts = [c.short for c in collections.all_collections()]
     monkeypatch.setattr(orchestrate, "run_stream",
-                        lambda collection_ids, sequential=False:
+                        lambda collection_ids, sequential=False, **_:
                         calls.append(("+".join(_SHORT[c] for c in collection_ids) + "-run",
                                       sequential)))
     _patch_dashboard_build_embed(monkeypatch, calls)
@@ -151,12 +168,8 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
 
     assert result.exit_code == 0, result.output
-    from bootstrap import bootstrap
-
-    expected = []
-    for group in bootstrap.streams(shorts):
-        expected += [f"{short}-generate" for short in group] + [("+".join(group) + "-run", False)]
-    assert any(len(g) > 1 for g in bootstrap.streams(shorts)), "no merged stream exercised"
+    expected = [("+".join(group) + "-run", False) for group in streams.streams(shorts)]
+    assert any(len(g) > 1 for g in streams.streams(shorts)), "no merged stream exercised"
     assert calls == [*expected, "build-data", "embed", "sync"]
 
 
@@ -164,44 +177,25 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
 def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
     """--collection bdm runs Birth Registrations and nothing else its asset
     holds (the asset split: Child Protection is another asset's now)."""
-    from cli.collection_cli import of as _cli_of
-    bdm = _cli_of('bdm')
-
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         calls.append(f"{_SHORT[collection_id]}-run"))
-
-    def _fail_if_called(**_):
-        raise AssertionError("--collection bdm must touch no other collection")
-    for other in _others("bdm"):
-        monkeypatch.setattr(_cli_of(other), "generate_synthetic_data", _fail_if_called)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "bdm"])
 
     assert result.exit_code == 0, result.output
-    assert calls == ["bdm-generate", "bdm-run", "build-data", "embed", "sync"]
+    assert calls == ["bdm-run", "build-data", "embed", "sync"]
 
 
 def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
     """--collection cp runs Child Protection and nothing else its asset holds
     (the asset split: its siblings are Emergency Department and Linkage
     Products; Birth Registrations is another asset's)."""
-    from cli.collection_cli import of as _cli_of
-    cp = _cli_of('cp')
-
-    calls = []
-
-    def _fail_if_called(**_):
-        raise AssertionError("--collection cp must touch no other collection")
     assert _others("cp"), "no sibling collection - this would prove nothing"
-    for other in _others("cp"):
-        monkeypatch.setattr(_cli_of(other), "generate_synthetic_data", _fail_if_called)
-
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
+    calls = []
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         calls.append(f"{_SHORT[collection_id]}-run"))
@@ -211,18 +205,15 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "cp"])
 
     assert result.exit_code == 0, result.output
-    assert calls == ["cp-generate", "cp-run", "build-data", "embed", "sync"]
+    assert calls == ["cp-run", "build-data", "embed", "sync"]
 
 
 def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
 
     seen = {}
-    shorts = _stub_generation(monkeypatch)
-    monkeypatch.setattr(orchestrate, "run_pipeline",
-                        lambda collection_id, sequential=False:
-                        seen.__setitem__(_SHORT[collection_id], sequential))
+    shorts = [c.short for c in collections.all_collections()]
     monkeypatch.setattr(orchestrate, "run_stream",
-                        lambda collection_ids, sequential=False:
+                        lambda collection_ids, sequential=False, **_:
                         seen.update({_SHORT[c]: sequential for c in collection_ids}))
     _patch_dashboard_build_embed(monkeypatch, [])
     _patch_snapshot(monkeypatch, [])
@@ -236,7 +227,6 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
 def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
 
     calls = []
-    _stub_generation(monkeypatch)
     monkeypatch.setattr(orchestrate, "run_pipeline", lambda collection_id, sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -252,7 +242,6 @@ def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
 def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
 
     calls = []
-    _stub_generation(monkeypatch)
     monkeypatch.setattr(orchestrate, "run_pipeline", lambda collection_id, sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -321,8 +310,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(tmp_path / "no-deliveries"))
 
     calls = []
-    monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
-    monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
+    monkeypatch.setattr(orchestrate, "run_stream", lambda ids, **k: calls.extend(ids))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
@@ -360,8 +348,7 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
     monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(receipts))
 
     calls = []
-    monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
-    monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
+    monkeypatch.setattr(orchestrate, "run_stream", lambda ids, **k: calls.extend(ids))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 

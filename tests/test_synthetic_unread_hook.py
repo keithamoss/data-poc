@@ -1,6 +1,7 @@
 """The audit hook REQ-GEN-370 criterion 3's tests watch with
 (tests/synthetic_unread_support.py) sees each kind of read it claims to, and
-excuses only the one read REQ-GEN-381 owns. No database, no pipeline."""
+excuses none (REQ-GEN-381 ended the one it used to). No database, no
+pipeline."""
 from __future__ import annotations
 
 import os
@@ -8,6 +9,8 @@ import subprocess
 import sys
 
 import pytest
+
+from bootstrap import decision_player
 
 from synthetic_unread_support import asset_folder, watching
 
@@ -80,23 +83,23 @@ class TestWhatTheHookSees:
         assert seen["asset_reads"] > 0
 
 
-class TestTheOneExcuse:
+class TestThereIsNoExcuse:
 
     @pytest.mark.asset("daily")
-    def test_a_player_built_outside_the_batch_pass_is_not_excused(self, folder):
-        """Only orchestrate._begin's Player is excused (REQ-GEN-381 ends it);
-        one built anywhere else reading the file is a read."""
+    def test_a_player_reading_the_scripts_is_a_read(self, folder):
+        """The batch pass's Player was the one read once excused; it is the
+        bootstrap's now (REQ-PIPE-383 criterion 2), and a Player built under
+        watch reading the file is a read like any other."""
         from asset_model import assets
-        from qa_tools.common import scripted_decisions
 
         before = assets.use_folder(folder)
         try:
             with watching(folder) as seen:
-                scripted_decisions.Player("civil-registration", placements={})
+                decision_player.Player("civil-registration", placements={})
         finally:
             assets.restore(before)
         assert _reads(seen), seen
-        assert seen["allowed"] == []
+        assert "allowed" not in seen
 
 
 #: The data asset this module's tests act for (C11, Keith 2026-11-02).

@@ -298,11 +298,11 @@ class TestSkippingTheTrial:
         from bootstrap import bootstrap as boot
 
         seen = []
-        # Every collection is generated through cli/pipeline.py's one
+        # Every collection is generated through bootstrap/generation.py, its one
         # entry point since REQ-GEN-246, its trial asked for only where its
         # provider declares one.
-        monkeypatch.setattr("cli.pipeline.generate_collection",
-                            lambda collection_id, *, trial: seen.append((collection_id, trial)))
+        monkeypatch.setattr("bootstrap.generation.generate_collection",
+                            lambda collection_id, *, trial, **_: seen.append((collection_id, trial)))
         monkeypatch.setattr(boot, "_run_collection", lambda *a, **k: 0.0)
         monkeypatch.setattr(boot, "_run_stream", lambda *a, **k: 0.0)
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
@@ -357,7 +357,7 @@ class TestAfterAReplay:
         """The real corpus: injected targets, lead-ins and following days, and
         every ordinary amber in both collections. Reading changes nothing
         (criterion 6)."""
-        from cli.pipeline import generated_targets
+        from generator.public import generated_targets
         from qa_tools.common import supply_db
 
         built = generated_targets()
@@ -450,11 +450,11 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
         class Stop(Exception):
             pass
 
-        # Every collection is generated through cli/pipeline.py's one
+        # Every collection is generated through bootstrap/generation.py, its one
         # entry point since REQ-GEN-246, its trial asked for only where its
         # provider declares one.
-        monkeypatch.setattr("cli.pipeline.generate_collection",
-                            lambda collection_id, *, trial: seen.append((collection_id, trial)))
+        monkeypatch.setattr("bootstrap.generation.generate_collection",
+                            lambda collection_id, *, trial, **_: seen.append((collection_id, trial)))
         monkeypatch.setattr(checkpoints, "copy_for_resume",
                             lambda c: (_ for _ in ()).throw(Stop()))
         with pytest.raises(Stop):
@@ -510,7 +510,7 @@ class TestARecordThatDoesNotAddUp:
 
         def broken():
             raise ValueError("TS-43: the generator's record holds 0 supplies for 2026-09-04")
-        monkeypatch.setattr("cli.pipeline.generated_targets", broken)
+        monkeypatch.setattr("generator.public.generated_targets", broken)
         [said] = boot.targets_agree(["bdm"])
         assert "TS-43" in said and "2026-09-04" in said
 
@@ -542,52 +542,6 @@ class TestARecordThatDoesNotAddUp:
         with pytest.raises(bdm.TargetTrialFailed):
             bdm.generate_synthetic_data()
         assert wrote == [], "the committed scenario map is not rewritten for a history not emitted"
-
-
-class TestAPipelineRunComparesToo:
-    """Post-build-review #157 finding 2 (Keith, 2026-10-11: compare there
-    too): `mothman pipeline run` replays the synthetic history and could
-    publish it without comparing."""
-
-    def _stub(self, monkeypatch, disagreements):
-        from cli import dashboard as dashboard_cli
-        from cli import pipeline
-        from dashboard import snapshot_dashboard
-        from bootstrap import bootstrap as boot
-
-        calls = {"compared": [], "published": []}
-        monkeypatch.setattr(boot, "holds_history", lambda conn: False)
-        monkeypatch.setattr(pipeline, "_run_collection", lambda coll, s: None)
-        monkeypatch.setattr(pipeline, "_run_stream", lambda colls, sequential: None)
-        monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
-        monkeypatch.setattr(boot, "targets_agree",
-                            lambda names: calls["compared"].append(list(names)) or disagreements)
-        monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
-        monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
-        monkeypatch.setattr(dashboard_cli, "publish", lambda: calls["published"].append(True))
-        monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
-        return calls
-
-    @pytest.mark.asset("quarterly")
-    def test_a_disagreement_fails_the_run_and_publishes_nothing(self, monkeypatch):
-        from cli import pipeline
-
-        calls = self._stub(monkeypatch, ("TS-43's arrival was built to amber and read red",))
-        out = CliRunner().invoke(pipeline.run_command, ["--publish"], env={"COLUMNS": "400"})
-        said = " ".join(out.output.split())
-        assert out.exit_code != 0 and "TS-43" in said and "did not read as built" in said
-        from asset_model import collections as declared_collections
-
-        shorts = [c.short for c in declared_collections.all_collections()]
-        assert calls["compared"] == [shorts] and calls["published"] == []
-
-    def test_agreement_lets_it_publish(self, monkeypatch):
-        from cli import pipeline
-
-        calls = self._stub(monkeypatch, ())
-        out = CliRunner().invoke(pipeline.run_command, ["--collection", "bdm", "--publish"])
-        assert out.exit_code == 0, out.output
-        assert calls["compared"] == [["bdm"]] and calls["published"] == [True]
 
 
 # ---------------------------------------------------------------------------
@@ -683,7 +637,7 @@ class TestGateOutcomes:
         assert len(found) == 1 and str(found[0]).startswith("TS-S1g: cp-clients")
         # AND IT FAILS THE BOOTSTRAP: the bootstrap's own comparison reads the
         # declarations through cli/ and returns them as disagreements.
-        from cli import pipeline as cli_pipeline
+        from generator import public as cli_pipeline
 
         monkeypatch.setattr(cli_pipeline, "generated_targets", lambda: [])
         monkeypatch.setattr(cli_pipeline, "generated_gate_outcomes", lambda: wrong)
@@ -714,7 +668,7 @@ class TestGateOutcomes:
         wrong = [targets.DeclaredGateOutcome("TS-S1g", "cp-notifications",
                                              _delivery_of(sc, v2["N2"]),
                                              target_agreement.PROMOTED)]
-        from cli import pipeline as cli_pipeline
+        from generator import public as cli_pipeline
 
         monkeypatch.setattr(cli_pipeline, "generated_targets", lambda: [])
         monkeypatch.setattr(cli_pipeline, "generated_gate_outcomes", lambda: wrong)

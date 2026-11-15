@@ -24,13 +24,12 @@ WHAT THE HOOK SEES, and what it does not (a decision on REQ-GEN-370):
   a directory descriptor cannot be resolved; one naming a `synthetic`
   component is counted as a read, so the gap fails safe.
 
-ONE KNOWN READ, OWNED ELSEWHERE: the batch pass builds a scripted-decision
-Player for every collection it runs (qa_tools/tools/orchestrate.py's
-_begin), and the Player reads the asset's synthetic/scripted_decisions.yaml.
-REQ-GEN-381 criteria 1 and 4 end it (Keith, 2026-11-15: c3 waits for it). It
-is excused only when the Player's constructor was called from _begin - any
-other read, by any other code or any other Player, fails - and the test stays
-green once the read goes.
+NO READ IS EXCUSED (REQ-GEN-370 criterion 3, met with REQ-GEN-381 and
+REQ-PIPE-383, 2026-11-15): the batch pass used to build a scripted-decision
+Player for every collection it ran (orchestrate._begin), which read the asset's
+synthetic/scripted_decisions.yaml, and that one read was excused while
+REQ-GEN-381 was owed. The pipeline builds no player now - the bootstrap builds
+and passes one - so the excuse is gone and every read under synthetic/ fails.
 """
 from __future__ import annotations
 
@@ -48,8 +47,6 @@ import equiv_support
 ROOT = Path(__file__).resolve().parent.parent
 REAL_SYNTHETIC = tuple(str((ROOT / "assets" / name / "synthetic").resolve())
                        for name in ("daily", "quarterly"))
-PLAYER_FILE = os.path.join("qa_tools", "common", "scripted_decisions.py")
-BEGIN_FILE = os.path.join("qa_tools", "tools", "orchestrate.py")
 EVENTS = ("open", "os.listdir", "os.scandir", "glob.glob", "subprocess.Popen")
 
 #: What the hook is watching for, or None when it is not watching. A hook
@@ -57,19 +54,6 @@ EVENTS = ("open", "os.listdir", "os.scandir", "glob.glob", "subprocess.Popen")
 #: nothing outside a `watching()` block.
 _STATE: dict | None = None
 _HOOKED = False
-
-
-def excused_player_frame(frame) -> bool:
-    """Whether `frame`'s stack holds the Player's constructor called from
-    orchestrate._begin - the one read REQ-GEN-381 ends."""
-    while frame is not None:
-        code = frame.f_code
-        if code.co_filename.endswith(PLAYER_FILE) and code.co_qualname == "Player.__init__":
-            caller = frame.f_back
-            return (caller is not None and caller.f_code.co_filename.endswith(BEGIN_FILE)
-                    and caller.f_code.co_name == "_begin")
-        frame = frame.f_back
-    return False
 
 
 #: How a path an event names is held against the synthetic/ roots.
@@ -135,10 +119,7 @@ def _hook(event: str, args) -> None:
     try:
         for path, how in _paths(event, args):
             if _under(path, how, state["roots"]):
-                if event == "open" and excused_player_frame(sys._getframe(1)):
-                    state["allowed"].append((event, path))
-                else:
-                    state["reads"].append((event, path, _who()))
+                state["reads"].append((event, path, _who()))
                 return
         if event != "subprocess.Popen" and any(
                 path.startswith(folder + os.sep) for path, _ in _paths(event, args)
@@ -162,8 +143,8 @@ def _who() -> str:
 
 class watching:
     """`with watching(asset_folder) as seen:` - every read under a synthetic/
-    folder while inside, in seen["reads"] (or seen["allowed"], the excused
-    Player read), and how many reads of the asset folder there were at all."""
+    folder while inside, in seen["reads"], and how many reads of the asset
+    folder there were at all."""
 
     def __init__(self, asset_folder: Path):
         self.asset_folder = Path(asset_folder)
@@ -180,7 +161,7 @@ class watching:
                       os.path.realpath(asset_folders.real_folder())),
             "roots": tuple(dict.fromkeys((os.path.realpath(own), os.path.abspath(own))
                                          + REAL_SYNTHETIC)),
-            "reads": [], "allowed": [], "asset_reads": 0}
+            "reads": [], "asset_reads": 0}
         _STATE = self.state
         return self.state
 
@@ -262,8 +243,9 @@ def run_and_build(collection_id: str, tree: Path, folder: Path, out: Path,
     def run():
         from qa_tools.tools import orchestrate
 
-        # THE REAL SCRIPT PATH, NOT THE CORPUS REDIRECT: the read under test
-        # is the one the resolver points the Player at.
+        # THE REAL SCRIPT PATH, NOT THE CORPUS REDIRECT: a pipeline that read
+        # the scripts would read the file the resolver points at - the one the
+        # "present" variant writes.
         scripted_decisions.script_path = the_scripts
         before = assets.use_folder(folder)
         mp = pytest.MonkeyPatch()
@@ -323,19 +305,15 @@ class Checks:
         assert (snap["out"] / "qa-reporting-dashboard.html").is_file()
         assert snap["seen"]["asset_reads"] > 0
 
-    def test_the_scripted_decision_was_played_under_watch(self, runs):
-        """The Player's non-empty path ran: its one decision is recorded,
-        and nothing of the kind without the folder."""
-        assert "reject" in column(runs["present"], "qa.decision", "action")
+    def test_the_batch_pass_plays_no_scripted_decision(self, runs):
+        """THE PIPELINE PLAYS NONE (REQ-PIPE-383 criterion 5): the "present"
+        variant's scripts file holds one decision a player would play on this
+        corpus (tests/test_bootstrap_plays_scripted_decisions.py plays it), and
+        the batch pass - given no player - records none, with the folder or
+        without it."""
+        assert "reject" not in column(runs["present"], "qa.decision", "action")
         assert "reject" not in column(runs["removed"], "qa.decision", "action")
 
     @pytest.mark.parametrize("variant", ["present", "removed"])
     def test_nothing_under_synthetic_was_read(self, runs, variant):
         assert sorted(set(runs[variant]["seen"]["reads"])) == []
-
-    def test_only_the_excused_player_read_the_scripted_decisions_file(self, runs):
-        """REQ-GEN-381 criteria 1 and 4 end it - an empty list once it goes."""
-        allowed = runs["present"]["seen"]["allowed"]
-        assert all(path.endswith(os.path.join("synthetic", "scripted_decisions.yaml"))
-                   for _, path in allowed), allowed
-        assert runs["removed"]["seen"]["allowed"] == []

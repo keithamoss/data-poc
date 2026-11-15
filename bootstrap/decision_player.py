@@ -19,17 +19,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from bootstrap import replay_clock
-from qa_tools.common.scripted_decisions import (
+from qa_tools.common import scripted_decisions as reader
+from qa_tools.common.scripted_decisions import (  # noqa: F401 - ScriptRefused re-exported
     CHAIN_MARK,
     CHOOSE_FILE,
     PERIOD,
     Script,
     ScriptRefused,
-    _due_at,
-    _wall_clock_after,
-    answers_for,
     label,
-    load,
 )
 
 
@@ -56,7 +53,7 @@ class Player:
 
         mine = {d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)}
         self.collection_id = collection_id
-        self.pending = [s for s in (scripts if scripts is not None else load())
+        self.pending = [s for s in (scripts if scripts is not None else reader.load())
                         if s.dataset_id in mine]
         self.placements = (placements if placements is not None
                            else scenario_map.read_placements())
@@ -116,7 +113,7 @@ class Player:
                     f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
                     [s.dataset_id, supply]).fetchall()
             filed_to = (period[0][0] if period else None) or placement.period
-            at = (_wall_clock_after(s, placement.period) if s.at is not None
+            at = (reader._wall_clock_after(s, placement.period) if s.at is not None
                   else received + timedelta(hours=s.after_hours))
             if at is None:
                 waiting.append((s, f"{s.dataset_id} has no date for {placement.period} to "
@@ -207,7 +204,7 @@ def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
 
     if placement is None or not placement.period:
         return None, "the scenario has no recorded placement - is it injected?"
-    due = _due_at(s.dataset_id, placement.period)
+    due = reader._due_at(s.dataset_id, placement.period)
     if due is None:
         return None, (f"{s.dataset_id} has no slot for {placement.period} - a period-scoped "
                       f"decision is timed from when its period was due")
@@ -294,7 +291,7 @@ def _apply(t: Timed) -> None:
 
                     _delivery, _period, files = settlement.pair_files(conn, s.dataset_id,
                                                                       supply)
-                    outcomes = tuple(answers_for(
+                    outcomes = tuple(reader.answers_for(
                         s, [f.filename for f in files],
                         lambda n: slots.relative_period(
                             s.dataset_id, t.placement_period or t.period, n)))

@@ -28,7 +28,6 @@ same division decision_log.Decision already makes for `supply_is_red`.
 """
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -373,77 +372,6 @@ def refusal_kind(why) -> str | None:
 #: something worth knowing about it, and holding every one of them for a
 #: person is how a queue becomes noise nobody reads.
 PROMOTES_ITSELF = frozenset({"green", "amber"})
-
-
-#: The window a promotion's invented lag falls in, for a supply being
-#: replayed from history. Hours to a couple of days: long enough to
-#: read as somebody getting to it, short enough not to read as
-#: neglect.
-_LAG_MIN = timedelta(hours=1)
-_LAG_SPAN = timedelta(days=3) - _LAG_MIN
-
-
-def effective_at_for(received_at: datetime, *, now: datetime | None = None,
-                      seed: str = "", before: datetime | None = None,
-                      within: timedelta | None = None) -> datetime:
-    """When a promotion of this supply took effect.
-
-    TWO THINGS ARE TRUE OF ANY PROMOTION, synthetic or real, and this
-    is just both of them: it cannot have taken effect BEFORE the supply
-    arrived, and it cannot have taken effect in the FUTURE. So the
-    answer is `min(now, received_at + lag)`.
-
-    WHY THAT IS NOT A REPLAY HACK, which is the point of expressing it
-    this way. In production an arrival is minutes old, `received_at +
-    lag` is ahead of now, and the rule returns `now` - unchanged
-    behaviour, no mode to set. In a replay the arrival is years old and
-    the rule returns the backdated instant. One expression, correct in
-    both, and nothing to forget to switch on.
-
-    WHAT IT FIXES. A bootstrap replays four years of arrivals under one
-    wall clock, so every promotion used to take effect within the same
-    few minutes - 91 decisions across one distinct day, measured
-    2026-10-02 - and "what did we hold as at 30 June 2024" resolved to
-    nothing in place, for everything. Meanwhile the ARRIVALS were
-    backdated properly, so the generator's fiction disagreed with
-    itself: February 2023 for the arrival, today for its promotion.
-
-    THE LAG IS INVENTED, AND SAYING SO IS PART OF THE DESIGN. Keith
-    chose it (2026-10-02) over promoting at the arrival instant, so
-    REQ-PIPE-080's receipt-to-promotion interval shows a spread rather
-    than a column of zeros. It is seeded off the run id so a
-    regeneration reproduces it, like everything else here - but no
-    particular supply's wait is a measurement of anything, and nothing
-    should be inferred from one. The synthetic corpus is fiction
-    throughout; this part of it is merely newer.
-    """
-    from asset_model import asset_time
-
-    now = now or asset_time.now()
-    digest = hashlib.sha256((seed or "").encode()).digest()
-    # A FRACTION OF THE WINDOW from the digest, rather than a modulo
-    # over hours - the window is a duration, so the lag should move
-    # with it if it is ever retuned.
-    fraction = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
-    # WITHIN THE CLAIM WINDOW AFTER RECEIPT, SPREAD ACROSS IT (Keith,
-    # 2026-10-11, REQ-GEN-185; post-build-review #156): a scheduled pass gets
-    # to a supply within its window. Uncapped, a daily supply's decision
-    # landed the next day - under the next day's amber setting, and after a
-    # person's decision about it that same evening; capped rather than
-    # rescaled, 25 of 33 sat on the window's edge. The orchestrators pass a
-    # window only in a replay, where this lag is invented at all.
-    if within is not None:
-        low = min(_LAG_MIN, within)
-        took = min(now, received_at + low + (within - low) * fraction)
-    else:
-        took = min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
-    # NEVER PAST THE NEXT ARRIVAL OF THE SAME DATASET (Keith, 2026-10-06,
-    # post-build-review #117 D5): an invented lag that outlived the next
-    # supply's receipt showed two versions waiting at once on the asset
-    # timeline. Just before it, and never earlier than this supply's own.
-    if before is not None and took >= before:
-        took = max(received_at, before - timedelta(seconds=1))
-    return took
 
 
 def next_receipt(arrival) -> datetime | None:

@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from qa_tools.common import qa_store, supply_db
 from bootstrap import bootstrap, synthetic_reset
+from qa_tools.common import streams
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -31,12 +32,12 @@ class TestTheCommand:
         with supply_db.connect(label="test-reset") as conn:
             qa_store.ensure_schema(conn)
             _history(conn)
-            assert bootstrap.holds_history(conn)
+            assert streams.holds_history(conn)
         result = CliRunner().invoke(env_group, ["reset-synthetic"],
                                     input=synthetic_reset.confirmation_phrase() + "\n")
         assert result.exit_code == 0, result.output
         with supply_db.connect(label="test-reset") as conn:
-            assert not bootstrap.holds_history(conn)
+            assert not streams.holds_history(conn)
             assert synthetic_reset.schemas_to_drop(conn) == []
 
     def test_a_period_standing_on_another_does_not_stop_it(self, private_supply_dsn):
@@ -72,7 +73,7 @@ class TestTheCommand:
             assert before[1] is not None, "the test database is marked"
             synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
             assert _identity(conn) == before
-            assert not bootstrap.holds_history(conn)
+            assert not streams.holds_history(conn)
             assert synthetic_reset.schemas_to_drop(conn) == []
 
     def test_a_wrong_phrase_deletes_nothing(self, private_supply_dsn):
@@ -84,7 +85,7 @@ class TestTheCommand:
         result = CliRunner().invoke(env_group, ["reset-synthetic"], input="yes\n")
         assert result.exit_code != 0
         with supply_db.connect(label="test-reset") as conn:
-            assert bootstrap.holds_history(conn)
+            assert streams.holds_history(conn)
 
     def test_the_prompt_names_what_it_deletes(self, private_supply_dsn):
         from cli.env import env_group
@@ -105,7 +106,7 @@ class TestTheCommand:
                                     input=synthetic_reset.confirmation_phrase() + "\n")
         assert result.exit_code != 0 and "not declared synthetic" in result.output
         with supply_db.connect(label="test-reset") as conn:
-            assert bootstrap.holds_history(conn)
+            assert streams.holds_history(conn)
             with pytest.raises(synthetic_reset.NotSynthetic):
                 synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
 
@@ -125,7 +126,7 @@ class TestTheCommand:
         assert result.exit_code != 0 and "production" in result.output
         monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "test")
         with supply_db.connect(label="test-reset") as conn:
-            assert bootstrap.holds_history(conn)
+            assert streams.holds_history(conn)
 
     def test_this_asset_is_declared_synthetic(self):
         assert synthetic_reset.is_synthetic() is True
@@ -145,7 +146,8 @@ class TestNothingElseDeletes:
     def test_no_other_module_calls_it(self):
         """Criterion 23: not reachable from any other command."""
         callers = []
-        for path in list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py")):
+        for path in (list((ROOT / "cli").glob("*.py")) + list((ROOT / "qa_tools").rglob("*.py"))
+                     + list((ROOT / "bootstrap").rglob("*.py"))):
             if path.name in ("synthetic_reset.py",):
                 continue
             text = path.read_text()
@@ -162,7 +164,7 @@ class TestNothingElseDeletes:
         assert result.refused and not result.populated
         assert "reset-synthetic" in result.reason
         with supply_db.connect(label="test-reset") as conn:
-            assert bootstrap.holds_history(conn)
+            assert streams.holds_history(conn)
 
     def test_the_filing_and_delivery_tables_have_their_new_shape(self, private_supply_dsn):
         """Criterion 33's column-absence tests."""

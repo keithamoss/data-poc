@@ -31,6 +31,12 @@ SHORTS = list(_SHORT.values())
 STREAMS = [boot.STREAM_JOIN.join(g) for g in boot.streams(SHORTS)]
 
 
+def _no_player(kwargs: dict) -> dict:
+    """An orchestrator call's arguments less the player the bootstrap builds
+    and passes in (REQ-PIPE-383 criterion 2) - asserted on its own below."""
+    return {k: v for k, v in kwargs.items() if k != "player"}
+
+
 def _key(collection_ids) -> str:
     return boot.STREAM_JOIN.join(_SHORT[c] for c in collection_ids)
 #: The first collection of the asset the suite acts for (the asset split: it was
@@ -106,14 +112,14 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
         empty_db.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}".t__20260101000000 (id int)')
         called = []
-        # Generation goes through cli/pipeline.py's one entry point since
+        # Generation goes through bootstrap/generation.py (REQ-GEN-381) since
         # REQ-GEN-246 - stubbed there, or the real driver runs.
-        monkeypatch.setattr("cli.pipeline.generate_collection",
+        monkeypatch.setattr("bootstrap.generation.generate_collection",
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
-                            lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
+                            lambda collection_id, **k: called.append((_SHORT[collection_id], _no_player(k))))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
-                            lambda collection_ids, **k: called.append((_key(collection_ids), k)))
+                            lambda collection_ids, **k: called.append((_key(collection_ids), _no_player(k))))
         # The corrections step is its own subject (test_correction_replay.py):
         # over this empty history a committed scripted keep has nothing to keep.
         monkeypatch.setattr("bootstrap.correction_replay.confirm_due",
@@ -130,9 +136,9 @@ class TestWhatItRuns:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        # Generation goes through cli/pipeline.py's one entry point since
+        # Generation goes through bootstrap/generation.py (REQ-GEN-381) since
         # REQ-GEN-246 - stubbed there, or the real driver runs.
-        monkeypatch.setattr("cli.pipeline.generate_collection",
+        monkeypatch.setattr("bootstrap.generation.generate_collection",
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append(_SHORT[collection_id]))
@@ -206,14 +212,14 @@ class TestCollectionsRunSideBySide:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        # Generation goes through cli/pipeline.py's one entry point since
+        # Generation goes through bootstrap/generation.py (REQ-GEN-381) since
         # REQ-GEN-246 - stubbed there, or the real driver runs.
-        monkeypatch.setattr("cli.pipeline.generate_collection",
+        monkeypatch.setattr("bootstrap.generation.generate_collection",
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
-                            lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
+                            lambda collection_id, **k: called.append((_SHORT[collection_id], _no_player(k))))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
-                            lambda collection_ids, **k: called.append((_key(collection_ids), k)))
+                            lambda collection_ids, **k: called.append((_key(collection_ids), _no_player(k))))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
         monkeypatch.setattr("bootstrap.correction_replay.confirm_due",
@@ -302,7 +308,7 @@ class TestTheBudgetLine:
         assert "1303s" in line and "583s over" in line
 
     def test_a_bootstrap_from_empty_prints_it_last(self, empty_db, monkeypatch):
-        monkeypatch.setattr("cli.pipeline.generate_collection", lambda cid, **_: None)
+        monkeypatch.setattr("bootstrap.generation.generate_collection", lambda cid, **_: None)
         # BOTH ENTRY POINTS: a stream of one collection (Birth Registrations)
         # runs through run_pipeline, and stubbing only run_stream replayed it
         # for real - nine minutes with data/ present, and a refused TS-47

@@ -44,23 +44,20 @@ class TestThereIsExactlyOnePublishPath:
     @staticmethod
     def _through_pipeline_run(monkeypatch):
         """`pipeline run --publish` with everything before the publish
-        stubbed out - the real run regenerates and checks every supply."""
+        stubbed out - the real run checks every supply that has arrived."""
         import contextlib
 
         from click.testing import CliRunner
 
         from cli import pipeline
         from dashboard import snapshot_dashboard
-        from qa_tools.common import processing_pass
-        from bootstrap import bootstrap
+        from qa_tools.common import processing_pass, streams
+        from qa_tools.tools import orchestrate
 
-        monkeypatch.setattr(bootstrap, "holds_history", lambda conn: False)
+        monkeypatch.setattr(streams, "holds_history", lambda conn: False)
         monkeypatch.setattr(processing_pass, "pass_lock",
                             lambda *a, **k: contextlib.nullcontext())
-        monkeypatch.setattr(pipeline, "_run_collection", lambda coll, sequential: None)
-        monkeypatch.setattr(pipeline, "_run_stream", lambda colls, sequential: None)
-        monkeypatch.setattr(bootstrap, "_confirm_corrections", lambda say: None)
-        monkeypatch.setattr(bootstrap, "targets_agree", lambda names: [])
+        monkeypatch.setattr(orchestrate, "run_stream", lambda ids, **k: None)
         monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
         monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
         monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])

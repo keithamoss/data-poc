@@ -15,6 +15,7 @@ import baseline_periods
 
 import test_supersession as _base
 from qa_tools.common import decision_log as dl, people, scenario_map, scripted_decisions as sd
+from bootstrap import decision_player
 from qa_tools.common import validate_people
 from test_supersession import DS, _filed
 
@@ -93,7 +94,7 @@ class TestPlayback:
         placements = {"TS-1": scenario_map.Placement(
             scenario_id="TS-1", dataset=DS, supplies=(supply_table,), period="p",
             in_place_on="2026-05-01")}
-        return sd.Player("child-protection", scripts=scripts, placements=placements)
+        return decision_player.Player("child-protection", scripts=scripts, placements=placements)
 
     def test_it_raises_a_persons_decision_at_its_instant_before_a_later_arrival(
             self, conn, period):
@@ -132,7 +133,7 @@ class TestPlayback:
     def test_never_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
         asset_folders.point(_not_synthetic(tmp_path).parent)
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
-            sd.Player("child-protection", scripts=[_script()], placements={})
+            decision_player.Player("child-protection", scripts=[_script()], placements={})
 
 
 def _not_synthetic(tmp_path: Path) -> Path:
@@ -174,7 +175,7 @@ class TestASupplyNotYetFiled:
         placements = {"TS-1": scenario_map.Placement(
             scenario_id="TS-1", dataset=DS, supplies=("cp_carers__999999999999999999",),
             period="p", in_place_on="2026-05-01")}
-        player = sd.Player("child-protection", scripts=[_script()], placements=placements)
+        player = decision_player.Player("child-protection", scripts=[_script()], placements=placements)
         early = SimpleNamespace(received_at=datetime.fromisoformat("2026-05-02T00:00:00+00:00"))
         assert player.before(early) == 0
         with pytest.raises(sd.ScriptRefused, match="TS-1"):
@@ -231,12 +232,9 @@ class TestRecordedAtItsOwnInstant:
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         player = TestPlayback()._player([_script(after_hours=3)], a_table)
         later = datetime.fromisoformat("2026-05-02T05:17:00+00:00")
-        replay_clock._active = True
-        try:
+        with replay_clock.replaying():
             replay_clock.anchor(later)
             assert player.before(SimpleNamespace(received_at=later)) == 1
-        finally:
-            replay_clock.stop()
         effective, recorded = conn.execute(
             f"SELECT effective_at, recorded_at FROM {dl.TABLE} "
             "WHERE supply = ? AND action = 'promote'", [a]).fetchall()[0]
@@ -367,7 +365,7 @@ class TestThePeriodsDueInstantIsTheCalendars:
         from types import SimpleNamespace
 
         script = _period_script(dataset_id="cp-placements", after_hours=5)
-        timed, why = sd._timed_by_period(script, SimpleNamespace(period="2024-Q4"))
+        timed, why = decision_player._timed_by_period(script, SimpleNamespace(period="2024-Q4"))
         assert why == ""
         assert timed.at.isoformat() == "2024-08-01T14:00:00+08:00"
         assert timed.stands_on == "2024-Q3"
@@ -376,9 +374,9 @@ class TestThePeriodsDueInstantIsTheCalendars:
         from types import SimpleNamespace
 
         played = []
-        monkeypatch.setattr(sd, "_apply", lambda t: played.append(t.script.operation))
-        monkeypatch.setattr(sd, "_refuse_unless_synthetic", lambda: None)
-        player = sd.Player("child-protection", placements={"TS-1": SimpleNamespace(
+        monkeypatch.setattr(decision_player, "_apply", lambda t: played.append(t.script.operation))
+        monkeypatch.setattr(decision_player, "_refuse_unless_synthetic", lambda: None)
+        player = decision_player.Player("child-protection", placements={"TS-1": SimpleNamespace(
             period="2024-Q4", supplies=())}, scripts=[
             _period_script(dataset_id="cp-placements"),
             _period_script(dataset_id="cp-placements", operation="mark-not-supplied",
@@ -396,8 +394,8 @@ class TestAMalformedScriptStopsTheReplayByName:
     def test_it_is_refused_naming_the_scenario(self, monkeypatch):
         from types import SimpleNamespace
 
-        monkeypatch.setattr(sd, "_refuse_unless_synthetic", lambda: None)
-        player = sd.Player("child-protection", placements={"TS-1": SimpleNamespace(
+        monkeypatch.setattr(decision_player, "_refuse_unless_synthetic", lambda: None)
+        player = decision_player.Player("child-protection", placements={"TS-1": SimpleNamespace(
             period="2024-Q3", supplies=("run_001",))},
             scripts=[_period_script(scope=None, stands_on=None, operation="promote",
                                     dataset_id="cp-placements")])
@@ -449,7 +447,7 @@ class TestAPeriodScopedDecisionIsPlayed:
         placements = {"TS-1": scenario_map.Placement(
             scenario_id="TS-1", dataset=DS, supplies=(), period=period,
             in_place_on="2026-05-02")}
-        return sd.Player("child-protection", scripts=scripts, placements=placements)
+        return decision_player.Player("child-protection", scripts=scripts, placements=placements)
 
     def test_a_substitution_is_timed_from_the_period_due_and_stands_on_its_supply(
             self, conn, pinned):
@@ -515,7 +513,7 @@ class TestAPeriodScopedDecisionIsPlayed:
         """Criterion 11."""
         asset_folders.point(_not_synthetic(tmp_path).parent)
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
-            sd.Player("child-protection", scripts=[_period_script()], placements={})
+            decision_player.Player("child-protection", scripts=[_period_script()], placements={})
 
 
 class TestThePlantedPairsAreSettled:
@@ -603,7 +601,7 @@ class TestAnOrdinaryChainIsSettledByPeriod:
     def test_it_promotes_the_periods_second_supply_at_its_instant(self, conn, period):
         a, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         b, _ = _filed(conn, period, "2026-05-09T01:00:00+00:00")
-        player = sd.Player("child-protection", scripts=[self._chain(period)], placements={})
+        player = decision_player.Player("child-protection", scripts=[self._chain(period)], placements={})
         assert player.finish() == 1
         rows = conn.execute(
             f"SELECT supply, actor, effective_at FROM {dl.TABLE} "
@@ -615,7 +613,7 @@ class TestAnOrdinaryChainIsSettledByPeriod:
 
     def test_it_waits_for_the_supply_and_the_end_names_the_chain(self, conn, period):
         _filed(conn, period, "2026-05-01T01:00:00+00:00")
-        player = sd.Player("child-protection", scripts=[self._chain(period)], placements={})
+        player = decision_player.Player("child-protection", scripts=[self._chain(period)], placements={})
         with pytest.raises(sd.ScriptRefused, match=re.escape(f"{DS} {period}")):
             player.finish()
 
@@ -666,7 +664,7 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
         # 2015-Q2, the first emptied quarter Child Protection owes: since
         # REQ-GEN-238 dropped 2013 and 2014 its first round is 2015-Q1's,
         # whose files go into 2015-Q2 (REQ-GEN-325).
-        timed, why = sd._timed_chain(self._mark("2015-Q2", dataset_id="cp-clients"))
+        timed, why = decision_player._timed_chain(self._mark("2015-Q2", dataset_id="cp-clients"))
         assert timed is not None, why
         slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2016, 1, 1))
                     if s.name == "2015-Q2")
@@ -722,11 +720,11 @@ class TestAScriptedDecisionsKnockOnRunsAtItsInstant:
         monkeypatch.setattr(fd, "consequences", lambda conn, req: SimpleNamespace(key=None))
         monkeypatch.setattr(fd, "apply", lambda req, **kw: SimpleNamespace(
             changed=True, owed=(), message="ok"))
-        monkeypatch.setattr(sd, "_connect", lambda: _NullConn())
+        monkeypatch.setattr(decision_player, "_connect", lambda: _NullConn())
         monkeypatch.setattr(knock_on, "follow_up_stream", lambda cid, **kw: seen.append(
             (cid, replay_clock.now() if replay_clock.active() else None)))
         with replay_clock.replaying():
-            sd._apply(sd.Timed(_script(dataset_id="cp-clients"), at, "s", "2020-Q4"))
+            decision_player._apply(decision_player.Timed(_script(dataset_id="cp-clients"), at, "s", "2020-Q4"))
         assert [cid for cid, _ in seen] == ["child-protection"]
         assert timedelta(0) <= seen[0][1] - at < timedelta(seconds=5), seen
 

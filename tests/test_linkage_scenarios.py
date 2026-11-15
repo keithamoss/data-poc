@@ -339,7 +339,7 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
 class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
     """REQ-GEN-334 criterion 12, refused before anything is written: an
     ordinary release received after the effective instant of each same-round
-    source promotion - the gate's own effective_at_for, seeded as the gate
+    source promotion - the replay clock's own lag rule (scenarios/promotion_lag.py), seeded as the gate
     seeds it - AND within its own due time and grace; else refused naming the
     quarter, the delivery and the promotion's effective instant."""
 
@@ -389,14 +389,14 @@ class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:
         orchestrate.effective_at_of computes it."""
         from datetime import timedelta
 
-        from qa_tools.common import promotion
         from asset_model import schedule
+        from scenarios import promotion_lag
 
         job, period = self._quarter()
         src = self._source(period, "16:00")
         first = asset_time.parse_instant(src["ed-presentations"][0].received_at, "t")
         at = asset_time.wall_clock(period.round_date + timedelta(days=1), "03:00")
-        took = promotion.effective_at_for(
+        took = promotion_lag.effective_at(
             first, seed=f"ed_presentations__{asset_time.arrival_key(first)}", before=at,
             within=schedule.claim_window("ed-presentations",
                                          on=asset_time.local_date(first)))

@@ -242,13 +242,17 @@ class TestAThirdCollectionAtEverySite:
         # from the provider, never named (the asset split: Birth Registrations
         # on the daily asset, Linkage Products on the quarterly).
         from cli.collection_cli import of
-        from cli.pipeline import has_target_trial
+        from generator.public import has_target_trial
 
         trials = [c for c in declared_collections.all_collections()
                   if c.id not in (FAKE_ID, BARE_ID) and has_target_trial(c.id)]
         assert trials, "no real collection declares a target trial - nothing to stub"
         for c in trials:
             monkeypatch.setattr(of(c.short), "try_targets", lambda **_: 0)
+        # THE TRIAL RUNNER IS HANDED IN BY cli/ (REQ-GEN-381 criterion 3); the
+        # bootstrap calls below pass the one `mothman pipeline bootstrap` does.
+        from cli import pipeline as pipeline_cli
+        self.try_targets = pipeline_cli.try_targets
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
         # A STREAM of collections sharing a calendar (REQ-PIPE-262).
@@ -271,7 +275,7 @@ class TestAThirdCollectionAtEverySite:
         from bootstrap import bootstrap as boot
 
         dispatched = self._stub_the_real_collections(monkeypatch)
-        result = boot.bootstrap(collection="all")
+        result = boot.bootstrap(collection="all", try_targets=self.try_targets)
         assert result.populated
         declared = _declared()
         # EVERY STREAM AT ONCE (REQ-PIPE-262 criterion 6), the new collection in one.
@@ -286,7 +290,7 @@ class TestAThirdCollectionAtEverySite:
         from bootstrap import bootstrap as boot
 
         dispatched = self._stub_the_real_collections(monkeypatch)
-        result = boot.bootstrap(collection="all")
+        result = boot.bootstrap(collection="all", try_targets=self.try_targets)
         assert result.refused and BARE_ID in result.reason
         assert dispatched == [] and without_adapter == []
 

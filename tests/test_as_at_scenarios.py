@@ -19,6 +19,8 @@ from datetime import date
 
 import pytest
 
+from bootstrap import decision_player
+
 from generator import scenario_injection as si
 from generator.targeting import Target
 
@@ -317,13 +319,13 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
     @staticmethod
     def _held_and_planted():
         from qa_tools.common import decision_log as dl
-        from qa_tools.common import scenario_map, scripted_decisions, supply_db
+        from qa_tools.common import scenario_map, supply_db
 
         placements = scenario_map.read_placements()
         planted = set()
         for sid, index in (("TS-43", 0), ("TS-78a", 0), ("TS-78a", 2)):
             run = placements[sid].supplies[index]
-            planted.add(scripted_decisions._supply_of("birth-registrations", run))
+            planted.add(decision_player._supply_of("birth-registrations", run))
         with supply_db.connect(label="test-hold-guard") as conn:
             held = {s for (s,) in conn.execute(
                 f"SELECT supply FROM {dl.TABLE} WHERE action = ? AND amber_setting = 'hold'",

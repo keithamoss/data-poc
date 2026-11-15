@@ -13,6 +13,7 @@ import pytest
 
 from pair_support import DS, TABLE, Pair, _at, free_day
 from qa_tools.common import dataset_blockers, decision_log, filing
+from bootstrap import decision_player
 from qa_tools.common import filing_decisions as fd
 from qa_tools.common import (people, qa_store, recheck, rejection, settlement,
                              supersession, supply_db, supply_files)
@@ -655,17 +656,15 @@ class TestAScriptNamesAPairByItsFiledSupply:
     the plain `<dataset>@<key>` no filing carries."""
 
     def test_the_pairs_run_is_its_hash_one(self, conn, day):
-        from qa_tools.common import scripted_decisions
 
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
                               (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
         run_id = supply_files.arrival_run_id_of(DS, p.pair)
-        assert scripted_decisions._supply_of(DS, run_id) == p.pair
+        assert decision_player._supply_of(DS, run_id) == p.pair
 
     def test_an_ordinary_run_is_its_plain_supply(self, conn):
-        from qa_tools.common import scripted_decisions
 
-        assert scripted_decisions._supply_of(DS, "birth_registrations__20990101000000000001") \
+        assert decision_player._supply_of(DS, "birth_registrations__20990101000000000001") \
             == f"{DS}@20990101000000000001"
 
 
@@ -706,7 +705,7 @@ class TestAScriptedSettlement:
         assert any("not both" in p for p in found)
 
     def test_it_plays_by_position_at_eleven_the_next_day(self, conn, day, monkeypatch):
-        from qa_tools.common import scenario_map, scripted_decisions as sd
+        from qa_tools.common import scenario_map
 
         nxt = day + timedelta(days=1)
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
@@ -714,10 +713,10 @@ class TestAScriptedSettlement:
         placements = {"TS-69": scenario_map.Placement(
             scenario_id="TS-69", dataset=DS, period=p.period, in_place_on=p.period,
             supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
-        player = sd.Player("civil-registration", scripts=[self._script()],
+        player = decision_player.Player("civil-registration", scripts=[self._script()],
                            placements=placements)
         ran = []
-        monkeypatch.setattr(sd, "_run_the_re_check_it_owed", lambda t, owed: ran.append(owed))
+        monkeypatch.setattr(decision_player, "_run_the_re_check_it_owed", lambda t, owed: ran.append(owed))
         assert player.finish() == 1
         (choose,) = [d for d in _entries(conn, p.pair) if d["action"] == "choose-file"]
         assert choose["effective_at"] == _at(nxt, "11:00")
@@ -738,9 +737,9 @@ class TestAScriptedSettlement:
         placements = {"TS-72": scenario_map.Placement(
             scenario_id="TS-72", dataset=DS, period=p.period, in_place_on=p.period,
             supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
-        player = sd.Player("civil-registration", placements=placements, scripts=[
+        player = decision_player.Player("civil-registration", placements=placements, scripts=[
             self._script(scenario="TS-72", files=("reject", "supply"))])
-        monkeypatch.setattr(sd, "_run_the_re_check_it_owed", lambda t, owed: None)
+        monkeypatch.setattr(decision_player, "_run_the_re_check_it_owed", lambda t, owed: None)
         with pytest.raises(sd.ScriptRefused, match="TS-72") as refused:
             player.finish()
         assert "never loaded" in str(refused.value)

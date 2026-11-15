@@ -15,7 +15,9 @@ import pytest
 
 import asset_params
 
+from bootstrap import replay_clock
 from qa_tools.common import knock_on, promotion
+from scenarios import promotion_lag
 from qa_tools.tools import orchestrate
 
 COLLECTIONS = ["civil-registration", "child-protection"]
@@ -38,9 +40,12 @@ def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch)
     # A run id whose seeded lag is far longer than thirty seconds, so the
     # cap is what keeps it before the next receipt.
     arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_lag_probe")
-    assert promotion.effective_at_for(RECEIVED, seed="run_lag_probe") > NEXT, (
+    assert promotion_lag.effective_at(RECEIVED, seed="run_lag_probe") > NEXT, (
         "test precondition - the uncapped lag must reach past the next receipt")
-    orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
+    # IN A REPLAY (REQ-PIPE-382 criterion 3): the replay clock answers with the
+    # lag and its caps; a real asset's promotion takes effect now.
+    with replay_clock.replaying():
+        orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
     [effective] = stamped
     at = datetime.fromisoformat(effective)
     assert RECEIVED <= at < NEXT
@@ -93,7 +98,7 @@ class TestWithinTheClaimWindowInAReplay:
     def test_the_lag_spreads_across_the_window(self):
         received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
         window = timedelta(hours=4)
-        lags = [promotion.effective_at_for(received, seed=f"run_{n}", within=window) - received
+        lags = [promotion_lag.effective_at(received, seed=f"run_{n}", within=window) - received
                 for n in range(60)]
         assert all(timedelta(hours=1) <= lag <= window for lag in lags)
         assert len(set(lags)) > 50, "the lag must spread, not sit on one value"
@@ -101,24 +106,26 @@ class TestWithinTheClaimWindowInAReplay:
 
     def test_without_a_window_the_lag_is_as_it_was(self):
         received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
-        assert promotion.effective_at_for(received, seed="run_lag_probe") == \
-            promotion.effective_at_for(received, seed="run_lag_probe", within=None)
+        assert promotion_lag.effective_at(received, seed="run_lag_probe") == \
+            promotion_lag.effective_at(received, seed="run_lag_probe", within=None)
 
     @pytest.mark.parametrize("collection_id", asset_params.per_asset(COLLECTIONS, ids=["bdm", "cp"]))
     @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
     def test_both_collections_pass_it_on_every_route(self, collection_id, replaying,
                                                       monkeypatch):
-        from bootstrap import replay_clock
-        from asset_model import schedule
+        import contextlib
+
+        from asset_model import asset_time, schedule
 
         seen = {}
-        real = promotion.effective_at_for
+        real = asset_time.when_effective
 
         def spy(received_at, **kw):
             seen.update(kw)
             return real(received_at, **kw)
-        monkeypatch.setattr(replay_clock, "active", lambda: replaying)
-        monkeypatch.setattr(promotion, "effective_at_for", spy)
+        # THE PIPELINE ASKS THE CLOCK WITH THE WINDOW ON EVERY ROUTE (REQ-PIPE-382
+        # criterion 4): a real asset's wall clock is passed it and ignores it.
+        monkeypatch.setattr(asset_time, "when_effective", spy)
         from qa_tools.common import gate
 
         monkeypatch.setattr(promotion, "next_receipt", lambda arrival: None)
@@ -131,9 +138,10 @@ class TestWithinTheClaimWindowInAReplay:
         dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
         arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
                                   files_by_dataset={dataset: "x"})
-        orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
+        with replay_clock.replaying() if replaying else contextlib.nullcontext():
+            orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
         expected = schedule.claim_window(dataset, on=RECEIVED.date())
-        assert seen["within"] == expected
+        assert seen["claim_window"] == expected
 
 
 def test_no_supply_is_held_back_after_the_promotion_that_ended_it(deployment_history):

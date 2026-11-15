@@ -143,14 +143,15 @@ class TestTheSharedCollectionOption:
     """Criteria 6 and 11 for cli/pipeline.py, cli/debug.py and cli/supply.py."""
 
     def test_pipeline_run_runs_a_third_collection(self, third_collection, monkeypatch):
-        import bootstrap.bootstrap as boot
         from cli import dashboard as dashboard_cli
         from cli import pipeline as pipeline_cli
+        from qa_tools.common import streams
+        from qa_tools.tools import orchestrate
 
-        monkeypatch.setattr(boot, "holds_history", lambda conn: False)
+        monkeypatch.setattr(streams, "holds_history", lambda conn: False)
         ran = []
-        monkeypatch.setattr(pipeline_cli, "_run_collection",
-                            lambda coll, sequential: ran.append(coll.id))
+        monkeypatch.setattr(orchestrate, "run_stream",
+                            lambda ids, **k: ran.extend(ids))
         monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
         monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
         import dashboard.snapshot_dashboard as snap

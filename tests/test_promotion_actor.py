@@ -49,7 +49,9 @@ ARRIVAL = SimpleNamespace(received_at=None, run_id="run_001")
 def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeypatch):
     from qa_tools.tools import orchestrate
 
-    monkeypatch.setattr(promotion, "effective_at_for",
+    from asset_model import asset_time
+
+    monkeypatch.setattr(asset_time, "when_effective",
                         lambda *a, **k: SimpleNamespace(isoformat=lambda: "2026-10-04T00:00:00+08:00"))
     orchestrate.promote_after(collection_id, ARRIVAL, [], "someone@example.org")
 
