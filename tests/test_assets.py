@@ -279,6 +279,18 @@ class TestLoadingByPath:
         assert module.__name__ == "mothman_provider_quarterly_child_protection"
         assert providers.provider("child-protection") is module.PROVIDER
 
+    @pytest.mark.asset("daily")
+    def test_a_provider_is_loaded_from_the_daily_assets_folder_too(self):
+        """REQ-GEN-370 criterion 9: a provider found by path under EACH
+        asset - the daily asset's own folder, never the quarterly one's."""
+        from generator import collections as providers
+
+        module = providers.provider_module("civil-registration")
+        assert Path(module.__file__) == ROOT / "assets" / "daily" / "synthetic" / "collections" / "civil_registration.py"
+        assert module.__name__ == "mothman_provider_daily_civil_registration"
+        assert providers.provider("civil-registration") is module.PROVIDER
+        assert providers.provider("civil-registration").collection_id == "civil-registration"
+
     def test_no_asset_folder_goes_on_sys_path(self):
         from qa_tools import collections
 

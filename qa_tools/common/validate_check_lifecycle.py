@@ -81,6 +81,18 @@ def _evidently_checks(source: str, rel_path: str) -> dict:
     return cl.evidently_checks_from_text(source, rel_path)
 
 
+def _yaml_outside_synthetic(folder: Path):
+    """Every YAML file under an asset folder, never descending into its
+    synthetic/ folder - which is not listed, let alone read."""
+    for entry in sorted(folder.iterdir()):
+        if entry.name == "synthetic":
+            continue
+        if entry.is_dir():
+            yield from entry.rglob("*.y*ml")
+        elif entry.is_file() and entry.match("*.y*ml"):
+            yield entry
+
+
 def sources_fingerprint() -> str:
     """A digest of every file the working tree's checks are collected from -
     each collection's check files and dbt folders, the shared dbt SQL - and
@@ -104,7 +116,11 @@ def sources_fingerprint() -> str:
             paths += sorted(p for p in (ROOT / rel_dir).rglob("*") if p.is_file())
     contract = ROOT / assets.folder_on_disk()
     if contract.is_dir():
-        paths += sorted(contract.rglob("*.y*ml"))
+        # NOT ITS synthetic/ FOLDER (REQ-GEN-370 criterion 3, post-build-review
+        # #337): no check is collected from synthetic-only configuration, and
+        # the checks read nothing there - listing it was the staging step
+        # reading scripted_decisions.yaml.
+        paths += sorted(p for p in _yaml_outside_synthetic(contract))
     for path in dict.fromkeys(paths):
         digest.update(str(path).encode())
         try:
