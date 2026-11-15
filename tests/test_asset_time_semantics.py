@@ -17,9 +17,27 @@ diff here after a timezone change is the finding, not the noise.
 REGENERATED THREE TIMES - twice on 2026-09-23, both checked rather than
 assumed, and once on 2026-09-28 to UNDO an extension that should never
 have happened (see TestEveryCommittedArrivalKeepsItsVerdict's own
-docstring). `mothman debug capture-arrival-golden` is how, so the one
-operation that can silently destroy this pin has a recorded procedure
-instead of an ad-hoc script.
+docstring).
+
+HOW IT IS RE-CAPTURED, PER ASSET, KEEPING BOTH. The golden holds both
+assets' datasets in one file, and each asset's tests compare only their own
+part of it. `mothman debug capture-arrival-golden` used to do this and was
+deleted (REQ-TEST-395): it collected only the selected asset's datasets and
+then rewrote the whole file, which would have dropped the other asset's
+pinned arrivals. The procedure now, one asset at a time:
+
+  a. Count the deliveries first (`ls data/deliveries | wc -l`, no
+     `handfiled-*`), and rebuild that asset's reports from its own history:
+     `MOTHMAN_ASSET=<asset> uv run mothman dashboard rebuild`.
+  b. For every dataset in that asset's `reports/` dashboard files, replace
+     ONLY that dataset's entry in the golden: {run_id: {"arrivalStatus":
+     ..., "arrivedAt": ...}} for each row of the dataset's `arrivalHistory`,
+     with `arrivedAt` taken from `arrivalByRun[run_id]` (a history row
+     carries no instant). Every key of the golden for a dataset the asset
+     does not hold is left exactly as it was.
+  c. Write it back with `json.dumps(golden, indent=2, sort_keys=True)` and a
+     trailing newline, and read the diff: it should touch only that asset's
+     datasets.
 
   1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
      distribution came back IDENTICAL - 131 onTime, 16 early, 3 late
@@ -164,8 +182,9 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     corpus did. It was the corpus, and the reflex was to believe the
     corpus.
 
-    So: before extending this golden, count the deliveries. `mothman
-    debug capture-arrival-golden` is still the recorded procedure, and
+    So: before extending this golden, count the deliveries. The per-asset
+    re-capture in this module's docstring is the recorded procedure (the
+    command that used to be it was deleted, REQ-TEST-395), and
     `ls data/deliveries | wc -l` is the question to ask first.
 
     RE-CAPTURED AGAIN THE SAME NIGHT for post-build-review #172 (pairs spaced

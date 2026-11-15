@@ -255,34 +255,6 @@ def check_renders_command() -> None:
     _check_renders()
 
 
-@dashboard_group.command("snapshot")
-@click.option("--prepare-site", "site_dir", default=None, type=click.Path(),
-              help="CI's own entry point: decompress every committed dashboard/snapshots/*.html.gz into "
-                   "<site_dir>/snapshots/ for the real GitHub Pages deploy artifact.")
-def snapshot_command(site_dir: str | None) -> None:
-    """Sync local snapshot copies for offline viewing (default), take a new one if SNAPSHOT_DASHBOARD=1 is
-    set, or (--prepare-site) decompress every committed snapshot into a deploy site directory."""
-    from pathlib import Path
-    from dashboard.snapshot_dashboard import prepare_deploy_site, sync_local_snapshots, take_snapshot
-    import os
-
-    if site_dir is not None:
-        prepare_deploy_site(site_dir=Path(site_dir))
-        console.print(f"Site prepared -> {site_dir}", style="green")
-        return
-
-    synced = sync_local_snapshots()
-    if synced:
-        console.print(f"Synced {len(synced)} local snapshot copy/copies for offline viewing.", style="dim")
-
-    if os.environ.get("SNAPSHOT_DASHBOARD") != "1":
-        console.print("SNAPSHOT_DASHBOARD not set to 1 - skipping the dashboard snapshot "
-                       "(pass SNAPSHOT_DASHBOARD=1 to take one for this run).", style="dim")
-        return
-    out_path = take_snapshot()
-    console.print(f"Dashboard snapshot written -> {out_path}", style="green")
-
-
 @dashboard_group.command("rebuild")
 @_out_dir_option
 def rebuild_command() -> None:

@@ -112,8 +112,8 @@ releases:
   - date: "2026-11-15"
     summary: >
       Two new checks keep the code's boundaries and the two assets' dbt
-      packages in line on every change, and ticket sync now posts nothing to
-      GitHub unless your environment turns ticketing on.
+      packages in line, ticket sync posts nothing unless your environment
+      turns ticketing on, and five out-of-date developer commands are gone.
     changes:
       - category: New
         items:
@@ -138,6 +138,16 @@ releases:
               Run by hand, mothman github sync-tickets could open issues from a
               sandbox or a laptop. It now stops first, naming your environment,
               unless that environment turns ticketing on in its settings.
+      - category: Improved
+        items:
+          - headline: Fewer, truer commands
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman debug equivalence`, `build-warehouses`, `changelog` and
+              `capture-arrival-golden`, and `mothman dashboard snapshot`, are
+              gone. Their help described designs that no longer exist, and one
+              could quietly overwrite a shared test file. `mothman supply load`
+              does what `build-warehouses` did.
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file

@@ -192,36 +192,6 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
 
 
-@pytest.mark.parametrize("short,collection_id", [
-    # Each collection on its own asset (the asset split).
-    pytest.param("bdm", "civil-registration", marks=pytest.mark.asset("daily")),
-    pytest.param("cp", "child-protection", marks=pytest.mark.asset("quarterly"))])
-def test_build_warehouses_stages_that_collection(monkeypatch, short, collection_id):
-    from qa_tools.tools import stage
-
-    called = []
-    monkeypatch.setattr(stage, "build_all", called.append)
-
-    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", short])
-
-    assert result.exit_code == 0, result.output
-    assert called == [collection_id]
-
-
-def test_changelog_prints_real_build_changelog_output_as_json(monkeypatch):
-    import qa_tools.common.changelog as changelog
-
-    monkeypatch.setattr(changelog, "build_changelog",
-                         lambda agency, dataset: [{"agency": agency, "dataset": dataset}])
-
-    result = _runner.invoke(debug_cli.debug_group,
-                             ["changelog", "--agency", "registry-services", "--dataset", "birth-registrations"])
-
-    assert result.exit_code == 0, result.output
-    assert '"agency": "registry-services"' in result.output
-    assert '"dataset": "birth-registrations"' in result.output
-
-
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("daily")

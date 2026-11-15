@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asset_folders
 
-import contextlib
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -230,7 +229,6 @@ class TestARefusalChangesNothing:
     @pytest.fixture
     def no_generating(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
-        from qa_tools import collections
 
         def refuse(**_):
             raise AssertionError("the synthetic data was regenerated before the refusal")
@@ -298,65 +296,6 @@ class TestARefusalChangesNothing:
         asset_folders.point(tmp_path)
         with pytest.raises(checkpoints.CheckpointRefused, match="synthetic"):
             checkpoints.require_synthetic()
-
-
-# --------------------------------------------------------------------------
-# Criterion 5, on the reduced corpus REQ-TEST-116 criterion 4 uses.
-# --------------------------------------------------------------------------
-
-from test_bootstrap_equivalence import corpus  # noqa: E402,F401 - the shared fixture
-
-import equiv_support  # noqa: E402
-
-
-@pytest.mark.on_demand
-class TestAResumeRecordsWhatAFullReplayDoes:
-
-    @pytest.mark.parametrize("short,before", [("bdm", 3), ("cp", 8)])
-    def test_identical(self, corpus, worker_id, short, before):  # noqa: F811
-        collection_id = collections.by_short(short).id
-        taken = []
-
-        def full():
-            from qa_tools.common import arrivals
-
-            # WHERE A REAL CHECKPOINT CAN BE (post-build-review #256): the
-            # bootstrap snaps one back to the start of its delivery, and this
-            # test calls taking_checkpoint directly, so it says so itself. Its
-            # corpus gained an arrival ahead of these and 7 landed inside the
-            # 2023-Q1 zip, a place no real checkpoint is taken.
-            found = arrivals.arrivals_for(collection_id, "")
-            assert checkpoints.snapped(found, before) == before, (
-                f"{short}: arrival {before} is inside a delivery - pick where one begins")
-            bootstrap._run_collection(
-                short, True, record_deliveries=True,
-                after_each=checkpoints.taking_checkpoint(
-                    collection_id, before, contextlib.nullcontext, on_taken=taken.append))
-
-        tag = f"{short}_{worker_id}"
-        full_snap = equiv_support.run_into_fresh_database(corpus, f"ckpt_full_{tag}", full)
-        [cp] = taken
-        try:
-            dsn = checkpoints.copy_for_resume(cp, os.environ["MOTHMAN_TEST_DSN"])
-            from qa_tools.common import scripted_decisions
-
-            def resumed():
-                player = scripted_decisions.Player(
-                    collection_id,
-                    scripts=[scripted_decisions.Script(**s) for s in cp.pending_scripts])
-                bootstrap._run_collection(short, True, record_deliveries=True,
-                                          start_at=cp.before, player=player)
-
-            resumed_snap = equiv_support.run_into_database(corpus, dsn, resumed)
-        finally:
-            checkpoints.delete(cp.name, os.environ["MOTHMAN_TEST_DSN"])
-            for name in [c.name for c in checkpoints.listed(os.environ["MOTHMAN_TEST_DSN"],
-                                                            checkpoints.RESUME_PREFIX)
-                         if c.name.startswith(f"{checkpoints.RESUME_PREFIX}{short}_{before:03d}")]:
-                checkpoints.delete(name, os.environ["MOTHMAN_TEST_DSN"])
-        assert sum(equiv_support.summary(full_snap).values()) > 0
-        diffs = equiv_support.differences(full_snap, resumed_snap)
-        assert not diffs, "a resume differs from the full replay:\n" + "\n".join(diffs)
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

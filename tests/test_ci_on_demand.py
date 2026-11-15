@@ -38,14 +38,6 @@ def test_no_other_job_deselects_them_by_running_them():
             assert "--run-on-demand" not in step.get("run", ""), name
 
 
-def test_no_job_takes_full_captures():
-    """Keith, 2026-10-16: the equivalence self-check is two full bootstraps
-    and runs only when somebody asks - never on a push."""
-    for name, job in _jobs().items():
-        for step in job.get("steps", []):
-            assert "--run-full-capture" not in step.get("run", ""), name
-
-
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")

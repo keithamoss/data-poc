@@ -135,52 +135,6 @@ def test_check_renders_raises_click_exception_on_nonzero_exit(monkeypatch):
     assert "dashboard render check failed" in result.output
 
 
-def test_snapshot_default_syncs_local_copies_and_skips_taking_one(monkeypatch):
-    import dashboard.snapshot_dashboard as snapshot_dashboard
-
-    monkeypatch.delenv("SNAPSHOT_DASHBOARD", raising=False)
-    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: ["a.html"])
-    taken = []
-    monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda: taken.append(True))
-
-    result = _runner.invoke(dashboard_cli.dashboard_group, ["snapshot"])
-
-    assert result.exit_code == 0, result.output
-    assert taken == []
-    assert "not set to 1" in result.output
-
-
-def test_snapshot_env_flag_takes_a_snapshot(monkeypatch):
-    import dashboard.snapshot_dashboard as snapshot_dashboard
-
-    monkeypatch.setenv("SNAPSHOT_DASHBOARD", "1")
-    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
-    monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda: "/fake/path.html.gz")
-
-    result = _runner.invoke(dashboard_cli.dashboard_group, ["snapshot"])
-
-    assert result.exit_code == 0, result.output
-    assert "Dashboard snapshot written" in result.output
-
-
-def test_snapshot_prepare_site_calls_prepare_deploy_site_and_skips_local_sync(monkeypatch, tmp_path):
-    import dashboard.snapshot_dashboard as snapshot_dashboard
-
-    called = []
-    monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site", lambda site_dir: called.append(site_dir))
-
-    def _fail_if_called():
-        raise AssertionError("--prepare-site must not also sync local copies")
-    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", _fail_if_called)
-
-    site_dir = str(tmp_path / "_site")
-    result = _runner.invoke(dashboard_cli.dashboard_group, ["snapshot", "--prepare-site", site_dir])
-
-    assert result.exit_code == 0, result.output
-    assert len(called) == 1
-    assert str(called[0]) == site_dir
-
-
 def test_rebuild_chains_every_step_in_order_and_does_not_use_ctx_invoke(monkeypatch):
     """Regression coverage for the real ctx.invoke()+sys.exit() composition
     bug found while building this: chaining sub-commands via ctx.invoke()

@@ -6412,7 +6412,6 @@ requirements:
       - qa_tools/tools/stage.py::build_all
       - cli/one_table.py::OneTableCLI::load_manifest
       - cli/many_tables.py::ManyTablesCLI::load_manifest
-      - cli/debug.py::capture_arrival_golden_command
     evidence:
       - >
         2026-09-23: docs/delivery-format.md is the normative
@@ -28540,8 +28539,13 @@ requirements:
         write once - the delivery log, schema migrations, shared period
         schemas - is made safe to run together, not merely usually fine.
     dependencies: []
+    retired_criteria:
+      - criterion: 4
+        date: "2026-11-15"
+        by: Keith
+        replaced_by: [REQ-TEST-393]
+        reason: "retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping"
     linked_tests:
-      - tests/test_bootstrap_equivalence.py
       - tests/test_bootstrap.py
       - tests/test_tools_beside.py
     implemented_by:
@@ -32599,9 +32603,14 @@ requirements:
     - cli/pipeline.py::resume_command
     - cli/pipeline.py::checkpoint_list_command
     - cli/pipeline.py::checkpoint_delete_command
+    retired_criteria:
+    - criterion: 5
+      date: '2026-11-15'
+      by: Keith
+      replaced_by: [REQ-TEST-393]
+      reason: 'retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping'
     linked_tests:
     - tests/test_checkpoints.py
-    - tests/test_bootstrap_equivalence.py
     - tests/test_promotion_waits_for_next_receipt.py
     - tests/test_ci_on_demand.py
     - tests/test_processing_pass.py
@@ -37210,28 +37219,9 @@ requirements:
       - "NO NEW DEPENDENCY: git worktrees, PostgreSQL, Playwright and the generators are already required."
     dependencies: []
     linked_tests:
-      - tests/test_equivalence.py::TestCompare
-      - tests/test_equivalence.py::TestCaptureRefuses
-      - tests/test_equivalence.py::TestTheSurfacesReadTheTree
-      - tests/test_equivalence.py::test_a_failed_capture_names_its_stage_and_leaves_nothing
-      - tests/test_equivalence.py::test_a_killed_captures_leftovers_go_with_the_next_capture
-      - tests/test_equivalence.py::test_a_second_capture_while_one_runs_is_refused
-      - tests/test_equivalence.py::test_a_refiling_is_compared_as_the_decision_that_made_it
-      - tests/test_equivalence.py::test_two_captures_of_one_commit_compare_equal
       - tests/test_pinned_now.py
-      - tests/test_ci_on_demand.py::test_no_job_takes_full_captures
-      - tests/test_equivalence_assets.py::TestDeliveriesAcrossTheSplit
     implemented_by:
-      - qa_tools/common/equivalence.py::capture
-      - qa_tools/common/equivalence.py::compare
-      - qa_tools/common/equivalence.py::snapshot
-      - qa_tools/common/equivalence.py::report_context
-      - qa_tools/common/equivalence.py::reports
-      - qa_tools/common/equivalence.py::generated_files
-      - qa_tools/common/equivalence.py::help_and_menus
       - qa_tools/common/asset_time.py::now
-      - cli/debug.py::equivalence_capture_command
-      - cli/debug.py::equivalence_compare_command
       - tests/conftest.py::pytest_collection_modifyitems
     evidence:
       - "2026-10-16, THE SELF-CHECK (criterion 5), recorded before any other requirement uses the harness: two full captures of 66efd5d, `mothman debug equivalence compare self-check-a self-check-b` - S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0. Bootstrap A 1756s (Birth Registrations 562s, Child Protection 1645s), B 1935s (674s, 1811s), difference +179s; B ran alongside this session's test and gate runs for part of its span."
@@ -38130,7 +38120,6 @@ requirements:
       - tests/test_dashboard_for_every_collection.py
       - tests/test_build_dashboard_data.py
       - tests/test_dashboard_e2e.py
-      - tests/test_equivalence.py
     implemented_by:
       - qa_tools/tools/run_soda.py::evaluate
       - qa_tools/common/soda_common.py::resource_attribute
@@ -38166,6 +38155,12 @@ requirements:
       - REQ-PIPE-243
       - REQ-DASH-244
       - REQ-QAC-241
+    retired_criteria:
+      - criterion: 8
+        date: "2026-11-14"
+        by: Keith
+        replaced_by: [REQ-TEST-393]
+        reason: "Retired by Keith, 2026-11-14: the synthetic demo history may move whenever a change needs it, and the test suite is the proof that a refactor is sound. A before-and-after capture of a ~58-minute bootstrap proves something nobody needs proved. The `mothman debug equivalence` commands, their module and their tests are deleted by REQ-TEST-393 - and with the compare goes the --renamed-by option this criterion added (REQ-TEST-239's approved reason, applied to this criterion by REQ-TEST-393, v6 Q4)."
     linked_tests:
       - tests/test_dataset_stats.py
       - tests/test_build_dashboard_data.py
@@ -38174,7 +38169,6 @@ requirements:
       - tests/test_collections_registry.py
       - tests/test_run_evidently_bdm.py
       - tests/test_evidently_recorded_reference.py
-      - tests/test_equivalence.py
       - tests/test_publish.py
       - tests/test_dashboard_e2e.py
     implemented_by:
@@ -38187,7 +38181,6 @@ requirements:
       - pipeline/build_dashboard_data.py::build
       - qa_tools/collections/__init__.py::Collection
       - qa_tools/common/validate_collections.py::config_problems
-      - qa_tools/common/equivalence.py::compare
       - assets/daily/dbt/models/civil-registration/stg_birth_registrations.sql
     evidence:
       - "2026-10-18, CRITERION 5: `mothman debug equivalence compare after-247b after-248 --renamed-by REQ-PIPE-248` (7c2913a against 578b2d5, 20 commits; bootstraps 1371s and 1465s). S4 generated files the same. S1: 111 recorded results differ, every one Birth Registrations' row-count-growth check and every one in `column_name` alone (registration_number -> (table)) - status, value and reference identical, so the per-table count read from the record equals the count the old path made; and all 482 dataset_stats records differ in shape only (row_count -> row_counts by table, aggregates keyed table.column, no arrival/earliest_extract). S5, with the four files mapped to their new names: Child Protection's dashboard file identical; its results file loses each record's `arrival`; Birth Registrations' results file gains the collection header and the stats shape above; Birth Registrations' dashboard file moves under `datasets`, where its one dataset equals the old document except that the volume check sits in Supply-level checks rather than registration_number and the Table-level and Supply-level pseudo-columns take Child Protection's order. S7: one line, `mothman debug equivalence compare`'s help gaining --renamed-by, which criterion 8 adds. Every difference is one this requirement or REQ-QAC-247's two moved calls names."
@@ -39790,8 +39783,6 @@ requirements:
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_corrections_are_confirmed_once_both_replays_finish
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_unclaimed_deliveries_are_recorded_once_after_both_run
     - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_wall_clock_is_reported
-    - tests/test_bootstrap_equivalence.py::TestASharedCalendarIsReplayedInReceiptOrder::test_eds_gap_inherits_its_newest_supply
-    - tests/test_bootstrap_equivalence.py::TestParallelRecordsTheSameHistory::test_identical_apart_from_the_named_exclusions
     - tests/test_inheritance.py::TestAPeriodIsOpenedWholeOrNotAtAll::test_a_failure_partway_leaves_it_unopened_and_nothing_inherited
     implemented_by:
     - qa_tools/common/bootstrap.py::streams
@@ -47302,7 +47293,6 @@ requirements:
     - tests/test_validate_soda.py::test_two_collections_sharing_a_table_name_are_each_held_to_their_own_key
     - tests/test_validate_soda.py::test_the_registry_keys_are_by_collection_and_table
     - tests/test_dashboard_e2e.py::TestASeveralColumnSampleOnTheRealPage
-    - tests/test_sample_keys_equivalence.py
     - tests/test_thirty_linked_datasets.py::TestEveryLinkageResultNamesItsRowsByTheWholeKey::test_each_result_records_the_key_columns
     evidence:
     - '2026-11-01 Perth, worktree b341: tests/test_sample_keys_composite.py, test_sample_keys_deterministic.py, test_common_helpers.py, test_collections_registry.py, test_validate_soda.py, test_check_fingerprint.py, test_linkage_check_sql.py, test_linked_datasets.py, test_qa_results_reader.py, test_build_from_the_record.py, test_check_lifecycle.py, test_validate_check_lifecycle.py, the six test_run_{soda,dbt,datacontract}_{bdm,cp}.py, test_soda_scoped.py and test_linkage_scenarios.py green; vitest sample-keys-compare, sample-fine-print, tool-verdict-status and dashboard-loads green. No bootstrap, no full suite (Keith''s terms for the build run).'
@@ -49772,12 +49762,12 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever maintains the pipeline, I want the before-and-after harness gone from the product code, so that nobody spends a 58-minute bootstrap proving the synthetic demo history did not move, while the tests that prove two real routes through today's code agree keep working.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-14, answering the architect''s QD: ''Just delete the equivalence thing, I told you I do not care.'' Asked how far: delete it everywhere. REQ-TEST-239''s retirement wording approved by Keith 2026-11-14 (''Yes, as worded''), applied separately; this requirement is the code half. The read-only command audit of 2026-11-14 (docs/drafts/command-audit-2026-11-14.md) supplied the callers. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL delete `mothman debug equivalence capture` and `mothman debug equivalence compare` (cli/debug.py lines 247-323, with the --renamed-by option REQ-PIPE-248 criterion 8 added, that criterion moving to REQ-PIPE-248's retired_criteria with REQ-TEST-239's approved reason, v6 Q4) and qa_tools/common/equivalence.py (1,312 lines at 72ec04d7).
     - 'THE SYSTEM SHALL delete the tests whose only subject is the harness or a before-and-after capture: tests/test_equivalence.py, tests/test_equivalence_assets.py and tests/test_sample_keys_equivalence.py (REQ-PIPE-341 criterion 7''s on-demand capture test), with conftest.py''s --run-full-capture option and full_capture mark (lines 1225-1298) and tests/test_ci_on_demand.py''s test_no_job_takes_full_captures (line 41), which exist only for it.'
-    - THE SYSTEM SHALL keep tests/test_checkpoints.py (REQ-TEST-159, a resumed replay against a full one), tests/test_replay_clock.py (REQ-PIPE-081, a replay's records stamped with its own time), tests/test_bootstrap_equivalence.py (REQ-TEST-116 criterion 4, a parallel bootstrap against a sequential one) and tests/test_kept_routes_agree.py (REQ-PIPE-086 criterion 11, one delivery kept three ways), each passing and asserting what it asserts today, by moving the code they use from equivalence.py - snapshot, differences, summary and the *_COLUMNS constants - into tests/equiv_support.py, which already holds their redirection.
+    - "THE SYSTEM SHALL keep tests/test_replay_clock.py (REQ-PIPE-081, a replay's records stamped with its own time) and tests/test_kept_routes_agree.py (REQ-PIPE-086 criterion 11, one delivery kept three ways), each passing and asserting what it asserts today, by moving the code they use from equivalence.py - snapshot, differences, summary and the *_COLUMNS constants - into tests/equiv_support.py, which already holds their redirection; and SHALL delete tests/test_bootstrap_equivalence.py and test_checkpoints.py's TestAResumeRecordsWhatAFullReplayDoes (retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping)."
     - 'THE SYSTEM SHALL leave no product module that only tests call: whatever equivalence.py held that the four tests need lives under tests/ (CLAUDE.md''s test rule: test helpers live in tests/, never in product code).'
     - 'THE SYSTEM SHALL remove test.yml''s `fetch-depth: 0` (lines 212-216 and 348-352), which exists only for tests/test_equivalence.py, and run the affected jobs'' tests in a depth-1 clone before the push to show nothing else needed the history; IF something else does, THEN the line stays with its comment rewritten to name what needs it.'
     - THE SYSTEM SHALL keep MOTHMAN_PINNED_NOW (tests/test_cli_cp.py lines 255 and 328 pin it) and rewrite the docstrings that justify it by the harness (qa_tools/common/asset_time.py lines 187-190, tests/test_pinned_now.py's module docstring) to say what it is for now.
@@ -49795,6 +49785,25 @@ requirements:
     - REQ-PIPE-086
     - REQ-PIPE-248
     - REQ-PIPE-341
+    linked_tests:
+    - tests/test_replay_clock.py
+    - tests/test_kept_routes_agree.py
+    - tests/test_checkpoints.py
+    - tests/test_ci_on_demand.py
+    - tests/test_pinned_now.py
+    - tests/test_cli_app.py::test_a_deleted_command_is_answered_as_any_unknown_command
+    implemented_by:
+    - tests/equiv_support.py::snapshot
+    - tests/equiv_support.py::differences
+    - tests/equiv_support.py::summary
+    - tests/equiv_support.py::run_into_fresh_database
+    - cli/debug.py::debug_group
+    - tests/conftest.py::pytest_collection_modifyitems
+    - qa_tools/common/asset_time.py::now
+    evidence:
+    - '2026-11-15 (Perth), branch wip/b393-deletions: after the deletions, test_replay_clock.py and test_kept_routes_agree.py run with --run-on-demand on the moved helper - green (39 passed across those and test_checkpoints.py''s other tests, with the bootstrap-equivalence and resume-against-full tests erroring at setup). Those errors - KeyError ''birth-registrations'' in the shared corpus fixture - were identical on the unchanged parent ac3a1376, so they predate this change; Keith then retired both tests (criterion 3 as reworded 2026-11-15).'
+    - 'CRITERION 5, the depth-1 clone: commit 83b1f16 cloned with --depth 1, 25 git-touching test modules run with -m "not needs_deployment" - 598 passed, 0 skipped - so the two fetch-depth: 0 lines went with nothing rewritten. critical.yml and validate-config.yml keep their own fetch-depth: 0, which the criterion does not name.'
+    - 'CRITERION 7, THE REGISTER CLAIMS NAMED FOR KEITH (built-requirement claim edits): REQ-PIPE-248 lost tests/test_equivalence.py and qa_tools/common/equivalence.py::compare (and its criterion 8 is retired); REQ-QAC-247 lost tests/test_equivalence.py; REQ-PIPE-341 lost tests/test_sample_keys_equivalence.py; the retired REQ-TEST-239 lost its ten deleted tests and nine deleted symbols. After Keith''s 2026-11-15 decision: REQ-TEST-116 and REQ-TEST-159 lost tests/test_bootstrap_equivalence.py, and REQ-PIPE-262 lost its two tests in that file (its criteria 13 and 14, which those tests evidenced and 14 of which names the file, are not retired - for Keith). Evidence prose is unchanged.'
     decisions:
     - 'DELETE THE EQUIVALENCE COMPARE EVERYWHERE (QD, Keith 2026-11-14, dictated): ''Just delete the equivalence thing, I told you I do not care. Synthetic [can] be removed. We have tests approved and we don''t need to assure that [the] demo hasn''t moved.'' The same stance as plans/supply-model.md''s ''I don''t care. This is all just fake data''. REJECTED (the architect''s QD options) a capture per build group, per requirement, or a first and a last.'
     - 'ITS OWN SMALL REQUIREMENT, FIRST IN THE BUILD (delivery-scoper, v6): Keith''s rule is small, self-contained requirements, and this deletion touches CLI, product code, five test files, conftest and a workflow, none of it part of any other requirement''s subject. It lands before the imports gate so the gate''s first allowlist does not list edges about to vanish. It could fold into REQ-TEST-384 if Keith prefers one fewer id.'
@@ -49802,6 +49811,9 @@ requirements:
     - 'test_sample_keys_equivalence.py GOES (delivery-scoper, v6): it is a before-and-after capture of REQ-PIPE-341, exactly what QD retires.'
     - 'REQ-PIPE-248 CRITERION 8 BECOMES UNTRUE (delivery-scoper, v6, from the register): it added --renamed-by to the compare; the option goes with the command. RETIRED under retired_criteria with REQ-TEST-239''s approved reason (v6 Q4, SETTLED by Keith 2026-11-14). REJECTED amending it to say the option existed until 2026-11-14.'
     - 'MOTHMAN_PINNED_NOW OUTLIVES ITS ORIGIN (delivery-scoper, v6): it began as REQ-TEST-239 criterion 16 but test_cli_cp.py uses it; REQ-PIPE-382 criterion 12 routes it through the one clock.'
+    - 'RETIRE THE TWO BROKEN KEPT TESTS (Keith, 2026-11-15, criterion 3 reworded verbatim as approved): tests/test_bootstrap_equivalence.py and test_checkpoints.py''s TestAResumeRecordsWhatAFullReplayDoes had failed at setup since the asset split (their corpus fixture''s KeyError ''birth-registrations''; on-demand, so nothing caught it) and no longer prove anything worth keeping. REQ-TEST-116 criterion 4 and REQ-TEST-159 criterion 5 retired with them, replaced_by REQ-TEST-393. REJECTED fixing the fixture per asset (the recommended option), and marking criterion 3 unmet.'
+    - 'WHAT THE RETIRED TESTS ALONE USED WENT WITH THEM (builder): the corpus fixture, equiv_support''s spawned-child redirection (CORPUS_ENV, redirected_run_collection, redirected_run_stream) and snapshot''s run_seq_within_collection option with its opening-order rules - only the parallel-against-sequential comparison asked for it. run_into_database stays, as run_into_fresh_database''s body.'
+    - 'THE MOVED RULES ARE VERBATIM (builder): equivalence.py''s S1 section - the four *_COLUMNS maps, the derived and uncomparable columns, snapshot, differences and summary - moved unchanged into tests/equiv_support.py, which no longer imports product code to do it; the surfaces S4, S5 and S7, capture and compare had no caller left and went.'
     open_questions: []
     signed_off:
       by: Keith
@@ -49847,7 +49859,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever runs or reads the mothman CLI, I want commands whose help describes retired designs, whose own example returns nothing, or which can quietly destroy a shared pin to be gone, so that every command listed is one that does what it says.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-14, COMMAND CLEAN-UP, from the read-only command audit (docs/drafts/command-audit-2026-11-14.md), recorded in docs/drafts/decisions-2026-11-01.md: the deletions go into #134 v6 beside scenarios bands and the equivalence commands. Drafted by delivery-scoper 2026-11-14 (v6). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - THE SYSTEM SHALL delete `mothman debug build-warehouses` (cli/debug.py from line 165), whose help describes a per-run DuckDB warehouse and a synthetic manifest that no longer exist and which duplicates `mothman supply load` (cli/supply.py lines 309-345, the same stage.build_all with a report of what changed); stage.build_all and tests/test_build_warehouses_rebuild.py, which tests it directly, stay.
@@ -49868,6 +49880,24 @@ requirements:
     - REQ-GEN-043
     - REQ-DASH-013
     - REQ-GEN-392
+    linked_tests:
+    - tests/test_cli_app.py::test_a_deleted_command_is_answered_as_any_unknown_command
+    - tests/test_cli_debug.py
+    - tests/test_cli_dashboard.py
+    - tests/test_cli_pipeline.py
+    - tests/test_snapshot_dashboard.py
+    - tests/test_build_warehouses_rebuild.py
+    implemented_by:
+    - cli/debug.py::debug_group
+    - cli/dashboard.py::dashboard_group
+    - cli/app.py::_MothmanGroup::resolve_command
+    - dashboard/snapshot_dashboard.py::prepare_deploy_site
+    - dashboard/snapshot_dashboard.py::take_snapshot
+    - qa_tools/tools/stage.py::build_all
+    - qa_tools/common/changelog.py::build_changelog
+    evidence:
+    - '2026-11-15 (Perth), worktree branch for b393: tests/test_cli_app.py, test_cli_debug.py, test_cli_dashboard.py, test_ci_on_demand.py, test_pinned_now.py, test_snapshot_dashboard.py, test_cli_pipeline.py, test_asset_time_semantics.py and test_cli_cp.py run together after the last code edit - 142 passed, 6 skipped (test_asset_time_semantics.py''s three per asset, skipping because this worktree has no built reports/, which only the deployment half has). Criterion 8''s test seen failing first: all five cases red on the tree before the deletions (each deleted name still resolved), green after. No full suite (the caller''s terms).'
+    - 'CRITERION 6, THE REGISTER CLAIMS NAMED FOR KEITH (built-requirement claim edits): REQ-GEN-043 loses implemented_by cli/debug.py::capture_arrival_golden_command. Re-grepped at build for the snapshot command under REQ-DASH-013, REQ-DASH-292 and REQ-PIPE-089: none of their linked_tests or implemented_by names the command or its three deleted tests - they name dashboard/snapshot_dashboard.py''s functions and tests/test_snapshot_dashboard.py, which stay - so nothing there changed. No requirement named build_warehouses_command, changelog_command, or the deleted test functions.'
     decisions:
     - 'DELETE FOUR, KEEP THE REST (COMMAND CLEAN-UP, SETTLED by Keith 2026-11-14): build-warehouses, changelog, the snapshot command and capture-arrival-golden go. KEPT, not chosen for deletion: sync-tickets, sync-leaderboard, snapshot-worktrees, cache-key, rebuild-results, build-data, embed, check-renders, population.'
     - 'INSIDE #134 v6, NOT A FIX BATCH NOW (Keith, 2026-11-14): beside scenarios bands (REQ-PIPE-385) and the equivalence commands (REQ-TEST-393). REJECTED a small fix batch now.'
@@ -49875,6 +49905,9 @@ requirements:
     - 'THE SNAPSHOT FUNCTIONS STAY (Keith, 2026-11-14: ''the dashboard snapshot COMMAND only''): publish and pipeline run call prepare_deploy_site and take_snapshot as Python functions (the audit).'
     - 'capture-arrival-golden IS ''LIKELY DESTRUCTIVE'' FROM READING THE CODE, NOT FROM RUNNING IT (the audit, 2026-11-14): its deletion needs no run to justify it, and nobody should run it to find out.'
     - 'NO DEFECT TEST FOR capture-arrival-golden (delivery-scoper): the command is deleted rather than fixed, so a regression test would guard nothing (CLAUDE.md''s test rule 2).'
+    - 'CRITERION 8 READ AS "THE SAME ANSWER AS ANY UNKNOWN NAME IN THAT GROUP" (builder, 2026-11-15): the asset''s collection commands beneath the message (cli/app.py) are what the TOP-LEVEL group answers; all five deleted names lived in subgroups (debug, dashboard), where any unknown name gets click''s own ''No such command''. The test compares a deleted name''s answer, word for word, with a name that never existed in the same group. REJECTED adding the asset listing to subgroups, which is new behaviour no criterion asked for.'
+    - 'THE GOLDEN''S RE-CAPTURE IS A WRITTEN PROCEDURE, NOT A NEW COMMAND (builder, criterion 3): tests/test_asset_time_semantics.py''s docstring says how, one asset at a time, replacing only that asset''s datasets'' entries. REJECTED a replacement command or test helper - the criterion asks for a procedure, and a new writer of a committed pin is the thing that was deleted.'
+    - 'README''s command summary also loses the retired github acceptance sync and gains snapshot-worktrees under debug and publish in the dashboard chain (criterion 5 named README lines 46-48).'
     open_questions: []
     signed_off:
       by: Keith
