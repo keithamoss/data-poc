@@ -121,7 +121,9 @@ NEGATION_MARKERS = (
 SKIP_SUFFIXES = (".pyc", ".gz", ".woff2", ".cast", ".png", ".jpg", ".ico")
 SKIP_DIRS = (".git", ".venv", "node_modules", "data", "reports", "_site",
              "assets/*/dbt/target", "assets/*/dbt/dbt_packages", ".playwright-mcp",
-             "__pycache__", ".pytest_cache", "dashboard/snapshots")
+             "__pycache__", ".pytest_cache", "dashboard/snapshots",
+             # Another checkout, maybe of an older commit (post-build-review #329).
+             ".claude/worktrees")
 
 #: Build outputs, which carry whatever the template said and are
 #: gitignored. Scanning one means a stale local build fails the gate for a

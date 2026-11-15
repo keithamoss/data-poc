@@ -147,6 +147,17 @@ class TestItDoesNotFireOnHistory:
         built.write_text("CI is the only publish path.\n")
         assert vp.findings() == []
 
+    def test_an_agent_worktree_is_not_scanned(self, tmp_path, monkeypatch):
+        """A worktree under .claude/worktrees/ is another checkout of the
+        repository, possibly of an older commit, and is gitignored: scanning
+        it failed the full suite for lines this tree does not hold
+        (post-build-review #329)."""
+        monkeypatch.setattr(vp, "ROOT", tmp_path)
+        other = tmp_path / ".claude" / "worktrees" / "agent-x" / "plans" / "old.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("CI is the only publish path.\n")
+        assert vp.findings() == []
+
 
 class TestEveryAllowanceSaysWhy:
     def test_each_allowlist_entry_carries_a_reason(self):

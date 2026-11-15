@@ -14636,3 +14636,17 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
        27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
        (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
+
+329. **[done, 2026-11-15]** **[Testing & dev tooling]** **The premise gate read the agents' worktrees.**
+     Found by the full suite on ac3a1376: `test_nothing_in_the_repository_asserts_a_retired_premise`
+     failed on four lines that are not in this tree - they were in builders'
+     worktrees under `.claude/worktrees/` (gitignored, other checkouts,
+     possibly of older commits), which `validate_premise._files()` walked
+     because it lists the disk rather than the repository. CI never has a
+     worktree, so only a local run with builders alive could fail.
+     - **Fix** (test first, seen failing): `.claude/worktrees` joins
+       `SKIP_DIRS`. Test `TestItDoesNotFireOnHistory::test_an_agent_worktree_is_not_scanned`.
+       Reading tracked files only would also have fixed it, but the gate's
+       own tests scan a temporary root with no git, so the narrower fix was
+       taken; REQ-TEST-384's imports gate reads tracked files (#325's fixes).
+     - **Ran**: `pytest tests/test_validate_premise.py` 19 passed, the real-tree test included.
