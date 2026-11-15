@@ -9,6 +9,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing, supply_holds
@@ -20,7 +22,7 @@ period = _base.period
 
 @pytest.fixture
 def target():
-    return f"2099-P{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("P", 6)
 
 
 def _held(conn, period, dataset=DS):

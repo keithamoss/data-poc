@@ -16,6 +16,14 @@ day-of-month rule expresses. A daily calendar states a rule, because
 365 enumerated dates would be absurd and the agreement genuinely is
 "every day".
 
+ONE BASELINE CALENDAR PER ASSET (REQ-PIPE-345, Keith 2026-10-31). An
+asset declares at most one calendar, its baseline, and every dataset that
+does not declare no calendar is on it - nothing names a calendar, so a
+period means one thing within an asset. Nothing may be faster than the
+baseline; a slower dataset owes a subset of its periods under
+`participates`. `baseline()` is how code asks for it, and its `kind` is how
+code asks whether it is a cadence rule or authored dates - never its name.
+
 THE ASSET OWNS THE CALENDAR, A DATASET OWNS ITS PARTICIPATION. On a
 scale argument, not a tidy one: the quarterly asset is heading for ~30
 datasets, roughly 70% of them arriving every quarter and the rest once
@@ -157,6 +165,11 @@ class CalendarVersion:
         return self.cadence_rule is not None
 
 
+#: A baseline's kind (REQ-PIPE-345 criterion 6): what code asks instead of
+#: testing a calendar's name.
+CADENCE_RULE, AUTHORED_DATES = "cadence rule", "authored dates"
+
+
 @dataclass(frozen=True)
 class Calendar:
     name: str
@@ -186,6 +199,17 @@ class Calendar:
     @property
     def current(self) -> CalendarVersion:
         return self.versions[-1]
+
+    @property
+    def kind(self) -> str:
+        """CADENCE_RULE or AUTHORED_DATES, by the version in force now - what
+        code asks rather than testing the calendar's name (REQ-PIPE-345
+        criterion 6)."""
+        return CADENCE_RULE if self.current.is_cadence_rule else AUTHORED_DATES
+
+    @property
+    def is_cadence_rule(self) -> bool:
+        return self.kind == CADENCE_RULE
 
 
 def parse_duration(value, where: str) -> timedelta:
@@ -349,6 +373,47 @@ def calendars(agreement=None) -> list[Calendar]:
     return list(_load(agreement).values())
 
 
+def baseline(agreement=None) -> Calendar | None:
+    """The asset's one baseline calendar (REQ-PIPE-345 criterion 1), or None
+    for an asset that declares none - which the gate accepts only where
+    every dataset declares no calendar.
+
+    NEVER ONE OF TWO: a file declaring a second calendar is refused by the
+    schedule gate, and a reader asked for the baseline of such a file raises
+    rather than picking the first - the quiet direction would be judging
+    every dataset against whichever calendar happened to be listed first."""
+    loaded = _load(agreement)
+    if len(loaded) > 1:
+        raise ScheduleConfigError(
+            f"{_calendar_file_rel()} declares {len(loaded)} calendars "
+            f"({', '.join(loaded)}), and an asset has one baseline. A dataset may not be "
+            f"faster than its asset's baseline; a slower one owes a subset of the "
+            f"baseline's periods, stated under participates; to go faster, change the "
+            f"asset's baseline.")
+    return next(iter(loaded.values()), None)
+
+
+def on_baseline(period_name: str, agreement=None) -> bool:
+    """Whether the asset's baseline names this period (REQ-PIPE-345
+    criterion 5) - asked before a period schema is created.
+
+    An authored baseline names exactly its authored periods in force. A
+    cadence rule names each day of a cadence-rule version's window by its
+    ISO date, from its first version's effective_from and never before."""
+    base = baseline(agreement)
+    if base is None or not period_name:
+        return False
+    if any(p.name == period_name for p in _calendar_periods(base)):
+        return True
+    try:
+        day = date.fromisoformat(period_name)
+    except ValueError:
+        return False
+    if day.isoformat() != period_name or day < base.versions[0].effective_from:
+        return False
+    return _version_in_force(base, day).is_cadence_rule
+
+
 def calendar(name: str, agreement=None) -> Calendar:
     loaded = _load(agreement)
     try:
@@ -433,11 +498,6 @@ def _no_calendar(dataset_id: str, agreement) -> str | None:
             f"{', '.join(NO_CALENDAR_VALUES)}. {NOT_YET_AGREED} means sample data before a "
             f"schedule is agreed, and it will graduate; {NEVER} means a one-off extraction "
             f"that has supplies and no cadence at all.")
-    if entry.calendar:
-        raise ScheduleConfigError(
-            f"dataset {dataset_id!r} declares both `calendar: {entry.calendar}` and "
-            f"`{NO_CALENDAR_KEY}: {declared}`. One of those is wrong and this will not guess "
-            f"which - a dataset either has an agreed schedule or says it has none.")
     return declared
 
 
@@ -479,12 +539,13 @@ def owes_from(dataset_id: str, agreement=None) -> date | None:
 
 
 def calendar_for_dataset(dataset_id: str, agreement=None) -> Calendar:
-    """The calendar a dataset names, resolved through the hierarchy.
+    """The calendar a dataset is on: its asset's baseline, always
+    (REQ-PIPE-345 criterion 2) - no collection or dataset names one.
 
-    Raises for a dataset the hierarchy does not define, and for a
-    calendar no calendar defines - a dataset named in one place and
-    absent from the other must be a detectable error, never a silent
-    mismatch.
+    Raises for a dataset the hierarchy does not define - a dataset named in
+    one place and absent from the other must be a detectable error, never a
+    silent mismatch - and for an asset with no baseline whose dataset does
+    not declare no calendar.
 
     RAISES `NoCalendarAgreed` FOR A DATASET THAT SAYS IT HAS NONE
     (REQ-PIPE-106), which is a different thing from the config error
@@ -496,14 +557,14 @@ def calendar_for_dataset(dataset_id: str, agreement=None) -> Calendar:
     declared = _no_calendar(dataset_id, agreement)
     if declared is not None:
         raise NoCalendarAgreed(dataset_id, declared)
-    name = agreement.calendar_name_for(dataset_id)
-    if not name:
+    base = baseline(agreement)
+    if base is None:
         raise ScheduleConfigError(
-            f"dataset {dataset_id!r} names no `calendar:` and does not declare "
-            f"`{NO_CALENDAR_KEY}:` either. Every dataset does one or the other - without "
-            f"either there is nothing to judge its supplies against, and a typo'd calendar "
-            f"name would leave it silently expecting nothing.")
-    return calendar(name, agreement)
+            f"dataset {dataset_id!r} does not declare `{NO_CALENDAR_KEY}:`, and "
+            f"{_calendar_file_rel()} declares no baseline calendar. Every dataset is on its "
+            f"asset's baseline or declares it has none - otherwise there is nothing to judge "
+            f"its supplies against.")
+    return base
 
 
 def delivery_months(dataset_id: str, on: date | None = None,
@@ -540,30 +601,6 @@ def not_expected_periods(dataset_id: str, agreement=None) -> dict[str, str]:
     """
     entry = _agreement(agreement).dataset(dataset_id)
     return dict(entry.not_expected) if entry else {}
-
-
-def dataset_dates_override(dataset_id: str, agreement=None) -> tuple[Period, ...] | None:
-    """A dataset's OWN authored dates, replacing its calendar's.
-
-    Overriding is a different act from subsetting, and both exist
-    deliberately. No dataset needs this today - everything is aligned to
-    one of the four agreed days - but it is cheap now and awkward to
-    retrofit once thirty datasets assume subsetting is the only shape.
-    VERSIONED LIKE A CALENDAR (REQ-PIPE-110 criterion 25): each version
-    contributes only the periods inside its own period of effect.
-    """
-    agreement = _agreement(agreement)
-    entry = agreement.dataset(dataset_id)
-    own = entry.own_dates if entry else None
-    if own is None:
-        return None
-    if any(v.participates is not None for v in agreement.resolved_versions(dataset_id)):
-        raise ScheduleConfigError(
-            f"dataset {dataset_id!r} dates: a dataset states EITHER its own `dates:` "
-            f"(overriding its calendar) OR a `participates:` list of months (subsetting it), "
-            f"never both - the two mean different things and carrying both leaves no way to "
-            f"tell which was meant.")
-    return tuple(_calendar_periods(own))
 
 
 def _calendar_periods(cal: "Calendar", until: date | None = None) -> list[Period]:
@@ -653,9 +690,10 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
                         agreement=None) -> list[DatasetPeriod]:
     """Every period this dataset's schedule produces, in date order.
 
-    An authored calendar's periods, filtered to the months the dataset's
-    participation owes on each period's date, or the dataset's own dates where it overrides the
-    calendar outright. A cadence-rule calendar generates one period per
+    The baseline's authored periods, filtered to the months the dataset's
+    participation owes on each period's date - a dataset slower than the
+    baseline owes a subset of its periods and has no dates of its own
+    (REQ-PIPE-345 criterion 4). A cadence-rule calendar generates one period per
     day up to `until`, which is required there - "every day" has no end
     of its own, so the caller has to say where it stops.
 
@@ -724,14 +762,9 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
             out.append((r, target))
         return out
 
-    override = dataset_dates_override(dataset_id, agreement)
-    if override is not None:
-        rounds = [p for p in override if until is None or p.date <= until]
-        return _decorate(_owed(rounds, list(override)))
-
     if version.is_cadence_rule and months is not None:
         raise ScheduleConfigError(
-            f"dataset {dataset_id!r} names calendar {cal.name!r}, which is a cadence rule, "
+            f"dataset {dataset_id!r} is on calendar {cal.name!r}, which is a cadence rule, "
             f"AND its participation names months. Months only mean something against authored dates; "
             f"a dataset on a cadence rule participates in every period the rule generates. "
             f"Rejected rather than ignored, because a key that is accepted and discarded is "

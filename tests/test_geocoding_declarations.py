@@ -234,21 +234,6 @@ class TestCriterionFour:
         text = _edit_asset(repo, change)
         assert "geo-cp-clients links 'cp-clients' by 3 identifier columns" in text, text
 
-    def test_a_source_on_another_calendar(self, repo):
-        """Within one asset (the asset split: Birth Registrations, the daily
-        source this used to name, is another asset's): the Client Register,
-        geo-cp-clients' own source, put on a calendar of its own."""
-        cal_path = repo / assets.folder_rel() / "calendar.yaml"
-        cal = yaml.safe_load(cal_path.read_text())
-        entry = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
-        entry.pop("no_calendar", None)
-        entry["calendar"] = "monthly"
-        cal_path.write_text(yaml.safe_dump(cal, sort_keys=False))
-        text = "\n".join(linked_datasets.problems(repo))
-        assert ("geo-cp-clients links 'cp-clients', which is never on geo-cp-clients's "
-                "calendar 'quarterly' (it is on 'monthly')") in text, text
-
-
 class TestCriterionFiveEachRuleReadsItsOwnBlock:
     """Criterion 5, seen failing first against the whole-file rule: a
     geocoding check naming cp-clients counted toward linkage's pair."""

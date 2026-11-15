@@ -1,8 +1,8 @@
 # The delivery agreement for this data asset - REQ-PIPE-110.
 #
-# ONE FILE HOLDS THE WHOLE AGREEMENT: the named calendars, which calendar
-# each collection and dataset is on, and each dataset's participation -
-# which periods it owes, by when on the day, with how much grace. Until
+# ONE FILE HOLDS THE WHOLE AGREEMENT: the asset's one baseline calendar,
+# and each dataset's participation - which of the baseline's periods it
+# owes, by when on the day, with how much grace. Until
 # 2026-10-11 the calendars lived in contract/data-asset.yaml and each
 # dataset's cadence, expected time and grace lived in its ODCS contract
 # under slaProperties. The two could disagree, nothing checked that they
@@ -26,10 +26,14 @@
 # a human to review, edit and commit; nothing evaluates against its
 # output.
 #
-# SEVERAL NAMED CALENDARS, each dataset naming exactly one. Not
-# generality bought for a hypothetical future: two cadences already
-# share this one asset - Birth Registrations daily, Child Protection
-# quarterly - so one asset-wide calendar could never have worked here.
+# ONE BASELINE CALENDAR PER ASSET (REQ-PIPE-345, Keith 2026-10-31): this
+# file declares at most one calendar, and every dataset that does not
+# declare no calendar is on it - no collection or dataset names a calendar
+# or dates of its own, and `mothman check` refuses either. A dataset may not
+# be faster than its asset's baseline; a slower one owes a subset of the
+# baseline's periods, stated under participates; to go faster, change the
+# asset's baseline. (Before the asset split one file held a daily and a
+# quarterly calendar side by side, each dataset naming one.)
 #
 # WHY THE ASSET OWNS THE CALENDAR AND A DATASET OWNS ITS PARTICIPATION:
 # the quarterly asset is heading for ~30 datasets, of which roughly 70%
@@ -149,12 +153,10 @@ calendars:
             new: {claim_window: 6h, cadence: {rule: daily}}
 
 # ---------------------------------------------------------------------
-# WHICH CALENDAR EACH COLLECTION IS ON. A dataset that names none takes
-# its collection's - thirty datasets naming one calendar thirty times is
-# thirty chances to disagree.
+# EACH COLLECTION'S OFFSET AND DEFAULTS. A collection names no calendar:
+# its datasets are on the asset's baseline above (REQ-PIPE-345).
 collections:
   - id: civil-registration
-    calendar: daily
     # WHICH PERIOD A ROUND'S FILES GO INTO (REQ-PIPE-320): stated on the
     # collection, never a dataset, from the collection's first round.
     files_go_to_period:
@@ -171,7 +173,7 @@ collections:
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
 # carries the dataset's expected time of day and its grace allowance (how
 # long after the expected time a supply still counts as on time), and may
-# override its calendar's claim window. It may say which of its calendar's
+# override the baseline's claim window. It may say which of the baseline's
 # periods the dataset owes, under `participates:` - delivery months by full
 # name, or `all` - with a `reason:` when it owes only some. Saying nothing
 # owes every period. The FIRST version's effective_from is the date the

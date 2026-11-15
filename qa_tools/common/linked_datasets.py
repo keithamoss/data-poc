@@ -40,15 +40,13 @@ def _walk(asset: dict):
 
 
 def _calendar_of(cal: dict, coll_id: str, ds_id: str) -> str | None:
-    """The calendar a dataset names, its own or its collection's; None where
-    it names none (REQ-PIPE-106)."""
+    """The calendar a dataset is on: its asset's baseline, the first calendar
+    declared (REQ-PIPE-345 - nothing names one); None where the dataset
+    declares no calendar (REQ-PIPE-106) or the asset declares none."""
     entry = next((d for d in cal.get("datasets") or [] if d.get("id") == ds_id), {}) or {}
     if entry.get("no_calendar"):
         return None
-    if entry.get("calendar"):
-        return entry["calendar"]
-    coll = next((c for c in cal.get("collections") or [] if c.get("id") == coll_id), {}) or {}
-    return coll.get("calendar")
+    return next(((c or {}).get("name") for c in cal.get("calendars") or []), None)
 
 
 def _columns(root: Path, contract: str, table: str) -> list[str]:

@@ -256,17 +256,16 @@ class TestTheGateRefusesTheNewShapeBroken:
     @pytest.mark.asset("daily")
     def test_a_collection_the_hierarchy_does_not_hold_is_refused(self, broken):
         def mutate(doc):
-            doc["collections"].append({"id": "nowhere", "calendar": "daily"})
+            doc["collections"].append({"id": "nowhere"})
         errors = broken(mutate)
         assert any("nowhere" in (e.scope or "") for e in errors), _text(errors)
 
     @pytest.mark.asset("daily")
     def test_a_dataset_on_no_calendar_at_all_is_refused_naming_both_files(self, broken):
-        """Criterion 18, the other direction: take the collection's
-        calendar away and the dataset is on nothing."""
+        """Criterion 18, the other direction: take the asset's baseline
+        away (REQ-PIPE-345) and the dataset is on nothing."""
         def mutate(doc):
-            doc["collections"] = [c for c in doc["collections"]
-                                  if c["id"] != "civil-registration"]
+            doc["calendars"] = []
         errors = broken(mutate)
         hit = [e for e in errors if "birth-registrations" in (e.scope or "")]
         assert hit and "calendar.yaml" in hit[0].problem + hit[0].fix, _text(errors)
@@ -308,17 +307,6 @@ class TestTheGateRefusesTheNewShapeBroken:
             versions.append(dict(versions[0]))
         errors = broken(mutate)
         assert any("not after it" in e.problem for e in errors), _text(errors)
-
-    def test_own_dates_reusing_a_calendar_period_name_are_refused(self, broken):
-        """Criterion 35."""
-        def mutate(doc):
-            _entry(doc, "cp-carers")["dates"] = {"versions": [{
-                "effective_from": "2023-01-01",
-                "changelog": [{"date": "2023-01-01", "author": "a test", "change": "own"}],
-                "dates": [{"period": "2024-Q1", "date": "2024-02-03"}]}]}
-        errors = broken(mutate)
-        assert any("2024-Q1" in e.problem for e in errors), _text(errors)
-
 
 class TestTheContractsDetection:
     def test_a_contract_is_recognised_by_its_kind(self):
@@ -492,24 +480,12 @@ class TestCriticFindingsOn110:
     def test_a_dataset_on_no_calendar_names_both_files(self, broken):
         """Criterion 18 says both files."""
         def mutate(doc):
-            doc["collections"] = [c for c in doc["collections"]
-                                  if c["id"] != "civil-registration"]
+            doc["calendars"] = []
         errors = broken(mutate)
         hit = [e for e in errors if "birth-registrations" in (e.scope or "")]
         assert hit, _text(errors)
         both = hit[0].problem + hit[0].fix
         assert "calendar.yaml" in both and "data-asset.yaml" in both, both
-
-    def test_a_datasets_own_calendar_beats_its_collections(self, tmp_path):
-        """Criterion 11, which had no test of its own."""
-        doc = yaml.safe_load((_real() / "calendar.yaml").read_text())
-        _entry(doc, "cp-clients")["calendar"] = "daily"
-        path = tmp_path / "calendar.yaml"
-        path.write_text(yaml.safe_dump(doc, sort_keys=False))
-        moved = agreement.load(path)
-        assert moved.calendar_name_for("cp-clients") == "daily"
-        assert moved.calendar_name_for("cp-carers") == "quarterly"
-
 
 @pytest.mark.asset("daily")
 def test_the_runtime_refuses_older_months_against_a_cadence_rule_too(tmp_path):

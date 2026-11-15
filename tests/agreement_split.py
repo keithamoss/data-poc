@@ -12,6 +12,11 @@ the schedule gate builds for its own checks.
 The new shape's own rules - plain-string changelogs refused, the retired
 keys refused, the restate rule - are tested against the two files
 directly, never through this.
+
+A DATASET'S `calendar:` IS DROPPED, NEVER WRITTEN (REQ-PIPE-345): every
+dataset is on its asset's one baseline, the first calendar of `calendars`,
+and nothing names one - tests/test_baseline_calendar.py writes the refused
+shapes into calendar.yaml directly.
 """
 from __future__ import annotations
 
@@ -64,19 +69,10 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
     collections = {c["id"]: c for c in cal.get("collections") or []}
 
     walked = list(_walk_datasets(asset))
-    # A collection keeps its calendar only while every dataset in it that
-    # declares no no-calendar still names it - a test that deletes a
-    # dataset's calendar means "this dataset is on none".
-    for cid, coll in list(collections.items()):
-        members = [d for d, c in walked if (c or {}).get("id") == cid]
-        named = coll.get("calendar")
-        if any(not (d or {}).get("calendar") and (d or {}).get(schedule.NO_CALENDAR_KEY) is None
-               for d in members):
-            coll.pop("calendar", None)
-            named = None
-        coll["_named"] = named
+    for coll in collections.values():
+        coll.pop("calendar", None)
 
-    for dataset, collection in walked:
+    for dataset, _collection in walked:
         if not isinstance(dataset, dict):
             continue
         moved = {k: dataset.pop(k) for k in _MOVED if k in dataset}
@@ -86,17 +82,12 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
             entry = {"id": did}
             entries[did] = entry
             cal.setdefault("datasets", []).append(entry)
-        coll = collections.get((collection or {}).get("id"), {})
         entry.pop("calendar", None)
         entry.pop(schedule.NO_CALENDAR_KEY, None)
         if moved.get(schedule.NO_CALENDAR_KEY) is not None:
             entry[schedule.NO_CALENDAR_KEY] = moved[schedule.NO_CALENDAR_KEY]
             if moved.get("delivery_months") is None:
                 entry.pop("participation", None)
-            if moved.get("calendar"):
-                entry["calendar"] = moved["calendar"]
-        elif moved.get("calendar") and moved["calendar"] != coll.get("_named"):
-            entry["calendar"] = moved["calendar"]
         versions = ((entry.get("participation") or {}).get("versions")) or []
         versions = [copy.deepcopy(v) for v in versions]
         if not versions and (moved.get(schedule.NO_CALENDAR_KEY) is None
@@ -132,8 +123,6 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
                 "dates": moved["dates"]}]}
         else:
             entry.pop("dates", None)
-    for coll in collections.values():
-        coll.pop("_named", None)
     return asset, cal
 
 

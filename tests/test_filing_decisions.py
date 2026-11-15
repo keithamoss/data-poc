@@ -17,6 +17,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import (filing_decisions as fd, hierarchy, inheritance,
                               people, period_schema, promotion, qa_store,
@@ -54,6 +56,7 @@ def periods(monkeypatch):
     names = (f"2099-P{tag}", f"2099-Q{tag}")
     from datetime import date
     order = {names[0]: date(2099, 1, 1), names[1]: date(2099, 4, 1)}
+    baseline_periods.declare(*names, dates=order)
     for mod in (schedule, inheritance.schedule):
         monkeypatch.setattr(mod, "date_of", lambda name, ds: order.get(name))
     return names

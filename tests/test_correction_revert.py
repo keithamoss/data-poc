@@ -70,7 +70,7 @@ def _timezone(cal, asset):
 
 
 def _membership(cal, asset):
-    _entry(cal, "cp-clients")["calendar"] = "daily"
+    _entry(cal, "cp-clients")["no_calendar"] = "never"
 
 
 def _several(cal, asset):
@@ -114,3 +114,24 @@ def test_an_item_it_does_not_know_is_refused():
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+def test_reverting_a_membership_to_another_calendar_is_refused_not_dropped():
+    """REQ-PIPE-345: a membership item's old value names the calendar the
+    dataset was on. The baseline reverts by dropping the no-calendar
+    declaration; a calendar other than the current baseline cannot be
+    written back, so the revert says so rather than silently leaving the
+    dataset on the baseline (post-build-review #340)."""
+    base_cal, base_asset = _docs()
+    with pytest.raises(ValueError, match="'monthly'"):
+        agreement_freeze.revert(base_cal, base_asset,
+                                [("dataset cp-clients calendar", "monthly", "quarterly")])
+
+
+def test_reverting_a_membership_to_the_baseline_drops_the_declaration():
+    base_cal, base_asset = _docs()
+    work = copy.deepcopy(base_cal)
+    _entry(work, "cp-clients")["no_calendar"] = "never"
+    got, _asset = agreement_freeze.revert(
+        work, base_asset, [("dataset cp-clients calendar", "quarterly", "no calendar (never)")])
+    assert "no_calendar" not in _entry(got, "cp-clients")

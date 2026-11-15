@@ -45,7 +45,7 @@ def _calendar_doc(**version_overrides):
             "calendars": [{"name": "c", "versions": [version]}],
             "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
                 {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
-                    {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
+                    {"id": "d", "name": "D", "table": "t"}]}]}]}}
 
 
 #: Each real calendar and the asset that defines it (the asset split: the
@@ -221,27 +221,6 @@ class TestParticipation:
             schedule.periods_for_dataset("d", until=date(2023, 1, 5))
 
 
-class TestOverridingRatherThanSubsetting:
-    def test_a_dataset_may_replace_its_calendars_dates_outright(self, tmp_path, monkeypatch):
-        doc = _calendar_doc()
-        doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"][0]["dates"] = [
-            {"period": "own-1", "date": "2026-03-15"}]
-        _repoint(tmp_path, monkeypatch, doc)
-        got = schedule.periods_for_dataset("d")
-        assert [p.name for p in got] == ["own-1"]
-
-    def test_overriding_and_subsetting_at_once_is_an_error(self, tmp_path, monkeypatch):
-        """They mean different things, and carrying both leaves no way
-        to tell which the author meant."""
-        doc = _calendar_doc()
-        ds = doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"][0]
-        ds["dates"] = [{"period": "own-1", "date": "2026-03-15"}]
-        ds["delivery_months"] = ["February"]
-        _repoint(tmp_path, monkeypatch, doc)
-        with pytest.raises(schedule.ScheduleConfigError, match="never both"):
-            schedule.periods_for_dataset("d")
-
-
 class TestNotExpectedPeriods:
     def test_a_not_expected_period_is_shown_not_dropped(self, tmp_path, monkeypatch):
         """"We agreed there would be no November file" and "we forgot to
@@ -369,7 +348,7 @@ class TestPeriodsAreDerivedVersionByVersion:
                 ]}],
                 "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
                     {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
-                        {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
+                        {"id": "d", "name": "D", "table": "t"}]}]}]}}
 
     def test_a_new_version_leaves_every_earlier_period_untouched(self, tmp_path, monkeypatch):
         _repoint(tmp_path, monkeypatch, self._two_versions())
@@ -496,11 +475,13 @@ class TestMalformedCalendars:
         with pytest.raises(hierarchy.UnknownDatasetError):
             schedule.calendar_for_dataset("cp_clients")
 
-    def test_a_dataset_naming_no_calendar_is_an_error(self, tmp_path, monkeypatch):
+    def test_a_dataset_on_an_asset_with_no_baseline_is_an_error(self, tmp_path, monkeypatch):
+        """No calendar at all, and the dataset does not declare it has none
+        (REQ-PIPE-345 criterion 1): nothing to judge its supplies against."""
         doc = _calendar_doc()
-        del doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"][0]["calendar"]
+        doc["calendars"] = []
         _repoint(tmp_path, monkeypatch, doc)
-        with pytest.raises(schedule.ScheduleConfigError, match="names no `calendar:`"):
+        with pytest.raises(schedule.ScheduleConfigError, match="no baseline calendar"):
             schedule.calendar_for_dataset("d")
 
 

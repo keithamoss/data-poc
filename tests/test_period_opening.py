@@ -14,6 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import baseline_periods
+
 import filing_support
 import carry_forward_support
 from carry_forward_support import CASE_WORKERS, KEYS, NAME, entries, promote, view_reads
@@ -345,6 +347,7 @@ class TestOweNothingQuarter:
         tag = _uuid.uuid4().hex[:6]
         q2, q4 = f"2099-{tag}-Q2", f"2099-{tag}-Q4"
         order = {q2: _date(2099, 4, 1), q4: _date(2099, 10, 1)}
+        baseline_periods.declare(q2, q4, dates=order)
         real_not_expected, real_date_of = schedule.not_expected_periods, schedule.date_of
         monkeypatch.setattr(schedule, "not_expected_periods",
                             lambda ds, *a, **k: ({q4: "delivered in Feb and Aug only"}

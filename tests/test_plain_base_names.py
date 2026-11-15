@@ -6,6 +6,8 @@ from contextlib import contextmanager
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import decision_log as dl, period_schema, promotion, rejection, supply_db
 from test_supersession import DS, REAL_PERSON, TABLE, WHEN, _filed
@@ -237,14 +239,13 @@ class TestADecisionNeverHangs:
 
     def test_a_substitution_waits_on_the_period_it_stands_on(self, conn, period,
                                                              monkeypatch):
-        import uuid
 
         from qa_tools.common import substitution
 
         monkeypatch.setattr(dl, "LOCK_TIMEOUT", "500ms")
         supply, table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         _promote(conn, supply, table, period)
-        later = f"2099-T{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("T", 6)
         with supply_db.connect(label="test-other-decision") as other:
             with other.raw.transaction():
                 dl.lock_slot(other, DS, period)
@@ -374,14 +375,13 @@ class TestASubstitutionIsJudgedAgainAfterItWaits:
     def test_refused_rather_than_reading_the_newcomer(self, conn, period):
         import threading
         import time
-        import uuid
 
         from qa_tools.common import substitution
 
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         _promote(conn, a, a_table, period)
         b, b_table = _filed(conn, period, "2026-05-02T01:00:00+00:00")
-        later = f"2099-T{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("T", 6)
         outcome = {}
 
         def substitute():

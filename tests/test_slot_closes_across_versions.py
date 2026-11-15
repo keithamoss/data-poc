@@ -21,7 +21,7 @@ def calendar(tmp_path, monkeypatch):
     def use(versions, extra=None):
         # 09:00, no grace, no override - the timing under test is the
         # calendar's (agreement_split's default participation).
-        ds = {"id": "d", "name": "D", "table": "t", "calendar": "c", **(extra or {})}
+        ds = {"id": "d", "name": "D", "table": "t", **(extra or {})}
         agreement_split.repoint(monkeypatch, tmp_path, {
             "data_asset_id": "data-asset-1",
             "calendars": [{"name": "c", "versions": versions}],
@@ -60,14 +60,6 @@ def test_a_claim_window_change_closes_with_the_next_periods_own_window(calendar)
          "dates": [{"period": "2027-Q1", "date": "2027-02-01"}]}])
     first = slots.slots_for_dataset("d")[0]
     assert first.closes_at == datetime(2027, 1, 25, 9, 0, tzinfo=PERTH)
-
-
-def test_a_datasets_own_dates_close_at_its_next_own_date(calendar):
-    calendar(AUTHORED_THEN_DAILY[:1],
-             {"dates": [{"period": "own-1", "date": "2024-03-01"},
-                        {"period": "own-2", "date": "2024-09-01"}]})
-    own1 = slots.slots_for_dataset("d")[0]
-    assert own1.closes_at == datetime(2024, 8, 18, 9, 0, tzinfo=PERTH)
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

@@ -23,7 +23,7 @@ import agreement_split
 from qa_tools.common import schedule
 
 
-def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
+def _asset_with(datasets: list[dict], tmp_path, monkeypatch, *, baseline: bool = True):
     """The real contract/data-asset.yaml with its datasets replaced.
 
     Built from the REAL file rather than a hand-written stub, so the
@@ -32,6 +32,8 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     exist.
     """
     doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
+    if not baseline:
+        doc["calendars"] = []
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
         "id": "civil-registration", "name": "Civil Registration", "short": "bdm", "run_prefix": "run_",
@@ -49,7 +51,7 @@ PROJECT = {"id": "one-off-extract", "name": "A Project Extract",
            "table": "one_off_extract", "no_calendar": "never",
            "arrival_pattern": r"one_off_extract\.csv"}
 AGREED = {"id": "birth-registrations", "name": "Birth Registrations",
-          "table": "birth_registrations", "calendar": "daily",
+          "table": "birth_registrations",
           "arrival_pattern": r"birth_registrations_[^/]+\.csv"}
 
 
@@ -81,27 +83,28 @@ class TestADatasetMaySayItHasNoCalendar:
         assert "yet" in str(sample.value)
         assert "never" in str(project.value)
 
-    def test_a_dataset_that_MERELY_OMITS_a_calendar_still_fails(
+    def test_a_dataset_that_omits_the_declaration_is_on_the_baseline(
             self, tmp_path, monkeypatch):
-        """The requirement's own second NFR, and the reason a declaration
-        exists at all: allowing absence would destroy a gate that catches a
-        real class of error, because a typo'd calendar name leaves a
-        dataset silently expecting nothing - and a dataset expecting
-        nothing never reports a missing supply."""
+        """Since REQ-PIPE-345 nothing names a calendar: a dataset that does
+        not declare it has none is on its asset's one baseline."""
         _asset_with([AGREED, {"id": "cp-referrals", "name": "Referrals",
                                "table": "cp_referrals",
                                "arrival_pattern": r"cp_referrals\.csv"}],
                      tmp_path, monkeypatch)
-        with pytest.raises(schedule.ScheduleConfigError, match="names no"):
-            schedule.calendar_for_dataset("cp-referrals")
+        assert schedule.calendar_for_dataset("cp-referrals") == schedule.baseline()
 
-    def test_declaring_BOTH_is_refused_rather_than_resolved(
+    def test_an_omission_on_an_asset_with_no_baseline_still_fails(
             self, tmp_path, monkeypatch):
-        """One of them is wrong and this will not guess which."""
-        both = {**SAMPLE, "calendar": "daily"}
-        _asset_with([AGREED, both], tmp_path, monkeypatch)
-        with pytest.raises(schedule.ScheduleConfigError, match="both"):
-            schedule.no_calendar("cp-referrals")
+        """The requirement's own second NFR, and the reason a declaration
+        exists at all: on an asset with no calendar (REQ-PIPE-345 criterion
+        1) a dataset that merely omits the declaration has nothing to judge
+        its supplies against - and a dataset expecting nothing never
+        reports a missing supply."""
+        _asset_with([SAMPLE, {"id": "cp-other", "name": "Other", "table": "cp_other",
+                              "arrival_pattern": r"cp_other\.csv"}],
+                     tmp_path, monkeypatch, baseline=False)
+        with pytest.raises(schedule.ScheduleConfigError, match="no baseline calendar"):
+            schedule.calendar_for_dataset("cp-other")
 
     def test_an_unrecognised_value_is_refused(self, tmp_path, monkeypatch):
         """Not read as "not yet agreed" by accident, which would be the
@@ -207,10 +210,10 @@ class TestTheConfigGateAcceptsItAndStaysStrict:
     keeps a typo from leaving a dataset silently expecting nothing, and
     this requirement must not weaken it."""
 
-    def _errors(self, datasets, tmp_path, monkeypatch):
+    def _errors(self, datasets, tmp_path, monkeypatch, *, baseline: bool = True):
         from qa_tools.common import validate_schedule
 
-        path = _asset_with(datasets, tmp_path, monkeypatch)
+        path = _asset_with(datasets, tmp_path, monkeypatch, baseline=baseline)
         # A REAL `Source`, pointing at the temporary asset and the REAL
         # contracts beside it - which is what the dataclass's own docstring
         # asks for: redirecting one and not the other validates a
@@ -223,41 +226,38 @@ class TestTheConfigGateAcceptsItAndStaysStrict:
         assert [e for e in found if "cp-referrals" in (e.scope or "")] == []
         assert [e for e in found if "one-off-extract" in (e.scope or "")] == []
 
-    def test_a_bare_omission_still_fails_the_gate(self, tmp_path, monkeypatch):
+    def test_a_bare_omission_on_an_asset_with_no_baseline_fails_the_gate(
+            self, tmp_path, monkeypatch):
         found = self._errors(
-            [AGREED, {"id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",
-                       "arrival_pattern": r"cp_referrals\.csv"}],
-            tmp_path, monkeypatch)
-        assert [e for e in found if "cp-referrals" in (e.scope or "")], \
-            "a dataset that merely omits a calendar must still fail"
+            [SAMPLE, {"id": "cp-other", "name": "Other", "table": "cp_other",
+                      "arrival_pattern": r"cp_other\.csv"}],
+            tmp_path, monkeypatch, baseline=False)
+        assert [e for e in found if "cp-other" in (e.scope or "")], \
+            "a dataset that merely omits the declaration on an asset with no calendar must fail"
+
+    def test_an_asset_with_no_calendar_passes_when_every_dataset_declares_none(
+            self, tmp_path, monkeypatch):
+        """REQ-PIPE-345 criterion 1: none is accepted only where every
+        dataset declares no calendar - the project-extraction shape."""
+        found = self._errors([SAMPLE, PROJECT], tmp_path, monkeypatch, baseline=False)
+        assert [e for e in found if "cp-referrals" in (e.scope or "")
+                or "one-off-extract" in (e.scope or "")] == []
 
     def test_the_omission_message_names_the_declaration_as_the_way_out(
             self, tmp_path, monkeypatch):
         found = self._errors(
-            [AGREED, {"id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",
+            [PROJECT, {"id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",
                        "arrival_pattern": r"cp_referrals\.csv"}],
-            tmp_path, monkeypatch)
+            tmp_path, monkeypatch, baseline=False)
         message = " ".join(f"{e.problem} {e.fix}" for e in found if "cp-referrals" in (e.scope or ""))
         assert schedule.NO_CALENDAR_KEY in message
         assert schedule.NOT_YET_AGREED in message
 
-    def test_an_unknown_calendar_name_still_fails_the_gate(self, tmp_path, monkeypatch):
-        found = self._errors([AGREED, {**SAMPLE, "no_calendar": None,
-                                        "calendar": "quartrly"}],
-                              tmp_path, monkeypatch)
-        assert [e for e in found if "cp-referrals" in (e.scope or "")], \
-            "a typo'd calendar name must still fail - that is the gate's whole job"
-
-    def test_declaring_both_fails_the_gate(self, tmp_path, monkeypatch):
-        found = self._errors([AGREED, {**SAMPLE, "calendar": "daily"}],
-                              tmp_path, monkeypatch)
-        assert any("BOTH" in e.problem for e in found if "cp-referrals" in (e.scope or ""))
-
     def test_subsetting_a_calendar_it_does_not_have_fails_the_gate(
             self, tmp_path, monkeypatch):
-        """`delivery_months:` and `dates:` both describe which of a
-        calendar's periods this dataset takes part in, and there is no
-        calendar here to take part in."""
+        """`delivery_months:` describes which of the baseline's periods this
+        dataset takes part in, and there is no calendar here to take part
+        in."""
         found = self._errors(
             [AGREED, {**SAMPLE, "delivery_months": ["February"]}], tmp_path, monkeypatch)
         assert [e for e in found if "cp-referrals" in (e.scope or "")]

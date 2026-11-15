@@ -7,6 +7,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import (amber_setting, decision_log as dl, period_schema, promotion,
                              substitution, supply_db)
@@ -77,7 +79,7 @@ class TestStandingOnAnotherPeriod:
     def test_a_substituted_table(self, conn, period):
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         _promote(conn, a, a_table, period, status="amber")
-        later = f"2099-L{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("L", 6)
         substitution.substitute(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
                                 logical_table=TABLE, period=later, stands_on=period,
                                 supply=a, actor=REAL_PERSON, reason="late",

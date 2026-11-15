@@ -365,7 +365,7 @@ def relative_period(dataset_id: str, period: str, offset: int,
 
 def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
-    calendar's, or its own dates where it overrides the calendar - with
+    asset's baseline's (REQ-PIPE-345: no dataset has dates of its own) - with
     the period AFTER `until` included, so the last slot generated still
     knows when it closes.
 
@@ -374,9 +374,6 @@ def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> li
     authored calendar is finite, so it is read whole where the next
     period lies beyond that.
     """
-    override = schedule.dataset_dates_override(dataset_id, agreement)
-    if override is not None:
-        return sorted(override, key=lambda p: p.date)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
     if until is None:
         return schedule.periods_for_calendar(cal.name, agreement=agreement)

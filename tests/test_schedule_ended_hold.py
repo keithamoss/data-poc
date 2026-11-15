@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import assignment, qa_store, schedule, slots, supply_db, supply_holds
 
 UTC = timezone.utc
@@ -144,6 +146,7 @@ class TestAddingDatesFilesWhatWasHeld:
         supply = f"cp-carers@{AFTER:%Y%m%d}a"
         self._held(conn, supply, AFTER)
         # DATES ADDED: the calendar now runs to a 2030 period covering it.
+        baseline_periods.declare("2030-Q2", dates={"2030-Q2": "2030-01-01"})  # the dates added
         later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
@@ -181,6 +184,7 @@ class TestAddingDatesFilesWhatWasHeld:
         second = f"cp-carers@{AFTER:%Y%m%d}d"
         self._held(conn, second, AFTER + timedelta(days=2))
         self._held(conn, first, AFTER)
+        baseline_periods.declare("2030-Q2", dates={"2030-Q2": "2030-01-01"})  # the dates added
         later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
@@ -219,6 +223,7 @@ class TestItWaitsForACorrectionsConfirmation:
         CONFIRMED configuration gives `confirmed` (no slot by default)."""
         from qa_tools.common import schedule_ended
 
+        baseline_periods.declare("2030-Q2", dates={"2030-Q2": "2030-01-01"})  # the dates added
         later = SLOTS + [_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
         monkeypatch.setattr(slots, "slots_for_dataset",

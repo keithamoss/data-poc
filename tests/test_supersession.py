@@ -6,9 +6,10 @@ test files or decides can answer another's question on the same worker.
 from __future__ import annotations
 
 import random
-import uuid
 
 import pytest
+
+import baseline_periods
 
 from qa_tools.common import (decision_log as dl, period_schema, promotion, qa_store,
                              supersession, supply_db)
@@ -27,7 +28,7 @@ def conn(supply_dsn):
 
 @pytest.fixture
 def period():
-    return f"2099-S{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("S", 6)
 
 
 def _key():
@@ -286,7 +287,7 @@ def test_mothman_supply_superseded_lists_them(supply_dsn, monkeypatch):
 
     with supply_db.connect(label="test-supersession") as conn:
         qa_store.ensure_schema(conn)
-        period = f"2099-S{uuid.uuid4().hex[:6]}"
+        period = baseline_periods.made_up("S", 6)
         old, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         new, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
         _supersede(conn, period, new)

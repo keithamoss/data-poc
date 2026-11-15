@@ -16,6 +16,8 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import (hierarchy, inheritance, period_schema, qa_store, schedule,
                              supply_db)
@@ -37,7 +39,9 @@ def conn(supply_dsn):
 @pytest.fixture
 def periods():
     tag = uuid.uuid4().hex[:6]
-    return (f"2099-A{tag}", f"2099-B{tag}", f"2099-M{tag}")
+    names = (f"2099-A{tag}", f"2099-B{tag}", f"2099-M{tag}")
+    baseline_periods.declare(*names)
+    return names
 
 
 @pytest.fixture
@@ -48,6 +52,7 @@ def two_groups(monkeypatch, periods):
     monkeypatch.setattr(inheritance.schedule, "not_expected_periods",
                         lambda ds: {second: REASON} if ds == ED else {})
     order = {first: date(2099, 1, 1), middle: date(2099, 2, 1), second: date(2099, 4, 1)}
+    baseline_periods.declare(*order, dates=order)
     monkeypatch.setattr(inheritance.schedule, "date_of", lambda name, ds: order.get(name))
     narrow(monkeypatch, [hierarchy.dataset(ED), hierarchy.dataset(CP)])
     monkeypatch.setattr(inheritance, "offset_group",

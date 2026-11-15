@@ -11,6 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import decision_log as dl, people, scenario_map, scripted_decisions as sd
 from qa_tools.common import validate_people
@@ -429,6 +431,7 @@ class TestAPeriodScopedDecisionIsPlayed:
     @pytest.fixture
     def pinned(self, monkeypatch, period):
         earlier = period + "-before"
+        baseline_periods.declare(earlier)
         monkeypatch.setattr(sd, "_due_at", lambda ds, p: self.DUE if p == period else None)
         monkeypatch.setattr("qa_tools.common.slots.relative_period",
                             lambda ds, p, off: earlier if (p, off) == (period, -1) else None)

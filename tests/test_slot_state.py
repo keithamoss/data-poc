@@ -13,6 +13,8 @@ from datetime import timedelta
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import asset_time
 from qa_tools.common import decision_log as dl
 from qa_tools.common import promotion, qa_store, slot_state, slots, supply_db
@@ -50,13 +52,13 @@ def _slot(dataset_id, name, due_at):
 @pytest.fixture
 def due_yesterday(dataset):
     now = asset_time.now()
-    return _slot(dataset, f"2099-{uuid.uuid4().hex[:6]}", now - timedelta(days=1))
+    return _slot(dataset, baseline_periods.made_up("", 6), now - timedelta(days=1))
 
 
 @pytest.fixture
 def due_next_month(dataset):
     now = asset_time.now()
-    return _slot(dataset, f"2099-{uuid.uuid4().hex[:6]}", now + timedelta(days=30))
+    return _slot(dataset, baseline_periods.made_up("", 6), now + timedelta(days=30))
 
 
 def _state(conn, dataset, slot, **over):

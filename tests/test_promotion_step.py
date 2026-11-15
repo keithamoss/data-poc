@@ -18,6 +18,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import promotion, qa_store, supply_db
 
@@ -39,7 +41,7 @@ def conn(supply_dsn):
 
 @pytest.fixture
 def period():
-    return f"2099-S{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("S", 6)
 
 
 def _dataset() -> str:

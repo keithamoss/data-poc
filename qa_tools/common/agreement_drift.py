@@ -14,8 +14,8 @@ neither; the fingerprint leaves the calendar's dates out on purpose.
 
 ACCOUNTED FOR (criterion 2, PROVISIONAL): a difference is accounted for
 where a declared correction in the configuration names one of that slot's
-input items - its participation version, its calendar version or date, its
-own date, its membership, its timezone version, a not_expected entry - with
+input items - its participation version, its calendar version or date,
+its membership, its timezone version, a not_expected entry - with
 the value the configuration now holds. That is also how a merged correction
 still awaiting the asset manager refuses nothing (REQ-PIPE-170 criterion
 22): once applied, the re-judged verdict carries the new fingerprint and
@@ -123,10 +123,6 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
                 keys.add(f"collection {collection} participation_defaults {since.isoformat()}")
     except Exception:  # noqa: BLE001
         pass
-    entry = agreement.dataset(dataset_id)
-    if entry is not None and entry.own_dates is not None:
-        for v in getattr(entry.own_dates, "versions", ()):
-            keys.add(f"dataset {dataset_id} dates version {v.effective_from.isoformat()}")
     try:
         cal = schedule.calendar_for_dataset(dataset_id, agreement)
         cal_version = schedule._version_in_force(cal, period_date)
@@ -172,8 +168,6 @@ def _kind(key: str) -> str | None:
             return "participation"
         if parts[2] == "not_expected":
             return "not_expected"
-        if parts[2] == "dates":
-            return "own_date"
     return None
 
 
@@ -181,10 +175,8 @@ def _kind(key: str) -> str | None:
 #: differs (delivery-critic on 173, #1). A grace change is a participation
 #: change and nothing else; a timezone change is a timezone version's.
 _KINDS_FOR = {
-    "period_date": {"cal_date", "own_date", "membership", "participation", "cal_version",
-                    "defaults"},
-    "due_date": {"cal_date", "own_date", "membership", "participation", "cal_version",
-                 "defaults"},
+    "period_date": {"cal_date", "membership", "participation", "cal_version", "defaults"},
+    "due_date": {"cal_date", "membership", "participation", "cal_version", "defaults"},
     "expected_time": {"participation", "defaults"},
     "days_before": {"participation", "defaults"},
     "grace_seconds": {"participation", "defaults"},
@@ -194,7 +186,7 @@ _KINDS_FOR = {
 #: A version's own settings changed with no input moving.
 _FINGERPRINT_KINDS = {"participation", "cal_version", "tz_version", "membership", "defaults"}
 #: The slot is no longer a period of the dataset's schedule.
-_MISSING_KINDS = {"cal_date", "own_date", "membership", "not_expected", "cal_version",
+_MISSING_KINDS = {"cal_date", "membership", "not_expected", "cal_version",
                   "participation", "defaults"}
 
 

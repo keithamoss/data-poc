@@ -18,6 +18,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 from qa_tools.common import decision_log as dl
 from qa_tools.common import period_schema, qa_store, substitution, supply_db
 
@@ -43,7 +45,9 @@ def dataset():
 def periods():
     """Three periods of this test's own, so their schemas cannot collide."""
     tag = uuid.uuid4().hex[:6]
-    return (f"2099-A{tag}", f"2099-B{tag}", f"2099-C{tag}")
+    names = (f"2099-A{tag}", f"2099-B{tag}", f"2099-C{tag}")
+    baseline_periods.declare(*names)
+    return names
 
 
 def _promote_into(conn, dataset_id, period, *, status_red=False, logical="carers"):

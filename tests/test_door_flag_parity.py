@@ -23,6 +23,8 @@ from datetime import timedelta
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing_decisions as fd
@@ -145,6 +147,7 @@ def minted(monkeypatch):
                   "nothing": now + timedelta(days=40),
                   "closed": now - timedelta(days=10)}[timing]
         name = f"2099-{timing[0]}{uuid.uuid4().hex[:8]}"
+        baseline_periods.declare(name)
         slot = slots.Slot(dataset_id=DS, period=schedule.Period(name=name, date=due.date()),
                           due_at=due, grace=timedelta(0), claim_opens_at=opens,
                           closes_at=closes)

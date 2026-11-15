@@ -143,23 +143,6 @@ class TestACadenceRuleCalendarKeepsDaysBefore:
         assert "civil-registration" in text and "days before" in text and "at most 1" in text
 
 
-class TestADatasetWithItsOwnDatesIsOnlySupportedAtZero:
-    """Criterion 13."""
-
-    def test_own_dates_under_a_non_zero_collection_is_refused(self, gate):
-        def mutate(doc):
-            d = _dataset(doc, "cp-carers")
-            versions = d["participation"]["versions"]
-            for v in versions:
-                v.pop("participates", None)
-            d["dates"] = {"versions": [{
-                "effective_from": "2015-01-01",
-                "changelog": [{"date": "2026-10-30", "author": "a test", "change": "own dates"}],
-                "dates": [{"period": "2025-Q1", "date": "2025-02-01"}]}]}
-        text = _text(_offset_errors(gate(mutate)))
-        assert "cp-carers" in text and "own dates" in text and "only at 0" in text
-
-
 class TestANegativeValueIsRefused:
     """Criterion 6."""
 

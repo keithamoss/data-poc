@@ -361,26 +361,6 @@ class TestWideningIsNeverAKeyword:
             and "cp-case-workers" not in hit[0].problem, _text(errors)
 
 
-class TestAnotherCalendarStatesItsOwn:
-    """Criterion 9."""
-
-    def test_a_dataset_on_its_own_calendar_taking_a_collection_value_is_refused(self, broken):
-        def mutate(doc):
-            # A second calendar in the asset for the dataset to sit on: the
-            # daily one, as the daily asset defines it (the asset split - the
-            # quarterly asset defines only its own, and one asset may define
-            # several).
-            daily = yaml.safe_load((asset_folders.real_folder_of("daily") / "calendar.yaml").read_text())
-            doc["calendars"].append(next(c for c in daily["calendars"] if c["name"] == "daily"))
-            _lift(doc, "cp-carers", keys=("grace",))
-            _entry(doc, "cp-carers")["calendar"] = "daily"
-            _defaults(doc, {"effective_from": "2023-01-01", "grace": "8h", "changelog": LOG})
-        errors = broken(mutate)
-        assert any(e.scope == "dataset 'cp-carers'" and "'daily'" in e.problem
-                   and "'quarterly'" in e.problem and "grace" in e.problem
-                   for e in errors), _text(errors)
-
-
 class TestOrderAndOneRootCauseOnce:
     """Criteria 11 and 12."""
 
@@ -558,9 +538,8 @@ class TestWhereEachValueCameFrom:
 class TestCriticFindingsOn181:
     """Each failed before its fix."""
 
-    def test_f1_a_dataset_naming_its_collections_own_calendar_is_still_widened(self, broken):
+    def test_f1_a_dataset_taking_its_collections_months_is_still_widened(self, broken):
         def mutate(doc):
-            _entry(doc, "cp-clients")["calendar"] = "quarterly"
             _defaults(doc,
                       {"effective_from": "2023-01-01", "participates": ["February", "August"],
                        "reason": "half-yearly", "changelog": LOG},
@@ -651,16 +630,6 @@ class TestCriticFindingsOn181:
         assert {e.scope for e in grace} == {"dataset 'cp-clients'", "dataset 'cp-carers'"}, \
             _text(errors)
 
-    def test_f6_datasets_on_another_calendar_are_not_grouped(self, broken):
-        def mutate(doc):
-            _lift(doc, "cp-clients", "cp-carers", keys=("grace",))
-            for ds in ("cp-clients", "cp-carers"):
-                _entry(doc, ds)["calendar"] = "daily"
-            _defaults(doc, {"effective_from": "2023-01-01", "grace": "8h", "changelog": LOG})
-        errors = broken(mutate)
-        assert not [e for e in errors if e.scope == "collection 'child-protection'"
-                    and "no grace" in e.problem], _text(errors)
-
     def test_f7_a_later_calendar_window_is_shown_as_a_change(self):
         from qa_tools.common import participation_view
 
@@ -705,18 +674,19 @@ class TestCriticFindingsOn181:
         assert agreement_drift._kind(
             "collection child-protection participation_defaults 2023-01-01") == "defaults"
 
-    def test_a_collection_correction_affects_its_datasets_not_one_on_its_own_calendar(self):
+    def test_a_collection_correction_affects_every_one_of_its_datasets(self):
+        """Every dataset is on the baseline (REQ-PIPE-345), so none is left out
+        as on a calendar of its own."""
         from qa_tools.common import correction_apply
 
         doc = _unshare(_doc())
-        _entry(doc, "cp-carers")["calendar"] = "daily"
         p = correction_apply.Pending(
             reference="CAB-2", owner=("collection", "child-protection"), label="l",
             date="2026-10-11", reason="r", approver="a",
             changes=(("collection child-protection participation_defaults 2023-01-01", None,
                       {"grace": "8h"}),))
         got = correction_apply.affected_datasets(p, doc)
-        assert "cp-clients" in got and "cp-carers" not in got
+        assert "cp-clients" in got and "cp-carers" in got
 
     def test_a_long_value_in_a_drafted_correction_pastes_as_valid_yaml(self):
         """Found migrating Child Protection (2026-10-11): cp-case-workers'

@@ -12,6 +12,8 @@ from datetime import date, datetime, timezone
 
 import pytest
 
+import baseline_periods
+
 import filing_support
 from qa_tools.common import assignment, promotion_state, qa_store, schedule, supply_db
 
@@ -36,6 +38,7 @@ def periods(monkeypatch):
     tag = uuid.uuid4().hex[:6]
     names = [f"2099-{n}{tag}" for n in "ABC"]
     dates = {n: date(2099, 1 + i * 2, 1) for i, n in enumerate(names)}
+    baseline_periods.declare(*names, dates=dates)
     monkeypatch.setattr(schedule, "date_of", lambda name, ds: dates.get(name))
     return names
 

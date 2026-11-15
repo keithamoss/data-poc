@@ -4,9 +4,10 @@ against a warning naming every consequence (REQ-GHUB-142). Against a real
 database; each test mints its own periods."""
 from __future__ import annotations
 
-import uuid
 
 import pytest
+
+import baseline_periods
 
 import test_supersession as _base
 from qa_tools.common import (decision_log as dl, filing, promotion,
@@ -21,7 +22,7 @@ AG, COL = "child-protection-family-support", "child-protection"
 
 @pytest.fixture
 def target():
-    return f"2099-R{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("R", 6)
 
 
 def _promote(conn, supply, table, period, *, kind=dl.RULE, at=WHEN):
@@ -94,7 +95,7 @@ class TestAPromotedSupplyLeavesItsPeriod:
 
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         _promote(conn, a, a_table, period)
-        later = f"2099-L{uuid.uuid4().hex[:6]}"
+        later = baseline_periods.made_up("L", 6)
         substitution.substitute(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
                                 logical_table=TABLE, period=later, stands_on=period,
                                 supply=a, actor=REAL_PERSON, reason="late", effective_at=WHEN)

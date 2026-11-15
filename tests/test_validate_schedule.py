@@ -99,13 +99,6 @@ class TestATypoCanNeverLeaveADatasetExpectingNothing:
         assert any("March" in e.problem and "no\n" not in e.problem for e in errors), _messages(errors)
         assert any("expects nothing in March" in e.fix for e in errors), _messages(errors)
 
-    def test_a_calendar_the_asset_does_not_define_is_rejected(self):
-        def mutate(doc):
-            _dataset(doc, "cp-clients")["calendar"] = "quarterly-v2"
-        errors = _run(mutate)
-        assert any("quarterly-v2" in e.problem for e in errors), _messages(errors)
-        assert any("expects nothing" in e.fix for e in errors), _messages(errors)
-
     def test_an_empty_delivery_months_list_is_rejected(self):
         def mutate(doc):
             _dataset(doc, "cp-case-workers")["delivery_months"] = []
@@ -125,15 +118,6 @@ class TestATypoCanNeverLeaveADatasetExpectingNothing:
                 if int(e["date"].split("-")[1]) in months]
         errors = _run(mutate)
         assert any("expects no supply in any period" in e.problem for e in errors), _messages(errors)
-
-    def test_a_dataset_expecting_nothing_is_reported_once_not_twice(self):
-        """A dataset naming a calendar that does not exist already has a
-        better error than "expects nothing" - saying both is two errors
-        for one mistake."""
-        def mutate(doc):
-            _dataset(doc, "cp-clients")["calendar"] = "nope"
-        errors = [e for e in _run(mutate) if e.scope == "dataset 'cp-clients'"]
-        assert len(errors) == 1, _messages(errors)
 
     def test_a_version_with_neither_dates_nor_a_rule_is_rejected(self):
         def mutate(doc):
@@ -255,14 +239,7 @@ class TestDurationsAreNeverCoerced:
                     for e in errors), _messages(errors)
 
 
-class TestSubsettingAndOverridingAreDifferentActs:
-    def test_a_dataset_cannot_do_both(self):
-        def mutate(doc):
-            _dataset(doc, "cp-case-workers")["dates"] = [
-                {"period": "2026-Q1", "date": "2026-02-01"}]
-        errors = _run(mutate)
-        assert any("BOTH" in e.problem for e in errors), _messages(errors)
-
+class TestMonthsAgainstACadenceRule:
     @pytest.mark.asset("daily")
     def test_delivery_months_against_a_cadence_rule_calendar_is_rejected(self):
         def mutate(doc):
@@ -313,12 +290,13 @@ class TestHowItReports:
         the count in the header is the true count."""
         def mutate(doc):
             for dataset in _datasets(doc):
-                dataset["calendar"] = "no-such-calendar"
+                dataset["delivery_months"] = ["Febuary"]
         errors = _run(mutate)
-        from qa_tools.common import hierarchy
+        from qa_tools.common import hierarchy, schedule
 
         named = {e.scope for e in errors if e.scope}
-        every = {f"dataset {d.dataset_id!r}" for d in hierarchy.all_datasets()}
+        every = {f"dataset {d.dataset_id!r}" for d in hierarchy.all_datasets()
+                 if schedule.no_calendar(d.dataset_id) is None}
         assert len(every) >= 7, every
         assert named == every, f"expected one error per dataset, got {len(named)}: {named}"
 
@@ -334,7 +312,7 @@ class TestHowItReports:
     def test_every_error_names_a_correction_not_only_the_rule(self):
         def mutate(doc):
             _dataset(doc, "cp-case-workers")["delivery_months"] = ["Febuary"]
-            _dataset(doc, "cp-clients")["calendar"] = "nope"
+            _dataset(doc, "cp-clients")["delivery_months"] = []
             _calendar(doc, "quarterly")["versions"][0]["claim_window"] = "4"
         errors = _run(mutate)
         assert errors
@@ -343,7 +321,7 @@ class TestHowItReports:
 
     def test_errors_carry_the_file_and_the_thing_to_open(self):
         def mutate(doc):
-            _dataset(doc, "cp-clients")["calendar"] = "nope"
+            _dataset(doc, "cp-clients")["delivery_months"] = ["Febuary"]
         errors = _run(mutate)
         assert all(e.file for e in errors)
         assert any(e.scope == "dataset 'cp-clients'" for e in errors), _messages(errors)
@@ -465,116 +443,6 @@ class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
         assert "calendar(s)" in out and "dataset(s)" in out
 
 
-class TestOneTypoReadsAsOneTypo:
-    """post-build-review #19, Keith's option (c), 2026-09-25.
-
-    Rename a calendar by one character and every dataset on it reports
-    "names calendar 'quarterly', which this asset does not define. Use
-    one of: daily, quarterley, or add that calendar."
-
-    Two things were wrong with that, and neither is the individual
-    reporting Keith settled on 2026-09-23 - nothing here hides an error
-    or changes the header count.
-
-    The true fix is one character in the calendar, and the output
-    described N broken datasets instead. And the options offered
-    included the typo itself, so a reader who followed the text
-    literally pointed every dataset at the misspelling and turned the
-    gate GREEN with it committed.
-    """
-
-    @pytest.fixture
-    def renamed_calendar(self, tmp_path):
-        """The real config with `quarterly` renamed by one character -
-        the exact mistake, not an approximation of it."""
-        import shutil
-
-        contract_dir = tmp_path / "contract"
-        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
-        path = contract_dir / "data-asset.yaml"
-        doc = agreement_split.merged_view(contract_dir)
-        for calendar in doc["calendars"]:
-            if calendar["name"] == "quarterly":
-                calendar["name"] = "quarterley"
-        # ANOTHER CALENDAR IN USE, as the one-asset layout had in `daily`
-        # (the asset split): with none in use the fix line deliberately lists
-        # every calendar defined, so the case needs one a dataset still names.
-        daily = yaml.safe_load((asset_folders.real_folder_of("daily") / "calendar.yaml").read_text())
-        doc["calendars"].append(next(c for c in daily["calendars"] if c["name"] == "daily"))
-        ed = next(c for a in doc["hierarchy"]["agencies"] for c in a["collections"]
-                  if c["id"] == "emergency-department")
-        ed["datasets"].append({"id": "probe-on-daily", "name": "Probe on daily",
-                               "table": "probe_on_daily", "calendar": "daily"})
-        agreement_split.write(contract_dir, doc)
-        return Source(path, contract_dir)
-
-    def _errors(self, src):
-        return validate(src)
-
-    def test_no_fix_line_offers_the_name_nothing_uses(self, renamed_calendar):
-        """`quarterley` is defined and no dataset names it. A calendar
-        nothing references is either brand new or a typo, and steering
-        a broken dataset at it is not a safe thing to suggest."""
-        unknown = [e for e in self._errors(renamed_calendar)
-                   if "does not define" in e.problem]
-        assert unknown, "precondition - the rename must produce unknown-calendar errors"
-        for error in unknown:
-            assert "quarterley" not in error.fix, (
-                f"the fix line offers the typo as a valid option:\n  {error.fix}")
-
-    def test_the_shared_cause_is_named_once_above_the_detail(self, renamed_calendar, capsys):
-        validate_schedule.main(renamed_calendar)
-        err = capsys.readouterr().err
-        assert "quarterly" in err
-        cause_lines = [ln for ln in err.splitlines() if "datasets name" in ln]
-        assert len(cause_lines) == 1, (
-            f"expected exactly one line naming the shared cause, got {cause_lines}")
-        assert "quarterley" in cause_lines[0], (
-            "the one calendar nothing references is the likely typo and should be named")
-
-    def test_every_offending_dataset_is_still_reported_individually(self, renamed_calendar, capsys):
-        """Keith's 2026-09-23 rule. The cause line is printed ABOVE the
-        detail; it suppresses nothing and changes no count."""
-        errors = self._errors(renamed_calendar)
-        from qa_tools.common import hierarchy, schedule
-
-        unknown = [e for e in errors if "does not define" in e.problem]
-        # Every dataset on the renamed calendar: Child Protection's six, and
-        # any collection added on it since (Emergency Department, REQ-QAC-231).
-        quarterly = [d.dataset_id for d in hierarchy.all_datasets()
-                     if schedule.calendar_for_dataset(d.dataset_id).name == "quarterly"]
-        assert len(quarterly) >= 6, quarterly
-        assert len(unknown) == len(quarterly), (
-            f"expected all {len(quarterly)} quarterly datasets reported, got {len(unknown)}")
-        validate_schedule.main(renamed_calendar)
-        err = capsys.readouterr().err
-        assert f"{len(errors)} error(s)" in err
-
-    def test_a_calendar_that_was_simply_never_written_gets_no_typo_guess(self, tmp_path, capsys):
-        """The guess is only safe when exactly one defined calendar is
-        unreferenced. Point a dataset at a name nobody has ever defined,
-        leave every real calendar in use, and there is nothing to
-        suggest as the typo."""
-        import shutil
-
-        contract_dir = tmp_path / "contract"
-        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
-        path = contract_dir / "data-asset.yaml"
-        doc = agreement_split.merged_view(contract_dir)
-        for _dataset, _collection in validate_schedule._walk_datasets(doc):
-            if _dataset.get("id") == "cp-carers":
-                _dataset["calendar"] = "fortnightly"
-        agreement_split.write(contract_dir, doc)
-
-        validate_schedule.main(Source(path, contract_dir))
-        err = capsys.readouterr().err
-        assert "fortnightly" in err
-        assert "if that is the typo" not in err, (
-            f"guessed a typo with no unreferenced calendar to guess at:\n{err}")
-        assert "datasets name" not in err, (
-            "one dataset is not a shared cause - there is nothing to aggregate")
-
-
 class TestTheGateActuallyFailsTheBuild:
     """REQ-PIPE-050 criterion 1 - "SHALL exit non-zero on any error".
 
@@ -596,9 +464,9 @@ class TestTheGateActuallyFailsTheBuild:
         shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
         path = contract_dir / "data-asset.yaml"
         doc = agreement_split.merged_view(contract_dir)
-        for calendar in doc["calendars"]:
-            if calendar["name"] == "quarterly":
-                calendar["name"] = "quarterley"
+        second = copy.deepcopy(_calendar(doc, "quarterly"))
+        second["name"] = "quarterley"
+        doc["calendars"].append(second)
         agreement_split.write(contract_dir, doc)
 
         assert validate_schedule.main(Source(path, contract_dir)) == 1
@@ -724,14 +592,12 @@ class TestTheHeaderCountIsTheNumberOfDatasetsActuallyAffected:
     def test_the_real_gate_fans_a_calendar_error_out_to_its_datasets(self, tmp_path,
                                                                       monkeypatch):
         """End to end against the real config, which is where the
-        critic found it: rename the calendar the six CP datasets name
-        and the count must be six, not zero."""
+        critic found it: break the baseline every CP dataset is on and the
+        count must be six or more, not zero."""
         from qa_tools.common import validate_schedule as mod
 
         doc = self._doc()
-        for calendar in doc["calendars"]:
-            if calendar["name"] == "quarterly":
-                calendar["name"] = "quarterley"
+        _calendar(doc, "quarterly")["versions"][0]["claim_window"] = "14"
         path = tmp_path / "data-asset.yaml"
         agreement_split.write(tmp_path, doc)
         src = Source(path, REAL_CONTRACT_DIR)

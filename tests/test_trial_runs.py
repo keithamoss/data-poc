@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import pytest
 
+import baseline_periods
+
 import attempt_support
 from qa_tools.common import supply_db, trial
 from staging_support import stage_bdm
@@ -404,6 +406,7 @@ class TestATrialIsNeverSilentlyCheckedAgainstPromotedData:
         with supply_db.connect(label="test-trial") as conn:
             supply_db.ensure_schemas(conn)
             supply_db.ensure_staging(conn, run_id)
+            baseline_periods.declare("2099-Q1")
             period = period_schema.ensure_period_schema(conn, "2099-Q1")
             physical = "cp_clients__trialoverlay"
             # THE TRIAL'S OWN TABLE, in its own schema, with a value

@@ -313,7 +313,7 @@ class TestTheClaimWindowIsEffectiveDated:
                 ]}],
                 "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
                     {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
-                        {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
+                        {"id": "d", "name": "D", "table": "t"}]}]}]}}
 
     def _repoint(self, tmp_path, monkeypatch, base=None):
         import shutil

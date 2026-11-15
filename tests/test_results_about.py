@@ -23,6 +23,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import baseline_periods
+
 import attempt_support
 from qa_tools.common import carried, filing, promotion, qa_store, supply_db, supply_status
 from attempt_support import ANY_CHECK
@@ -120,7 +122,7 @@ class TestNewerIsTheLaterOpenedRun:
             with dl.apply_decision(conn, dl.Decision(
                     agency_id=KEYS["agency_id"], collection_id=KEYS["collection_id"],
                     dataset_id="cp-clients", action=dl.RECHECK, supply=supply, actor="k@x",
-                    actor_kind=dl.PERSON, to_slot=f"2099-q{uuid.uuid4().hex[:6]}",
+                    actor_kind=dl.PERSON, to_slot=baseline_periods.made_up("q", 6),
                     reason="pytest", effective_at=effective)):
                 pass
             ids.append(conn.execute(f"SELECT max(id) FROM {dl.TABLE}").fetchone()[0])
@@ -206,7 +208,7 @@ class TestTheBuildAndTheGateAgree:
         supply = f"cp-clients@{_key()}"
         with dl.apply_decision(conn, dl.Decision(
                 **KEYS, dataset_id="cp-clients", action=dl.PROMOTE, supply=supply,
-                actor="k@x", actor_kind=dl.PERSON, to_slot=f"2099-q{uuid.uuid4().hex[:6]}",
+                actor="k@x", actor_kind=dl.PERSON, to_slot=baseline_periods.made_up("q", 6),
                 promoted_status="green", effective_at="2099-03-01T09:00:00+08:00")):
             pass
         table = {"cp_clients": (f"cp_clients__{supply.split('@')[1]}", supply)}
@@ -231,7 +233,7 @@ def _filed(conn, dataset_id: str, supply: str, delivery: str, at: datetime) -> N
     filing_support.ensure_delivery(delivery, dataset_id, at, filename=f"{dataset_id}.csv")
     conn.execute(f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, delivery) "
                  "VALUES (?, ?, ?, 'test', ?)",
-                 [dataset_id, supply, f"2099-q{uuid.uuid4().hex[:6]}", delivery])
+                 [dataset_id, supply, baseline_periods.made_up("q", 6), delivery])
 
 
 def _arrival(conn, key: str, dataset_id: str, delivery: str, at: datetime, **kw) -> str:

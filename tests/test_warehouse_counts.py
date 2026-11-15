@@ -13,6 +13,8 @@ import uuid
 
 import pytest
 
+import baseline_periods
+
 import rebuild_support
 from pipeline import build_dashboard_data as bdd
 from qa_tools.common import decision_log as dl, qa_results_writer, supply_db
@@ -87,7 +89,7 @@ def _uid(prefix):
 
 @pytest.fixture
 def period():
-    return f"2099-W{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("W", 6)
 
 
 class TestAReadersOnlyReCheckIsPlaced:

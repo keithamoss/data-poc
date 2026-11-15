@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+import baseline_periods
+
 import test_supersession as _base
 from qa_tools.common import (decision_log as dl, period_schema, promotion, substitution,
                              supersession, supply_db)
@@ -17,8 +19,7 @@ AG, COL = "child-protection-family-support", "child-protection"
 
 @pytest.fixture
 def later():
-    import uuid
-    return f"2099-T{uuid.uuid4().hex[:6]}"
+    return baseline_periods.made_up("T", 6)
 
 
 def _promote(conn, supply, table, period, *, kind=dl.RULE, actor="promotion rule", at=WHEN):

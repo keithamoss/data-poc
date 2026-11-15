@@ -124,24 +124,12 @@ class ConfigError:
     problem: str
     fix: str
 
-    # ONE MISTAKE, REPORTED N TIMES, IS STILL ONE MISTAKE
-    # (plans/post-build-review.md #19). `cause` groups errors that share
-    # a single root - a calendar renamed by one character produces one
-    # error per dataset on it - so _report() can say what the root is
-    # ABOVE the detail. It suppresses nothing: every offending item is
-    # still printed individually and the header count is unchanged,
-    # which is Keith's own rule from 2026-09-23. `cause_hint` carries
-    # the one extra sentence that names a likely fix, resolved where the
-    # configuration is in scope rather than at print time.
-    cause: str | None = None
-    cause_hint: str | None = None
-
     # WHICH DATASETS THIS BREAKS, for the header count. A calendar-
     # scoped error used to contribute ZERO to it, however many datasets
     # named that calendar - so a renamed calendar reported "affecting 1
     # dataset(s)" with seven of seven broken, which is the
     # safe-looking direction (post-build-review #18). Structural rather
-    # than parsed back out of `scope`, same reasoning as `cause`.
+    # than parsed back out of `scope`.
     #
     # Empty is meaningful: an error about the asset's own top-level
     # configuration affects no NAMED dataset, and _report says so in
@@ -196,7 +184,7 @@ def _month_number(value) -> int | None:
 #: generated ones up to it.
 _SHAPES: dict[str, str] = {
     "data_asset_id": "a short identifier for this data asset, like 'wa-health-quarterly'",
-    "name": "the calendar's name, as datasets refer to it - like 'quarterly'",
+    "name": "the asset's baseline calendar's name, like 'quarterly'",
     "effective_from": "the date this version starts applying, as YYYY-MM-DD - like 2027-01-01",
     "changelog": ("a list of entries, each a date, an author and the change - like "
                   "[{date: 2027-01-01, author: Jo Bloggs, change: authored 2027 dates}]"),
@@ -211,7 +199,6 @@ _SHAPES: dict[str, str] = {
     "days_before": "a whole number of days, 0 or more, like 1",
     "grace": "a duration with its unit, like 1h or 8h",
     "versions": "a list of versions, each with its own effective_from and changelog",
-    "calendar": "the name of a calendar defined in this file",
     "arrival_pattern": ("a regular expression matching this dataset's own "
                          "delivered filenames, like 'cp_clients\\.csv' - single-quoted, "
                          "because YAML rejects a backslash escape in double quotes"),
@@ -294,6 +281,8 @@ def _schema_errors(raw: dict, src: Source, model=None, file_name: str | None = N
             loc = [str(p) for p in err["loc"]]
             if err["type"] == "extra_forbidden" and loc and loc[-1] in RETIRED_KEYS:
                 continue  # refused by name, with its replacement, by _retired_key_errors
+            if err["type"] == "extra_forbidden" and _baseline_key(loc):
+                continue  # refused by name, with REQ-PIPE-345's rule, by _baseline_errors
             scope = _scope_from_loc(raw, err["loc"])
             where = " -> ".join(loc) or "(top level)"
             field = ".".join(loc) or None
@@ -378,6 +367,92 @@ def _walk_datasets(raw: dict):
         for collection in (agency.get("collections") or []):
             for dataset in (collection.get("datasets") or []):
                 yield dataset, collection
+
+
+# ---- one baseline calendar per asset (REQ-PIPE-345) ------------------
+
+#: Criterion 3's words, which every refusal of a second cadence carries.
+BASELINE_RULE = ("a dataset may not be faster than its asset's baseline; a slower one owes a "
+                 "subset of the baseline's periods, stated under participates; to go faster, "
+                 "change the asset's baseline")
+
+
+def _baseline_key(loc: list[str]) -> bool:
+    """Whether a schema location is a key _baseline_errors refuses by name:
+    `calendar:` on a collection or dataset of either file, or `dates:` on a
+    dataset of calendar.yaml."""
+    if len(loc) == 3 and loc[0] in ("collections", "datasets") and loc[1].isdigit():
+        return loc[2] == "calendar" or (loc[0] == "datasets" and loc[2] == "dates")
+    if loc[:1] == ["hierarchy"] and len(loc) >= 3 and loc[-3] in ("collections", "datasets"):
+        return loc[-1] == "calendar" or (loc[-3] == "datasets" and loc[-1] == "dates")
+    return False
+
+
+def baseline_name(cal_raw: dict) -> str | None:
+    """The asset's baseline calendar's name - the first calendar declared,
+    which _baseline_errors requires to be the only one - or None for an
+    asset that declares none."""
+    for c in (cal_raw or {}).get("calendars") or []:
+        return (c or {}).get("name")
+    return None
+
+
+def _baseline_errors(raw: dict, cal_raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-345 criterion 3: a second calendar, a collection or dataset
+    naming a calendar (in either file), or a dataset stating authored dates
+    of its own - each refused, naming the asset, the item and the file, with
+    the rule that says what to do instead."""
+    out: list[ConfigError] = []
+    asset = (raw or {}).get("data_asset_id") or src.asset_path.parent.name
+    cal_file = src.calendar_name
+    calendars = [(c or {}) for c in (cal_raw.get("calendars") or [])]
+    base = baseline_name(cal_raw)
+    for extra in calendars[1:]:
+        name = extra.get("name")
+        out.append(ConfigError(
+            cal_file, f"calendar {name!r}",
+            f"asset {asset!r} declares a second calendar, {name!r}, beside its baseline "
+            f"{base!r} in {cal_file}; an asset has one baseline calendar.",
+            f"Remove calendar {name!r}: {BASELINE_RULE}.", field="calendars"))
+    for kind, entries in (("collection", cal_raw.get("collections")),
+                          ("dataset", cal_raw.get("datasets"))):
+        for i, entry in enumerate(entries or []):
+            entry = entry or {}
+            item = f"{kind} {entry.get('id')!r}"
+            if "calendar" in entry:
+                out.append(ConfigError(
+                    cal_file, item,
+                    f"asset {asset!r}: {item} names calendar {entry.get('calendar')!r} in "
+                    f"{cal_file}; every {kind} is on the asset's baseline and names none.",
+                    f"Remove `calendar:`: {BASELINE_RULE}.",
+                    field=f"{kind}s.{i}.calendar"))
+            if kind == "dataset" and "dates" in entry:
+                out.append(ConfigError(
+                    cal_file, item,
+                    f"asset {asset!r}: {item} states authored dates of its own (`dates:`) in "
+                    f"{cal_file}; a dataset has only its asset's baseline periods.",
+                    f"Remove `dates:`: {BASELINE_RULE}.", field=f"datasets.{i}.dates"))
+    for agency in (((raw or {}).get("hierarchy") or {}).get("agencies") or []):
+        for collection in ((agency or {}).get("collections") or []):
+            collection = collection or {}
+            named = [(f"collection {collection.get('id')!r}", collection)]
+            named += [(f"dataset {(d or {}).get('id')!r}", d or {})
+                      for d in (collection.get("datasets") or [])]
+            for item, entry in named:
+                if "calendar" in entry:
+                    out.append(ConfigError(
+                        src.name, item,
+                        f"asset {asset!r}: {item} names calendar {entry.get('calendar')!r} in "
+                        f"{src.name}; nothing names a calendar - every dataset is on the "
+                        f"asset's baseline, declared in {cal_file}.",
+                        f"Remove `calendar:`: {BASELINE_RULE}."))
+                if item.startswith("dataset ") and "dates" in entry:
+                    out.append(ConfigError(
+                        src.name, item,
+                        f"asset {asset!r}: {item} states authored dates of its own (`dates:`) "
+                        f"in {src.name}; a dataset has only its asset's baseline periods.",
+                        f"Remove `dates:`: {BASELINE_RULE}."))
+    return out
 
 
 # ---- calendars ------------------------------------------------------
@@ -508,31 +583,6 @@ def _version_date_errors(scope: str, index: int, version: dict, src: Source) -> 
 
 def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
     out: list[ConfigError] = []
-    calendars = {(c or {}).get("name"): (c or {}) for c in (raw.get("calendars") or [])}
-
-    # ONLY SUGGEST A CALENDAR SOMETHING ALREADY USES (#19). The fix line
-    # used to list every defined calendar, which meant that after a
-    # one-character rename it offered the TYPO as a valid option:
-    # follow it literally, point six datasets at `quarterley`, and the
-    # gate goes green with the misspelling committed. A calendar no
-    # dataset references is either brand new or a typo, and neither is
-    # something to steer a broken dataset at.
-    #
-    # Falls back to listing everything when nothing is referenced at
-    # all - a first dataset being added to a fresh asset - because there
-    # is then no usage signal to prefer one by, and an empty list helps
-    # nobody.
-    in_use = {(d or {}).get("calendar") for d, _c in _walk_datasets(raw)
-              if (d or {}).get("calendar") in calendars}
-    options = ", ".join(sorted(n for n in (in_use or set(calendars)) if n))
-
-    # The one defined calendar nothing references, when there is exactly
-    # one, is the likely other half of a rename. More than one and there
-    # is nothing to point at, so nothing is claimed.
-    unreferenced = sorted(n for n in calendars if n and n not in in_use)
-    typo_hint = (f" The calendar {unreferenced[0]!r} is defined and no dataset names it - "
-                 f"if that is the typo, one edit there fixes them all."
-                 if len(unreferenced) == 1 else "")
 
     for dataset, _collection in _walk_datasets(raw):
         dataset = dataset or {}
@@ -556,67 +606,36 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                     f"`{schedule.NOT_YET_AGREED}` is sample data before a schedule is agreed, "
                     f"and it will graduate. `{schedule.NEVER}` is a one-off extraction that "
                     f"has supplies and no cadence at all."))
-            elif named:
-                out.append(ConfigError(
-                    src.name, scope,
-                    f"declares BOTH `calendar: {named}` and "
-                    f"`{schedule.NO_CALENDAR_KEY}: {declared_none}`.",
-                    "Keep one. A dataset either has an agreed schedule or says it has none, "
-                    "and carrying both leaves no way to tell which was meant."))
-            elif dataset.get("delivery_months") or dataset.get("dates"):
+            elif dataset.get("delivery_months"):
                 out.append(ConfigError(
                     src.name, scope,
                     f"declares `{schedule.NO_CALENDAR_KEY}: {declared_none}` and still "
-                    f"subsets or overrides a calendar.",
-                    "`participates:` and `dates:` both describe which of a calendar's "
-                    "periods this dataset takes part in, and there is no calendar here to "
-                    "take part in."))
+                    f"subsets a calendar.",
+                    "`participates:` describes which of the baseline's periods this dataset "
+                    "takes part in, and a dataset with no calendar takes part in none."))
             continue
 
+        # ON THE BASELINE (REQ-PIPE-345 criterion 2): an asset with none
+        # accepts only datasets declaring no calendar (criterion 1).
         if not named:
             out.append(ConfigError(
                 src.name, scope,
-                f"is in {assets.selected().data_asset_yaml.name}'s hierarchy and names no `calendar:` in "
-                f"{src.calendar_name} - "
-                f"neither on the dataset nor on its collection - and no deliberate no-calendar "
-                f"declaration.",
-                f"In {src.calendar_name}, name one of: {options} on the dataset or its "
-                f"collection, or declare "
-                f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` if no schedule has "
-                f"been agreed for it yet (or `{schedule.NEVER}` for a one-off extraction). "
-                f"Without either there is nothing to judge this dataset's supplies against, "
-                f"and a typo'd calendar name would leave it silently expecting nothing."))
-            continue
-        if named not in calendars:
-            out.append(ConfigError(
-                src.name, scope,
-                f"names calendar {named!r}, which this asset does not define.",
-                f"Use one of: {options}, or add that "
-                f"calendar. A dataset on a calendar that does not exist expects nothing.",
-                cause=f"unknown-calendar:{named}",
-                cause_hint=typo_hint))
+                f"is in {assets.selected().data_asset_yaml.name}'s hierarchy, and "
+                f"{src.calendar_name} declares no baseline calendar and no deliberate "
+                f"no-calendar declaration for it.",
+                f"In {src.calendar_name}, declare the asset's baseline under `calendars:`, or "
+                f"declare `{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` for this "
+                f"dataset if no schedule has been agreed for it yet (or `{schedule.NEVER}` "
+                f"for a one-off extraction). Without either there is nothing to judge this "
+                f"dataset's supplies against."))
             continue
 
         months = dataset.get("delivery_months")
-        overrides = dataset.get("dates")
-
-        if months and overrides:
-            out.append(ConfigError(
-                src.name, scope,
-                "carries BOTH a `participates:` list and its own `dates:`.",
-                "Keep one. Subsetting a calendar and replacing it are different acts, and "
-                "carrying both leaves no way to tell which was meant."))
 
         # Months are checked per participation version, against the calendar
         # versions each overlaps, in _participation_errors (REQ-PIPE-110
         # criterion 7) - not here on the newest version alone.
 
-        if overrides is not None and not overrides:
-            out.append(ConfigError(
-                src.name, scope,
-                "has a `dates:` key with nothing in it.",
-                "Remove the key to use the calendar's own dates, or author real ones. As "
-                "written this dataset expects nothing."))
         if months is not None and not months:
             out.append(ConfigError(
                 src.name, scope,
@@ -700,22 +719,18 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
         if any((v or {}).get("cadence") for v in versions):
             continue  # a rule generates a period every day; it cannot be empty
 
-        own = dataset.get("dates")
-        if own:
-            periods = {(e or {}).get("period") for e in own}
-        else:
-            months = dataset.get("delivery_months")
-            wanted = {n for n in (_month_number(m) for m in (months or [])) if n}
-            periods = set()
-            for version in versions:
-                for entry in ((version or {}).get("dates") or []):
-                    entry = entry or {}
-                    try:
-                        when = date.fromisoformat(str(entry.get("date")))
-                    except (TypeError, ValueError):
-                        continue
-                    if not months or when.month in wanted:
-                        periods.add(entry.get("period"))
+        months = dataset.get("delivery_months")
+        wanted = {n for n in (_month_number(m) for m in (months or [])) if n}
+        periods = set()
+        for version in versions:
+            for entry in ((version or {}).get("dates") or []):
+                entry = entry or {}
+                try:
+                    when = date.fromisoformat(str(entry.get("date")))
+                except (TypeError, ValueError):
+                    continue
+                if not months or when.month in wanted:
+                    periods.add(entry.get("period"))
 
         excluded = {(e or {}).get("period") for e in (dataset.get("not_expected") or [])}
         remaining = {p for p in periods if p and p not in excluded}
@@ -1094,37 +1109,32 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
 def _merged_view(raw: dict, cal_raw: dict) -> dict:
     """The asset file with each dataset's agreement filled in from
     calendar.yaml, in the shape the calendar and dataset checks above read:
-    its calendar (its own, else its collection's), its newest version's
-    participates as `delivery_months`, not_expected, its own dates flattened,
-    and its no-calendar declaration. A VIEW FOR CHECKING ONLY - nothing
+    its calendar - the asset's baseline, never one a collection or dataset
+    names (REQ-PIPE-345 criterion 2) - its newest version's participates as
+    `delivery_months`, not_expected, and its no-calendar declaration. A VIEW FOR CHECKING ONLY - nothing
     writes it back, and the two files stay the only statements."""
     import copy
 
     merged = copy.deepcopy(raw)
     merged["calendars"] = list(cal_raw.get("calendars") or [])
     by_dataset = {(d or {}).get("id"): (d or {}) for d in (cal_raw.get("datasets") or [])}
-    by_collection = {(c or {}).get("id"): (c or {}) for c in (cal_raw.get("collections") or [])}
-    for dataset, collection in _walk_datasets(merged):
+    base = baseline_name(cal_raw)
+    for dataset, _collection in _walk_datasets(merged):
         entry = by_dataset.get((dataset or {}).get("id"), {})
-        own = entry.get("calendar")
+        # A `calendar:` or `dates:` written in the hierarchy is not read either
+        # (REQ-PIPE-345): _baseline_errors refuses both by name.
+        dataset.pop("calendar", None)
+        dataset.pop("dates", None)
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             dataset[schedule.NO_CALENDAR_KEY] = entry[schedule.NO_CALENDAR_KEY]
-            if own:
-                dataset["calendar"] = own
-        else:
-            named = own or by_collection.get((collection or {}).get("id"), {}).get("calendar")
-            if named:
-                dataset["calendar"] = named
+        elif base:
+            dataset["calendar"] = base
         versions = ((entry.get("participation") or {}).get("versions")) or []
         months = (versions[-1] or {}).get("participates") if versions else None
         if isinstance(months, list):
             dataset["delivery_months"] = months
         if entry.get("not_expected"):
             dataset["not_expected"] = entry["not_expected"]
-        own_dates = [d for v in (((entry.get("dates") or {}).get("versions")) or [])
-                     for d in ((v or {}).get("dates") or [])]
-        if own_dates:
-            dataset["dates"] = own_dates
     return merged
 
 
@@ -1272,7 +1282,7 @@ def _defaults_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
         if not versions:
             continue
         scope = f"collection {cid!r}"
-        cal_name = c.get("calendar")
+        cal_name = baseline_name(cal_raw)
         calendar = calendars.get(cal_name, {})
         windows = _version_windows(versions)
         for i, (version, (start, end)) in enumerate(zip(versions, windows), start=1):
@@ -1337,13 +1347,9 @@ def _defaults_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
                     after = _months_owed(None, calendar)
                     # Every dataset of the collection whose version in force
                     # on any date this one governs takes participates from
-                    # above - naming its collection's calendar explicitly
-                    # (F1) and having stated months earlier (F5) included.
+                    # above - having stated months earlier (F5) included.
                     affected = []
                     for ds in members.get(cid, []):
-                        own_cal = entries.get(ds, {}).get("calendar")
-                        if own_cal and own_cal != cal_name:
-                            continue
                         mine = _raw_versions(entries.get(ds, {}).get("participation"))
                         windows_ds = _version_windows(mine)
                         if any(not _gives(v, "participates")
@@ -1391,8 +1397,8 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
         if cid in collections:
             out.append(ConfigError(
                 file_name, f"collection {cid!r}", f"is listed twice in {file_name}.",
-                "Keep one entry. With two, the later silently decides which calendar the "
-                "collection is on."))
+                "Keep one entry. With two, the later silently decides the collection's "
+                "defaults."))
         collections[cid] = c or {}
     entries: dict = {}
     for e in (cal_raw.get("datasets") or []):
@@ -1420,7 +1426,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 f"Correct the id, or add the dataset to {src.name}. The two files have to "
                 f"agree about what exists."))
 
-    own_names: set[str] = set()
+    base = baseline_name(cal_raw)
     names = {c.get("id"): c.get("name") or c.get("id") for _d, c in walked}
     # CRITERION 12: one collection-level value leaving several datasets
     # without a due time is one root cause, reported once.
@@ -1430,11 +1436,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
         entry = entries.get(ds, {})
         scope = f"dataset {ds!r}"
         cid = collection.get("id")
-        coll_cal = collections.get(cid, {}).get("calendar")
-        on_own_calendar = bool(entry.get("calendar")) and entry.get("calendar") != coll_cal
         defaults = _raw_versions(collections.get(cid, {}).get("participation_defaults"))
-        for v in (((entry.get("dates") or {}).get("versions")) or []):
-            own_names |= {str((d or {}).get("period")) for d in ((v or {}).get("dates") or [])}
         seen_periods: set = set()
         for item in (entry.get("not_expected") or []):
             period = (item or {}).get("period")
@@ -1454,7 +1456,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                     "a reader of the page will see."))
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             continue
-        cal_name = entry.get("calendar") or collections.get(collection.get("id"), {}).get("calendar")
+        cal_name = base
         if not cal_name:
             continue  # reported by the dataset checks, naming both files
         versions = [(v or {}) for v in (((entry.get("participation") or {}).get("versions")) or [])]
@@ -1462,35 +1464,17 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
             out.append(ConfigError(
                 file_name, scope,
                 f"is on calendar {cal_name!r}"
-                + ("" if ds in entries else f" (through its collection) and has no entry in {file_name}")
+                + ("" if ds in entries else f" (its asset's baseline) and has no entry in {file_name}")
                 + " - it has no participation versions, so nothing says when it is due.",
                 "Add it to `datasets:` with `participation: {versions: [...]}`, at least one "
                 "version stating its effective_from, expected_time and grace (criterion 3)."))
             continue
         calendar = calendars.get(cal_name, {})
         windows = _version_windows(versions)
-        # A CALENDAR THAT DOES NOT EXIST is already one error, with its fix;
-        # what the dataset would or would not take from above follows from
-        # it and is not a second mistake to report.
         known = cal_name in calendars
-        # CRITERION 9: a dataset on another calendar states what it would
-        # otherwise take from its collection - months and windows written
-        # for one calendar never land silently on another.
-        if known and on_own_calendar and defaults:
-            taken = [k for k in _RESOLVED
-                     if any(_gives(d, k) for d in defaults)
-                     and any(not _gives(v, k) for v in versions)]
-            if taken:
-                out.append(ConfigError(
-                    file_name, scope,
-                    f"names calendar {cal_name!r}, not its collection's {coll_cal!r}, and would "
-                    f"take {', '.join(taken)} from {names.get(cid)}'s participation_defaults, "
-                    f"which were written for {coll_cal!r}.",
-                    f"State {', '.join(taken)} on every one of this dataset's participation "
-                    f"versions."))
         for i, (version, (start, end)) in enumerate(zip(versions, windows), start=1):
             label = f"participation version {i} (effective {start})"
-            above = None if on_own_calendar else _governing(defaults, start, end)
+            above = _governing(defaults, start, end)
             out += [ConfigError(file_name, scope, prob, fix)
                     for prob, fix in _inherit_misuse(version, label)]
             months = version.get("participates")
@@ -1529,7 +1513,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 if above is not None and all(_gives(d, key) for d in above):
                     continue
                 unresolved.setdefault((cid, key, what), []).append(
-                    (ds, label, start, end, calendar, on_own_calendar))
+                    (ds, label, start, end, calendar))
             if _gives(version, "grace"):
                 problem = _duration_error(version.get("grace"), f"{scope} grace")
                 if problem:
@@ -1587,7 +1571,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 if version.get("participates") == _INHERIT:
                     prev_value = previous.get("participates")
                     if not _gives(previous, "participates"):
-                        prev_above = None if on_own_calendar else _governing(
+                        prev_above = _governing(
                             defaults, str(previous.get("effective_from")), start)
                         prev_value = (prev_above[-1].get("participates")
                                       if prev_above and _gives(prev_above[-1], "participates")
@@ -1621,7 +1605,7 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
         # ONCE ONLY WHERE THE COLLECTION COULD BE THE FIX (Keith, 2026-10-11,
         # on the critic's F6): it has defaults, and the datasets take them.
         has_defaults = bool(_raw_versions(collections.get(cid, {}).get("participation_defaults")))
-        grouped = [g for g in gaps if has_defaults and not g[5]]
+        grouped = [g for g in gaps if has_defaults]
         if len({g[0] for g in grouped}) < 2:
             grouped = []
         datasets = sorted({g[0] for g in grouped})
@@ -1634,25 +1618,16 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 f"State `{key}:` on {names.get(cid)}'s participation_defaults (or on each "
                 f"dataset). A period owed with no {what} has no due instant to judge a supply "
                 f"against."))
-        for ds, label, start, end, calendar, _own in [g for g in gaps if g not in grouped]:
+        for ds, label, start, end, calendar in [g for g in gaps if g not in grouped]:
             out.append(ConfigError(
                 file_name, f"dataset {ds!r}",
                 f"{label} states no {key}, so the periods it governs have no {what}: "
                 f"{_governed_periods(calendar, start, end)}. Looked in: the dataset's "
                 f"participation versions and its collection's participation_defaults in "
                 f"{file_name}.",
-                f"Add `{key}:` to this version"
-                + ("" if _own else ", or to the collection's participation_defaults")
-                + f". A period owed with no {what} has no due instant to judge a supply "
+                f"Add `{key}:` to this version, or to the collection's "
+                f"participation_defaults. A period owed with no {what} has no due instant to judge a supply "
                   f"against."))
-    # CRITERION 35: a dataset's own period names are not a calendar's.
-    calendar_names = {str((d or {}).get("period")) for c in calendars.values()
-                      for v in (c.get("versions") or []) for d in ((v or {}).get("dates") or [])}
-    for clash in sorted(own_names & calendar_names):
-        out.append(ConfigError(
-            file_name, None,
-            f"period name {clash!r} is used by a dataset's own dates and by a calendar.",
-            "Name the dataset's own period differently - one name, one period, one schema."))
     return out
 
 
@@ -1715,13 +1690,12 @@ def _turn_off_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
         members.setdefault((c or {}).get("id"), []).append((d or {}).get("id"))
 
     def inheriting(cid) -> list[str]:
-        """The datasets taking cid's defaults - on its calendar (REQ-PIPE-181
-        criterion 9) and with participation of their own to resolve."""
-        coll_cal = collections.get(cid, {}).get("calendar")
+        """The datasets taking cid's defaults - every one on the baseline
+        (REQ-PIPE-345) with participation of its own to resolve."""
         return [ds for ds in members.get(cid, [])
-                if not (entries.get(ds, {}).get("calendar")
-                        and entries.get(ds, {}).get("calendar") != coll_cal)
-                and not entries.get(ds, {}).get(schedule.NO_CALENDAR_KEY)]
+                if not entries.get(ds, {}).get(schedule.NO_CALENDAR_KEY)]
+
+    base = calendars.get(baseline_name(cal_raw), {})
 
     # Every changelog entry in the file: turns_off is true or absent.
     def walk(node, where):
@@ -1825,15 +1799,13 @@ def _turn_off_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
     collection_gaps: dict = {}
     for cid, c in collections.items():
         versions = _raw_versions(c.get("participation_defaults"))
-        cals = [calendars.get(entries.get(ds, {}).get("calendar") or c.get("calendar"), {})
-                for ds in inheriting(cid)] or [calendars.get(c.get("calendar"), {})]
-        gaps = check_versions(versions, f"collection {cid!r}", "participation_defaults", cals)
+        gaps = check_versions(versions, f"collection {cid!r}", "participation_defaults", [base])
         collection_gaps[cid] = [(to, nxt, why, versions) for to, nxt, why in gaps]
     for d, c in _walk_datasets(raw):
         ds, cid = (d or {}).get("id"), (c or {}).get("id")
         entry = entries.get(ds, {})
         scope = f"dataset {ds!r}"
-        cal = calendars.get(entry.get("calendar") or collections.get(cid, {}).get("calendar"), {})
+        cal = base
         versions = _raw_versions(entry.get("participation"))
         gaps = [(to, nxt, why, "set for this dataset")
                 for to, nxt, why in check_versions(versions, scope, "participation", [cal])]
@@ -2023,14 +1995,8 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
                                            "stated with days before, of at most 1 (REQ-PIPE-324 "
                                            "criterion 4); state 0 here."))
                     break
-                # CRITERION 13: a dataset with its own dates only at 0.
-                if d.own_dates is not None:
-                    out.append(ConfigError(name, scope,
-                                           f"states {_OFFSET_KEY} {v.value} on the version "
-                                           f"effective {v.effective_from.isoformat()}, and its "
-                                           f"dataset {did!r} carries its own dates.",
-                                           "A dataset with its own dates is supported only at 0 "
-                                           "- give it its collection's calendar, or state 0."))
+                # REQ-PIPE-320 criterion 13's own-dates refusal went with own
+                # dates (REQ-PIPE-345): no dataset states dates of its own.
         out += _rise_errors(name, cid, scope, on_calendar, versions, agr)
     return out
 
@@ -2210,9 +2176,8 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
 
 
 def _collection_calendars(cid: str, agr) -> tuple[str, list[str]]:
-    """(collection name, each distinct authored-or-rule calendar its datasets
-    name, in hierarchy order) - every calendar, never only the first
-    member's (critic finding 6)."""
+    """(collection name, the calendar its datasets are on) - the asset's
+    baseline, once, where any member is on it (REQ-PIPE-345)."""
     from qa_tools.common import hierarchy
 
     try:
@@ -2328,7 +2293,14 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors = _retired_key_errors([(raw, src.name), (cal_raw, cal_path.name)])
     errors += _schema_errors(raw, src)
     errors += _schema_errors(cal_raw, src, CalendarFile, cal_path.name)
+    errors += _baseline_errors(raw, cal_raw, src)
     errors += _calendar_errors(cal_raw, cal_src)
+    if len(cal_raw.get("calendars") or []) > 1:
+        # TWO CALENDARS AND NOTHING BELOW CAN BE JUDGED (REQ-PIPE-345): every
+        # later check reads the datasets' periods off the one baseline, and
+        # guessing which of two is meant would judge them against the wrong
+        # one. The refusals above say what to do; the rest waits for it.
+        return _attribute(errors, merged)
     errors += _dataset_errors(merged, cal_src)
     errors += _participation_errors(cal_raw, raw, src)
     errors += _defaults_errors(cal_raw, raw, src)
@@ -2520,31 +2492,6 @@ def _report(errors: list[ConfigError]) -> None:
     subject = f"{len(datasets)} dataset(s)" if datasets else "the asset's own configuration"
     headline = f"schedule validation FAILED - {len(errors)} error(s) affecting {subject}:"
     print(_colour(headline, "1;31"), file=sys.stderr)
-
-    # THE SHARED CAUSE, ONCE, ABOVE THE DETAIL (#19). One calendar
-    # renamed by a character produces one error per dataset on it, and
-    # the detail below correctly describes N broken datasets - while the
-    # repair is one edit in the calendar they all name. Printed here so
-    # a reader meets the root before the symptoms, and only when there
-    # is genuinely something to aggregate: a single error is not a
-    # shared cause, and a line restating it would be noise.
-    #
-    # NOTHING IS SUPPRESSED. Every offending item is still printed
-    # individually below and the count in the header is unchanged -
-    # Keith's own rule, 2026-09-23, against the reviewer's
-    # cause-suppression recommendation. This adds a line; it removes
-    # none.
-    by_cause: dict[str, list[ConfigError]] = defaultdict(list)
-    for error in errors:
-        if error.cause:
-            by_cause[error.cause].append(error)
-    for cause, shared in sorted(by_cause.items()):
-        if len(shared) < 2:
-            continue
-        _kind, _, value = cause.partition(":")
-        print(_colour(f"\n  {len(shared)} datasets name calendar {value!r}, which this "
-                       f"asset does not define.{shared[0].cause_hint or ''}", "1;33"),
-              file=sys.stderr)
 
     by_file: dict[str, dict[str | None, list[ConfigError]]] = defaultdict(lambda: defaultdict(list))
     for error in errors:

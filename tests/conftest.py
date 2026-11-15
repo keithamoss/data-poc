@@ -329,6 +329,17 @@ def selected_asset(monkeypatch, request):
 
 
 @pytest.fixture
+def test_baseline(tmp_path):
+    """`test_baseline(*periods)` declares made-up periods on the selected
+    asset's baseline, in a copy of its folder, so a period schema may be
+    created for them (REQ-PIPE-345 criterion 5) - see tests/baseline_periods.py.
+    Requested by a test that needs it; never applied to the suite as a whole."""
+    import baseline_periods
+
+    return lambda *periods: baseline_periods.declare(*periods, root=tmp_path)
+
+
+@pytest.fixture
 def asset_folder(tmp_path):
     """THE ONE FIXTURE THAT POINTS THE RESOLVER AT AN ASSET FOLDER
     (REQ-PIPE-342 criterion 7), in place of monkeypatching a path constant.

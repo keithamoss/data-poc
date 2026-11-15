@@ -14,6 +14,8 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
+
+import baseline_periods
 from click.testing import CliRunner
 
 import carry_forward_support
@@ -278,13 +280,13 @@ class TestADecisionThatDoesNotStandOpensNothing:
     def _held(self, conn):
         import test_place_held_supply as place_support
 
-        return place_support._held(conn, f"2099-H{uuid.uuid4().hex[:6]}")
+        return place_support._held(conn, baseline_periods.made_up("H", 6))
 
     def test_a_placement_opens_its_period_once_it_stands(self, conn):
         import test_place_held_supply as place_support
 
         supply, _table = self._held(conn)
-        target = f"2099-P{uuid.uuid4().hex[:6]}"
+        target = baseline_periods.made_up("P", 6)
         assert not period_schema.opened(conn, target)
         assert place_support._place(conn, supply, target).changed
         assert period_schema.opened(conn, target)
@@ -296,7 +298,7 @@ class TestADecisionThatDoesNotStandOpensNothing:
         import test_place_held_supply as place_support
 
         supply, _table = self._held(conn)
-        target = f"2099-P{uuid.uuid4().hex[:6]}"
+        target = baseline_periods.made_up("P", 6)
         self._fails_owing(monkeypatch)
         with pytest.raises(RuntimeError):
             place_support._place(conn, supply, target)

@@ -131,6 +131,14 @@ releases:
               A second new check fails when the two assets' dbt projects ask
               for different package versions, naming the first difference and
               the command to run once both match.
+          - headline: One calendar for each asset
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Each asset's calendar.yaml now holds one baseline calendar, and
+              every dataset is on it. The check fails a second calendar, a
+              collection or dataset naming one, or a dataset with dates of its
+              own; a slower dataset owes some of the baseline's periods
+              instead.
       - category: Fixed
         items:
           - headline: Ticket sync respects ticketing off
