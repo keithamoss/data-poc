@@ -47852,7 +47852,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever runs both assets on one machine, I want each asset's generated files kept apart, so that bootstrapping or resetting one never reads, overwrites or replays the other's.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -47872,6 +47872,32 @@ requirements:
     - REQ-PIPE-363
     - REQ-TEST-117
     - REQ-TEST-160
+    linked_tests:
+    - tests/test_checkpoints.py::TestEachAssetSeesOnlyItsOwn
+    - tests/test_checkpoints.py::TestOnlyASyntheticAsset
+    - tests/test_replay_inputs.py::TestOneInputList
+    - tests/test_replay_inputs.py::TestAnEditToOneAssetLeavesTheOthersKey
+    - tests/test_replay_inputs.py::TestTheCommandPrintsTheSelectedAssetsKey
+    - tests/test_one_asset_beside_another.py
+    - tests/test_state_paths_at_call_time.py
+    implemented_by:
+    - qa_tools/common/assets.py::data_dir
+    - qa_tools/common/assets.py::reports_dir
+    - qa_tools/common/checkpoints.py::listed
+    - qa_tools/common/checkpoints.py::resumes
+    - qa_tools/common/checkpoints.py::delete
+    - qa_tools/common/checkpoints.py::require_synthetic
+    - qa_tools/common/replay_inputs.py::inputs
+    - qa_tools/common/replay_inputs.py::replay_patterns
+    - qa_tools/common/replay_inputs.py::cache_key
+    - cli/pipeline.py::cache_key_command
+    - cli/pipeline.py::checkpoint_list_command
+    - cli/env.py::reset_synthetic_command
+    evidence:
+    - '2026-11-15 (Perth), split T3, tree f4b2598c (this sandbox, shared with other builders): `uv run pytest` over tests/test_checkpoints.py, test_one_asset_beside_another.py, test_ci_bootstrap_cache.py, test_replay_inputs.py, test_ci_on_demand.py, test_ci_usage.py, test_devcontainer.py, test_postgres_version.py, test_no_calendar.py, test_validate_imports.py, test_state_paths_at_call_time.py, test_cli_asset_selection.py, test_db_identity.py::TestEveryPlaceMarksItsOwn and test_publish.py''s TestNeitherHalfOfCIQuietlyStopsCovering, TestTheWorkflowCarriesEveryVariableThePipelineNeeds and TestACriticalTestCIcannotRunFailsCollection, -n 3 - 308 passed, 1 skipped (test_no_calendar.py:414, npm not installed in this sandbox), 570s.'
+    - 'Seen failing first, the new tests run against the base''s code (647861ed) before any product change: test_checkpoints.py::TestEachAssetSeesOnlyItsOwn - 4 failed (a quarterly checkpoint named mothman_ckpt_cp_..., listed for daily, and quarterly''s prune dropped a daily checkpoint of the same source); test_replay_inputs.py''s new per-asset tests - 13 failed (no per-asset key or inputs).'
+    - 'c5''s test shown able to fail, 2026-11-15: with the copy''s resolver edited to send every asset''s data/ to data/daily, the quarterly direction failed at its first command - `cp generate-synthetic-data` read daily''s populated receipts (KeyError ''received_at''). The test is not a defect fix: criterion 5''s behaviour already held; it had no test.'
+    - 'c1 and c4 as recorded at the split T0 status pass (HEAD 8df9ddb5); c5''s test exercises both - each command writes under its own data/<asset>/ and reports/<asset>/ in the copy and the other asset''s are byte-identical after every one, in both directions.'
     decisions:
     - 'STATE FOLLOWS THE ASSET (delivery-scoper): the four data/ paths test.yml caches (lines 410-414 today) and every reports/ file become per asset; scenario_placements.json was missing from v1 (architect SHOULD).'
     - 'PROVIDERS STAY OUT OF THE REPLAY INPUTS (architect v3 SHOULD 5): REPLAY_INPUTS excludes generators, which are compared as deliveries; providers moved under assets/<asset>/synthetic/ would otherwise land in ''the asset''s whole folder'', and any provider edit would restart a resume. Amendment A43.'
@@ -47882,6 +47908,12 @@ requirements:
       selected asset''s checkpoints, and there is no per-asset test; c3 - replay_inputs.INPUTS hashes assets/** (every asset) into ONE cache key, so it is not keyed on the selected asset (KEY_PREFIX bump and
       the providers exclusion are done); c5 - no test runs a command for one asset beside the other''s populated data/ and reports/ and compares them byte for byte. Left not_started: two of five met. The split
       plan''s T3 owns c3 and c5.'
+    - 'BUILT 2026-11-15 (split T3, branch wip/split-t3): c2 - every checkpoint and resume database is named for its asset (mothman_ckpt_<asset>_..., mothman_resume_<asset>_...), and listed(), resumes(), find(), delete() and the prune read the selected asset''s names alone; delete() refuses another asset''s before asking the server, so the refusal reads the same whether or not that database exists. An asset name has no underscore (assets.NAME_PATTERN), so one asset''s prefix is never the start of another''s. A name longer than PostgreSQL''s 63 characters is refused rather than truncated.'
+    - 'BY NAME, NOT BY THE SOURCE DATABASE (split T3): a resume carries no description, so the asset has to be in its name to be told apart; and a checkpoint of a test''s scratch database has a source that is no asset''s database name. REJECTED filtering on the comment''s source field.'
+    - 'PROVISIONAL (split T3): a checkpoint or resume taken before this change, named mothman_ckpt_<short>_..., is now listed for neither asset and cannot be deleted through mothman (delete() refuses a name that is not the selected asset''s). They are throwaway copies on a sandbox server; drop one by hand with DROP DATABASE. Question for Keith: is that acceptable, or should `checkpoint list` name the unclaimed old ones and `checkpoint delete` accept them?'
+    - 'c3 BUILT (split T3): INPUTS is the shared inputs - assets/** replaced by assets/environments.yaml - and inputs(asset) adds assets/<asset>/** for the selected asset (default) or a named one; cache_key(asset) is KEY_PREFIX + <asset> + ''-'' + the digest, so two assets'' keys differ whatever their files. REPLAY_INPUTS keeps its name as the shared half less the generators, and replay_patterns(asset) adds the asset''s folder less its synthetic/collections/. KEY_PREFIX bumped v3 -> v4 (the key changed meaning). INPUTS still starts with generator/** and lists the shared packages, so REQ-TEST-384 c14''s list check is unchanged.'
+    - 'ANOTHER ASSET''S CONFIGURATION CAN STILL CHANGE A BOOTSTRAP''S OUTCOME, NOT ITS OUTPUT (split T3, checked before keying per asset): generator/scenario_injection.py reads every asset''s hierarchy (every_asset) only to refuse a scenario naming a dataset no asset declares. A daily edit can therefore make a quarterly bootstrap refuse, never make it produce different data, so a quarterly cache kept across that edit holds nothing stale.'
+    - 'c5 BUILT (split T3): tests/test_one_asset_beside_another.py copies every file git considers part of the checkout into a temporary folder and runs each command there for real (python -m cli.app, its own process, MOTHMAN_ASSET and a scratch database of its own): <short> generate-synthetic-data, pipeline cache-key, pipeline checkpoint list, env reset-synthetic, dashboard rebuild-results, dashboard build-data, and a bootstrap refused for its arrival number after regenerating to count (the NFR''s failed bootstrap). The other asset''s data/ and reports/ are populated with a file of each kind criterion 1 names plus dbt scratch and both ticket files, and compared byte for byte after every command, in both directions. In a copy because the suite never writes the real reports/; the copy''s own code is asserted to be the code imported. A resume is not run - it needs a bootstrapped checkpoint, minutes of work; its paths are the checkpoint ones c2''s tests cover.'
     open_questions: []
   - id: REQ-QAC-368
     title: Each asset has a dbt project of its own under assets/<asset>/dbt/, taking the shared macros and generic tests from dbt_shared/ through its macro-paths and test-paths, and its packages are installed by `mothman env dbt-deps`
@@ -48615,7 +48647,7 @@ requirements:
     date_written: '2026-10-31'
     story: As Keith paying for CI from a 2,000-minute monthly allowance, I want both assets checked on every push at about the cost of checking today's one combined asset, so that the split does not cut how often finished work can be pushed.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48642,6 +48674,23 @@ requirements:
     - REQ-TEST-260
     - REQ-QAC-368
     - REQ-PIPE-369
+    linked_tests:
+    - tests/test_ci_bootstrap_cache.py
+    - tests/test_replay_inputs.py::TestAnEditToOneAssetLeavesTheOthersKey
+    - tests/test_replay_inputs.py::TestTheCommandPrintsTheSelectedAssetsKey
+    - tests/test_db_identity.py::TestEveryPlaceMarksItsOwn::test_every_ci_job_with_a_database
+    - tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering
+    - tests/test_publish.py::TestTheWorkflowCarriesEveryVariableThePipelineNeeds
+    - tests/test_validate_imports.py::test_each_new_package_once_it_exists_is_named_in_every_list
+    implemented_by:
+    - .github/workflows/test.yml
+    - qa_tools/common/replay_inputs.py::cache_key
+    - cli/pipeline.py::cache_key_command
+    evidence:
+    - '2026-11-15 (Perth), split T3, tree f4b2598c: the same targeted run as REQ-PIPE-365''s evidence - 308 passed, 1 skipped (npm not installed), 570s - including tests/test_ci_bootstrap_cache.py (19 tests) and the other workflow-reading tests.'
+    - 'Seen failing first: tests/test_ci_bootstrap_cache.py run against the base workflow (647861ed''s test.yml put back in place, then restored) - 15 failed, 4 passed: no per-asset key, restore or save step, no side-by-side bootstrap, one restored/rebuilt line.'
+    - 'Every run block of test.yml passes `bash -n` (expressions replaced by a placeholder). actionlint is not installed here and installing it was not permitted, so the workflow has not been linted, and none of it has run on a GitHub runner - every push of this work carried [skip ci].'
+    - 'c3, c4, c8 and c9 as recorded at the split T0 status pass (HEAD 8df9ddb5), unchanged here.'
     decisions:
     - A CEILING ON CACHE-HIT CI MINUTES, AND THE CACHE-MISS FIGURE RECORDED (Keith, 2026-10-31, draft Q5 (a), with the architect's addition). REJECTED (b), measure and report only, and (c), a ceiling on both CI and each bootstrap.
     - 'ONE DEPLOYMENT JOB, NOT TWO (Keith, 2026-10-31, architect Q2 (a)): criterion 2. REJECTED a job per asset, which would report a daily failure sooner but bill a second runner on every push.'
@@ -48651,6 +48700,25 @@ requirements:
       env dbt-deps` per asset in all three test.yml jobs and critical.yml) and c9 (--cov=assets on both test.yml coverage lines, assets in coverage''s source). UNMET c1 - one cache key (replay_inputs.INPUTS
       hashes assets/**) and one cache cover both assets; c2 - the bootstraps run one after the other in a for-loop, not side by side; c5 - one restored/rebuilt line for the job, not per asset; c7 - no ci-usage
       figures before and after. NOT CONFIRMED c6 (the fast half''s skip count; needs a hand-started test.yml). Left not_started: four of nine met; the split plan''s T3 owns the rest.'
+    - 'c1, c2 AND c5 BUILT (split T3, branch wip/split-t3): test.yml keys each asset with `MOTHMAN_ASSET=<asset> mothman pipeline cache-key` (one step output per asset), and restores and saves each asset''s own cache - ci-cache/supply_<asset>.dump and its four data/<asset>/ paths, no wildcard reaching the other asset - in a restore and a save step per asset. One step restores each hit''s dump and prints ''<asset>: bootstrap RESTORED from cache key <key>'' or ''<asset>: bootstrap REBUILT - no cache for key <key>'', handing the misses on as REBUILT_ASSETS; the bootstrap starts every missed asset at once in the background, each its own process with its own MOTHMAN_ASSET and DSN, its lines prefixed [<asset>], and fails naming each that failed. Still one deployment job, no matrix.'
+    - 'A CACHE STEP PER ASSET, WRITTEN OUT (split T3): actions/cache cannot loop, so the quarterly and daily steps are named in the workflow. tests/test_ci_bootstrap_cache.py fails when an asset folder has no restore and save step of its own, and the restore step fails on the runner, naming the asset, for one it has no cache output for. REJECTED a job matrix over assets (a second runner, which c2 and Keith''s architect Q2 (a) rule out) and one combined cache with per-asset files in it (a daily edit would miss both, which c1 exists to stop).'
+    - 'THE WORKFLOW''S SHELL IS RUN LOCALLY, NOT ONLY READ (split T3): the side-by-side bootstrap step is executed with uv stood in for by a stub that waits for the other asset to start, so one-after-the-other would fail it, and a failure in one asset is shown to fail the step naming that asset only; the restore step is executed with pg_restore stood in for, checking its per-asset lines and REBUILT_ASSETS. Neither has run on a GitHub runner (all pushes [skip ci]).'
+    unmet_criteria:
+    - blocked_by:
+        unowned: true
+      criterion: 'Criteria 1, 2 and 5 on GitHub''s runner - each asset''s cache restored or saved under its own key, both bootstraps side by side within the one job, and a per-asset RESTORED/REBUILT line in the Actions log.'
+      owner: 'the first hand-started test.yml run after the split''s push'
+      why: 'test.yml cannot run from this sandbox, and no hand-started run was made (about 80-145 billable minutes). Its steps are asserted from the YAML and the two shell steps executed locally with stand-ins (decisions).'
+    - blocked_by:
+        unowned: true
+      criterion: 'Criterion 6 - the fast half''s skip count at zero with both assets present.'
+      owner: 'the first hand-started test.yml run after the split''s push'
+      why: 'Not confirmed. The local reproduction (an empty scratch database, data/ and reports/ aside, the whole fast half) is the full suite, which this build was told not to run on a shared machine.'
+    - blocked_by:
+        unowned: true
+      criterion: 'Criterion 7 - billable minutes from `mothman github ci-usage` of a cache-hit and a cache-miss run before and after the split, and the 10 percent ceiling on the cache-hit run.'
+      owner: 'a hand-started test.yml run, cache miss then cache hit, after the split''s push'
+      why: 'Needs real runs; none was started (Keith''s budget, REQ-TEST-260).'
     open_questions: []
   - id: REQ-PIPE-372
     title: Until REQ-PIPE-255 gives an asset its own hosting, a publish is refused for any asset whose data-asset.yaml does not hold today's publish setting - only the quarterly asset holds it - exiting non-zero and pointing to `mothman dashboard rebuild`
