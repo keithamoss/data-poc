@@ -91,6 +91,15 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # lru_cache or cache needs a reviewed reason.
     ("caches", ["uv", "run", "python3", "-m", "qa_tools.common.validate_caches"],
      "no unreviewed functools cache under qa_tools/ or pipeline/", False),
+    # REQ-TEST-384: the separation between the shared reading code, the real
+    # pipeline, the generator, scenarios/, the bootstrap and cli/, checked on
+    # every change rather than remembered. Repository-wide.
+    ("imports", ["uv", "run", "mothman", "dashboard", "validate-imports"],
+     "no import across a forbidden edge between pipeline, generator and the rest", False),
+    # REQ-TEST-388: every asset's dbt project on the same packages, compared
+    # across assets - so once, never once per asset.
+    ("dbt packages", ["uv", "run", "mothman", "dashboard", "validate-dbt-packages"],
+     "every asset's dbt packages.yml and package-lock.yml agree", False),
     # The one gate with a warning state today: REQ-PIPE-053's low
     # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],
@@ -187,7 +196,8 @@ _DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 #: Gates that read no asset's configuration: run once, whatever
 #: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
 #: criterion 9).
-_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "npm test", "pytest"})
+_REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "imports", "dbt packages",
+                              "npm test", "pytest"})
 
 
 def _asset_passes(label: str) -> list[dict]:

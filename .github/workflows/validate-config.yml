@@ -51,6 +51,17 @@ on:
       - "assets/**"
       - "dbt_shared/**"
       - "qa_tools/**"
+      # Every directory the imports gate reads (REQ-TEST-384 criterion 12),
+      # and its allowlist, so a push changing only one of them still runs it.
+      # asset_model/**, scenarios/** and bootstrap/** join with the
+      # requirements that create them.
+      - "generator/**"
+      - "synthetic_data_generator/**"
+      - "pipeline/**"
+      - "dashboard/**"
+      - "cli/**"
+      - "aws/**"
+      - "imports-allowlist.yaml"
       - "CHANGELOG.yaml"
       - "requirements.yaml"
       - "plans/**"
@@ -95,6 +106,14 @@ jobs:
 
       - name: Gate - hierarchy validation (REQ-QAC-039)
         run: uv run mothman dashboard validate-hierarchy
+
+      # REQ-TEST-384 and REQ-TEST-388: repository-wide, so they run in both
+      # legs like the other repository-wide gates; seconds each.
+      - name: Gate - no import across a forbidden edge (REQ-TEST-384)
+        run: uv run mothman dashboard validate-imports
+
+      - name: Gate - every asset's dbt packages agree (REQ-TEST-388)
+        run: uv run mothman dashboard validate-dbt-packages
 
       - name: Gate - schedule and asset config validation (REQ-PIPE-050)
         run: uv run mothman schedule validate
