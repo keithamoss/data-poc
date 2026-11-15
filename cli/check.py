@@ -356,11 +356,13 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list
     return _worst(codes), _failed_in(passes, codes, can_warn)
 
 
-#: What the full gate measures coverage over - the same four packages test.yml
-#: measures, so the floor means the same thing here as in a hand-started run.
+#: What the full gate measures coverage over - the same folders test.yml
+#: measures, so the floor means the same thing here as in a hand-started run:
+#: the four packages and assets/, whose adapters and providers are loaded by
+#: path (REQ-PIPE-369 criterion 6, REQ-TEST-353 criterion 9).
 #: `fail_under` itself is read from pyproject.toml by pytest-cov (REQ-TEST-375
 #: criterion 9: enforced in this gate, never in push CI).
-COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard")
+COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard", "assets")
 
 
 def _pytest_argv(argv: list[str], reports: Path) -> list[str]:

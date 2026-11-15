@@ -406,6 +406,27 @@ class TestTheFullGateIsTheWholeSuitesRecord:
         assert check_cli._tree_state().startswith("tree unknown")
 
 
+def test_coverage_measures_the_asset_folders_wherever_it_is_measured():
+    """REQ-PIPE-369 criterion 6 and REQ-TEST-353 criterion 9: the adapters and
+    providers are loaded by path from assets/, which holds no __init__.py, so
+    every place coverage is measured names assets and coverage is told to walk
+    folders that are not packages - else a moved adapter silently leaves the
+    figure fail_under is held against. Read from the configuration, as there is
+    no behaviour of ours to observe: an architecture rule (test rule 1)."""
+    import tomllib
+    from pathlib import Path
+
+    root = Path(check_cli.ROOT)
+    run = tomllib.loads((root / "pyproject.toml").read_text())["tool"]["coverage"]["run"]
+    assert "assets" in run["source"] and run.get("include_namespace_packages") is True
+    assert "assets" in check_cli.COVERAGE_PACKAGES
+    lines = [ln for ln in (root / ".github/workflows/test.yml").read_text().splitlines()
+             if "--cov=" in ln]
+    assert lines, "test.yml measures no coverage - this would prove nothing"
+    for line in lines:
+        assert {f"--cov={p}" for p in check_cli.COVERAGE_PACKAGES} <= set(line.split()), line
+
+
 class TestEveryFailureNamesItsAsset:
     """REQ-PIPE-364 criterion 1: a gate run once per asset folder prints the
     same kind of failure for each, so each line of a pass names the asset it
