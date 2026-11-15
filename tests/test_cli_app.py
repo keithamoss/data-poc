@@ -142,7 +142,8 @@ class TestOneNounPerThing:
     `--dataset` meant two different things across the CLI: a
     `click.Choice` of the collection shorthands `bdm`/`cp` in
     `pipeline run` and most of `debug`, and a real dataset id in
-    `schedule show` and `debug changelog`. One flag name, two
+    `schedule show` and `debug changelog` (deleted 2026-11-15,
+    REQ-TEST-395). One flag name, two
     vocabularies, and `mothman supply` was about to have to pick a side.
 
     Both shorthands map one-to-one onto a real collection -
@@ -195,7 +196,6 @@ class TestOneNounPerThing:
         with the incorrect one."""
         dataset_flags = [path for path, opt, _c in self._options() if opt == "--dataset"]
         assert "schedule show" in dataset_flags
-        assert "debug changelog" in dataset_flags
 
 
 def test_a_refusal_inside_a_flow_returns_to_the_menu(monkeypatch, capsys):
@@ -217,6 +217,26 @@ def test_a_refusal_inside_a_flow_returns_to_the_menu(monkeypatch, capsys):
     out = capsys.readouterr()
     assert seen == ["qa", "qa"], "the second choice was never offered"
     assert "no reference was given" in out.out + out.err
+
+
+#: The commands REQ-TEST-393 and REQ-TEST-395 deleted, each with the group it
+#: was in.
+DELETED_COMMANDS = [("debug", "equivalence"), ("debug", "build-warehouses"),
+                    ("debug", "changelog"), ("debug", "capture-arrival-golden"),
+                    ("dashboard", "snapshot")]
+
+
+@pytest.mark.parametrize("group,name", DELETED_COMMANDS)
+def test_a_deleted_command_is_answered_as_any_unknown_command(group, name):
+    """REQ-TEST-395 criterion 8: no forwarding alias - a deleted name gets
+    exactly the answer a name that never existed in that group gets."""
+    deleted = _runner.invoke(app.cli, [group, name])
+    unknown = _runner.invoke(app.cli, [group, "no-such-command-ever"])
+    assert deleted.exit_code == unknown.exit_code == 2, deleted.output
+    assert f"No such command '{name}'" in deleted.output, deleted.output
+    # The error box pads to the name's length, so the words are compared.
+    assert (" ".join(deleted.output.replace(name, "<name>").split())
+            == " ".join(unknown.output.replace("no-such-command-ever", "<name>").split()))
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

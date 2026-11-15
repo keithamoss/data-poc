@@ -42,11 +42,11 @@ access point to this repo (`plans/tooling.md` #1) - `mothman pipeline
 run` above is one of six command groups/commands: `bdm`/`cp` (Quality
 Assurance + Generate/Regenerate synthetic data, Tier 1, also reachable
 via the interactive TUI from a bare `./mothman`), `dashboard` (the
-dashboard rebuild/embed/validate/snapshot chain, Tier 2), `github`
-(GitHub Issues ticket/acceptance/leaderboard sync, Tier 2), `debug`
+dashboard rebuild/embed/validate/publish chain, Tier 2), `github`
+(GitHub Issues ticket/leaderboard sync, Tier 2), `debug`
 (per-tool debug runners against a run already on disk - `run-dbt`/
-`run-soda`/`run-datacontract`/`run-evidently`/`build-warehouses`/
-`changelog`, Tier 3), `pipeline` (the full real-tool
+`run-soda`/`run-datacontract`/`run-evidently` - plus
+`snapshot-worktrees`, Tier 3), `pipeline` (the full real-tool
 batch run this section just ran, Tier 2), and `population` (a
 population-scale, cross-agency-identity-linked synthetic dataset via
 the separate `synthetic_data_generator/` package - Tier 4, explicitly

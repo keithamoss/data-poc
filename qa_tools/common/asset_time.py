@@ -185,9 +185,12 @@ def now() -> datetime:
     to whoever opens the file.
 
     PINNED (REQ-TEST-239 criterion 16): where MOTHMAN_PINNED_NOW names an
-    instant, that instant IS now - so the equivalence harness can build two
-    captures hours apart and have them agree on which slots have closed.
-    Refused on an asset not declared synthetic: a real asset's "now" is
+    instant, that instant IS now - so a test, or a person demonstrating a
+    synthetic asset, can run the real commands at a chosen moment and get
+    the same answer every time about which slots have closed and what is
+    still awaiting (tests/test_cli_cp.py pins it this way). It began as the
+    retired equivalence harness's pin (deleted, REQ-TEST-393) and outlives
+    it. Refused on an asset not declared synthetic: a real asset's "now" is
     evidence, and is never invented.
     """
     pinned = os.environ.get(PINNED_NOW_VARIABLE)

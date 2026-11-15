@@ -66,7 +66,7 @@ alone:
   the picker's existing links already point at - so the dashboard's JS/
   markup needed zero changes, locally or on Pages, the same relative
   link now resolves either way. Called unconditionally from `main()`
-  (so a plain `mothman pipeline run`/`mothman dashboard snapshot`, with
+  (so a plain `mothman pipeline run`, with
   no `SNAPSHOT_DASHBOARD` flag, still backfills local copies for
   whatever snapshots already exist in the repo - e.g. right after a
   fresh clone) and again at the end of

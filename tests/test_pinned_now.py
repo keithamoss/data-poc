@@ -1,9 +1,12 @@
 """MOTHMAN_PINNED_NOW: the asset clock read as one fixed instant
 (REQ-TEST-239 criterion 16, Keith 2026-10-16).
 
-The equivalence harness pins it so that two captures built hours or days
-apart agree on everything the build works out from "now" - which slots
-have closed, what is still awaiting, how long a supply has waited."""
+It lets a test - or a person demonstrating a synthetic asset - run the real
+commands at a chosen moment, so everything worked out from "now" (which
+slots have closed, what is still awaiting, how long a supply has waited)
+comes out the same on every run; tests/test_cli_cp.py pins it this way. It
+began as the retired equivalence harness's pin (deleted, REQ-TEST-393) and
+outlives it."""
 from __future__ import annotations
 
 from datetime import datetime

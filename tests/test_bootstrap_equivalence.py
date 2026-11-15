@@ -297,7 +297,7 @@ class TestASharedCalendarIsReplayedInReceiptOrder:
         promoted = [r for r in rows if r["action"] == "promote"]
         assert promoted, "the corpus promoted no ED supply - the test would prove nothing"
         # BY ITS ID, which embeds the receipt instant: the comparison snapshot
-        # blanks a rule's effective_at (qa_tools/common/equivalence.py).
+        # blanks a rule's effective_at (tests/equiv_support.py).
         newest = max(r["supply"] for r in promoted)
         gap = [(r["action"], r["supply"]) for r in rows if r["to_slot"] == "2015-Q4"]
         assert gap == [("inherit", newest)], (gap, newest)
