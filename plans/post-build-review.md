@@ -15193,3 +15193,22 @@ twice. It deliberately did not re-find the `TypeError`.
      - **#55's open shapes (LOW, judgement)** - sample datasets, project
        extractions, ad hoc QA, shared check definitions - had no live entry
        once #55 came out. Now plans/running-thoughts.md #140, `investigate`.
+
+351. **[done, 2026-11-16]** **[Testing & dev tooling]** **The session's chunked suite runner deleted every pytest temp root on the machine.**
+     Found overnight on 2026-11-15. The scratchpad script that runs the full
+     suite in chunks (`run_chunks.sh`, session-local and not in the
+     repository) ran `rm -rf /tmp/pytest-of-root/pytest-[0-9]*` before each
+     chunk. That folder is shared by every pytest session on the machine. A
+     builder's fast-half run in its own worktree had its tmp_path folders
+     deleted mid-run and failed for reasons unrelated to its change, and the
+     run had to be repeated.
+     - **Fix**: each chunk now gets its own `--basetemp` under the
+       scratchpad, deleted before and after that chunk and nowhere else. The
+       runner never touches /tmp/pytest-of-root. It also measures asset_model/
+       now that #134 step 2 adds that package. No regression test: the
+       script is not product code and lives outside the repository.
+     - **The rule this follows already exists**: CLAUDE.md says concurrent
+       test sessions each set `MOTHMAN_TEST_DB_TAG`. The same reasoning
+       covers the filesystem, so each concurrent session also gets its own
+       `--basetemp`. Builders were already told to do this. The main
+       session's own runner did not.
