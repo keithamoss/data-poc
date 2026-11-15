@@ -3610,4 +3610,14 @@ one or more component tags, and a date.
       assets/<asset>/synthetic/ now). **NOT VERIFIED**: the README's new
       quickstart was never run on a fresh machine (it would write real
       supply_* databases).
+    - **SPLIT PUSHED (~00:15 Perth, 2026-11-16)**: the full chunked suite on
+      4240a263 ran 7950 tests: 1 failed, 1 skipped (#175's deliberate one),
+      coverage 95% (floor 92). The failure is
+      `test_collections_registry.py::TestAThirdCollectionAtEverySite::test_a_checkpoint_resume_is_named_with_its_short`,
+      a stale test still expecting the pre-T3 checkpoint name. It is fixed on
+      wip/sep-step2 (#134 step 2), which merges next. Pushed anyway, and the
+      commit message says so: that one test is the only red. `mothman check
+      --no-pytest` was green, with warnings only. The suite's first background
+      job reached its two-hour limit during the e2e chunk; the resumed job
+      finished it (437 passed, 32 minutes).
 
