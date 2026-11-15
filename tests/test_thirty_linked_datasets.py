@@ -14,7 +14,7 @@ again and promoted over the first by a scripted person.
 ON DEMAND (the requirement's TEST COST NFR offers the fast half or a
 deliberate mark): it generates and replays a stream, so it runs in CI's
 on-demand job beside REQ-TEST-249's copy, never in the fast half, and needs
-no deployment bootstrap. The repository's own contract/, data/ and reports/
+no deployment bootstrap. The repository's own assets/, data/ and reports/
 are never touched.
 """
 
@@ -80,6 +80,7 @@ def copy(tmp_path_factory):
     c.changed_before_run = fx.changed_product_files(c.tree)
     out = tmp_path_factory.mktemp("evidence") / "evidence.json"
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": _fresh_database(), "MOTHMAN_ENVIRONMENT": "test",
+           "MOTHMAN_ASSET": "quarterly",
            "NO_COLOR": "1", "COLUMNS": "200"}
     start = time.perf_counter()
     done = subprocess.run([sys.executable, str(RUNNER), str(out)], cwd=c.tree, env=env,
@@ -88,7 +89,7 @@ def copy(tmp_path_factory):
     assert done.returncode == 0, f"the replay failed:\n{done.stdout[-6000:]}\n{done.stderr[-6000:]}"
     c.log = done.stdout
     c.evidence = json.loads(out.read_text())
-    doc = json.loads((c.tree / "reports" / "results_lkunit_lk-linkage.json").read_text())
+    doc = json.loads((c.tree / "reports" / "quarterly" / "results_lkunit_lk-linkage.json").read_text())
     c.results = doc["results"]
     c.changed_after_run = fx.changed_product_files(c.tree)
     runs = [r for r in c.evidence["recorded_runs"] if r["collection"] == fx.PRODUCT["collection"]]
@@ -198,7 +199,7 @@ class TestTheIdentifierShapeChecksPassOnCorrectlyShapedRows:
     times."""
 
     def _release(self, copy) -> list[dict]:
-        found = sorted((copy.tree / "data" / "deliveries").glob(f"*/{fx.PRODUCT['table']}.csv"))
+        found = sorted((copy.tree / "data" / "quarterly" / "deliveries").glob(f"*/{fx.PRODUCT['table']}.csv"))
         assert len(found) == 1, found
         with found[0].open() as f:
             return list(csv.DictReader(f))
@@ -315,7 +316,7 @@ class TestNoProductFileChanged:
         tree = fx.build(tmp_path / "tree")
         (tree / "qa_tools" / "common" / "run_reads.py").write_text("# edited\n")
         (tree / "qa_tools" / "tools" / "stray.py").write_text("")
-        hierarchy = tree / "contract" / "data-asset.yaml"
+        hierarchy = tree / fx.A / "data-asset.yaml"
         hierarchy.write_text(hierarchy.read_text().replace("short: cp ", "short: cpx", 1))
         said = fx.changed_product_files(tree)
         assert any("qa_tools/common/run_reads.py" in p for p in said), said

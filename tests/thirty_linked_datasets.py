@@ -31,7 +31,7 @@ the round as a delivery of its own, a second delivery stream of the product's
 provider (REQ-GEN-295 criterion 1).
 
 Everything is written into a COPY of the tracked tree (tests/tree_copy.py);
-the repository's own contract/, data/ and reports/ are never touched.
+the repository's own assets/, data/ and reports/ are never touched.
 """
 from __future__ import annotations
 
@@ -86,8 +86,9 @@ def geo_sample_key(g: dict) -> list[str]:
 
 #: Where a collection's own files may go (criterion 3), and the configuration
 #: files that take an insert.
-CONFIG_FILES = ("contract/data-asset.yaml", "contract/calendar.yaml",
-                "contract/presentation.yaml", "contract/scripted_decisions.yaml")
+A = "assets/quarterly"  # the asset these collections join (REQ-PIPE-342; post-build-review #324)
+CONFIG_FILES = (f"{A}/data-asset.yaml", f"{A}/calendar.yaml",
+                f"{A}/presentation.yaml", f"{A}/synthetic/scripted_decisions.yaml")
 
 
 def _agency_of(n: int) -> str:
@@ -119,9 +120,9 @@ def linked() -> list[dict]:
 def own_paths() -> tuple[str, ...]:
     agencies = [a for a, _n, _x in SOURCE_AGENCIES] + [PRODUCT_AGENCY[0]]
     colls = [c["id"] for c in sources()] + [PRODUCT["collection"]]
-    return (tuple(f"contract/{a}/" for a in agencies)
-            + tuple(f"dbt_project/models/{c}/" for c in colls)
-            + ("qa_tools/collections/", "generator/collections/"))
+    return (tuple(f"{A}/{a}/" for a in agencies)
+            + tuple(f"{A}/dbt/models/{c}/" for c in colls)
+            + (f"{A}/collections/", f"{A}/synthetic/collections/"))
 
 
 # ---- the source collections' files ----------------------------------------
@@ -159,7 +160,7 @@ def _source_soda(c: dict) -> str:
         doc[f"checks for {d['table']}"] = [{"row_count": {
             "fail": "when < 1",
             "attributes": {
-                "check_id": f"data-asset-1.{c['agency']}.{c['id']}.{d['id']}.row_count_soda",
+                "check_id": f"quarterly.{c['agency']}.{c['id']}.{d['id']}.row_count_soda",
                 "category": "completeness", "introduced_date": INTRODUCED,
                 "description": "A supply must carry at least one row.",
                 "failure_indicates": "self-evident", "changelog": []}}}]
@@ -347,7 +348,7 @@ def _geo_table(g: dict) -> dict:
 
 
 def geo_check_id(g: dict, tail: str) -> str:
-    return (f"data-asset-1.{PRODUCT_AGENCY[0]}.{PRODUCT['collection']}."
+    return (f"quarterly.{PRODUCT_AGENCY[0]}.{PRODUCT['collection']}."
             f"{g['id']}.{tail}")
 
 
@@ -384,7 +385,7 @@ def _geo_soda(g: dict) -> list:
 
 
 def check_id(tail: str) -> str:
-    return (f"data-asset-1.{PRODUCT_AGENCY[0]}.{PRODUCT['collection']}."
+    return (f"quarterly.{PRODUCT_AGENCY[0]}.{PRODUCT['collection']}."
             f"{PRODUCT['dataset']}.{tail}")
 
 
@@ -516,7 +517,7 @@ def _product_provider() -> str:
     return f'''"""The fake linkage product's generator (REQ-TEST-339), in a copy only:
 one release in {PERIOD}, at 17:05 on the round, linking every row of the last
 supply of each linked dataset received before it, across id_1 to id_{N_ID}.
-Generic over the linked datasets declared in contract/data-asset.yaml, read
+Generic over the linked datasets declared in assets/quarterly/data-asset.yaml, read
 through each source provider's declared rows (generated_supplies)."""
 from __future__ import annotations
 
@@ -776,7 +777,7 @@ def install(tree: Path) -> Path:
         dest.write_text(text)
 
     for c in sources():
-        stem = f"contract/{c['agency']}/{c['id']}"
+        stem = f"{A}/{c['agency']}/{c['id']}"
         write(f"{stem}-contract.yaml", _source_contract(c))
         write(f"{stem}-soda-checks.yml", _source_soda(c))
         write(f"{stem}-evidently-checks.yml", "checks: []\n")
@@ -785,12 +786,12 @@ def install(tree: Path) -> Path:
               "".join(f"checks for {d['table']}: []\n" for d in c["datasets"]))
         write(f"{stem}-evidently-checks-retired.yml", "checks: []\n")
         for name, text in _dbt(c["id"], [d["table"] for d in c["datasets"]]).items():
-            write(f"dbt_project/models/{c['id']}/{name}", text)
+            write(f"{A}/dbt/models/{c['id']}/{name}", text)
         module = c["id"].replace("-", "_")
-        write(f"qa_tools/collections/{module}.py", _source_adapter(c))
-        write(f"generator/collections/{module}.py", _source_provider(c))
+        write(f"{A}/collections/{module}.py", _source_adapter(c))
+        write(f"{A}/synthetic/collections/{module}.py", _source_provider(c))
 
-    stem = f"contract/{PRODUCT_AGENCY[0]}/{PRODUCT['collection']}"
+    stem = f"{A}/{PRODUCT_AGENCY[0]}/{PRODUCT['collection']}"
     write(f"{stem}-contract.yaml", _product_contract())
     write(f"{stem}-soda-checks.yml", _product_soda())
     write(f"{stem}-evidently-checks.yml", "checks: []\n")
@@ -800,19 +801,19 @@ def install(tree: Path) -> Path:
     write(f"{stem}-evidently-checks-retired.yml", "checks: []\n")
     for name, text in _dbt(PRODUCT["collection"],
                            [PRODUCT["table"], *(g["table"] for g in GEO)]).items():
-        write(f"dbt_project/models/{PRODUCT['collection']}/{name}", text)
+        write(f"{A}/dbt/models/{PRODUCT['collection']}/{name}", text)
     module = PRODUCT["collection"].replace("-", "_")
-    write(f"qa_tools/collections/{module}.py", _product_adapter())
-    write(f"generator/collections/{module}.py", _product_provider())
+    write(f"{A}/collections/{module}.py", _product_adapter())
+    write(f"{A}/synthetic/collections/{module}.py", _product_provider())
 
-    _append(tree / "contract/data-asset.yaml", _hierarchy_block())
+    _append(tree / f"{A}/data-asset.yaml", _hierarchy_block())
     colls, datasets = _calendar_blocks()
-    _insert_before(tree / "contract/calendar.yaml", "datasets:", colls)
-    _append(tree / "contract/calendar.yaml", datasets)
+    _insert_before(tree / f"{A}/calendar.yaml", "datasets:", colls)
+    _append(tree / f"{A}/calendar.yaml", datasets)
     agencies, pcolls = _presentation_blocks()
-    _insert_before(tree / "contract/presentation.yaml", "collections:", agencies)
-    _append(tree / "contract/presentation.yaml", pcolls)
-    _insert_before(tree / "contract/scripted_decisions.yaml", "corrections:", _decision_block())
+    _insert_before(tree / f"{A}/presentation.yaml", "collections:", agencies)
+    _append(tree / f"{A}/presentation.yaml", pcolls)
+    _insert_before(tree / f"{A}/synthetic/scripted_decisions.yaml", "corrections:", _decision_block())
     for rel in CONFIG_FILES:
         yaml.safe_load((tree / rel).read_text())
     return tree

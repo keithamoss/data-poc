@@ -14617,3 +14617,22 @@ twice. It deliberately did not re-find the `TypeError`.
        1 xfailed, the comparison included. A future module writing to the
        deployment is not caught by anything; Keith's call.
 
+
+324. **[done, 2026-11-15]** **[Testing & dev tooling]** **The on-demand thirty-linked-datasets test had not run since the asset split.**
+     Found running it for the evidence walk-through's items [20] (REQ-QAC-340
+     c11) and [23] (REQ-PIPE-341 c8), both of which it proves: all 24 tests
+     erred in setup - tests/thirty_linked_datasets.py still wrote its five fake
+     collections into the pre-split `contract/`, `dbt_project/models/`,
+     `qa_tools/collections/` and `generator/collections/`, gave its checks the
+     former `data-asset-1` prefix, and read `reports/` and `data/deliveries/`
+     without the asset folder. Nothing noticed because the module is on demand,
+     run only by a hand-started test.yml.
+     - **Fix** (the failing module was the test, failing first): every path is
+       the quarterly asset's - `assets/quarterly/<agency>/`, `.../dbt/models/`,
+       `.../collections/`, `.../synthetic/collections/`,
+       `.../synthetic/scripted_decisions.yaml` - check ids `quarterly.`, the
+       runner given MOTHMAN_ASSET=quarterly, results under `reports/quarterly/`
+       and the release under `data/quarterly/deliveries/`.
+     - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
+       27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
+       (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
