@@ -51,7 +51,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: emergency_department.run_plan held the calendar for the process.
 #: assets/ too: each asset's QA adapters and generator providers are code
 #: (REQ-PIPE-369, REQ-GEN-370), keyed below by `assets/*/...` so no asset is named.
-SCANNED = ("qa_tools", "pipeline", "generator", "assets")
+#: asset_model/ joined with REQ-PIPE-380 criterion 17: the shared reading code
+#: moved out of qa_tools/ is still read here.
+SCANNED = ("asset_model", "qa_tools", "pipeline", "generator", "assets")
 
 #: THE MODULES WHOSE CALLS READ CONFIGURATION, by the name a file binds them
 #: to: a call into one at import builds a value from the file as it stood

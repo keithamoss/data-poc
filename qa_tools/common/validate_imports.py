@@ -32,10 +32,10 @@ It reads the syntax trees of the files git tracks (committed or staged, so a
 scratch file in a working tree is not read, and a tracked one in a hidden
 directory is) through qa_tools/common/syntax_walk.py, and imports nothing it
 reads, so it needs no asset, no database and no network. A file that does not
-parse is a finding of its own, never a crash. RULES is
-where REQ-PIPE-376 criterion 8 (no underscore-led asset_model name used
-outside it) and REQ-PIPE-390 criterion 5 (no status ranking of its own) join
-as rules of this gate rather than scanners of their own.
+parse is a finding of its own, never a crash. RULES holds REQ-PIPE-376
+criterion 8 (no underscore-led asset_model name used outside it) and
+REQ-PIPE-390 criterion 5 (no status ranking of its own) as rules of this
+gate rather than scanners of their own; neither is allowlistable.
 """
 from __future__ import annotations
 
@@ -86,9 +86,9 @@ ALLOWED = {
     "cli": frozenset(SIDES),
 }
 
-#: The asset resolver's path loader, where it lives today and where REQ-PIPE-380
-#: moves it, and which side each kind it loads is on (criterion 5).
-LOADER_MODULES = frozenset({"asset_model.assets", "asset_model.assets"})
+#: The asset resolver's path loader, in asset_model/ since REQ-PIPE-380, and
+#: which side each kind it loads is on (criterion 5).
+LOADER_MODULES = frozenset({"asset_model.assets"})
 LOADER = "load"
 LOADED_SIDES = {"adapter": "pipeline", "provider": "generator"}
 
@@ -194,10 +194,109 @@ def forbidden_edges(rel: str, tree, root: Path) -> tuple[list[Finding], list[Pro
     return findings + loads, problems
 
 
+def _asset_model_bindings(tree, rel: str, root: Path) -> dict[str, str]:
+    """{local name: asset_model module} for every asset_model module the file
+    binds as a name - `from asset_model import x [as y]`, `import
+    asset_model.x as y` - at any depth."""
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            for a in node.names:
+                full = f"{node.module}.{a.name}"
+                if full.split(".")[0] == "asset_model" and syntax_walk._is_module(root, full):
+                    out[a.asname or a.name] = full
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.split(".")[0] == "asset_model" and a.asname:
+                    out[a.asname] = a.name
+    return out
+
+
+def _private(name: str) -> bool:
+    return name.startswith("_") and not (name.startswith("__") and name.endswith("__"))
+
+
+def private_names(rel: str, tree, root: Path) -> tuple[list[Finding], list[Problem]]:
+    """REQ-PIPE-376 criteria 3 and 8: no module outside asset_model/ (and
+    tests/, which the gate does not read) uses an underscore-led asset_model
+    name - imported from it, read as an attribute of it, or named to
+    getattr/setattr on it. A name the shared code is used by is public, so a
+    private one is a promise nobody knows was made. Reads source, because the
+    rule is an architecture rule with no behaviour to observe (CLAUDE.md's
+    test rule allows that when said). Never allowlistable: the fix is to give
+    the name a public one in asset_model/."""
+    if side_of_file(rel) in (None, "asset_model"):
+        return [], []
+    problems = []
+
+    def found(line, module, name, how):
+        problems.append(Problem(
+            f"{rel}:{line}: {side_of_file(rel)} {how} {module}.{name}, an underscore-led "
+            f"asset_model name - give it a public name in {module.replace('.', '/')}.py "
+            f"(REQ-PIPE-376 criterion 3)"))
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module \
+                and node.module.split(".")[0] == "asset_model":
+            for a in node.names:
+                if _private(a.name):
+                    found(node.lineno, node.module, a.name, "imports")
+    bound = _asset_model_bindings(tree, rel, root)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) \
+                and node.value.id in bound and _private(node.attr):
+            found(node.lineno, bound[node.value.id], node.attr, "reads")
+        elif isinstance(node, ast.Call) and len(node.args) >= 2 \
+                and isinstance(node.args[0], ast.Name) and node.args[0].id in bound \
+                and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str) \
+                and _private(node.args[1].value):
+            found(node.lineno, bound[node.args[0].id], node.args[1].value, "names")
+        elif isinstance(node, ast.Attribute) and _private(node.attr):
+            # import asset_model.x, then asset_model.x._name
+            dotted = ast.unparse(node.value)
+            if dotted.split(".")[0] == "asset_model" and syntax_walk._is_module(root, dotted):
+                found(node.lineno, dotted, node.attr, "reads")
+    return [], problems
+
+
+#: The status words a ranking orders (REQ-PIPE-390): the ordered statuses.
+RANKED_WORDS = frozenset({"nodata", "green", "amber", "red"})
+
+
+def status_rankings(rel: str, tree, root: Path) -> tuple[list[Finding], list[Problem]]:
+    """REQ-PIPE-390 criterion 5: no Python module outside asset_model/ (and
+    tests/) defines its own ranking of the status words - a dictionary
+    literal mapping two or more of nodata, green, amber and red to numbers,
+    which is what each former copy was ({"green": 0, "amber": 1, "red": 2}).
+    The ranking is asset_model.statuses' ORDERED_STATUSES and VERDICT_ORDER,
+    read rather than repeated. Python modules only - the dashboard page keeps
+    its own copy, held equal by status-cases.json (criterion 4). Reads source,
+    an architecture rule with no behaviour to observe. Never allowlistable."""
+    if side_of_file(rel) in (None, "asset_model"):
+        return [], []
+    problems = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict) or not node.keys:
+            continue
+        keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
+        if len(keys) != len(node.keys) or len(set(keys) & RANKED_WORDS) < 2:
+            continue
+        if all(isinstance(v, ast.Constant) and isinstance(v.value, (int, float))
+               and not isinstance(v.value, bool)
+               or (isinstance(v, ast.UnaryOp) and isinstance(v.operand, ast.Constant))
+               for v in node.values):
+            problems.append(Problem(
+                f"{rel}:{node.lineno}: {side_of_file(rel)} defines its own ranking of the "
+                f"status words ({ast.unparse(node)}) - read asset_model.statuses' "
+                f"ORDERED_STATUSES or VERDICT_ORDER instead (REQ-PIPE-390 criterion 5)"))
+    return [], problems
+
+
 #: Each rule takes (file relative to the root, its syntax tree, the root) and
-#: returns (allowlistable findings, problems). REQ-PIPE-376 criterion 8 and
-#: REQ-PIPE-390 criterion 5 add theirs here.
-RULES = (forbidden_edges,)
+#: returns (allowlistable findings, problems): the forbidden edges
+#: (REQ-TEST-384), the underscore-name rule (REQ-PIPE-376 criterion 8) and the
+#: status-ranking rule (REQ-PIPE-390 criterion 5).
+RULES = (forbidden_edges, private_names, status_rankings)
 
 
 def scan(root: Path = ROOT) -> tuple[list[Finding], list[Problem]]:

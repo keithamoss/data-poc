@@ -55,10 +55,10 @@ from __future__ import annotations
 
 import bisect
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence
 
-from asset_model import asset_time, slots as slots_mod
+from asset_model import asset_time, hierarchy, schedule, slots as slots_mod
 
 #: Which branch of the rule decided an assignment (REQ-PIPE-062
 #: criterion 9). Recorded with the supply rather than recomputed later,
@@ -229,7 +229,7 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
         considered = current_slot(slots, at)
         index = _opened_by(slots, at)
         ended = schedule_ended(slots, at, opened=index, final_period=final_period)
-        fall = None if ended else slots_mod.fall_hold(dataset_id, at)
+        fall = None if ended else fall_hold(dataset_id, at)
         return Assignment(
             dataset_id=dataset_id, supply_id=supply_id, received_at=at, slot=None,
             branch=HELD, considered=(considered.name,) if considered else (),
@@ -275,3 +275,58 @@ def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
         out.append((slots[index].name,
                     "its claim window has not opened yet, and nothing may claim forward"))
     return tuple(out)
+
+
+def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
+    """Where `at` falls in a round that opens no slot because a FALL in its
+    collection's files_go_to_period means an earlier round already fills
+    that round's period (REQ-PIPE-322 criterion 3): the agreement change -
+    collection, version, round and the period it would be a second supply
+    for - or None. Cheap for a collection that never changes its value.
+
+    Beside assign(), its one caller (REQ-PIPE-376 criterion 4); it was
+    slots.fall_hold."""
+    agr = schedule._agreement(agreement)
+    try:
+        cid = hierarchy.dataset(dataset_id).collection_id
+        name = hierarchy.dataset(dataset_id).collection_name
+    except hierarchy.UnknownDatasetError:
+        return None
+    versions = agr.offsets.get(cid, ())
+    if len({v.value for v in versions}) < 2:
+        return None
+    try:
+        cal = schedule.calendar_for_dataset(dataset_id, agr).name
+    except schedule.NoCalendarAgreed:
+        return None
+    day = asset_time.local_date(at)
+    # Two years ahead BY DAYS, not day.replace(year+2), which raises on
+    # 29 February (critic finding 3).
+    rounds = schedule.periods_for_calendar(cal, until=day + timedelta(days=731),
+                                           agreement=agr)
+    k = None
+    for i, r in enumerate(rounds):
+        if slots_mod.slot_instants(dataset_id, r.date, agr).claim_opens_at <= at:
+            k = i
+        else:
+            break
+    if k is None:
+        return None
+    rnd = rounds[k]
+    n = agr.files_go_to_period_for(dataset_id, rnd.date) or 0
+    if k + n >= len(rounds):
+        return None
+    target = rounds[k + n]
+    filler = schedule.round_of(target.name, dataset_id, agr)
+    if filler is None or filler == rnd.date:
+        return None
+    version = max((v for v in versions if v.effective_from <= rnd.date),
+                  key=lambda v: v.effective_from)
+    # THE ROUND THE CHANGE TOOK EFFECT FROM (REQ-PIPE-322 criterion 3, critic
+    # finding 8) beside the round the supply arrived in: after a fall of 2 or
+    # more they differ, and the words name the change's.
+    from_round = next((r.date for r in rounds if r.date >= version.effective_from), rnd.date)
+    return {"collection_id": cid, "collection": name,
+            "version": version.effective_from.isoformat(), "round": rnd.date.isoformat(),
+            "from_round": from_round.isoformat(),
+            "period": target.name, "filled_by": filler.isoformat()}

@@ -53,8 +53,9 @@ on:
       - "qa_tools/**"
       # Every directory the imports gate reads (REQ-TEST-384 criterion 12),
       # and its allowlist, so a push changing only one of them still runs it.
-      # asset_model/**, scenarios/** and bootstrap/** join with the
-      # requirements that create them.
+      # scenarios/** and bootstrap/** join with the requirements that
+      # create them; asset_model/** joined with REQ-PIPE-380.
+      - "asset_model/**"
       - "generator/**"
       - "synthetic_data_generator/**"
       - "pipeline/**"

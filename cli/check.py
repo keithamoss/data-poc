@@ -372,7 +372,7 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> tuple[int, list
 #: path (REQ-PIPE-369 criterion 6, REQ-TEST-353 criterion 9).
 #: `fail_under` itself is read from pyproject.toml by pytest-cov (REQ-TEST-375
 #: criterion 9: enforced in this gate, never in push CI).
-COVERAGE_PACKAGES = ("qa_tools", "pipeline", "generator", "dashboard", "assets")
+COVERAGE_PACKAGES = ("asset_model", "qa_tools", "pipeline", "generator", "dashboard", "assets")
 
 
 def _pytest_argv(argv: list[str], reports: Path) -> list[str]:

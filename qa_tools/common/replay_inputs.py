@@ -47,7 +47,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: configuration, adapters, providers and dbt project - and never another
 #: asset's, so a daily-only edit rebuilds only the daily bootstrap. A shared
 #: edit still restarts both, which costs time and never leaves a stale verdict.
-INPUTS = ("generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
+INPUTS = ("asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
           "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml", "assets/environments.yaml")
 
@@ -66,8 +66,9 @@ REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS)
 
 #: Bumped when what the key covers changes shape, so an old cache never
 #: matches a new meaning (v3: assets/ and dbt_shared/ since the split; v4: one
-#: key per asset, the asset named in it).
-KEY_PREFIX = "bootstrap-v4-"
+#: key per asset, the asset named in it; v5: asset_model/, the shared reading
+#: code REQ-PIPE-380 moved out of qa_tools/).
+KEY_PREFIX = "bootstrap-v5-"
 
 
 def _asset(asset: str | None) -> str:

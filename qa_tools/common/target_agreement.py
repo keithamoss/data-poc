@@ -20,9 +20,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, Sequence
+from asset_model.statuses import VERDICT_ORDER
 
-#: How bad each gate verdict is, for "what does this target allow".
-_RANK = {"green": 0, "amber": 1, "red": 2}
 
 
 @dataclass(frozen=True)
@@ -59,22 +58,22 @@ def responsible(dataset_id: str, results: Sequence[dict], target: str,
 
     if reads is None:
         reads = promotion._declared_reads()
-    allowed = _RANK.get(target, 0)
+    allowed = VERDICT_ORDER.get(target, 0)
     worse, quiet, named = [], [], []
     rules = tuple(rules)
     for record in promotion._contributing_records(dataset_id, results, reads):
         status = dataset_status.dashboard_status(promotion._gating_status(record))
         check = record.get("check_id") or ""
-        if status not in _RANK:
+        if status not in VERDICT_ORDER:
             # A QUIET STATUS - no reference, nothing measured - is a verdict
             # of its own, never green (post-build-review #157 finding 6).
             quiet.append(f"{_short(check)} {_said(status)}")
-        elif _RANK[status] > allowed:
+        elif VERDICT_ORDER[status] > allowed:
             worse.append(f"{_short(check)} {_said(status)}")
         elif rules and any(f".{rule.split('.')[0]}." in check for rule in rules):
             named.append(f"{_short(check)} {_said(status)}")
     found = sorted(worse) or sorted(quiet) or sorted(named)
-    if not found and _RANK.get(target, 0) > 0:
+    if not found and VERDICT_ORDER.get(target, 0) > 0:
         # BETTER THAN BUILT, WITH NO RULE NAMED: an ordinary amber carries
         # none, so say what happened rather than nothing (finding 6).
         found = [f"no check {'warned' if target == 'amber' else 'failed'}"]

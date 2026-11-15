@@ -36,7 +36,8 @@ from asset_model import assets as _assets
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: Where product code lives (criterion 8).
-SCANNED = ("qa_tools", "pipeline", "generator", "cli", "dashboard")
+#: asset_model/ joined with REQ-PIPE-380 criterion 17.
+SCANNED = ("asset_model", "qa_tools", "pipeline", "generator", "cli", "dashboard")
 
 #: EXEMPT, each for its reason (criterion 9, as amended by A18 for the asset
 #: split). qa_tools/collections/ and generator/collections/ are no longer
@@ -93,7 +94,10 @@ def _reaches_another_module(name: str, adapters: set[str], providers: set[str]) 
     parts = name.split(".")
     if parts[0] == "assets" or parts[0].startswith(("mothman_adapter_", "mothman_provider_")):
         return True
-    if parts[:2] == ["qa_tools", "collections"] and len(parts) > 2:
+    # The registry's two halves (REQ-PIPE-380 criterion 3): the pipeline's
+    # adapter loader and asset_model's declarations, neither a way to an adapter.
+    if parts[:2] in (["qa_tools", "collections"], ["asset_model", "collections"]) \
+            and len(parts) > 2:
         return parts[2] in adapters
     if parts[:2] == ["generator", "collections"] and len(parts) > 2:
         return parts[2] in providers
@@ -133,7 +137,7 @@ def adapter_import_problems(package: Path | None = None) -> list[str]:
     """Every import statement in the selected asset's adapters that reaches
     another adapter, a generator provider or anything under assets/
     (REQ-PIPE-369 criterion 3), naming the file and the statement. Shared code
-    - qa_tools.collections.base, qa_tools.common, generator.collections.base -
+    - qa_tools.collections.base, qa_tools.common, asset_model, generator.collections.base -
     and the standard library are what an adapter may import."""
     from asset_model import assets
 

@@ -37,6 +37,7 @@ import hashlib
 from datetime import datetime, time, timedelta
 
 from generator.collections.base import Job, Plan, Provider, Stream
+from asset_model.statuses import VERDICT_ORDER
 
 COLLECTION_ID = "linkage-products"
 DATASET_ID = "linkage-keys"
@@ -342,12 +343,11 @@ def planned_verdict(dataset_id: str, rows, catalogue) -> str:
     return "green"
 
 
-_RANK = {"green": 0, "amber": 1, "red": 2}
 
 
 def worst(*verdicts: str) -> str:
     """The worst of several planned verdicts."""
-    return max(verdicts, key=lambda v: _RANK[v]) if verdicts else "green"
+    return max(verdicts, key=lambda v: VERDICT_ORDER[v]) if verdicts else "green"
 
 
 def known_values(dataset_id: str, column: str) -> list:

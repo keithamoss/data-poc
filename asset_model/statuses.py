@@ -56,6 +56,15 @@ ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
 STATUS_ORDER = ORDERED_STATUSES
 
 
+#: The three VERDICTS in their order - the ordered statuses less nodata,
+#: which is "nothing to measure", not a verdict. What a re-check, a target
+#: trial and a planned verdict rank by (rechecking.is_worse,
+#: target_agreement.responsible, the Linkage Products provider's worst()),
+#: where a quiet status is a verdict of its own and never ranked against
+#: green (REQ-PIPE-390 criterion 1).
+VERDICT_ORDER = {s: n for s, n in ORDERED_STATUSES.items() if n >= 0}
+
+
 #: The words a person reads for each status (REQ-DASH-359 criterion 1,
 #: REQ-TEST-360 criterion 1): the LABEL for a pill, a legend or a status
 #: reached or held ('Fail', 'became Fail'); the VERB form for running prose

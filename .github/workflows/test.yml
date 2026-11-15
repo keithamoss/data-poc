@@ -296,7 +296,7 @@ jobs:
         # deployment tests reach.
         run: |
           uv run pytest -m "not needs_deployment" -rs \
-            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
+            --cov=asset_model --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
             --cov-report= --cov-fail-under=0
 
       - name: Keep this half's coverage for the combine
@@ -648,7 +648,7 @@ jobs:
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
               uv run pytest -m needs_deployment --only-asset "$asset" -rs \
-                --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
+                --cov=asset_model --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
                 --cov-append --cov-report= --cov-fail-under=0
           done
 

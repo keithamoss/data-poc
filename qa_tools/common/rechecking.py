@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from qa_tools.common import decision_log
+from asset_model.statuses import VERDICT_ORDER
 
 WAITING = "waiting"
 PROMOTED = "promoted"
@@ -113,14 +114,12 @@ def record(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply:
                            decision_id=decision_id)
 
 
-#: Worse is further down this list (criterion 15).
-_RANK = {"green": 0, "amber": 1, "red": 2}
 
 
 def is_worse(promoted_on: str | None, now: str | None) -> bool:
     """Whether `now` is worse than the verdict a supply was promoted on, by
     this module's one ranking (criterion 15); False where either is unknown."""
-    return promoted_on in _RANK and now in _RANK and _RANK[now] > _RANK[promoted_on]
+    return promoted_on in VERDICT_ORDER and now in VERDICT_ORDER and VERDICT_ORDER[now] > VERDICT_ORDER[promoted_on]
 
 
 def promoted_on(conn, dataset_id: str, period: str) -> str | None:
@@ -182,7 +181,7 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
         (promote_id, promoted_on, promoted_at), = conn.execute(
             f"SELECT id, promoted_status, effective_at FROM {decision_log.TABLE} WHERE id = ?",
             [holds.decision_id]).fetchall()
-        if promoted_on not in _RANK or promote_id > recheck_id:
+        if promoted_on not in VERDICT_ORDER or promote_id > recheck_id:
             continue
         # A STANDING ACKNOWLEDGEMENT SINCE (REQ-PIPE-166 criterion 9): one
         # withdrawn lists it again.
