@@ -70,14 +70,18 @@ def _write(root: Path, rel: str, text: str = "") -> None:
 
 @pytest.fixture
 def repo(tmp_path):
-    """A repository with one empty module per side and an empty allowlist."""
+    """A git repository with one empty module per side and an empty
+    allowlist. The gate reads tracked files, so _run() stages everything."""
+    _git(tmp_path, "init", "-q")
     for rel in HOMES.values():
         _write(tmp_path, rel)
     (tmp_path / vi.ALLOWLIST).write_text("entries: []\n")
     return tmp_path
 
 
-def _run(root: Path, capsys) -> tuple[int, str]:
+def _run(root: Path, capsys, stage: bool = True) -> tuple[int, str]:
+    if stage:
+        _git(root, "add", "-A")
     code = vi.main(root=root)
     return code, capsys.readouterr().out
 
@@ -282,8 +286,7 @@ def _commit_all(root: Path, message: str) -> str:
 
 @pytest.fixture
 def history(repo):
-    """The repository under git, its base commit allowlisting one import."""
-    _git(repo, "init", "-q")
+    """The repository's base commit, allowlisting one import."""
     _write(repo, "generator/thing.py", "import cli.command\n")
     _allow(repo, {"file": "generator/thing.py", "imports": "cli.command",
                   "removed_by": "REQ-GEN-386"})
@@ -355,7 +358,7 @@ def test_the_landing_allowlist_names_only_the_requirements_that_remove_its_entri
 
 
 def test_every_python_file_here_has_a_side_or_is_exempt():
-    files = syntax_walk.python_files(ROOT, exempt=tuple(vi.EXEMPT))
+    files = syntax_walk.tracked_python_files(ROOT, exempt=tuple(vi.EXEMPT))
     assert files, "the walker found no file - nothing to check"
     assert [f for f in files if vi.side_of_file(f.relative_to(ROOT).as_posix()) is None] == []
 
@@ -397,8 +400,211 @@ def test_validate_configs_paths_name_every_directory_the_gate_reads():
     """Criterion 12: a push changing only one of them still runs the gate."""
     paths = _workflow()[True]["push"]["paths"]  # PyYAML reads `on:` as True
     tops = {f.relative_to(ROOT).parts[0]
-            for f in syntax_walk.python_files(ROOT, exempt=tuple(vi.EXEMPT))
+            for f in syntax_walk.tracked_python_files(ROOT, exempt=tuple(vi.EXEMPT))
             if f.relative_to(ROOT).parts[0] != f.name}
     assert tops, "the gate reads no directory - nothing to check"
     assert sorted(t for t in tops if f"{t}/**" not in paths) == []
     assert vi.ALLOWLIST in paths
+
+
+# ------------------------------------------- the post-build critic's findings
+# (plans/post-build-review.md, REQ-TEST-384's critic, 2026-11-15)
+
+
+def test_the_pipeline_importing_a_provider_module_fails(repo, capsys):
+    _write(repo, "qa_tools/common/thing.py",
+           "import assets.quarterly.synthetic.collections.x\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert ("qa_tools/common/thing.py:1: pipeline imports generator "
+            "(assets.quarterly.synthetic.collections.x) - forbidden edge") in out
+
+
+def test_a_provider_importing_an_adapter_module_fails(repo, capsys):
+    _write(repo, "assets/quarterly/synthetic/collections/p.py",
+           "from assets.quarterly.collections import x\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert ("assets/quarterly/synthetic/collections/p.py:1: generator imports pipeline "
+            "(assets.quarterly.collections) - forbidden edge") in out
+
+
+def test_asset_model_importing_anything_under_assets_fails(repo, capsys):
+    """REQ-PIPE-380 criterion 9: any file under assets/, sided or not."""
+    _write(repo, "asset_model/reader.py", "import assets.quarterly.helpers\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert ("asset_model/reader.py:1: asset_model imports no side "
+            "(assets.quarterly.helpers) - forbidden edge") in out
+
+
+def test_import_module_by_keyword_is_caught(repo, capsys):
+    _write(repo, "generator/thing.py",
+           "from importlib import import_module\nimport_module(name='cli.command')\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert "generator/thing.py:2: generator imports cli (cli.command)" in out
+
+
+def test_dunder_import_with_a_literal_is_caught(repo, capsys):
+    _write(repo, "generator/thing.py", "__import__('cli.command')\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert "generator/thing.py:1: generator imports cli (cli.command)" in out
+
+
+def test_a_file_that_cannot_be_parsed_is_a_finding_not_a_crash(repo, capsys):
+    _write(repo, "generator/thing.py", "x = 1\n\ndef broken(:\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert "generator/thing.py:3: cannot be parsed" in out
+
+
+def test_an_untracked_file_is_not_read(repo, capsys):
+    """COMPATIBILITY: the gate reads committed files only."""
+    _git(repo, "add", "-A")
+    _write(repo, "generator/scratch.py", "import cli.command\n")
+    code, out = _run(repo, capsys, stage=False)
+    assert code == 0, out
+
+
+def test_a_tracked_file_in_a_hidden_directory_is_in_no_side(repo, capsys):
+    _write(repo, ".github/scripts/x.py", "x = 1\n")
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert ".github/scripts/x.py:1: in no side" in out
+
+
+@pytest.mark.parametrize("text", [
+    "entries:\n- generator/thing.py\n",
+    "entries: generator/thing.py\n",
+    "entries: [\n",
+])
+def test_a_malformed_allowlist_is_a_finding_not_a_crash(repo, capsys, text):
+    (repo / vi.ALLOWLIST).write_text(text)
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert f"{vi.ALLOWLIST}:" in out
+    assert "malformed" in out
+
+
+def test_a_duplicate_allowlist_entry_fails(repo, capsys):
+    _write(repo, "generator/thing.py", "import cli.command\n")
+    entry = {"file": "generator/thing.py", "imports": "cli.command", "removed_by": "REQ-GEN-386"}
+    _allow(repo, entry, entry)
+    code, out = _run(repo, capsys)
+    assert code == 1
+    assert (f"{vi.ALLOWLIST}: entry generator/thing.py imports cli.command (REQ-GEN-386) "
+            f"is listed twice") in out
+
+
+# ------------------------------------------- B6: the five lists (criterion 14)
+
+#: The packages later requirements create (REQ-PIPE-380, REQ-GEN-381,
+#: REQ-GEN-386), each of which must join every list below the day it exists.
+NEW_PACKAGES = ("asset_model", "scenarios", "bootstrap")
+
+
+def _assigned_tuple(path: Path, name: str) -> list[str]:
+    import ast
+
+    tree = ast.parse(path.read_text())
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else (
+            [node.target] if isinstance(node, ast.AnnAssign) else [])
+        if any(isinstance(t, ast.Name) and t.id == name for t in targets):
+            return [str(v) for v in ast.literal_eval(node.value)]
+    raise AssertionError(f"{path} assigns no {name}")
+
+
+def _lists(root: Path) -> dict[str, list[str]]:
+    """The five lists B6 names, read from the files under `root`, each as the
+    entries it holds."""
+    import re
+    import tomllib
+
+    workflow = yaml.safe_load((root / ".github/workflows/validate-config.yml").read_text())
+    test_yml = (root / ".github/workflows/test.yml").read_text()
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text())
+    return {
+        "validate-config.yml paths": workflow[True]["push"]["paths"],
+        "validate_caches.SCANNED": _assigned_tuple(
+            root / "qa_tools/common/validate_caches.py", "SCANNED"),
+        "validate_collections.SCANNED": _assigned_tuple(
+            root / "qa_tools/common/validate_collections.py", "SCANNED"),
+        "pyproject.toml coverage source": pyproject["tool"]["coverage"]["run"]["source"],
+        "cli/check.py COVERAGE_PACKAGES": _assigned_tuple(
+            root / "cli/check.py", "COVERAGE_PACKAGES"),
+        "test.yml --cov": re.findall(r"--cov=([\w.]+)", test_yml),
+        "replay_inputs.INPUTS": _assigned_tuple(
+            root / "qa_tools/common/replay_inputs.py", "INPUTS"),
+    }
+
+
+def _named(package: str, entries: list[str]) -> bool:
+    return any(e in (package, f"{package}/**", f"{package}/") for e in entries)
+
+
+def unlisted(root: Path) -> list[str]:
+    """'<package> is not in <list>' for each of NEW_PACKAGES that exists under
+    `root` and is missing from one of the lists."""
+    lists = _lists(root)
+    return [f"{p} is not in {name}" for p in NEW_PACKAGES if (root / p).is_dir()
+            for name, entries in lists.items() if not _named(p, entries)]
+
+
+def test_each_new_package_once_it_exists_is_named_in_every_list():
+    """B6, narrowed by Keith 2026-11-15: asset_model/, scenarios/ and
+    bootstrap/, once each exists, are named in validate-config.yml's paths,
+    both SCANNED tuples, the coverage sources and replay_inputs.INPUTS.
+
+    TODAY THIS PASSES BECAUSE NONE OF THE THREE EXISTS YET - the requirements
+    that create them (REQ-PIPE-380, REQ-GEN-381, REQ-GEN-386) add each to the
+    lists. That it can fail is shown on a fixture repository below."""
+    lists = _lists(ROOT)
+    assert all(lists.values()), f"a list read empty - nothing to check: {lists}"
+    assert unlisted(ROOT) == []
+
+
+def _copy_lists(dest: Path) -> None:
+    import shutil
+
+    for rel in (".github/workflows/validate-config.yml", ".github/workflows/test.yml",
+                "pyproject.toml", "qa_tools/common/validate_caches.py",
+                "qa_tools/common/validate_collections.py", "cli/check.py",
+                "qa_tools/common/replay_inputs.py"):
+        (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / rel, dest / rel)
+
+
+def test_a_new_package_left_out_of_a_list_fails(tmp_path):
+    _copy_lists(tmp_path)
+    (tmp_path / "scenarios").mkdir()
+    missing = unlisted(tmp_path)
+    assert "scenarios is not in validate_caches.SCANNED" in missing
+    assert "scenarios is not in replay_inputs.INPUTS" in missing
+    assert not any(m.startswith(("asset_model", "bootstrap")) for m in missing)
+
+
+def test_a_new_package_named_in_every_list_passes(tmp_path):
+    _copy_lists(tmp_path)
+    (tmp_path / "bootstrap").mkdir()
+    for rel, old, new in (
+        (".github/workflows/validate-config.yml", '- "qa_tools/**"',
+         '- "qa_tools/**"\n      - "bootstrap/**"'),
+        ("qa_tools/common/validate_caches.py", 'SCANNED = ("qa_tools",',
+         'SCANNED = ("bootstrap", "qa_tools",'),
+        ("qa_tools/common/validate_collections.py", 'SCANNED = ("qa_tools",',
+         'SCANNED = ("bootstrap", "qa_tools",'),
+        ("pyproject.toml", 'source = ["qa_tools",', 'source = ["bootstrap", "qa_tools",'),
+        ("cli/check.py", 'COVERAGE_PACKAGES = ("qa_tools",',
+         'COVERAGE_PACKAGES = ("bootstrap", "qa_tools",'),
+        (".github/workflows/test.yml", "--cov=qa_tools", "--cov=bootstrap --cov=qa_tools"),
+        ("qa_tools/common/replay_inputs.py", 'INPUTS = ("generator/**",',
+         'INPUTS = ("bootstrap/**", "generator/**",'),
+    ):
+        path = tmp_path / rel
+        text = path.read_text()
+        assert old in text, (rel, old)
+        path.write_text(text.replace(old, new))
+    assert unlisted(tmp_path) == []

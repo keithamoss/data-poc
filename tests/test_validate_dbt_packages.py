@@ -136,3 +136,15 @@ def test_validate_config_runs_it():
     wf = yaml.safe_load((ROOT / ".github/workflows/validate-config.yml").read_text())
     runs = [s.get("run") for s in wf["jobs"]["validate"]["steps"]]
     assert "uv run mothman dashboard validate-dbt-packages" in runs
+
+
+def test_an_asset_folder_with_no_dbt_project_fails(two, capsys):
+    """Post-build critic (2026-11-15): an asset folder - one with a
+    data-asset.yaml - that has no dbt/ differs, as a missing file does."""
+    root, _, _ = two
+    (root / "assets" / "gamma").mkdir()
+    (root / "assets" / "gamma" / "data-asset.yaml").write_text("data_asset_id: gamma\n")
+    code, out = _run(root, capsys)
+    assert code == 1
+    assert "asset 'gamma' has no dbt/packages.yml, which 'alpha' has" in out
+    assert out.strip().splitlines()[0].endswith(NEXT)

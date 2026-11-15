@@ -32,13 +32,16 @@ ABSENT = "(absent)"
 
 
 def asset_projects(root: Path = ROOT) -> dict[str, Path]:
-    """{asset name: its dbt project} for every asset folder under assets/
-    that has one, by name - the folders the asset resolver lists."""
+    """{asset name: where its dbt project is} for every asset folder under
+    assets/ - one holding a data-asset.yaml or a dbt/ - by name. An asset
+    folder with no dbt/ is listed too, so its missing files are a difference
+    (the post-build critic, 2026-11-15) rather than an asset silently skipped."""
     base = Path(root) / "assets"
     if not base.is_dir():
         return {}
     return {p.name: p / "dbt" for p in sorted(base.iterdir())
-            if p.is_dir() and not p.name.startswith((".", "_")) and (p / "dbt").is_dir()}
+            if p.is_dir() and not p.name.startswith((".", "_"))
+            and ((p / "dbt").is_dir() or (p / "data-asset.yaml").is_file())}
 
 
 def _read(path: Path):
@@ -76,7 +79,13 @@ def problems(root: Path = ROOT) -> list[str]:
     for name in names[1:]:
         first = names[0]
         for file in FILES:
-            found = first_difference(_read(projects[first] / file), _read(projects[name] / file))
+            left_doc, right_doc = _read(projects[first] / file), _read(projects[name] / file)
+            if (left_doc == ABSENT) != (right_doc == ABSENT):
+                lacking, having = (first, name) if left_doc == ABSENT else (name, first)
+                out.append(f"dbt packages: asset {lacking!r} has no dbt/{file}, which "
+                           f"{having!r} has - {NEXT_STEP}")
+                continue
+            found = first_difference(left_doc, right_doc)
             if found:
                 where, left, right = found
                 out.append(f"dbt packages: assets {first!r} and {name!r} differ in {file} at "

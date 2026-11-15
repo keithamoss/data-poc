@@ -49152,7 +49152,7 @@ requirements:
     date_written: '2026-11-02'
     story: As whoever maintains the pipeline, I want a gate that fails a forbidden import in either direction, including code run by file path, on every change and every push, so that the separation is checked rather than remembered.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31: ''a strict separation''); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14 with Q11; v6 2026-11-14 with the CLI review''s findings 4 and 5 and the architect''s non-blocking points (one walker, a named subcommand, no file in no side). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL offer an `imports` gate, run as `mothman dashboard validate-imports` and needing no asset and no database, that reads every Python file of the repository outside tests/, scripts/ and docs/ by its syntax tree - module-level and function-level imports, imports under `if TYPE_CHECKING:`, and importlib.import_module calls with a literal name - and assigns each file to one side: asset_model/; the real pipeline (qa_tools/, pipeline/, dashboard/, aws/ and each asset''s collections/); the generator (generator/, synthetic_data_generator/ and each asset''s synthetic/collections/); scenarios/; bootstrap/; or cli/.'
@@ -49163,12 +49163,12 @@ requirements:
     - 'THE SYSTEM SHALL read the gate''s exceptions from one committed allowlist whose every entry names a file, the module it imports and the requirement that removes it; WHERE an entry names no requirement the gate SHALL fail, and WHERE an entry matches no import any more it SHALL fail saying ''<allowlist file>: entry <file> imports <module> (<requirement>) matches no import any more - delete it''.'
     - IF a change adds an allowlist entry absent at the base commit, THEN the gate SHALL fail, saying the list only shrinks (REQ-TEST-384) and naming the base commit it compared against.
     - WHEN this gate lands, THE SYSTEM SHALL hold in the allowlist exactly the gate's own findings on that commit, so that it lands green, and each of REQ-PIPE-380, REQ-GEN-381, REQ-PIPE-382, REQ-PIPE-383, REQ-PIPE-385, REQ-GEN-386, REQ-QAC-389 and REQ-PIPE-390 SHALL remove the entries it names.
-    - THE SYSTEM SHALL build the gate on one syntax-tree walker shared with validate_caches (which already walks syntax trees), and SHALL carry as rules of this gate, rather than as scanners of their own, REQ-PIPE-376 criterion 8 (no underscore-led asset_model name used outside it) and REQ-PIPE-390 criterion 4 (no status ranking of its own).
+    - THE SYSTEM SHALL build the gate on one syntax-tree walker shared with validate_caches (which already walks syntax trees), and SHALL carry as rules of this gate, rather than as scanners of their own, REQ-PIPE-376 criterion 8 (no underscore-led asset_model name used outside it) and REQ-PIPE-390 criterion 5 (no status ranking of its own).
     - THE SYSTEM SHALL run the gate once per `mothman check` whatever MOTHMAN_ASSET says (cli/check.py's _REPOSITORY_WIDE, line 190), under the label `imports`, reachable by `mothman check --only imports`, with a one-line 'What it covers' entry in the summary table, placed among the cheap gates before `schedule`.
     - 'THE SYSTEM SHALL run the gate as its own step in .github/workflows/validate-config.yml beside the other configuration gates, in both legs of its per-asset matrix (post-build-review #321), as that workflow already runs every repository-wide gate (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14).'
     - THE SYSTEM SHALL add to validate-config.yml's push `paths:` (lines 48-57) every directory the gate reads that the filter does not already name - at 72ec04d7 generator/**, synthetic_data_generator/**, pipeline/**, dashboard/**, cli/** and aws/** - and the gate's allowlist file, so that a push changing only one of them still runs the gate; asset_model/**, scenarios/** and bootstrap/** are added by the requirements that create them.
     - THE SYSTEM SHALL mark every test of the gate `critical` (REQ-TEST-375), each needing no deployment, no browser and no database, so that push CI's critical set runs them (Q11 of 2026-11-14, SETTLED by Keith 2026-11-14).
-    - THE SYSTEM SHALL have tests, seen failing first, of each forbidden edge failing, of each allowed edge passing, of a function-level import caught, of a file in no side failing, of a provider loaded by path from the real pipeline failing, of a non-literal loader kind failing, of a stale allowlist entry failing, of an added entry failing with the base commit named, and of every top-level package the gate gives a side being named in validate-config.yml's paths filter, validate_caches.SCANNED, validate_collections.SCANNED, the coverage sources and replay_inputs.INPUTS (B6), so that a package given a side and left out of any of them fails.
+    - THE SYSTEM SHALL have tests, seen failing first, of each forbidden edge failing, of each allowed edge passing, of a function-level import caught, of a file in no side failing, of a provider loaded by path from the real pipeline failing, of a non-literal loader kind failing, of a stale allowlist entry failing, of an added entry failing with the base commit named, and of each of the packages asset_model, scenarios and bootstrap, once it exists, being named in validate-config.yml's paths filter, validate_caches.SCANNED, validate_collections.SCANNED, the coverage sources and replay_inputs.INPUTS (B6, narrowed by Keith 2026-11-15), so that one of them left out of any of them fails.
     non_functional_requirements:
     - 'PERFORMANCE: the gate reads syntax trees and imports nothing, and runs in under 5 seconds over the repository; run in both matrix legs it adds seconds, not minutes.'
     - 'MAINTAINABILITY: each allowlist entry names its requirement, so the list is a to-do list that can only get shorter; one walker serves this gate, the underscore-name rule, the status-ranking rule and validate_caches.'
@@ -49182,6 +49182,37 @@ requirements:
     - REQ-GEN-370
     - REQ-TEST-375
     - REQ-TEST-393
+    linked_tests:
+    - tests/test_validate_imports.py
+    implemented_by:
+    - qa_tools/common/syntax_walk.py::tracked_python_files
+    - qa_tools/common/syntax_walk.py::files
+    - qa_tools/common/syntax_walk.py::imports
+    - qa_tools/common/syntax_walk.py::calls_of
+    - qa_tools/common/validate_imports.py::side_of_file
+    - qa_tools/common/validate_imports.py::side_of_module
+    - qa_tools/common/validate_imports.py::forbidden_edges
+    - qa_tools/common/validate_imports.py::RULES
+    - qa_tools/common/validate_imports.py::scan
+    - qa_tools/common/validate_imports.py::read_allowlist
+    - qa_tools/common/validate_imports.py::allowlist_problems
+    - qa_tools/common/validate_imports.py::main
+    - qa_tools/common/validate_caches.py::scan
+    - imports-allowlist.yaml
+    - cli/dashboard.py::validate_imports_command
+    - cli/check.py::_GATES
+    - cli/check.py::_REPOSITORY_WIDE
+    - .github/workflows/validate-config.yml
+    evidence:
+    - '2026-11-15, first build (11d389ae): tests/test_validate_imports.py seen failing first - collection error with the gate absent, then 8 failed with cli/check.py, cli/dashboard.py and validate-config.yml at the base commit - and 13 mutants of the gate (each edge rule, module-level imports only, loads ignored, no-side ignored, the stale, gain and requirement checks off) each failed the tests written for them. The allowlist landed holding exactly the tree''s findings: 69 (file, module) entries, 142 imports.'
+    - '2026-11-15, after the post-build critic (plans/post-build-review.md #325): 13 new tests (assets.* modules sided, import_module by keyword, __import__, a file that does not parse, tracked files only, a hidden tracked file in no side, a malformed and a duplicate allowlist entry) seen failing first, 13 failed, then passing; the B6 test (criterion 14 as narrowed) passes today because none of asset_model, scenarios or bootstrap exists, and fails on a fixture repository where scenarios/ exists and is left out, and with its list check broken. tests/test_validate_imports.py 81 passed, all critical, no database. The real tree''s findings unchanged: 69 entries, 142 imports, none new.'
+    - '`mothman dashboard validate-imports` run per asset leg with no DSN, as validate-config.yml runs it: both legs exit 0 in about 2.5s, inside the 5-second NFR.'
+    unmet_criteria:
+    - criterion: 'Criterion 9, its rules half - REQ-PIPE-376 criterion 8 (no underscore-led asset_model name used outside it) and REQ-PIPE-390 criterion 5 (no status ranking of its own) carried as rules of this gate.'
+      why: 'The one walker is built and validate_caches uses it, and validate_imports.RULES is the hook each rule joins; the rules themselves belong to those two requirements, and the underscore rule would check nothing until asset_model/ exists (Keith, 2026-11-15).'
+      owner: REQ-PIPE-376 and REQ-PIPE-390, each adding its rule and its test on RULES
+      blocked_by:
+        requirements: [REQ-PIPE-376, REQ-PIPE-390]
     decisions:
     - 'THE GATE COMES FIRST, AFTER THE HARNESS GOES (delivery-scoper; v6 order): landing it with today''s findings allowlisted makes it the measure each later requirement shrinks. REQ-TEST-393 lands just before it, so the allowlist never carries the deleted harness''s edges.'
     - 'BOTH DIRECTIONS IN ONE GATE (the brief, 2026-11-02): the pipeline never imports the generator today, but nothing holds that true; the generator imports the pipeline in 97 statements.'
@@ -49197,6 +49228,14 @@ requirements:
     - 'BOTH MATRIX LEGS, NOT ONE (delivery-scoper, v5, Keith may change it): validate-config.yml''s own comment runs every repository-wide gate in both legs because each costs seconds.'
     - 'ONE TEST KEEPS EVERY LIST HONEST (delivery-scoper, v6, answering the architect''s B6): five lists must each name a moved package - the paths filter, two SCANNED tuples, the coverage sources, the cache inputs - and each would otherwise fail silently, a false green. Each requirement that creates a package adds it (REQ-PIPE-380, REQ-GEN-381, REQ-GEN-386 criteria), and criterion 14''s last test fails the one it forgets.'
     - 'NO FAULT-RATE GATE (Q11 of 2026-11-14 with Q5, SETTLED by Keith 2026-11-14): REQ-GEN-392 derives the rates.'
+    - 'CRITERION 14''S LAST TEST NARROWED (Keith, 2026-11-15, wording approved verbatim): the builder found the signed wording - every top-level package the gate gives a side - failed on four of the five lists today, against deliberate exclusions (synthetic_data_generator out of coverage, aws/ exempt from the collections gate, only cli/pipeline.py in the cache key). It now covers asset_model, scenarios and bootstrap, once each exists. REJECTED widening the four lists, and REJECTED leaving the test as an unmet criterion.'
+    - 'CRITERION 9 CITES REQ-PIPE-390 CRITERION 5 (Keith, 2026-11-15): the status-ranking rule is that requirement''s criterion 5; the signed text said 4. The two rules themselves are added by REQ-PIPE-376 and REQ-PIPE-390 on validate_imports.RULES, so criterion 9''s rules half is unmet until they land.'
+    - 'THE FIVE LISTS ARE READ BY THE TEST, NOT BY THE GATE (builder, 2026-11-15): the check lives in tests/test_validate_imports.py, which reads the lists from the files under a root and is shown failing on a fixture repository where scenarios/ exists and is left out; CLAUDE.md keeps test helpers out of product code.'
+    - 'COMMITTED FILES ONLY, READ AS GIT TRACKS THEM (post-build critic, 2026-11-15, under the COMPATIBILITY NFR): the gate reads `git ls-files --cached` (committed or staged), so a scratch file in a working tree is not read and a tracked file in a hidden directory, such as .github/scripts/, is - in no side. validate_caches keeps reading the working tree, as it did before.'
+    - 'A MODULE UNDER assets/ IS SIDED AS ITS FILE IS (post-build critic, 2026-11-15): assets.<asset>.collections.* is the pipeline''s, assets.<asset>.synthetic.collections.* the generator''s, and anything else under assets/ is ''no side'', which no side may import (REQ-PIPE-380 criterion 9). It added no finding on today''s tree.'
+    - 'ENTRIES ARE (file, module), ONE PER PAIR (builder, 2026-11-15): one entry covers every import of that module in that file, with no line number, so an edit above an import does not stale it. `from X import a` reaches X.a where that is a module of the repository, else X; a load by path is recorded as ''<kind> loaded by path''. A duplicate entry, and a malformed one, fail rather than crash.'
+    - 'WHO REMOVES EACH ENTRY (builder, 2026-11-15), by build order where two could: REQ-PIPE-380 58 (modules it moves into asset_model/, the registry''s declaration half, the declared-corrections readers), REQ-GEN-386 7 (scenario_map, scripted_decisions, promotion''s lag rule and the delivery writer), REQ-GEN-381 3 (the bootstrap''s cli.pipeline imports), REQ-QAC-389 1 (Linkage Products loading its adapter). REQ-PIPE-382, 383, 385 and 390 remove none: today''s tree has no crossing they own.'
+    - 'THE LOADER IS RECOGNISED IN BOTH HOMES (builder, 2026-11-15): qa_tools.common.assets.load today and asset_model.assets.load, where REQ-PIPE-380 moves the resolver whole, so the rule survives the move without an edit.'
     open_questions: []
     signed_off:
       by: Keith
@@ -49551,6 +49590,7 @@ requirements:
     - .github/workflows/validate-config.yml
     evidence:
     - '2026-11-15: tests/test_validate_dbt_packages.py 9 passed (all marked critical, no database); seen failing first with cli/check.py, cli/dashboard.py and validate-config.yml at the base commit (the command, the check gate and the workflow step, 3 failed), and with the gate module absent (collection error); four mutants of the gate (bytes compared instead of parsed YAML, the lock file left out, the second asset never compared, one asset not reported) each failed the test written for it. `mothman dashboard validate-dbt-packages` run per asset leg with no DSN, as validate-config.yml runs it: both legs exit 0, ''agree across 2 assets (daily, quarterly)'', 0.4-0.6s.'
+    - '2026-11-15, after the post-build critic (plans/post-build-review.md #325): an asset folder with a data-asset.yaml and no dbt/ was skipped in silence; it now differs as a missing file does (asset ''<name>'' has no dbt/packages.yml, which ''<other>'' has). Its test seen failing first; tests/test_validate_dbt_packages.py 10 passed.'
     - 'Criterion 1 holds as REQ-QAC-368 built it: assets/quarterly/dbt/ and assets/daily/dbt/ each keep packages.yml and package-lock.yml, and `mothman env dbt-deps` installs each asset''s from its own; this requirement added the gate that holds them equal.'
     decisions:
     - SAME PACKAGES, KEPT PER PROJECT, GATED (SPLIT D2, SETTLED by Keith 2026-11-03). REJECTED packages per asset, and one shared install folder.

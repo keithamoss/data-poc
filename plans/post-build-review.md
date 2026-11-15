@@ -14636,3 +14636,43 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Ran**: `pytest tests/test_thirty_linked_datasets.py --run-on-demand`
        27 passed in 43s - including TestEachFakeGeocodingDatasetIsCheckedAgainstItsSource
        (5) and TestEveryLinkageResultNamesItsRowsByTheWholeKey; ruff.
+
+
+325. **[done, 2026-11-15]** **[Testing & dev tooling]** **The imports gate and the dbt packages gate (REQ-TEST-384, REQ-TEST-388), from `delivery-critic` on 11d389ae.**
+     Each finding verified against the code before it was fixed, and each
+     fixed test-first: 13 new tests in tests/test_validate_imports.py and one
+     in tests/test_validate_dbt_packages.py, 14 failed before the fix.
+     - **(MEDIUM) A module under assets/ had no side.** `side_of_module`
+       read only top-level packages, so the pipeline importing
+       `assets.quarterly.synthetic.collections.x`, or a provider importing
+       `assets.quarterly.collections`, passed. **Fixed**: such a module is
+       sided as side_of_file sides its file; anything else under assets/ is
+       `no side`, which no side may import (REQ-PIPE-380 criterion 9). Re-run
+       on the real tree: no new finding, so no new allowlist entry.
+     - **(LOW) `import_module(name=...)` and `__import__('x')` were not read.**
+       **Fixed** in syntax_walk.imports.
+     - **(LOW) A file that does not parse crashed the gate.** **Fixed**: it is a
+       `path:line: cannot be parsed` finding.
+     - **(LOW) The gate read the working tree and skipped hidden directories.**
+       The COMPATIBILITY NFR says committed files only. **Fixed**: the gate
+       reads `git ls-files --cached`, so an untracked scratch file is not
+       read and a tracked `.github/scripts/x.py` is, in no side. Today's tree
+       tracks no Python file in a hidden directory, so nothing changed for it.
+       validate_caches keeps its working-tree walk.
+     - **(LOW) An asset folder with no dbt/ was ignored by the dbt packages
+       gate.** **Fixed**: a folder holding a data-asset.yaml with no dbt/
+       differs, as a missing file does.
+     - **(INFO) A malformed allowlist crashed the gate, and a duplicate entry
+       passed.** **Fixed**: both are findings.
+     - **Left alone, as the critic advised**: aliasing the loader by
+       assignment, and getattr routes; the (file, module) entry granularity
+       and `removed_by`, which follow the criterion.
+     - **Keith, the same day, on the builder's two open points**: criterion
+       14's last test narrowed to asset_model, scenarios and bootstrap once
+       each exists (built, shown failing on a fixture repository); criterion 9
+       cites REQ-PIPE-390 criterion 5, and its rules half is recorded unmet,
+       blocked by REQ-PIPE-376 and REQ-PIPE-390.
+     - **Ran**: tests/test_validate_imports.py 81 passed;
+       tests/test_validate_dbt_packages.py 10 passed; with test_validate_caches,
+       test_cli_check, test_publish and test_validate_provisional, 262 passed;
+       ruff; both gates per asset leg with no DSN, exit 0.
