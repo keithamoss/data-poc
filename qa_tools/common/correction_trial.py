@@ -31,10 +31,10 @@ supply rows.
 """
 from __future__ import annotations
 
+from asset_model import declared_corrections
 import contextlib
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
-from qa_tools.common import assets as _assets
 
 #: The instants of a slot a correction can move, in the order a reader
 #: thinks in, with the dashboard's words for them (NFR 1).
@@ -531,44 +531,6 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
     return "\n".join(lines) + "\n"
 
 
-# ---- the two states, from disk and from git --------------------------------
-
-class Unreadable(ValueError):
-    """A state of the configuration that could not be read."""
-
-
-def _working_docs() -> tuple[dict, dict]:
-    from qa_tools.common import agreement_drift
-
-    return agreement_drift._load_docs()
-
-
-def _readable(docs: tuple[dict, dict], what: str) -> tuple[dict, dict]:
-    """The two documents, or Unreadable naming what is wrong (delivery-
-    critic on 169, F4): a working copy part-way through an edit is the state
-    the Calendar entry is most used in, and it must be said in words - never
-    a traceback, never a "nothing to declare"."""
-    from qa_tools.common import agreement, asset_time
-
-    try:
-        agreement.from_doc(docs[0])
-        asset_time.parse_timezone_versions(docs[1] or {})
-    except Exception as exc:  # noqa: BLE001 - every way a document can be wrong
-        raise Unreadable(f"{what} cannot be read, so nothing was compared: {exc}") from exc
-    return docs
-
-
-def working() -> tuple[dict, dict]:
-    """The configuration on disk - the working copy being corrected."""
-    try:
-        docs = _working_docs()
-    except Exception as exc:  # noqa: BLE001 - a YAML slip, or a missing file
-        raise Unreadable(f"the working copy cannot be read, so nothing was compared: "
-                         f"{exc}") from exc
-    return _readable(docs, f"the working copy of {_assets.config_dir()}/calendar.yaml or "
-                           f"{_assets.config_dir()}/data-asset.yaml")
-
-
 def at_ref(ref: str) -> tuple[dict, dict]:
     """The configuration at a git ref, as REQ-PIPE-111's gate reads it."""
     from qa_tools.common import agreement_freeze, config_yaml
@@ -578,19 +540,19 @@ def at_ref(ref: str) -> tuple[dict, dict]:
     for rel in (agreement_freeze.calendar_rel(), agreement_freeze.asset_rel()):
         text = _content_at(rel, ref)
         if text is None:
-            raise Unreadable(f"{rel} could not be read at {ref!r} - is it a ref this "
+            raise declared_corrections.Unreadable(f"{rel} could not be read at {ref!r} - is it a ref this "
                              f"checkout has?")
         try:
             docs.append(config_yaml.parse(text) or {})
         except Exception as exc:  # noqa: BLE001 - a YAML slip at that ref
-            raise Unreadable(f"{rel} at {ref!r} cannot be read: {exc}") from exc
-    return _readable((docs[0], docs[1]), f"the configuration at {ref!r}")
+            raise declared_corrections.Unreadable(f"{rel} at {ref!r} cannot be read: {exc}") from exc
+    return declared_corrections.readable((docs[0], docs[1]), f"the configuration at {ref!r}")
 
 
 def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
     """The impact preview of the working copy against `ref` (by default the
     base REQ-PIPE-111's gate compares against) - one function for the
-    command and the terminal's Calendar entry. Raises Unreadable where a
+    command and the terminal's Calendar entry. Raises declared_corrections.Unreadable where a
     state cannot be read, and supply_db.SupplyDbError where the recorded
     facts cannot be reached (criterion 9): an impact computed from
     configuration alone is not complete, so none is offered."""
@@ -602,7 +564,7 @@ def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
     at = at or datetime.now(UTC)
-    base, work = at_ref(ref), working()
+    base, work = at_ref(ref), declared_corrections.working()
     with supply_db.connect(read_only=True, label="mothman:correction-preview") as conn:
         t = trial(conn, base, work, at=at)
     return report(t, as_at=at, database=database_label(), against=ref)
@@ -620,7 +582,7 @@ def draft(ref: str | None = None, **given) -> list[str]:
     from qa_tools.common.validate_schedule import _content_at
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
-    base, work = at_ref(ref), working()
+    base, work = at_ref(ref), declared_corrections.working()
     people = config_yaml.parse(_content_at(agreement_freeze.people_rel(), ref) or "") or {}
     return agreement_freeze.drafts(
         base[0], work[0], base[1], work[1], people,
@@ -634,7 +596,7 @@ def rise_entries() -> list[str]:
     rise is drafted complete rather than refused first."""
     from qa_tools.common import validate_schedule
 
-    cal, asset = working()
+    cal, asset = declared_corrections.working()
     src = validate_schedule.Source.default()
     found = validate_schedule._files_go_to_period_errors(cal, asset, src)
     return [f"{e.scope}: {e.problem}\n  {e.fix}" for e in found if e.problem.startswith("rises from ")]
@@ -759,7 +721,7 @@ def declared(conn=None, cal_doc: dict | None = None,
     from qa_tools.common import agreement_freeze, verdict
 
     if cal_doc is None or asset_doc is None:
-        cal_doc, asset_doc = working()
+        cal_doc, asset_doc = declared_corrections.working()
     applied: set[str] = set()
     if conn is not None:
         applied = {r[0] for r in conn.execute(

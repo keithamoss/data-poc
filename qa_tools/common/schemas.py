@@ -51,6 +51,7 @@ from typing import Annotated, Literal
 from pydantic import (BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr,
                       field_validator, model_validator)
 
+from asset_model.amber_setting import AMBER_SETTINGS
 from qa_tools.common.vocab import (
     CHANGELOG_CATEGORIES,
     COMPONENT_CODES,
@@ -514,10 +515,10 @@ class TimezoneConfig(_Strict):
     corrections: list["Correction"] = Field(default_factory=list)
 
 
-#: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
-#: criteria 1 and 2). This tuple is the one order; every list of them -
-#: an error message, a comment, the documentation - takes it from here.
-AMBER_SETTINGS = ("hold", "promote-and-acknowledge", "promote")
+#: THE AMBER SETTING'S THREE VALUES are asset_model.amber_setting's
+#: AMBER_SETTINGS (REQ-PIPE-380 criterion 2), so asset_model/ need not import
+#: this requirements and changelog schema to read them.
+# (imported at the top of this module)
 
 
 class AmberSettingVersion(_Strict):

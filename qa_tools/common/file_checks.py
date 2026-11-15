@@ -27,6 +27,11 @@ AN EVALUATOR BUG IS NOT A SUPPLIER FAULT (criterion 13): anything raised
 while evaluating is re-raised as FileCheckCrashed naming the check, which
 the loader deliberately does NOT catch - the run fails, and nothing about
 the file is recorded.
+
+THE DEFINITIONS ARE asset_model/file_check_definitions.py (REQ-PIPE-380
+criterion 2): which file checks exist, their severities and their ids are
+configuration the generator reads too; evaluating a file's bytes and
+recording the findings are the real pipeline's, so they stay here.
 """
 from __future__ import annotations
 
@@ -36,34 +41,15 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-from qa_tools.common import config_yaml
+from asset_model import config_yaml
+from asset_model import file_check_definitions as defs
+from asset_model.file_check_definitions import (
+    COLUMN_ORDER, DELIMITER, ENCODING, FAILURE, FIELDS_PER_ROW, HEADER_NAMES_UNIQUE, HEADER_ROW,
+    TOOL, WARNING, Definition,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-
-def definitions_path() -> Path:
-    """The selected asset's file-checks.yaml, resolved now (REQ-PIPE-342 criterion
-    6; it was the import-time constant DEFINITIONS_PATH)."""
-    from qa_tools.common import assets
-
-    return assets.selected().file("file-checks.yaml")
-
-#: The fifth tool suffix (check_id.TOOLS) and the value of `qa.check_result.tool`.
-TOOL = "file"
-
-#: How much a finding matters (criterion 18): a FAILURE refuses the file, a
-#: WARNING is recorded and the file loads.
-FAILURE = "failure"
-WARNING = "warning"
-
-ENCODING = "encoding"
-DELIMITER = "delimiter"
-HEADER_ROW = "header_row"
-HEADER_NAMES_UNIQUE = "header_names_unique"
-FIELDS_PER_ROW = "fields_per_row"
-COLUMN_ORDER = "column_order"
-#: Evaluation order, which is also reading order on the page.
-NAMES = (ENCODING, DELIMITER, HEADER_ROW, HEADER_NAMES_UNIQUE, FIELDS_PER_ROW, COLUMN_ORDER)
 
 #: The existing status vocabulary, nothing new (REQ-DASH-097 criterion 10).
 #: `nodata` is a check that could not be asked of this file because an
@@ -79,37 +65,6 @@ class FileCheckCrashed(RuntimeError):
         super().__init__(f"the file check {check!r} could not be evaluated: "
                          f"{type(exc).__name__}: {exc}")
         self.check = check
-
-
-@dataclass(frozen=True)
-class Definition:
-    check: str
-    severity: str
-    formats: tuple[str, ...]
-    name: str
-    retired: bool
-
-
-def definitions(path: Path | str | None = None) -> list[Definition]:
-    """Every file check in the committed configuration, in NAMES order."""
-    doc = config_yaml.parse(Path(path or definitions_path()).read_text()) or {}
-    out = [Definition(check=str(raw["check"]), severity=str(raw["severity"]),
-                      formats=tuple(raw.get("formats") or ("csv",)),
-                      name=str(raw.get("name") or raw["check"]).strip(),
-                      retired=bool(raw.get("retired_as_of")))
-           for raw in doc.get("checks") or []]
-    order = {n: i for i, n in enumerate(NAMES)}
-    return sorted(out, key=lambda d: order.get(d.check, len(order)))
-
-
-def active(fmt: str = "csv", path=None) -> list[Definition]:
-    return [d for d in definitions(path) if not d.retired and fmt in d.formats]
-
-
-def check_id_for(dataset, check: str) -> str:
-    """Criterion 4: `<asset>.<agency>.<collection>.<dataset>.<check>_file`."""
-    return (f"{dataset.data_asset_id}.{dataset.agency_id}.{dataset.collection_id}."
-            f"{dataset.dataset_id}.{check}_{TOOL}")
 
 
 @dataclass(frozen=True)
@@ -321,7 +276,7 @@ def evaluate(path, expected_columns, *, definitions_path=None,
     except Exception as exc:  # noqa: BLE001 - criterion 13
         raise FileCheckCrashed("(reading the file)", exc) from exc
     out = []
-    for d in active("csv", definitions_path):
+    for d in defs.active("csv", definitions_path):
         evaluator = _EVALUATORS.get(d.check)
         if evaluator is None:
             raise FileCheckCrashed(d.check, LookupError("no evaluator for this check"))
@@ -345,7 +300,7 @@ def reason_for(finding: Finding, filename: str) -> str:
     naming the file and the check (REQ-DASH-097 criterion 6)."""
     # BY ITS NAME, as the section and panel call it (#118 D-G), and a
     # finished sentence, since the outstanding item appends another.
-    names = {d.check: d.name for d in definitions()}
+    names = {d.check: d.name for d in defs.definitions()}
     words = finding.words.rstrip()
     return (f"{filename} failed the file check {names.get(finding.check, finding.check)}: "
             f"{words}{'' if words.endswith('.') else '.'}")
@@ -364,7 +319,7 @@ def expected_columns(contract_path, table: str) -> list[str]:
 def _as_record(finding: Finding, dataset, definition: Definition | None) -> dict:
     return {
         "dataset_id": dataset.dataset_id,
-        "check_id": check_id_for(dataset, finding.check),
+        "check_id": defs.check_id_for(dataset, finding.check),
         "check_name": definition.name if definition else finding.check,
         "status": finding.status,
         "dimension": None,
@@ -410,7 +365,7 @@ def record(findings: list[Finding], *, run_id: str, dataset_id: str, delivery: s
     from qa_tools.common import qa_results_writer, qa_store, replay_clock, sample_data, supply_db
 
     dataset = _dataset(dataset_id)
-    by_check = {d.check: d for d in definitions()}
+    by_check = {d.check: d for d in defs.definitions()}
     rows = [_as_record(f, dataset, by_check.get(f.check)) for f in findings]
 
     def write(db):

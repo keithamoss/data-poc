@@ -17,6 +17,7 @@ import threading
 from pathlib import Path
 
 
+from asset_model import assets
 from qa_tools.common import sample_keys, supply_db
 
 # dbt-postgres since REQ-PIPE-087 (post-build-review #124: the tag still
@@ -550,3 +551,33 @@ def install_packages(project_dir, profiles_dir) -> bool:
         said = "\n".join(p.strip() for p in (done.stdout, done.stderr) if p and p.strip())
         raise DbtRunFailed(f"dbt deps failed for {project}. dbt said:\n{said}")
     return True
+
+
+class DbtPackagesMissing(assets.AssetError):
+    """The selected asset's dbt packages are not installed (REQ-QAC-368
+    criterion 6). In the real pipeline, not asset_model/ (REQ-PIPE-380
+    criterion 5): only the pipeline runs dbt, so a QA tool's install state is
+    not the shared reading code's to know."""
+
+
+# ---- the asset's dbt project (REQ-QAC-368) ----
+
+def dbt_project_ready() -> Path:
+    """The selected asset's dbt project, once its packages are installed -
+    refused before dbt is invoked when they are not (REQ-QAC-368 criterion
+    6), naming the asset and the one command that fixes it, rather than
+    failing later with a FileNotFoundError on manifest.json."""
+    # ONE MEANING OF "INSTALLED" EVERYWHERE (Keith, 2026-11-03, morning
+    # report 12 Q10; criterion 6 as amended): dbt's own package-lock rule, the
+    # one `mothman env dbt-deps` decides by, so packages outdated by an edit to
+    # packages.yml, or deleted since, are refused as a missing folder is.
+    # REJECTED keeping the missing-or-empty folder test as first signed.
+    asset = assets.selected()
+    if not packages_installed(asset.dbt_project):
+        raise DbtPackagesMissing(
+            f"asset {asset.name!r} has no current dbt packages installed - "
+            f"{asset.dbt_project / PACKAGE_LOCK} is missing or stale against "
+            f"packages.yml, or a package it names is missing from {asset.dbt_packages}, so "
+            f"dbt cannot compile its checks. Run `mothman env dbt-deps` (with "
+            f"{assets.ASSET_ENV}={asset.name}), then run this again.")
+    return asset.dbt_project

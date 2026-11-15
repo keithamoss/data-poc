@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 from qa_tools.common import assets as _assets
 
-REPO = Path(__file__).resolve().parent.parent.parent
+REPO = Path(__file__).resolve().parent.parent
 
 
 def _asset_folder(root: Path) -> Path:

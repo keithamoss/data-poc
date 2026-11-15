@@ -29,17 +29,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from qa_tools.common import assets
+from asset_model import assets, check_sources
 from qa_tools.common import check_id as cid
 from qa_tools.common import check_lifecycle as cl
 from qa_tools.common.diff_base import diff_base
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-
-#: Which parser reads each tool's check files.
-_PARSERS = {"dbt": cl.parse_dbt_check_metadata, "soda": cl.parse_soda_check_metadata,
-            "contract": cl.parse_contract_check_metadata}
-
 
 def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     """Every file the checks at `ref` are defined in - `[(path, parser)]`
@@ -52,8 +47,7 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     Grouped by tool in a fixed order - dbt, Soda, contracts, file checks,
     Evidently - the order the hand-written list had, so nothing that lists
     checks moves."""
-    from qa_tools import collections
-    from qa_tools.common import config_yaml, hierarchy
+    from asset_model import hierarchy
 
     if ref is not None:
         # A READ AT A GIT REF names the files by repository path, which a
@@ -64,21 +58,7 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     asset = hierarchy.data_asset_yaml()
     rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
     text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
-    colls = collections.collections_in(config_yaml.parse(text or "") or {})
-    yaml_sources = [(c.dbt_schema, _PARSERS["dbt"]) for c in colls]
-    yaml_sources += [(c.dbt_retired_schema, _PARSERS["dbt"]) for c in colls]
-    for kind in ("soda", "contract"):
-        for c in colls:
-            yaml_sources += [(c.check_file(kind), _PARSERS[kind]),
-                             (c.check_file(kind, retired=True), _PARSERS[kind])]
-    yaml_sources.append((collections.file_checks(), cl.parse_file_check_metadata))
-    evidently = [f for c in colls for f in (c.check_file("evidently"),
-                                             c.check_file("evidently", retired=True))]
-    return yaml_sources, evidently
-
-
-def _evidently_checks(source: str, rel_path: str) -> dict:
-    return cl.evidently_checks_from_text(source, rel_path)
+    return check_sources.sources(text)
 
 
 def _yaml_outside_synthetic(folder: Path):
@@ -150,33 +130,16 @@ def _git_show(rel_path: str, ref: str) -> str | None:
     return result.stdout
 
 
-#: Where the project's own dbt SQL lives (REQ-QAC-223 criterion 2): macros
-#: and custom generic tests - dbt_shared/, read by every asset's project
-#: (REQ-QAC-368) - and singular tests, every collection's folder under the
-#: selected asset's project's tests/ (`_dbt_singular_dir`, asked at call time).
-#: Package macros (dbt_packages/) and models are deliberately NOT covered.
-def _dbt_macro_dirs() -> tuple[str, ...]:
-    from qa_tools import collections
-
-    return collections.SHARED_DBT_DIRS
-
-
 def _dbt_singular_dir(ref: str | None = None) -> str:
     # At a git ref, a repository path - refused outside it (C7).
     return f"{assets.dbt_on_disk() if ref is None else assets.dbt_rel()}/tests"
 
 
-_MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
-
-
 def _files_in(rel_dir: str, ref: str | None) -> list[str]:
     """The .sql files anywhere under `rel_dir`, at `ref` or in the working
-    tree. Recursive because dbt is: it reads every folder under its
-    macro-paths and test-paths, so a macro filed in a subfolder still backs
-    checks (post-build-review #182 - it used to be invisible here)."""
+    tree (check_sources.sql_files_in, at None)."""
     if ref is None:
-        d = ROOT / rel_dir
-        return sorted(f"{rel_dir}/{p.relative_to(d).as_posix()}" for p in d.rglob("*.sql")) if d.is_dir() else []
+        return check_sources.sql_files_in(rel_dir, ROOT)
     result = subprocess.run(["git", "ls-tree", "-r", "--name-only", f"{ref}:{rel_dir}"], cwd=ROOT,
                             capture_output=True, text=True)
     if result.returncode != 0:
@@ -186,59 +149,11 @@ def _files_in(rel_dir: str, ref: str | None) -> list[str]:
 
 
 def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
-    """What `parse_dbt_check_metadata(definition=...)` reads at one ref: the
-    project SQL behind each dbt check (REQ-QAC-223 criterion 2).
-
-    The project's macros are scanned ONCE per ref (NFR: not once per check)
-    into {name: (file, text)}; a `{% test x(` names test type `x`, a
-    `{% macro test_x(` does too. A singular test is its own SQL file plus
-    every project macro whose name appears in it, followed transitively. The
-    scan is lexical and errs towards including too much, which can only ask
-    for a changelog entry that was not strictly needed."""
-    macros: dict[str, tuple[str, str]] = {}
-    for rel_dir in _dbt_macro_dirs():
-        for rel in _files_in(rel_dir, ref):
-            text = _old_file_content(rel, ref) or ""
-            for kind, name in _MACRO_HEAD.findall(text):
-                macros[name] = (rel, text)
-                if kind == "macro" and name.startswith("test_"):
-                    macros.setdefault(name[len("test_"):], (rel, text))
-
-    singular_dir = _dbt_singular_dir(ref)
-    singular = [f for f in _files_in(singular_dir, ref)
-                if not f.startswith(f"{singular_dir}/generic/")]
-
-    def _with_used_macros(files: list[str], texts: list[str]) -> tuple[str, tuple[str, ...]]:
-        seen = set(files)
-        i = 0
-        while i < len(texts):
-            for name, (rel, text) in macros.items():
-                if rel not in seen and re.search(rf"\b{re.escape(name)}\s*\(", texts[i]):
-                    seen.add(rel)
-                    files.append(rel)
-                    texts.append(text)
-            i += 1
-        # Each file is named by its FILE NAME, not its path, so moving a test
-        # into a collection's folder is not a change to what it does
-        # (REQ-QAC-241's build question): dbt names a singular test by its
-        # file name too, and the collections gate keeps those unique.
-        return "\n".join(f"-- {f.rsplit('/', 1)[-1]}\n{t}" for f, t in zip(files, texts)), tuple(files)
-
-    def definition(kind: str, name: str):
-        if kind == "singular":
-            # dbt names a singular test by its file, in any folder under
-            # tests/ - generic tests (tests/generic/) are macros, not these.
-            rel = next((f for f in singular if f.rsplit("/", 1)[-1] == f"{name}.sql"), None)
-            text = _old_file_content(rel, ref) if rel else None
-            if text is None:
-                return None, ()
-            return _with_used_macros([rel], [text])
-        if "." in name or name not in macros:  # dbt's own or a package's
-            return None, ()
-        rel, text = macros[name]
-        return _with_used_macros([rel], [text])
-
-    return definition
+    """What `parse_dbt_check_metadata(definition=...)` reads at one ref - the
+    one scan (check_sources.dbt_definitions) over this ref's files."""
+    return check_sources.dbt_definitions(lambda rel: _old_file_content(rel, ref),
+                                         lambda rel_dir: _files_in(rel_dir, ref),
+                                         _dbt_singular_dir(ref))
 
 
 def _dbt_kwargs(parser, ref: str | None) -> dict:
@@ -249,20 +164,19 @@ def _dbt_kwargs(parser, ref: str | None) -> dict:
 
 def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     """`ref=None` means the current working tree; otherwise a git ref
-    (e.g. `"HEAD~1"`). A source path missing at `ref=None` reads as "no
-    checks from it" too, same as a path that didn't exist yet at an old
-    ref - each tool's own `-retired` sibling file (schema-retired.yml
-    etc., see their own header comments) is a genuinely optional source
-    until a real project's first check ever gets retired, so this can't
-    assume every listed path already exists on disk."""
-    checks: list[cl.CheckMetadata] = []
+    (e.g. `"HEAD~1"`). A source path missing at either reads as "no checks
+    from it", same as a path that didn't exist yet at an old ref - each
+    tool's own `-retired` sibling file is a genuinely optional source.
+
+    THE WORKING-TREE READ IS asset_model/check_sources.py (REQ-PIPE-380
+    criterion 12, 380 Q1 (a) SETTLED by Keith 2026-11-14), so the generator
+    reads checks exactly as this gate does; reading a check file AT A REF -
+    git - is this half's, and stays here."""
     yaml_sources, evidently = _sources(ref)
+    if ref is None:
+        return check_sources.collect_working_tree(yaml_sources, evidently, ROOT)
+    checks: list[cl.CheckMetadata] = []
     for rel_path, parser in yaml_sources:
-        if ref is None:
-            if not (ROOT / rel_path).exists():
-                continue
-            checks.extend(parser(ROOT / rel_path, **_dbt_kwargs(parser, None)))
-            continue
         content = _old_file_content(rel_path, ref)
         if content is None:
             continue
@@ -274,17 +188,11 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
         checks.extend(parser(tmp_path, **past, **_dbt_kwargs(parser, ref)))
 
     for rel_path in evidently:
-        if ref is None:
-            if not (ROOT / rel_path).exists():
-                continue
-            with open(ROOT / rel_path) as f:
-                source = f.read()
-        else:
-            source = _old_file_content(rel_path, ref)
-            if source is None:
-                continue
+        source = _old_file_content(rel_path, ref)
+        if source is None:
+            continue
         checks.extend(cl.parse_evidently_check_metadata(
-            _evidently_checks(source, rel_path), source=rel_path))
+            cl.evidently_checks_from_text(source, rel_path), source=rel_path))
 
     return checks
 

@@ -31,6 +31,7 @@ reason, as a keep at confirmation is recorded.
 """
 from __future__ import annotations
 
+from asset_model import declared_corrections
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -48,61 +49,18 @@ RESOLVED = f'"{qa_store.SCHEMA}".correction_parked_resolved'
 RULE_ACTOR = "mothman (a confirmed correction)"
 
 
-@dataclass(frozen=True)
-class Pending:
-    """One declared correction with no applied record."""
-
-    reference: str
-    owner: tuple
-    label: str
-    date: str
-    reason: str
-    approver: str
-    changes: tuple[tuple[str, object, object], ...]
-
-
-def _declared(cal: dict, asset: dict) -> list[Pending]:
-    """Every declared correction, ONE PER CHANGE REFERENCE (delivery-critic on
-    170, D1): the gate makes each changed item be declared on its own owner,
-    so one correction - a collection moved to another calendar, a date and a
-    grace changed together - is several entries sharing a reference, and is
-    trialled, listed and applied as one."""
-    from qa_tools.common import agreement_freeze
-
-    by_ref: dict[str, Pending] = {}
-    for owner, entries in agreement_freeze._corrections_by_owner(cal, asset).items():
-        for corr in entries:
-            corr = corr or {}
-            ref = str(corr.get("change_reference") or "")
-            changes = tuple((str((c or {}).get("item")), (c or {}).get("old"),
-                             (c or {}).get("new")) for c in corr.get("changes") or [])
-            label = agreement_freeze._owner_label(owner)
-            if ref in by_ref:
-                was = by_ref[ref]
-                by_ref[ref] = Pending(ref, was.owner, f"{was.label}; {label}", was.date,
-                                      was.reason, was.approver, was.changes + changes)
-                continue
-            by_ref[ref] = Pending(
-                reference=ref, owner=owner, label=label, date=str(corr.get("date") or ""),
-                reason=str(corr.get("reason") or ""), approver=str(corr.get("approver") or ""),
-                changes=changes)
-    # BY DATE; a tie keeps the order the files are read in - calendars, then
-    # datasets, then the timezone - not the order they were written (J4).
-    return sorted(by_ref.values(), key=lambda p: p.date)
-
-
 def applied_references(conn) -> set[str]:
     return {r[0] for r in conn.execute(f"SELECT change_reference FROM {APPLIED}").fetchall()}
 
 
-def pending(conn, docs: tuple[dict, dict] | None = None) -> list[Pending]:
+def pending(conn, docs: tuple[dict, dict] | None = None) -> list[declared_corrections.Pending]:
     """Every declared correction not yet applied, oldest first."""
     cal, asset = docs or correction_trial.working()
     done = applied_references(conn)
-    return [p for p in _declared(cal, asset) if p.reference not in done]
+    return [p for p in declared_corrections.declared(cal, asset) if p.reference not in done]
 
 
-def affected_datasets(p: Pending, cal: dict) -> list[str]:
+def affected_datasets(p: declared_corrections.Pending, cal: dict) -> list[str]:
     """The datasets a correction's declared changes name - from configuration
     alone, which is all the pass's 'awaiting confirmation' marking reads."""
     from qa_tools.common import agreement, agreement_freeze, hierarchy
@@ -126,7 +84,7 @@ def affected_datasets(p: Pending, cal: dict) -> list[str]:
     return [d for d in every if d in out]
 
 
-def states(p: Pending, all_pending: list[Pending],
+def states(p: declared_corrections.Pending, all_pending: list[declared_corrections.Pending],
            docs: tuple[dict, dict]) -> tuple[tuple[dict, dict], tuple[dict, dict]]:
     """(before, after) this correction: the configuration with every later
     pending correction reverted, then with this one reverted too."""
@@ -145,7 +103,7 @@ class NotPending(decision_log.DecisionRefused):
     """A reference that is not a pending correction."""
 
 
-def _find(conn, reference: str, docs) -> tuple[Pending, list[Pending]]:
+def _find(conn, reference: str, docs) -> tuple[declared_corrections.Pending, list[declared_corrections.Pending]]:
     found = pending(conn, docs)
     match = [p for p in found if p.reference == reference]
     if not match:
@@ -421,7 +379,7 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
     # and that correction's own confirmation then moves or re-judges it.
     docs = docs or correction_trial.working()
     for later in reversed(pending(conn, docs)):
-        docs = agreement_freeze_revert(docs, later)
+        docs = declared_corrections.revert(docs[0], docs[1], list(later.changes))
     with correction_trial.configured(*docs):
         for item in found:
             if correction_trial._blocked(conn, item.dataset_id, item.supply_id,
@@ -466,12 +424,6 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
                 f"cleared, so it moves to {item.to_period or 'a hold'} as confirmed")
             done.append((item.dataset_id, item.supply_id, item.from_period, item.to_period))
     return done
-
-
-def agreement_freeze_revert(docs: tuple[dict, dict], p: Pending) -> tuple[dict, dict]:
-    from qa_tools.common import agreement_freeze
-
-    return agreement_freeze.revert(docs[0], docs[1], list(p.changes))
 
 
 def _carry_out(conn, item: Parked, entry, at: str):
@@ -594,7 +546,7 @@ def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: st
         raised_by=f"correction {reference}")
 
 
-def summary(p: Pending, t, done: Applied, *, as_at: datetime, database: str) -> str:
+def summary(p: declared_corrections.Pending, t, done: Applied, *, as_at: datetime, database: str) -> str:
     """What was actually applied, in the impact preview's own order and
     form (criterion 22), for the change reference and its approver."""
     applied_moves = tuple(

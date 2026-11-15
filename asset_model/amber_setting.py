@@ -46,7 +46,13 @@ from pathlib import Path
 
 from qa_tools.common import config_yaml
 
-from qa_tools.common.schemas import AMBER_SETTINGS
+
+#: THE AMBER SETTING'S THREE VALUES, STRICTEST FIRST (REQ-PIPE-122
+#: criteria 1 and 2). This tuple is the one order; every list of them -
+#: an error message, a comment, the documentation, the requirements schema
+#: (qa_tools/common/schemas.py, which imports it from here since
+#: REQ-PIPE-380) - takes it from here.
+AMBER_SETTINGS = ("hold", "promote-and-acknowledge", "promote")
 
 HOLD, PROMOTE_AND_ACKNOWLEDGE, PROMOTE = AMBER_SETTINGS
 

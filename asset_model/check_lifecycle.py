@@ -40,7 +40,7 @@ from typing import Any, Callable
 
 from qa_tools.common import config_yaml
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 # REQ-QAC-024. The literal value `failure_indicates` carries when a
 # human looked and decided the cause of a failure adds nothing to what
@@ -1001,7 +1001,7 @@ def contract_columns(paths=None) -> dict[str, set[str]]:
     (REQ-QAC-241 criterion 8)."""
     from qa_tools import collections
 
-    root = Path(__file__).resolve().parent.parent.parent
+    root = Path(__file__).resolve().parent.parent
     out: dict[str, set[str]] = {}
     for rel in collections.check_files("contract") if paths is None else paths:
         doc = config_yaml.parse((root / rel).read_text()) or {}

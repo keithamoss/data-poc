@@ -47,7 +47,7 @@ from pathlib import Path
 
 from qa_tools.common import config_yaml
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 
 #: Units a bound is stated in. A rule mixing ROWS and PERCENT is compared at

@@ -32,34 +32,15 @@ noisily-broken. An unrecognised recorded status used to fall through to
 threshold arithmetic here and return green; in the dashboard it passed
 straight out to a rollup that could not order it, where the reduce kept
 its green seed. Two routes, one false green. Both now raise.
+
+THE ORDER AND THE WORDS ARE asset_model/statuses.py (REQ-PIPE-390): the
+generator and the bootstrap rank and word statuses too, so those two are
+held once there and read here; what is recognised where, and the rollups,
+stay in this module.
 """
 from __future__ import annotations
 
-class UnknownStatusError(ValueError):
-    """A recorded status neither implementation recognises.
-
-    Raised rather than fallen back on, and that is the whole point of
-    REQ-QAC-047. The previous behaviour converted "I do not know what
-    this is" into "this is fine" - an unrecognised verdict fell through
-    to threshold arithmetic here, and passed straight out to a rollup
-    that could not order it in the dashboard, where the reduce kept its
-    green seed. Two different routes to the same false green.
-
-    This changes the failure mode from silently-wrong to noisily-broken.
-    That is deliberate: a malformed committed result now stops a
-    dashboard build that would previously have rendered a green tile."""
-
-
-# The agreed vocabulary. Held to status-cases.json by tests/
-# test_status_parity.py and tests-js/status-parity.test.js, which is what
-# stops this module and the dashboard's own STATUS_ORDER drifting apart
-# the way they did in plans/qa-pipeline.md item 74.
-#
-# The numbers ARE the rule: worst-of is a reduce seeded at green, so
-# nodata sits below green where it can only ever lose. "Nothing to show
-# yet" must not outrank a real green, and must not look like the worst
-# outcome either.
-ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
+from asset_model.statuses import ORDERED_STATUSES, UnknownStatusError
 
 # Recognised, but deliberately OUTSIDE the ordering so no rollup can
 # absorb them - a caller that needs one surfaces it ALONGSIDE the rolled
@@ -98,51 +79,6 @@ CHECK_STATUSES = set(ORDERED_STATUSES) | {"inactive"}
 # tile - so a mis-written result cannot read as quiet and uncounted.
 LEFT_OUT_STATUSES = {"notchecked"}
 DATASET_STATUSES = RECOGNISED_STATUSES - LEFT_OUT_STATUSES
-
-# Retained under its original name because callers outside this module
-# index it directly. Same mapping, now including nodata - whose absence
-# was the defect.
-STATUS_ORDER = ORDERED_STATUSES
-
-
-#: The words a person reads for each status (REQ-DASH-359 criterion 1,
-#: REQ-TEST-360 criterion 1): the LABEL for a pill, a legend or a status
-#: reached or held ('Fail', 'became Fail'); the VERB form for running prose
-#: ('failing because ...'); the COUNT form for a count ('2 failing'). Held
-#: equal to status-cases.json's vocabulary.labels block by tests/
-#: test_status_parity.py, as the page's own copy is by tests-js/
-#: status-parity.test.js - so the terminal's words and the page's cannot
-#: drift apart. The stored VALUES (the keys) do not change.
-STATUS_WORDS = {
-    "green": {"label": "Pass", "verb": "passing", "count": "passing"},
-    "amber": {"label": "Warn", "verb": "warning", "count": "warning"},
-    "red": {"label": "Fail", "verb": "failing", "count": "failing"},
-    "nodata": {"label": "No data", "verb": "no data", "count": "no data"},
-    "exhausted": {"label": "Schedule ended", "verb": "schedule ended",
-                  "count": "schedule ended"},
-    "inactive": {"label": "No rule defined", "verb": "no rule defined",
-                 "count": "no rule defined"},
-    "notchecked": {"label": "Not checked", "verb": "not checked", "count": "not checked"},
-    "notcounted": {"label": "Not counted", "verb": "not counted", "count": "not counted"},
-    "turnedoff": {"label": "Turned off", "verb": "turned off", "count": "turned off"},
-}
-STATUS_WORD_FORMS = ("label", "verb", "count")
-
-
-def status_words(value: str, form: str = "label") -> str:
-    """A status in the words a person reads - 'Fail', 'failing' - never its
-    stored value. REFUSES a status it has no word for (REQ-QAC-047's rule):
-    a raw 'red' printed because nothing recognised it is exactly the leak
-    REQ-DASH-359 closes, and a guess is worse than a refusal."""
-    if form not in STATUS_WORD_FORMS:
-        raise ValueError(f"unknown status word form {form!r}; forms are "
-                         f"{', '.join(STATUS_WORD_FORMS)}")
-    words = STATUS_WORDS.get(value) if isinstance(value, str) else None
-    if words is None:
-        raise UnknownStatusError(
-            f"unrecognised status {value!r}: it has no words to show, so it is refused "
-            "rather than printed raw - see status-cases.json.")
-    return words[form]
 
 
 def is_retired(check: dict) -> bool:

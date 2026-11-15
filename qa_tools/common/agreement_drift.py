@@ -31,6 +31,7 @@ qa.verdict and qa.supply_receipt, never a schema holding supply rows.
 """
 from __future__ import annotations
 
+from asset_model import declared_corrections
 from dataclasses import dataclass, field
 from datetime import date
 from qa_tools.common import assets as _assets
@@ -237,17 +238,6 @@ def _accounted(sources: set[str], declared: dict, items, kinds: set[str],
     return False
 
 
-def _load_docs():
-    from qa_tools.common import agreement, config_yaml
-    from qa_tools.common.asset_time import data_asset_yaml
-
-    with open(agreement.calendar_yaml()) as f:
-        cal_doc = config_yaml.parse(f) or {}
-    with open(data_asset_yaml()) as f:
-        asset_doc = config_yaml.parse(f) or {}
-    return cal_doc, asset_doc
-
-
 def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
                 asset_doc: dict | None = None) -> Refusal | None:
     """This dataset's refusal, or None where every recorded judgement still
@@ -262,7 +252,7 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
     from qa_tools.common import agreement, agreement_freeze, asset_time, verdict
 
     if cal_doc is None or asset_doc is None:
-        cal_doc, asset_doc = _load_docs()
+        cal_doc, asset_doc = declared_corrections.load_docs()
     agr = agreement.from_doc(cal_doc)
     items = agreement_freeze.flatten(cal_doc, asset_doc)
     declared = _declared(cal_doc, asset_doc)
@@ -331,7 +321,7 @@ def refusals(conn=None, dataset_ids=None, *, errors: list | None = None) -> dict
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:agreement-drift") as opened:
             return refusals(opened, dataset_ids, errors=errors)
-    cal_doc, asset_doc = _load_docs()
+    cal_doc, asset_doc = declared_corrections.load_docs()
     ids = dataset_ids or [d.dataset_id for d in hierarchy.all_datasets()]
     out = {}
     for ds in ids:
