@@ -183,7 +183,7 @@ class TestTheTrialsOwnRule:
     """Criterion 15: trial_reads_agree, beside compare over own_results."""
 
     def _agree(self, results, staged=(), unstaged=()):
-        from qa_tools.common import target_agreement
+        from bootstrap import target_agreement
 
         return target_agreement.trial_reads_agree("geo-cp-clients", results, staged=staged,
                                                   unstaged=unstaged, label="TS-x", reads=READS)
@@ -218,7 +218,7 @@ class TestTheTrialsOwnRule:
     def test_a_scenario_moving_a_check_it_is_not_aimed_at_is_a_disagreement(self):
         """Criterion 7: the missing-year scenario's file may fail only its
         missing-year check."""
-        from qa_tools.common import target_agreement
+        from bootstrap import target_agreement
 
         base = "quarterly.department-of-health.linkage-products.geo-cp-clients."
         aimed = ["census_year.missing_set_members_dbt"]
@@ -234,7 +234,7 @@ class TestTheTrialsOwnRule:
     def test_own_results_is_unchanged(self):
         """Criterion 15: own_results still drops a not-evaluated cross-table
         result - the comparison after replay relies on it."""
-        from qa_tools.common import target_agreement
+        from bootstrap import target_agreement
 
         held = _record(CHECK, status="nodata", unrunnable_reason="x",
                        unrunnable_table="cp_clients")
@@ -368,7 +368,7 @@ class TestARealTrialInItsPeriod:
         end-of-run bootstrap's."""
         from cli import target_trial
 
-        from qa_tools.common import target_agreement
+        from bootstrap import target_agreement
 
         captured = {}
 
@@ -393,7 +393,7 @@ class TestARealTrialInItsPeriod:
         geocodes arrive, so the trial stages it and evaluates the orphan and
         coverage checks; the planted missing year reads red, as built."""
         from cli import target_trial
-        from qa_tools.common import target_agreement
+        from bootstrap import target_agreement
 
         captured = {}
         original = target_agreement.trial_reads_agree

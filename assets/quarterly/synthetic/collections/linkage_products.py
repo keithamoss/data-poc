@@ -1699,15 +1699,15 @@ def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
     12, for each ORDINARY quarter's release (a scenario's quarter keeps what
     it plants): received within its own due time and grace, and after each
     same-round source supply's promotion takes effect - that instant computed
-    as the gate computes it (orchestrate.effective_at_of): the one function,
-    promotion.effective_at_for, seeded by the arrival's run id, capped at the
+    as the replay clock answers the gate (REQ-PIPE-382 criterion 3): the one
+    rule, scenarios.promotion_lag.effective_at, seeded by the arrival's run id, capped at the
     source dataset's next receipt and at the first release reading its period
     (promotion.next_receipt's lag cap), within its claim window. Refused
     naming the quarter, the release and the effective instant."""
     from datetime import timedelta
 
     from asset_model import asset_time, hierarchy, schedule, slots
-    from qa_tools.common import promotion
+    from scenarios import promotion_lag
 
     # ONLY THE DATASETS THE LINKAGE RELEASE READS: a source only the
     # geocoding stream reads is that stream's refusal's (REQ-GEN-295).
@@ -1742,7 +1742,7 @@ def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
                                  for s in supplies) if t > first]
             readers = [t for t, name in releases if t > first and name == job.period.name]
             caps = [min(c) for c in (later, readers) if c]
-            took = promotion.effective_at_for(
+            took = promotion_lag.effective_at(
                 first, seed=f"{hierarchy.dataset(did).table}__{asset_time.arrival_key(first)}",
                 before=min(caps) if caps else None,
                 within=schedule.claim_window(did, on=asset_time.local_date(first)))
@@ -1766,7 +1766,7 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
     from datetime import timedelta
 
     from asset_model import asset_time, hierarchy, schedule, slots
-    from qa_tools.common import promotion
+    from scenarios import promotion_lag
 
     instants = {asset_time.parse_instant(s.received_at, did): f"{did} {s.received_at}"
                 for did, supplies in sources.items() for s in supplies}
@@ -1798,7 +1798,7 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
                                      for s in sources[src]) if t > first]
                 readers = [t for t, name in releases if t > first and name == job.period.name]
                 caps = [min(c) for c in (later, readers) if c]
-                took = promotion.effective_at_for(
+                took = promotion_lag.effective_at(
                     first, seed=f"{hierarchy.dataset(src).table}__{asset_time.arrival_key(first)}",
                     before=min(caps) if caps else None,
                     within=schedule.claim_window(src, on=asset_time.local_date(first)))

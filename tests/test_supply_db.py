@@ -468,7 +468,7 @@ class TestALostDsnIsRefusedByAnotherEnvironmentsDatabase:
         """checkpoints.save() opens its own admin connection, not connect(),
         so it used to copy - and prune the checkpoints of - whatever database
         it was pointed at with no identity check at all."""
-        from qa_tools.common import checkpoints, replay_inputs
+        from bootstrap import checkpoints, replay_inputs
 
         name, server = sandbox_marked_scratch
         monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV)

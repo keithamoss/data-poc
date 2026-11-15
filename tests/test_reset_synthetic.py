@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from qa_tools.common import bootstrap, qa_store, supply_db, synthetic_reset
+from qa_tools.common import qa_store, supply_db
+from bootstrap import bootstrap, synthetic_reset
 
 ROOT = Path(__file__).resolve().parent.parent
 

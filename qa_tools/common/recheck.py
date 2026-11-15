@@ -33,7 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from qa_tools.common import replay_clock as _replay_clock
+from asset_model import asset_time as _clock
 from qa_tools.common import qa_store, supply_db
 
 RECHECK = "recheck"
@@ -133,7 +133,7 @@ def owe(conn: supply_db.SupplyConnection, *, dataset_id: str, supply_id: str,
         f"INSERT INTO {TABLE} (kind, dataset_id, supply_id, caused_by_decision, "
         "caused_by_load, owed_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
         [RECHECK, dataset_id, supply_id, decision_id, load_id,
-         _replay_clock.now()]).fetchall()[0][0])
+         _clock.now()]).fetchall()[0][0])
 
 
 def owed(conn: supply_db.SupplyConnection, dataset_id: str | None = None) -> list[Owed]:
@@ -257,7 +257,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
         # that broke half-built never reaches (#114, minor).
         orchestrate.discard_run_schemas(run_key)
         raise
-    results = orchestrate.run_one(entry_ds.collection_id, entry, _replay_clock.now().isoformat(),
+    results = orchestrate.run_one(entry_ds.collection_id, entry, _clock.now().isoformat(),
                                   run_by or get_run_by(), on_step=on_step)
     return arrival, results
 
@@ -526,7 +526,7 @@ def clear(owed_id: int, run_key: str, found_worse: bool | None = None) -> None:
     with supply_db.connect(label="mothman:recheck") as conn:
         conn.execute(f"UPDATE {TABLE} SET cleared_at = ?, cleared_by_run = ?, "
                      "last_failure = NULL, found_worse = ? WHERE id = ?",
-                     [_replay_clock.now(), run_key, found_worse, owed_id])
+                     [_clock.now(), run_key, found_worse, owed_id])
 
 
 def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),

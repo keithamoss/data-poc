@@ -50,8 +50,8 @@ from pathlib import Path
 import psycopg
 from psycopg import sql
 
-from asset_model import config_yaml
-from qa_tools.common import replay_inputs, supply_db
+from qa_tools.common import supply_db
+from bootstrap import replay_inputs
 
 #: Every checkpoint database's name starts with this, and every resume's with
 #: RESUME_PREFIX - so both can be found and cleared on a cluster that already
@@ -73,13 +73,12 @@ class CheckpointRefused(RuntimeError):
 
 
 def require_synthetic() -> None:
-    """Criterion 6: never on an asset that has not declared itself synthetic."""
-    from asset_model.hierarchy import data_asset_yaml
+    """Criterion 6: never on an asset that has not declared itself synthetic -
+    asked of the one reader (REQ-PIPE-382 criterion 7), which reads `is True`,
+    NOT TRUTHINESS: a string "false" is truthy (post-build-review #131 D9)."""
+    from asset_model import asset_time
 
-    doc = config_yaml.parse(Path(data_asset_yaml()).read_text()) or {}
-    # `is True`, NOT TRUTHINESS, as the reset command and the replay clock read
-    # it - a string "false" is truthy (post-build-review #131 D9).
-    if doc.get("synthetic") is not True:
+    if not asset_time.declared_synthetic():
         raise CheckpointRefused(
             "checkpoints and resumes are for a synthetic history only, and this data asset "
             "does not declare `synthetic: true` - nothing was copied")
@@ -296,7 +295,7 @@ def arrivals_of(collection_id: str) -> list:
     import tempfile
     import warnings
 
-    from cli.pipeline import generated_into
+    from generator.public import generated_into
     from asset_model import arrivals as arrival_tree
 
     with tempfile.TemporaryDirectory(prefix="mothman-ckpt-") as tmp, \

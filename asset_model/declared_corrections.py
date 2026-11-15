@@ -16,8 +16,8 @@ THE OTHER HALVES, and why each cut sits where it does:
 - qa_tools/common/correction_trial.py - trialling a correction against the
   recorded filings, and reading the configuration AT A GIT REF (at_ref):
   the database and git.
-- qa_tools/common/correction_replay.py - the player half (staged,
-  for_arrival, confirm_due, history_end), which reads the database; it goes
+- bootstrap/correction_replay.py - the player half (staged,
+  for_instant, confirm_due, history_end), which reads the database; it went
   to the bootstrap with REQ-GEN-381.
 - qa_tools/common/agreement_freeze.py - the schedule gate, which compares
   the agreement between git refs and so runs git (architect B4): only its

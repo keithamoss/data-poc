@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Iterable, Mapping, Sequence
 
-from qa_tools.common import replay_clock as _replay_clock
+from asset_model import asset_time as _clock
 from asset_model import check_id as check_id_mod
 from qa_tools.common import qa_store
 from asset_model import hierarchy
@@ -299,7 +299,7 @@ def open_period(conn, period_name: str, *, opened_by: str,
         inserted = conn.execute(
             f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by, opened_at) '
             "VALUES (?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
-            [period_name, opened_by, _replay_clock.now()]).fetchall()
+            [period_name, opened_by, _clock.now()]).fetchall()
         # EACH OFFSET GROUP ONCE (REQ-PIPE-323): a filing makes its own
         # collection's group's inheritances, whether or not it opened the
         # period; a person's explicit open makes every group's, as the one

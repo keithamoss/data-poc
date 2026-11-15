@@ -6,7 +6,7 @@ around it, and every ordinary amber in both collections. This module says
 which supplies those are and what each was aimed at - read from the
 generator's own two records, its bookkeeping and the scenario placements,
 and from nothing else. It never says what a supply SCORED: that is the
-real tools' answer, compared by qa_tools/common/target_agreement.py
+real tools' answer, compared by bootstrap/target_agreement.py
 (criterion 4 - no predicted verdict of the generator's own).
 
 WHY HERE AND NOT IN qa_tools: the bookkeeping is the generator's, and no

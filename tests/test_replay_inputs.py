@@ -9,7 +9,7 @@ import inspect
 import json
 from pathlib import Path
 
-from qa_tools.common import replay_inputs as ri
+from bootstrap import replay_inputs as ri
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -47,9 +47,11 @@ class TestOneInputList:
         # REQ-PIPE-365 criterion 3 keys it on the selected asset's folder and
         # assets/environments.yaml, never another asset's.
         # asset_model/ joined with REQ-PIPE-380 criterion 17 (the shared
-        # reading code moved out of qa_tools/).
-        assert set(ri.INPUTS) == {"asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**",
-                                  "qa_tools/**", "dbt_shared/**", "cli/pipeline.py",
+        # reading code moved out of qa_tools/); bootstrap/ and scenarios/ with
+        # REQ-GEN-381 criterion 7, which dropped cli/pipeline.py.
+        assert set(ri.INPUTS) == {"asset_model/**", "bootstrap/**", "scenarios/**",
+                                  "generator/**", "synthetic_data_generator/**", "pipeline/**",
+                                  "qa_tools/**", "dbt_shared/**",
                                   "pyproject.toml", "uv.lock", ".github/workflows/test.yml",
                                   "assets/environments.yaml"}
         assert set(ri.inputs("daily")) == set(ri.INPUTS) | {"assets/daily/**"}
@@ -69,8 +71,10 @@ class TestOneInputList:
         assert "assets/environments.yaml" in files
         assert any(p.startswith("dbt_shared/") for p in files)
         assert not any("/synthetic/collections/" in p for p in files)
-        assert "cli/pipeline.py" in files
-        assert not any(p.startswith("cli/") and p != "cli/pipeline.py" for p in files)
+        # NO cli/ FILE (REQ-GEN-381 criterion 7): the bootstrap reaches none.
+        assert not any(p.startswith("cli/") for p in files)
+        assert any(p.startswith("bootstrap/") for p in files)
+        assert any(p.startswith("scenarios/") for p in files)
 
     def test_an_edited_check_moves_the_key(self, monkeypatch):
         """A check file under an asset is an input, so editing one changes the

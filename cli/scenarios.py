@@ -125,7 +125,7 @@ def validate_command() -> None:
         declared_corrections as correction_apply,
         declared_corrections,
     )
-    from qa_tools.common import scripted_corrections
+    from bootstrap import scripted_corrections
 
     confirmations = scripted_corrections.load()
     found += scripted_corrections.problems(confirmations, declared={

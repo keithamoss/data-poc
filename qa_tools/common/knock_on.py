@@ -42,7 +42,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from qa_tools.common import replay_clock as _replay_clock
+from asset_model import asset_time as _clock
 from qa_tools.common import qa_store, supply_db
 
 
@@ -70,7 +70,7 @@ def owe(conn: supply_db.SupplyConnection, moves: list[tuple[int, str, str]]) -> 
             f"INSERT INTO {recheck.TABLE} (kind, dataset_id, period, tables, "
             "caused_by_decision, owed_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
             [recheck.REEVALUATE, slot["dataset"], period, sorted(slot["tables"]),
-             slot["decision"], _replay_clock.now()]).fetchall()[0][0]))
+             slot["decision"], _clock.now()]).fetchall()[0][0]))
     return out
 
 
@@ -473,13 +473,14 @@ def follow_up_stream(collection_id: str, *, run_by: str | None = None, on_step=N
     (post-build-review #251): a promotion that opens a period makes every
     owe-nothing dataset on that calendar inherit, so the re-evaluations it
     owes can belong to another collection. The streams a bootstrap replays
-    together are exactly these (REQ-PIPE-262), so they are asked rather
+    together are exactly these (REQ-PIPE-262), so they are asked of the one
+    grouping (qa_tools/common/streams.py, REQ-GEN-381 criterion 5) rather
     than worked out again."""
     from asset_model import collections
-    from qa_tools.common import bootstrap
+    from qa_tools.common import streams
 
     short = collections.by_id(collection_id).short
-    stream = next(s for s in bootstrap.streams([c.short for c in collections.all_collections()])
+    stream = next(s for s in streams.streams([c.short for c in collections.all_collections()])
                   if short in s)
     done = []
     for name in stream:

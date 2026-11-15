@@ -12,7 +12,8 @@ import psycopg
 import pytest
 
 from asset_model import collections
-from qa_tools.common import bootstrap, checkpoints, replay_inputs, supply_db
+from qa_tools.common import supply_db
+from bootstrap import bootstrap, checkpoints, replay_inputs
 
 
 @dataclass(frozen=True)

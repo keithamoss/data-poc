@@ -150,7 +150,8 @@ class TestAResetTakesThePeriodSchemas:
     every period's superseded schema too."""
 
     def test_both_are_dropped(self, private_supply_dsn):
-        from qa_tools.common import period_schema, synthetic_reset
+        from qa_tools.common import period_schema
+        from bootstrap import synthetic_reset
 
         with supply_db.connect(label="test-reset-periods") as c:
             plain = period_schema.period_schema("2099-Q1")

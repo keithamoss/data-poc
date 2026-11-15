@@ -42,7 +42,6 @@ from qa_tools.common import (
     period_overlay,
     promotion,
     qa_store,
-    replay_clock,
     supply_db,
     ticket_reconciler,
     trial,
@@ -492,14 +491,19 @@ def _claim_window(collection_id: str, arrival):
 
 
 def effective_at_of(collection_id: str, arrival) -> str:
-    """WHEN A GATE REACHED FROM THIS ARRIVAL TAKES EFFECT (REQ-PIPE-081): its
-    receipt plus the seeded lag, never past the next receipt nor the claim
-    window - live, simply now. The one rule, so a retried package gate
-    (gate.run_owed) takes effect when its first attempt would have
-    (post-build-review #274 D1), never at the wall clock of the retry."""
-    return promotion.effective_at_for(
-        arrival.received_at, seed=arrival.run_id, before=promotion.next_receipt(arrival),
-        within=_claim_window(collection_id, arrival)).isoformat()
+    """WHEN A GATE REACHED FROM THIS ARRIVAL TAKES EFFECT (REQ-PIPE-382
+    criteria 3 and 4): the clock is asked one neutral question with the facts
+    the pipeline already knows - the receipt, the arrival's run id, the next
+    receipt and the claim window - and answers. The wall clock and a pinned
+    clock answer now, the instant the decision is made, on every asset, so a
+    retried package gate on a real asset takes effect at the retry; an
+    installed replay answers from the arrival that completed the package
+    (post-build-review #274 D1, kept for a replay). No lag, seed or cap is
+    here."""
+    return asset_time.when_effective(
+        arrival.received_at, run_id=arrival.run_id,
+        next_receipt=promotion.next_receipt(arrival),
+        claim_window=_claim_window(collection_id, arrival)).isoformat()
 
 
 def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
@@ -559,26 +563,27 @@ def run_arrivals(collection_id: str, found_arrivals, run_by: str, on_step=None) 
         steps=steps(collection_id), run_by=run_by, on_step=on_step, exclusive=True)
 
 
-# ON THE REPLAY'S OWN CLOCK (REQ-PIPE-081 criteria 27-31): on a synthetic asset
-# every record the batch writes is stamped with the replay's simulated time.
-@replay_clock.on_replay_clock
 def run_pipeline(collection_id: str, sequential: bool = False,
                  record_deliveries: bool = True, *, start_at: int = 1, after_each=None,
                  player=None) -> dict:
-    """Every recognised arrival of one collection, then its results file."""
+    """Every recognised arrival of one collection, then its results file.
+
+    `player` IS THE CALLER'S (REQ-PIPE-383 criteria 1 and 2): run before each
+    arrival and after the last - the bootstrap passes the one that plays its
+    scripted decisions - and none runs where none is passed. The real pipeline
+    builds no player, and installs no clock: what time each record carries is
+    whichever clock is in force (REQ-PIPE-382).
+    """
     # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
     parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
     run = _begin(collection_id, player)
-    # A RESUME'S CLOCK STARTS AT ITS FIRST ARRIVAL (REQ-TEST-159 criterion 4).
-    if start_at > 1 and replay_clock.active():
-        replay_clock.anchor(run.arrivals[start_at - 1].received_at)
 
     # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME, through the one per-arrival
-    # lifecycle; SCRIPTED PERSON DECISIONS played back between arrivals
-    # (REQ-GEN-135), refused unless the asset declares itself synthetic; EACH
-    # ARRIVAL STAGED AS IT COMES (REQ-TEST-159).
+    # lifecycle; EACH ARRIVAL STAGED AS IT COMES (REQ-TEST-159) and STAMPED AS
+    # IT STARTS (run_timestamp None) - on the clock in force, so a replay's
+    # arrival carries its receipt and a real run's the moment it ran.
     arrival_lifecycle.process_all(
-        run.arrivals, steps=run.steps, run_by=run.run_by, run_timestamp=run.run_timestamp,
+        run.arrivals, steps=run.steps, run_by=run.run_by, run_timestamp=None,
         player=run.player, prepare=run.prepare, start_at=start_at, after_each=after_each)
     return _end(run, record_deliveries)
 
@@ -599,8 +604,6 @@ class _CollectionRun:
 
 
 def _begin(collection_id: str, player=None) -> _CollectionRun:
-    from qa_tools.common import scripted_decisions
-
     coll = declared_collections.by_id(collection_id)
     # RECOGNISED FROM DISK, never read from a declaration (REQ-GEN-043).
     found_arrivals = arrival_tree.arrivals_for(coll.id, coll.run_prefix)
@@ -619,7 +622,7 @@ def _begin(collection_id: str, player=None) -> _CollectionRun:
         manifest=[entry_for(coll.id, a) for a in found_arrivals],
         steps=steps(coll.id),
         prepare=arrival_lifecycle.staged_as_it_arrives(stage.stager(coll.id)),
-        player=player if player is not None else scripted_decisions.Player(coll.id),
+        player=player,
         run_timestamp=asset_time.now().isoformat(),
         # Fails loudly here, before any real tool runs, if git identity is unset.
         run_by=get_run_by())
@@ -653,43 +656,27 @@ def merged_arrivals(by_collection: dict) -> list[tuple[str, object]]:
     return pairs
 
 
-class StreamPlayer:
-    """Every collection's scripted decisions, played across one stream
-    (REQ-PIPE-262 criterion 4): before ANY arrival of the stream received
-    after a decision's instant, not only that collection's own next one."""
-
-    def __init__(self, players):
-        self.players = list(players)
-
-    def before(self, arrival) -> int:
-        return sum(p.before(arrival) or 0 for p in self.players)
-
-    def finish(self) -> int:
-        return sum(p.finish() or 0 for p in self.players)
-
-
-# ON THE REPLAY CLOCK, as run_pipeline is: without it a stream's arrivals were
-# filed under the corrected agreement and stamped with the wall clock, so a
-# correction found nothing to move (REQ-PIPE-262; found by a full bootstrap).
-@replay_clock.on_replay_clock
 def run_stream(collection_ids: list[str], sequential: bool = False,
-               record_deliveries: bool = True) -> list[dict]:
+               record_deliveries: bool = True, *, player=None) -> list[dict]:
     """Collections that share a calendar, replayed as ONE stream in receipt
     order, as the live pass does (REQ-PIPE-262): who opens each period first
     is then the arrival received first, never whichever process ran ahead.
     Each arrival goes through its own collection's
     steps; each collection still ends with its own results file (criterion 5).
+
+    `player` IS THE CALLER'S, one for the whole stream (REQ-PIPE-383 criteria 1
+    and 2): run before ANY arrival of the stream and after the last - the
+    bootstrap's combined player - and none where none is passed.
     """
     if len(collection_ids) == 1:
         return [run_pipeline(collection_ids[0], sequential=sequential,
-                             record_deliveries=record_deliveries)]
+                             record_deliveries=record_deliveries, player=player)]
     parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
     runs = {cid: _begin(cid) for cid in collection_ids}
-    player = StreamPlayer(run.player for run in runs.values())
     results: dict[str, list] = {cid: [] for cid in collection_ids}
     arrival_lifecycle.process_stream(
         merged_arrivals({cid: run.arrivals for cid, run in runs.items()}),
-        {cid: (run.arrivals, run.steps, run.prepare, run.run_by, run.run_timestamp)
+        {cid: (run.arrivals, run.steps, run.prepare, run.run_by, None)
          for cid, run in runs.items()},
         player=player, results=results)
     # ONE DELIVERY RECORD for the stream, after its last arrival (criterion 5).

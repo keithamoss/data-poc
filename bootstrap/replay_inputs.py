@@ -31,11 +31,15 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 #: Every input that shapes a bootstrap (REQ-TEST-117 criterion 1, as amended
-#: 2026-10-06: cli/pipeline.py and no other cli/ file - the bootstrap enters
-#: through it, and a terminal change must not cost a full bootstrap).
+#: 2026-10-06: no cli/ file but the one the bootstrap entered through, so a
+#: terminal change never costs a full bootstrap). SINCE REQ-GEN-381 (criterion
+#: 7) the bootstrap reaches nothing of cli/pipeline.py, so it is no input any
+#: more, and the packages moved out of qa_tools/ - bootstrap/ and scenarios/,
+#: beside asset_model/ - are, so a change to code that left qa_tools/** still
+#: restarts a resume and misses the cache.
 #:
 #: THE SHARED INPUTS - everything but an asset's own folder. Since the asset
 #: split: dbt_shared/, the macros and tests both assets' dbt projects read
@@ -47,8 +51,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: configuration, adapters, providers and dbt project - and never another
 #: asset's, so a daily-only edit rebuilds only the daily bootstrap. A shared
 #: edit still restarts both, which costs time and never leaves a stale verdict.
-INPUTS = ("asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
-          "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
+INPUTS = ("asset_model/**", "bootstrap/**", "scenarios/**", "generator/**",
+          "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
+          "dbt_shared/**", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml", "assets/environments.yaml")
 
 #: The selected asset's own folder, the one input that differs by asset.
@@ -67,8 +72,9 @@ REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS)
 #: Bumped when what the key covers changes shape, so an old cache never
 #: matches a new meaning (v3: assets/ and dbt_shared/ since the split; v4: one
 #: key per asset, the asset named in it; v5: asset_model/, the shared reading
-#: code REQ-PIPE-380 moved out of qa_tools/).
-KEY_PREFIX = "bootstrap-v5-"
+#: code REQ-PIPE-380 moved out of qa_tools/; v6: bootstrap/ and scenarios/, and
+#: no cli/ file, REQ-GEN-381 criterion 7).
+KEY_PREFIX = "bootstrap-v6-"
 
 
 def _asset(asset: str | None) -> str:
@@ -193,7 +199,7 @@ def regenerated_print(collection_id: str) -> list[ArrivalPrint]:
     # THROUGH cli, NEVER generator DIRECTLY: no pipeline module may import the
     # generator package (tests/test_arrivals.py's wall), and cli is where the
     # pipeline already reaches it from - as bootstrap does.
-    from cli.pipeline import generated_into
+    from generator.public import generated_into
 
     # QUIET: the generators narrate every delivery they write, which is
     # noise in the middle of a resume that only wants the comparison.

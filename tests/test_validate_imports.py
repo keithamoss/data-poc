@@ -535,7 +535,7 @@ def _lists(root: Path) -> dict[str, list[str]]:
             root / "cli/check.py", "COVERAGE_PACKAGES"),
         "test.yml --cov": re.findall(r"--cov=([\w.]+)", test_yml),
         "replay_inputs.INPUTS": _assigned_tuple(
-            root / "qa_tools/common/replay_inputs.py", "INPUTS"),
+            root / "bootstrap/replay_inputs.py", "INPUTS"),
     }
 
 
@@ -570,43 +570,58 @@ def _copy_lists(dest: Path) -> None:
     for rel in (".github/workflows/validate-config.yml", ".github/workflows/test.yml",
                 "pyproject.toml", "qa_tools/common/validate_caches.py",
                 "qa_tools/common/validate_collections.py", "cli/check.py",
-                "qa_tools/common/replay_inputs.py"):
+                "bootstrap/replay_inputs.py"):
         (dest / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest / rel)
 
 
+#: Each list's entry naming scenarios/, as the real files carry it since
+#: REQ-GEN-381 and REQ-PIPE-382 landed it (step 3 of #134).
+_SCENARIOS_ENTRIES = (
+    (".github/workflows/validate-config.yml", '\n      - "scenarios/**"'),
+    ("qa_tools/common/validate_caches.py", ' "scenarios",'),
+    ("qa_tools/common/validate_collections.py", ' "scenarios",'),
+    ("pyproject.toml", ' "scenarios",'),
+    ("cli/check.py", ' "scenarios",'),
+    (".github/workflows/test.yml", " --cov=scenarios"),
+    ("bootstrap/replay_inputs.py", ' "scenarios/**",'),
+)
+
+
 def test_a_new_package_left_out_of_a_list_fails(tmp_path):
+    """A package that exists and is missing from the lists is named for each -
+    shown by taking scenarios/ back out of copies of the real lists."""
     _copy_lists(tmp_path)
     (tmp_path / "scenarios").mkdir()
+    (tmp_path / "bootstrap").mkdir(exist_ok=True)
+    for rel, entry in _SCENARIOS_ENTRIES:
+        path = tmp_path / rel
+        text = path.read_text()
+        assert entry in text, (rel, entry)
+        path.write_text(text.replace(entry, ""))
     missing = unlisted(tmp_path)
     assert "scenarios is not in validate_caches.SCANNED" in missing
     assert "scenarios is not in replay_inputs.INPUTS" in missing
+    assert len([m for m in missing if m.startswith("scenarios")]) == len(_SCENARIOS_ENTRIES)
     assert not any(m.startswith(("asset_model", "bootstrap")) for m in missing)
 
 
 def test_a_new_package_named_in_every_list_passes(tmp_path):
     _copy_lists(tmp_path)
-    (tmp_path / "bootstrap").mkdir()
-    for rel, old, new in (
-        (".github/workflows/validate-config.yml", '- "qa_tools/**"',
-         '- "qa_tools/**"\n      - "bootstrap/**"'),
-        ("qa_tools/common/validate_caches.py", 'SCANNED = ("asset_model", "qa_tools",',
-         'SCANNED = ("asset_model", "bootstrap", "qa_tools",'),
-        ("qa_tools/common/validate_collections.py", 'SCANNED = ("asset_model", "qa_tools",',
-         'SCANNED = ("asset_model", "bootstrap", "qa_tools",'),
-        ("pyproject.toml", 'source = ["asset_model", "qa_tools",',
-         'source = ["asset_model", "bootstrap", "qa_tools",'),
-        ("cli/check.py", 'COVERAGE_PACKAGES = ("asset_model", "qa_tools",',
-         'COVERAGE_PACKAGES = ("asset_model", "bootstrap", "qa_tools",'),
-        (".github/workflows/test.yml", "--cov=qa_tools", "--cov=bootstrap --cov=qa_tools"),
-        ("qa_tools/common/replay_inputs.py", 'INPUTS = ("asset_model/**", "generator/**",',
-         'INPUTS = ("asset_model/**", "bootstrap/**", "generator/**",'),
-    ):
-        path = tmp_path / rel
-        text = path.read_text()
-        assert old in text, (rel, old)
-        path.write_text(text.replace(old, new))
+    (tmp_path / "bootstrap").mkdir(exist_ok=True)
+    (tmp_path / "scenarios").mkdir()
     assert unlisted(tmp_path) == []
+
+
+def test_bootstrap_and_scenarios_are_named_in_every_list_now_they_exist():
+    """REQ-GEN-381 criterion 8 and REQ-GEN-386 criterion 10's lists: both
+    landed in step 3 of #134, so both are in every list - shown against this
+    repository, not a fixture."""
+    lists = _lists(ROOT)
+    for package in ("bootstrap", "scenarios"):
+        assert (ROOT / package).is_dir()
+        assert [name for name, entries in lists.items()
+                if not _named(package, entries)] == [], package
 
 
 def test_asset_model_is_named_in_every_list_now_it_exists():

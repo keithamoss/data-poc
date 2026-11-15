@@ -8,19 +8,17 @@
 #
 # Who removes what. REQ-PIPE-380 moved the shared reading code into
 # asset_model/ and rewrote its importers (criteria 1, 2 and 15), removing its
-# 58 entries on 2026-11-15. REQ-GEN-386
-# moves the register, map and scripted-decision readers and the promotion lag
-# rule into scenarios/ (criteria 4 and 6) and gives the generator its own
-# delivery writer (criterion 7). REQ-GEN-381 takes the bootstrap off
-# cli.pipeline (criterion 3). REQ-QAC-389 stops the Linkage Products provider
+# 58 entries on 2026-11-15. REQ-GEN-381 took the bootstrap off cli.pipeline
+# (criterion 3), and the promotion lag rule moved into scenarios/ with
+# REQ-PIPE-382 (REQ-GEN-386 criterion 4's lag half), removing 4 more the same
+# day. REQ-GEN-386 moves the register, map and scripted-decision readers into
+# scenarios/ (criteria 4 and 6) and gives the generator its own delivery
+# writer (criterion 7). REQ-QAC-389 stops the Linkage Products provider
 # loading its collection's QA adapter (criterion 9).
 entries:
 - file: assets/quarterly/synthetic/collections/linkage_products.py
   imports: qa_tools.collections
   removed_by: REQ-QAC-389
-- file: assets/quarterly/synthetic/collections/linkage_products.py
-  imports: qa_tools.common.promotion
-  removed_by: REQ-GEN-386
 - file: assets/quarterly/synthetic/collections/linkage_products.py
   imports: qa_tools.common.scripted_decisions
   removed_by: REQ-GEN-386
@@ -39,12 +37,3 @@ entries:
 - file: generator/targets.py
   imports: qa_tools.common.scenario_map
   removed_by: REQ-GEN-386
-- file: qa_tools/common/bootstrap.py
-  imports: cli.pipeline
-  removed_by: REQ-GEN-381
-- file: qa_tools/common/checkpoints.py
-  imports: cli.pipeline
-  removed_by: REQ-GEN-381
-- file: qa_tools/common/replay_inputs.py
-  imports: cli.pipeline
-  removed_by: REQ-GEN-381

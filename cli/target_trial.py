@@ -88,7 +88,8 @@ def try_in_period(collection_id: str, spec: dict) -> list:
     from cli import common
     from asset_model import asset_time, hierarchy
     from qa_tools.common import period_overlay, run_reads
-    from qa_tools.common import supply_db, target_agreement, trial
+    from qa_tools.common import supply_db, trial
+    from bootstrap import target_agreement
     from qa_tools.tools import orchestrate, stage
 
     run_id = trial.trial_run_id()
@@ -180,7 +181,7 @@ def try_all(collection_id: str, specs: list[dict], say=None) -> tuple[list, floa
             try:
                 found += future.result()
             except Exception as exc:  # noqa: BLE001 - a lost worker is that trial's disagreement
-                from qa_tools.common import target_agreement
+                from bootstrap import target_agreement
 
                 found.append(target_agreement.ReadDisagreement(
                     spec["label"], spec["dataset_id"],
@@ -191,7 +192,7 @@ def try_all(collection_id: str, specs: list[dict], say=None) -> tuple[list, floa
 def _guarded(collection_id: str, spec: dict) -> list:
     """try_in_period, with a trial that could not run reported as a
     disagreement naming it rather than raised past the others."""
-    from qa_tools.common import target_agreement
+    from bootstrap import target_agreement
 
     try:
         return try_in_period(collection_id, spec)

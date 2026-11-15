@@ -16,7 +16,7 @@ import pytest
 from click.testing import CliRunner
 
 from generator import targets
-from qa_tools.common import target_agreement
+from bootstrap import target_agreement
 from generator import driver
 
 DS = "birth-registrations"
@@ -295,7 +295,7 @@ class TestSkippingTheTrial:
 
     @pytest.mark.asset("quarterly")
     def test_the_bootstrap_flag_reaches_both_generators(self, monkeypatch):
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         seen = []
         # Every collection is generated through cli/pipeline.py's one
@@ -325,7 +325,7 @@ class TestAfterAReplay:
 
     def test_a_disagreement_fails_the_bootstrap_naming_it(self, monkeypatch):
         from cli import pipeline
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         result = boot.BootstrapResult(populated=True, staged_before=0, staged_after=3,
                                       disagreements=("the ordinary amber for 2026-08-28 "
@@ -410,7 +410,7 @@ class TestEveryBootstrapCallerFailsOnADisagreement:
 
     def test_the_tui_menu_says_so_rather_than_ready(self, monkeypatch, capsys):
         from cli import app, common
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         result = boot.BootstrapResult(populated=True, staged_before=0, staged_after=3,
                                       disagreements=("TS-43's 2026-09-05 14:00 arrival "
@@ -436,8 +436,8 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
     def test_its_regeneration_runs_no_trial(self, monkeypatch):
         import types
 
-        from qa_tools.common import bootstrap as boot
-        from qa_tools.common import checkpoints, replay_inputs
+        from bootstrap import bootstrap as boot
+        from bootstrap import checkpoints, replay_inputs
 
         cp = types.SimpleNamespace(recorded=types.SimpleNamespace(readable=True, arrivals=[]),
                                    collection_id="child-protection", before=3, name="ckpt")
@@ -506,7 +506,7 @@ class TestARecordThatDoesNotAddUp:
     as a traceback - and after a replay, only once the bootstrap was done."""
 
     def test_after_a_replay_it_is_a_disagreement(self, monkeypatch):
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         def broken():
             raise ValueError("TS-43: the generator's record holds 0 supplies for 2026-09-04")
@@ -553,7 +553,7 @@ class TestAPipelineRunComparesToo:
         from cli import dashboard as dashboard_cli
         from cli import pipeline
         from dashboard import snapshot_dashboard
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         calls = {"compared": [], "published": []}
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
@@ -660,7 +660,8 @@ class TestGateOutcomes:
         promotes it - fails the bootstrap's comparison, naming the scenario;
         declared rightly, nothing fails."""
         from gate_support import own_red
-        from qa_tools.common import bootstrap, supply_db
+        from qa_tools.common import supply_db
+        from bootstrap import bootstrap
         from test_package_gate import established
 
         sc = gate_scenario
@@ -701,7 +702,7 @@ class TestGateOutcomes:
         declaration in silence (found building REQ-GEN-273 criterion 4,
         2026-10-25)."""
         from gate_support import own_red
-        from qa_tools.common import bootstrap
+        from bootstrap import bootstrap
         from test_package_gate import established
 
         sc = gate_scenario

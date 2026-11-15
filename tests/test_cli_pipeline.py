@@ -67,7 +67,7 @@ def _no_history_yet(monkeypatch):
     have already written history into - so `pipeline run` would refuse
     (REQ-PIPE-144 criterion 39). They are about what a run DOES, so they
     run as though on an empty database; the refusal has its own tests."""
-    import qa_tools.common.bootstrap as boot
+    import bootstrap.bootstrap as boot
     monkeypatch.setattr(boot, "holds_history", lambda conn: False)
     # The corrections step after a full replay is its own subject below.
     monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
@@ -82,7 +82,7 @@ class TestCorrectionsAfterAFullRun:
     each due correction once both are replayed, as a bootstrap does."""
 
     def _run(self, monkeypatch, *args):
-        import qa_tools.common.bootstrap as boot
+        import bootstrap.bootstrap as boot
         calls = []
         monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
         monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
@@ -109,7 +109,7 @@ class TestARunOverRecordedHistoryIsRefused:
     """REQ-PIPE-144 criterion 39."""
 
     def test_it_refuses_and_runs_nothing(self, monkeypatch):
-        import qa_tools.common.bootstrap as boot
+        import bootstrap.bootstrap as boot
         monkeypatch.setattr(boot, "holds_history", lambda conn: True)
         calls = []
         monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
@@ -151,7 +151,7 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
 
     assert result.exit_code == 0, result.output
-    from qa_tools.common import bootstrap
+    from bootstrap import bootstrap
 
     expected = []
     for group in bootstrap.streams(shorts):

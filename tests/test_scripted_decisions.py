@@ -226,7 +226,7 @@ class TestRecordedAtItsOwnInstant:
     REQ-PIPE-081 criterion 28: recorded at the instant it takes effect."""
 
     def test_a_played_decision_is_recorded_when_it_took_effect(self, conn, period):
-        from qa_tools.common import replay_clock
+        from bootstrap import replay_clock
 
         a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         player = TestPlayback()._player([_script(after_hours=3)], a_table)
@@ -714,7 +714,8 @@ class TestAScriptedDecisionsKnockOnRunsAtItsInstant:
     later. Playback follows up the decision's stream at its own instant."""
 
     def test_playback_follows_up_at_the_decisions_instant(self, monkeypatch):
-        from qa_tools.common import filing_decisions as fd, knock_on, replay_clock
+        from qa_tools.common import filing_decisions as fd, knock_on
+        from bootstrap import replay_clock
 
         at = datetime.fromisoformat("2020-11-02T03:00:00+00:00")
         seen = []

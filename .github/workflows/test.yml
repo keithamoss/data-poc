@@ -296,7 +296,7 @@ jobs:
         # deployment tests reach.
         run: |
           uv run pytest -m "not needs_deployment" -rs \
-            --cov=asset_model --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
+            --cov=asset_model --cov=bootstrap --cov=scenarios --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
             --cov-report= --cov-fail-under=0
 
       - name: Keep this half's coverage for the combine
@@ -420,7 +420,7 @@ jobs:
 
       # EACH ASSET'S BOOTSTRAP IS CACHED ON ITS OWN, KEYED ON EVERY INPUT
       # THAT SHAPES IT (REQ-TEST-117; REQ-TEST-353 criterion 1). The list is
-      # qa_tools/common/replay_inputs.py's - the same one a checkpoint replay
+      # bootstrap/replay_inputs.py's - the same one a checkpoint replay
       # compares (REQ-TEST-160), so it is held once rather than copied here:
       # the shared inputs and that asset's own folder, never another asset's
       # (REQ-PIPE-365 criterion 3), so a daily-only edit rebuilds only the
@@ -648,7 +648,7 @@ jobs:
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
               uv run pytest -m needs_deployment --only-asset "$asset" -rs \
-                --cov=asset_model --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
+                --cov=asset_model --cov=bootstrap --cov=scenarios --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
                 --cov-append --cov-report= --cov-fail-under=0
           done
 

@@ -390,11 +390,12 @@ def sql() -> str:
 
 
 def _recorded_stamp(delivery):
-    """When the delivery is written down: now, or in a replay of a synthetic
-    history the moment it was received (REQ-PIPE-081 criteria 27-31)."""
-    from qa_tools.common import replay_clock
-    replay_clock.anchor(delivery.received_at)
-    return replay_clock.now()
+    """When the delivery is written down: the clock in force, told first that a
+    delivery received at its instant is being recorded (REQ-PIPE-382 criterion
+    8) - so a replay stamps it as received, and the wall clock says now."""
+    from asset_model import asset_time
+    asset_time.receiving(delivery.received_at)
+    return asset_time.now()
 
 
 def record_arrival(arrival) -> dict | None:

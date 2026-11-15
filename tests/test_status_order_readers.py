@@ -19,7 +19,8 @@ import pytest
 
 from asset_model import statuses
 from collection_modules import provider_module
-from qa_tools.common import dataset_status, rechecking, target_agreement
+from qa_tools.common import dataset_status, rechecking
+from bootstrap import target_agreement
 
 #: The data asset this module's tests act for (C11): the provider is the
 #: quarterly asset's; the other readers read no asset.

@@ -3,25 +3,14 @@ tooling.md #1 Phase 4's "Full-pipeline run... Tier 2, not human-facing -
 that's more there for like integration tests and for yourself and not
 there for the humans" - Keith's own framing).
 
-This is the real gap Phase 4's own plan text got wrong: it claimed
-orchestrate_bdm.py/orchestrate_cp.py were "already named in Phases 1-3,"
-but only their run_single() function is reused by `mothman bdm/cp qa` -
-their own __main__ blocks (run_pipeline()/run_pipeline_cp(), the full
-manifest BATCH mode that regenerates synthetic data, runs all 4 real
-tools against EVERY run, and writes both reports/results_*.json and
-fresh qa_results/ history for the whole manifest) had no mothman command
-at all until this one - this is what retired run_pipeline.sh's steps 1-2
-actually did, and what CP's own equivalent never had a script for
-either.
-
-Unlike `mothman bdm/cp qa` (single run, careful scratch-dir-then-Promote
-staging so a hand-supplied check never touches real history uninvited), this
-command's whole point is the real batch regeneration - every run in the
-manifest, written straight to committed qa_results/ history, no staging.
-That's real pipeline behaviour, not a debug side effect - run this when
-you mean to refresh the actual record (Keith's own local dev loop, CI
-integration-test parity), not for one-off poking (use `mothman debug
-run-*` for that)."""
+`mothman pipeline run` is the real path on every asset (CLI A, SETTLED by
+Keith 2026-11-14; REQ-PIPE-385 criterion 4): it processes every arrival in
+the delivery tree through the real tools, recording QA history, then builds
+the dashboard. It generates nothing, plays nothing and installs no replay
+clock - a replayed synthetic history is `mothman pipeline bootstrap`'s, which
+the bootstrap package (bootstrap/) runs. `process` is the scheduler's pass
+over what has arrived since.
+"""
 from __future__ import annotations
 
 import rich_click as click
@@ -32,35 +21,6 @@ from cli import common
 console = Console()
 
 
-def _run_collection(coll, sequential: bool) -> None:
-    """Generate one collection's synthetic history, then run the real tools
-    over every arrival - for any registered collection (REQ-TEST-245)."""
-    from cli.collection_cli import label, of
-    from qa_tools.tools import orchestrate
-
-    console.print(f"Generating synthetic data ({label(coll)})...", style="dim")
-    of(coll.id).generate_synthetic_data()
-    console.print(f"Running the real tools against every {coll.short.upper()} run...",
-                  style="dim")
-    orchestrate.run_pipeline(coll.id, sequential=sequential)
-
-
-def _run_stream(colls, sequential: bool) -> None:
-    """Collections that share a calendar, generated and then replayed as ONE
-    receipt-ordered stream, as the live pass is (REQ-PIPE-262) - so who opens
-    each period first never depends on which collection ran first."""
-    from cli.collection_cli import label, of
-    from qa_tools.tools import orchestrate
-
-    for coll in colls:
-        console.print(f"Generating synthetic data ({label(coll)})...", style="dim")
-        of(coll.id).generate_synthetic_data()
-    console.print("Running the real tools against every "
-                  + " and ".join(c.short.upper() for c in colls)
-                  + " run, as one stream in receipt order...", style="dim")
-    orchestrate.run_stream([c.id for c in colls], sequential=sequential)
-
-
 @click.group("pipeline")
 def pipeline_group() -> None:
     """Full real-tool batch pipeline run - Tier 2 (CI/automation, integration-test parity)."""
@@ -69,7 +29,7 @@ def pipeline_group() -> None:
 @pipeline_group.command("run")
 @common.short_collection_option(
     all_choice=True,
-    help="Which collection's full manifest to regenerate and run - {legend}. Default: {every}.")
+    help="Which collection's arrivals to process - {legend}. Default: {every}.")
 @click.option("--sequential", is_flag=True,
               help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted - and collections that share a calendar always run as one stream in receipt order.")
 @click.option("--snapshot", is_flag=True,
@@ -78,9 +38,9 @@ def pipeline_group() -> None:
               help="Also publish the built dashboard. OPT-IN: a run without this builds for "
                    "local viewing and publishes nothing.")
 def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: bool) -> None:
-    """Replaces run_pipeline.sh: regenerate synthetic data, run the real tools against every
-    run in the manifest (recording fresh QA history), then rebuild and embed the dashboard.
-    Records real QA history like any other real pipeline run - not a dry run.
+    """Run the real tools against every arrival in the delivery tree, recording QA
+    history, then rebuild and embed the dashboard - a real pipeline run, not a dry run.
+    It needs a database with no QA history yet.
 
     PUBLISHING IS OPT-IN (REQ-PIPE-092 criterion 16), and that was decided the other way
     first. Opt-out reads as friendlier and is wrong here: a debugging run, a batch and a
@@ -91,14 +51,16 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
     """
     import os
 
-    from qa_tools.common import bootstrap as bootstrap_mod
-    from qa_tools.common import qa_store, supply_db
+    from asset_model import asset_time
+    from qa_tools.common import qa_store, streams, supply_db
 
     from . import dashboard as dashboard_cli
 
     # REFUSED OVER RECORDED HISTORY (REQ-PIPE-144 criterion 39), before
-    # anything is generated or run, for the reason bootstrap --force is:
-    # a re-run adds to the history rather than replacing it.
+    # anything is run, for the reason bootstrap --force is: a re-run adds to
+    # the history rather than replacing it. The refusal is the pipeline's own
+    # (qa_tools/common/streams.py, REQ-GEN-381 criterion 5), so this command
+    # needs nothing of the bootstrap package.
     #
     # NOTHING PRUNES THE DELIVERY LOG ANY MORE (criteria 19 and 24,
     # amending REQ-PIPE-069 criterion 6). A delivery whose files have
@@ -106,12 +68,22 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
     # delivery - is history that still exists.
     with supply_db.connect(label="mothman:pipeline-run") as conn:
         qa_store.ensure_schema(conn)
-        if bootstrap_mod.holds_history(conn):
-            raise click.ClickException(bootstrap_mod.HISTORY_REFUSAL[0].upper()
-                                       + bootstrap_mod.HISTORY_REFUSAL[1:])
+        if streams.holds_history(conn):
+            raise click.ClickException(streams.HISTORY_REFUSAL[0].upper()
+                                       + streams.HISTORY_REFUSAL[1:])
+
+    # THE REAL PATH ON EVERY ASSET (CLI A, SETTLED by Keith 2026-11-14;
+    # REQ-PIPE-385 criterion 4; REQ-PIPE-383 criteria 5 and 6): it generates
+    # nothing, plays no scripted decision, installs no replay clock, compares no
+    # targets and confirms no correction - a replayed history is
+    # `mothman pipeline bootstrap`'s. Said once, dimly, where it would be asked.
+    if asset_time.declared_synthetic():
+        console.print("Scripted decisions are played only by `mothman pipeline bootstrap` "
+                      "- this run played none.", style="dim")
 
     # THE PASS LOCK (REQ-PIPE-151 criterion 16), held while anything runs.
     from qa_tools.common import processing_pass
+    from qa_tools.tools import orchestrate
 
     try:
         with processing_pass.pass_lock("run"):
@@ -120,37 +92,23 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
             chosen = [c.short for c in collections.all_collections()
                       if collection in (c.short, "all")]
             try:
-                groups = bootstrap_mod.streams(chosen)
-            except bootstrap_mod.StreamRefused as exc:
+                groups = streams.streams(chosen)
+            except streams.StreamRefused as exc:
                 raise click.ClickException(str(exc)) from exc
             for group in groups:
                 colls = [collections.by_short(short) for short in group]
-                if len(colls) == 1:
-                    _run_collection(colls[0], sequential)
-                else:
-                    _run_stream(colls, sequential)
-            if collection == "all":
-                # EACH DUE CORRECTION CONFIRMED once both are replayed (Keith,
-                # 2026-10-11, (n)), as a bootstrap does.
-                bootstrap_mod._confirm_corrections(
-                    lambda m: console.print(m, style="dim", markup=False))
+                console.print("Running the real tools against every "
+                              + " and ".join(c.short.upper() for c in colls) + " arrival"
+                              + (", as one stream in receipt order" if len(colls) > 1 else "")
+                              + "...", style="dim")
+                orchestrate.run_stream([c.id for c in colls], sequential=sequential)
     except processing_pass.PassLockHeld as exc:
         raise click.ClickException(str(exc)) from None
-
-    # A REPLAY LIKE A BOOTSTRAP'S, SO COMPARED LIKE ONE (REQ-GEN-186
-    # criterion 3; Keith, 2026-10-11, post-build-review #157). The local
-    # dashboard is still built, so the disagreement can be looked at; the
-    # run fails before anything is snapshotted or published.
-    console.print("Comparing every targeted supply's recorded verdict with what it was "
-                  "built to...", style="dim")
-    disagreements = bootstrap_mod.targets_agree(
-        [n for n in common.collection_shorts() if collection in ("all", n)])
 
     console.print("Reshaping into dashboard JSON...", style="dim")
     dashboard_cli._build_data()
     console.print("Embedding real data into the dashboard...", style="dim")
     dashboard_cli._embed()
-    _fail_on_disagreements(disagreements)
 
     if snapshot:
         os.environ["SNAPSHOT_DASHBOARD"] = "1"
@@ -298,114 +256,34 @@ def _say_pass(report) -> None:
         console.print("At least one recorded result is a Fail.", style="yellow")
 
 
-def generated_into(root):
-    """Both generators writing under `root` - for a resume's comparison
-    (REQ-TEST-160), which lives in qa_tools/ and so may not import the
-    generator package itself."""
-    from generator.output import generated_into as _generated_into
-
-    return _generated_into(root)
-
-
 class TargetTrialUnavailable(click.ClickException):
     """A target trial asked of a collection whose provider declares none
     (REQ-GEN-246 criterion 6)."""
 
 
+def try_targets(collection_id: str) -> int:
+    """A collection's target trial - the collection command's (cli/
+    collection_cli.py), handed to the bootstrap, which may not import cli/
+    (REQ-GEN-381 criterion 3)."""
+    from cli.collection_cli import of
+
+    return of(collection_id).try_targets(collection_id=collection_id)
+
+
 def generate_collection(collection_id: str, *, trial: bool) -> None:
-    """One collection's synthetic history, through the shared driver
-    (REQ-GEN-246), then its target trial, then the scenario map.
-
-    THE TRIAL RUNS WHERE THE PROVIDER DECLARES ONE, and is REFUSED BY NAME
-    where it does not (criterion 6) - never silently skipped, which is what
-    a Child Protection trial used to be. The trial is the shared
-    collection command's try_targets() (cli/collection_cli.py), reached
-    through the collection's command object.
-
-    THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157 finding
-    7): the map is committed, and a history the trial refused to emit
-    should not leave it rewritten. A map regenerated separately from the
-    history is a map that disagrees with it (REQ-GEN-045 criterion 3)."""
-    from generator import collections as providers
-    from generator import driver
-    from qa_tools.common import scenario_map
+    """One collection's synthetic history, its target trial, then the scenario
+    map - bootstrap/generation.py's, with its refusals said as this terminal
+    says a refusal."""
+    from bootstrap import generation
 
     try:
-        provider = providers.provider(collection_id)
-    except providers.NoProviderError as exc:
-        # REFUSED BY NAME, NOT A TRACEBACK (post-build-review #229): a real
-        # deployment's collections have no synthetic generator at all.
-        raise click.ClickException(
-            f"{collection_id} has no synthetic data generator, so there is nothing to "
-            f"generate ({exc})") from None
-    if trial and not provider.target_trial:
-        raise TargetTrialUnavailable(
-            f"{collection_id} has no target trial: its generator provider declares none, so "
-            f"there is nothing to try against the real tools")
-    # A COLLECTION OF SEVERAL DATASETS HAS ITS TRIAL TOO (REQ-GEN-298 criterion
-    # 10): the trial is the shared collection command's, and each supply is
-    # tried against its own dataset's table - the refusal post-build-review
-    # #232 added for want of that is lifted.
-    driver.generate(collection_id)
-    if trial:
-        from cli.collection_cli import of
-
-        of(collection_id).try_targets(collection_id=collection_id)
-    elif provider.target_trial:
-        console.print("Target trial skipped: no injected target was tried against the "
-                      "real tools. The comparison after a replay still runs.",
-                      style="yellow")
-    from generator import scenario_injection
-
-    scenario_map.write_map(naming_mine=scenario_injection.this_assets_scenarios())
-
-
-def provider_collection(collection_id: str):
-    from asset_model import collections
-
-    return collections.by_id(collection_id)
-
-
-def has_target_trial(collection_id: str) -> bool:
-    """Whether the collection's generator provider declares a target trial -
-    for the bootstrap, which lives in qa_tools/ and so may not import the
-    generator package itself (criterion 5)."""
-    from generator import collections as providers
-
-    return providers.provider(collection_id).target_trial
-
-
-def target_datasets(collection_id: str) -> tuple[str, ...]:
-    """The datasets whose built targets the replay's comparison reads for
-    this collection, as its provider declares them (criterion 5)."""
-    from generator import collections as providers
-
-    return providers.provider(collection_id).target_datasets
-
-
-def generated_collections() -> list[str]:
-    """Every collection with a generator provider, in hierarchy order."""
-    from generator import collections as providers
-
-    return [p.collection_id for p in providers.providers()]
-
-
-def generated_targets():
-    """What the last generation built each targeted supply to - for the
-    comparison after a replay (REQ-GEN-186 criterion 3), which lives in
-    qa_tools/ and so may not read the generator's bookkeeping itself."""
-    from generator import targets
-
-    return targets.written()
-
-
-def generated_gate_outcomes():
-    """The gate outcomes the scripted scenarios declare (REQ-GEN-273
-    criterion 3), from the generator's placements - for the comparison after
-    a replay, which may not read the generator's records itself."""
-    from generator import targets
-
-    return targets.gate_outcomes()
+        generation.generate_collection(
+            collection_id, trial=trial, try_targets=try_targets,
+            say=lambda m: console.print(m, style="yellow"))
+    except generation.NoGenerator as exc:
+        raise click.ClickException(str(exc)) from None
+    except generation.TargetTrialUnavailable as exc:
+        raise TargetTrialUnavailable(str(exc)) from None
 
 
 @pipeline_group.command("cache-key")
@@ -414,9 +292,9 @@ def cache_key_command() -> None:
     (REQ-TEST-117): one digest of every input that shapes its bootstrap - the
     shared inputs and this asset's own folder, never another asset's
     (REQ-PIPE-365 criterion 3). The input list is
-    qa_tools/common/replay_inputs.py's, which a checkpoint replay compares
+    bootstrap/replay_inputs.py's, which a checkpoint replay compares
     too (REQ-TEST-160) - one list, two readers. Needs no database."""
-    from qa_tools.common import replay_inputs
+    from bootstrap import replay_inputs
 
     click.echo(replay_inputs.cache_key())
 
@@ -454,11 +332,11 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     populate-a-throwaway-database step, so none of the three can drift
     from the others.
     """
-    from qa_tools.common.bootstrap import bootstrap
+    from bootstrap.bootstrap import bootstrap
 
     result = bootstrap(collection=collection, force=force, sequential=sequential,
                         on_step=_step, checkpoint_before=checkpoint_before,
-                        skip_target_trial=skip_target_trial)
+                        skip_target_trial=skip_target_trial, try_targets=try_targets)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:
@@ -512,7 +390,7 @@ def checkpoint_list_command() -> None:
     resumes' databases - never another asset's (REQ-PIPE-365) - then any
     made before the asset split, which belong to no asset."""
     from asset_model import assets as _assets
-    from qa_tools.common import checkpoints
+    from bootstrap import checkpoints
 
     found = checkpoints.listed()
     if not found:
@@ -553,7 +431,7 @@ def checkpoint_arrivals_command(collection: str) -> None:
     """The arrival numbers `--checkpoint-before N` counts, with the delivery
     and receipt instant of each - from a regeneration, never data/."""
     from asset_model import collections
-    from qa_tools.common import checkpoints
+    from bootstrap import checkpoints
 
     found = checkpoints.arrivals_of(collections.by_short(collection).id)
     for i, a in enumerate(found, start=1):
@@ -570,7 +448,7 @@ def checkpoint_arrivals_command(collection: str) -> None:
 def checkpoint_delete_command(name: str, yes: bool) -> None:
     """Delete one checkpoint, or a resume's database, by name (from
     `mothman pipeline checkpoint list`). Anything connected to it is cut off."""
-    from qa_tools.common import checkpoints
+    from bootstrap import checkpoints
 
     if not yes and not click.confirm(
             f"Delete {name}? Anything connected to it is disconnected, and a checkpoint takes "
@@ -597,7 +475,7 @@ def resume_command(name: str, sequential: bool) -> None:
     checkpoint recorded. A change before the checkpoint is refused, naming the
     arrival; nothing changed says so and replays nothing. The checkpoint, and
     the database you were using, are never written to."""
-    from qa_tools.common.bootstrap import resume
+    from bootstrap.bootstrap import resume
 
     result = resume(name, sequential=sequential, on_step=_step)
     if result.refused:

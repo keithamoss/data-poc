@@ -51,7 +51,8 @@ class TestThereIsExactlyOnePublishPath:
 
         from cli import pipeline
         from dashboard import snapshot_dashboard
-        from qa_tools.common import bootstrap, processing_pass
+        from qa_tools.common import processing_pass
+        from bootstrap import bootstrap
 
         monkeypatch.setattr(bootstrap, "holds_history", lambda conn: False)
         monkeypatch.setattr(processing_pass, "pass_lock",

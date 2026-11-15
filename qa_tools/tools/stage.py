@@ -31,15 +31,8 @@ import sys
 
 from asset_model import collections
 from asset_model import arrivals, hierarchy
-from qa_tools.common import (
-    file_checks,
-    load_log,
-    replay_clock,
-    sample_data,
-    supply_db,
-    supply_holds,
-    trial,
-)
+from qa_tools.common import file_checks, load_log, sample_data, supply_db, supply_holds, trial
+from asset_model import asset_time
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 __all__ = ["build_all", "stage_arrival", "stage_table", "stager"]
@@ -164,9 +157,11 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
     collections.by_id(collection_id)  # refuses an unknown collection by name
     contract_path = contract_path or contract_for(collection_id)
     arrival = received_at if received_at is not None else run_id
-    # A REPLAY STAMPS THE LOAD AS RECEIVED (REQ-PIPE-081 criteria 27-31).
+    # A FILE RECEIVED AT ITS INSTANT IS BEING STAGED (REQ-PIPE-382 criterion
+    # 8): announced, so a replay stamps the load as received; the wall clock
+    # ignores it.
     if received_at is not None:
-        replay_clock.anchor(received_at)
+        asset_time.receiving(received_at)
     physical = supply_db.staged_table(table, arrival, ordinal)
     # THE SAME SEGMENT staged_table() names the physical table with - not
     # arrival_key() directly. They disagreed for one commit and the run
@@ -231,7 +226,7 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
             conn.execute(f'DROP TABLE IF EXISTS "{staging}"."{physical}" CASCADE')
             screening.record_against(load_log.record_load(
                 delivery_name, dataset_id, physical, load_log.FAILED,
-                replay_clock.now().isoformat(), reason=load_log.own_words(exc),
+                asset_time.now().isoformat(), reason=load_log.own_words(exc),
                 trial=trial_scope), conn=conn)
             # THE LIBRARY'S OWN MESSAGE ONLY HERE, on standard error, for
             # whoever ran the load - it can quote a row, and the recorded
@@ -244,7 +239,7 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
         # skips one that never loaded.
         screening.record_against(load_log.record_load(
             delivery_name, dataset_id, physical, load_log.LOADED,
-            replay_clock.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
+            asset_time.now().isoformat(), row_count=rows, trial=trial_scope), conn=conn)
         res = _build_run_views(conn, collection_id, run_id, key, trial_scope)
         # Recorded at staging time, which is the only moment this is an
         # observed fact rather than a re-derivation.

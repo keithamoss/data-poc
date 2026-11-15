@@ -18,14 +18,8 @@ import pytest
 
 import filing_support
 from conftest import drop_qa_schema
-from qa_tools.common import (
-    agreement_freeze,
-    correction_apply,
-    correction_replay,
-    people,
-    qa_store,
-    supply_db,
-)
+from qa_tools.common import agreement_freeze, correction_apply, people, qa_store, supply_db
+from bootstrap import correction_replay
 from asset_model import (
     asset_time,
     assignment,
@@ -106,7 +100,8 @@ class _Arrival:
 class TestEachArrivalIsFiledAsItStood:
     def test_the_replay_processes_each_arrival_under_its_own_agreement(
             self, two, monkeypatch):
-        from qa_tools.common import arrival_lifecycle, replay_clock
+        from qa_tools.common import arrival_lifecycle
+        from bootstrap import replay_clock
 
         seen = {}
 
@@ -126,9 +121,9 @@ class TestEachArrivalIsFiledAsItStood:
         asset's history is never re-staged."""
         from qa_tools.common import arrival_lifecycle
 
-        def staged(_arrival):
+        def staged(_at):
             raise AssertionError("staged outside a replay")
-        monkeypatch.setattr(correction_replay, "for_arrival", staged)
+        monkeypatch.setattr(correction_replay, "for_instant", staged)
         monkeypatch.setattr(arrival_lifecycle, "process", lambda arrival, **_k: [])
         arrival_lifecycle.process_all([_Arrival("x", datetime(2025, 1, 1, tzinfo=PERTH))],
                                       steps=None, run_by="me")
@@ -205,7 +200,7 @@ class TestStampedWhereTheHistoryEnds:
         assert correction_replay.history_end(conn) == datetime(2023, 8, 1, 12, tzinfo=PERTH)
 
     def test_a_bootstrap_never_stamps_the_wall_clock(self, two, conn, monkeypatch):
-        from qa_tools.common import bootstrap
+        from bootstrap import bootstrap
 
         monkeypatch.setattr(bootstrap, "_rebuild_results", lambda _short: None)
         # The fixture's supply has no staged table to re-check (REQ-GEN-205

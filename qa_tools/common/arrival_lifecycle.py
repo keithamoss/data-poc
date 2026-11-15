@@ -36,7 +36,6 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from asset_model import asset_time
-from qa_tools.common import replay_clock
 
 
 @dataclass(frozen=True)
@@ -138,7 +137,7 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
         # `start_at` are already in the checkpoint it was copied from.
         if position < start_at:
             continue
-        with _as_it_stood(arrival):
+        with asset_time.processing_arrival(arrival.received_at):
             _one_of_many(arrival, arrivals, position, steps=steps, run_by=run_by,
                          run_timestamp=run_timestamp, on_step=on_step, player=player,
                          prepare=prepare, after_each=after_each, results=results)
@@ -157,26 +156,13 @@ def process_stream(order, runs: dict, *, player, results: dict) -> None:
     for collection_id, arrival in order:
         arrivals, steps, prepare, run_by, run_timestamp = runs[collection_id]
         positions[collection_id] += 1
-        with _as_it_stood(arrival):
+        with asset_time.processing_arrival(arrival.received_at):
             _one_of_many(arrival, arrivals, positions[collection_id], steps=steps,
                          run_by=run_by, run_timestamp=run_timestamp, on_step=None,
                          player=player, prepare=prepare, after_each=None,
                          results=results[collection_id])
-    player.finish()
-
-
-def _as_it_stood(arrival):
-    """THE AGREEMENT AS IT STOOD AT THIS ARRIVAL'S RECEIPT, during a replay
-    (REQ-PIPE-170 criterion 23; Keith, 2026-10-11, (n)): a correction merged
-    after it is reverted, so the arrival is filed and judged as it was then.
-    Outside a replay, the agreement on disk - nothing is re-staged."""
-    import contextlib
-
-    if not replay_clock.active():
-        return contextlib.nullcontext()
-    from qa_tools.common import correction_replay
-
-    return correction_replay.for_arrival(arrival)
+    if player is not None:
+        player.finish()
 
 
 def _one_of_many(arrival, arrivals, position, *, steps, run_by, run_timestamp, on_step,
@@ -187,20 +173,19 @@ def _one_of_many(arrival, arrivals, position, *, steps, run_by, run_timestamp, o
     # together - so the database never holds an arrival from its future.
     if prepare is not None:
         prepare(arrival, arrivals)
-    # SCRIPTED DECISIONS BETWEEN ARRIVALS (REQ-GEN-135 criterion 3): every
-    # one that takes effect before this arrival was received is played
-    # first - only by the batch replay of a synthetic history, which is
-    # the one caller that passes a player.
+    # THE CALLER'S PLAYER BETWEEN ARRIVALS (REQ-PIPE-383 criterion 1): run
+    # before this arrival is processed, and none where none is passed - the
+    # bootstrap's plays every scripted decision taking effect before this
+    # arrival's receipt (REQ-GEN-135 criterion 3).
     if player is not None:
         player.before(arrival)
-    # A REPLAY PROCESSES EACH ARRIVAL AS IT IS RECEIVED (REQ-PIPE-081
-    # criteria 27-31): its run is stamped then, not with one instant for
-    # the whole pass - which was the wall clock, the day of the replay.
-    if replay_clock.active():
-        replay_clock.anchor(arrival.received_at)
-        stamp = replay_clock.now().isoformat()
-    else:
-        stamp = run_timestamp or asset_time.now().isoformat()
+    # THE ARRIVAL IS RECEIVED INTO ITS PROCESSING (REQ-PIPE-382 criterion 8),
+    # announced unconditionally: a replay's clock moves back to this receipt
+    # after the staging and playing above, and the wall clock ignores it. Its
+    # run is then stamped by the clock in force - per arrival where the caller
+    # passes no pass-wide instant.
+    asset_time.receiving(arrival.received_at)
+    stamp = run_timestamp or asset_time.now().isoformat()
     results.extend(process(arrival, steps=steps, among=arrivals,
                            run_timestamp=stamp, run_by=run_by,
                            on_step=on_step))
@@ -238,7 +223,9 @@ def staged_as_it_arrives(stage_one) -> Callable:
         for a in arriving_with(arrival, among):
             if a.run_id in done:
                 continue
-            replay_clock.anchor(a.received_at)
+            # A FILE RECEIVED AT ITS INSTANT IS BEING STAGED (REQ-PIPE-382
+            # criterion 8): announced, never asked whether a replay runs.
+            asset_time.receiving(a.received_at)
             stage_one(a)
             delivery_log.record_arrival(a)
             done.add(a.run_id)

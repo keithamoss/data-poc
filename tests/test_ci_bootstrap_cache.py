@@ -13,12 +13,13 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
 
 #: Criterion 1, as amended 2026-10-06 (cli/pipeline.py and nothing else
-#: under cli/).
+#: under cli/), and by REQ-GEN-381 criterion 7 (bootstrap/ and scenarios/, and
+#: no cli/ file at all).
 #: The shared inputs; each asset's key adds that asset's own folder
 #: (REQ-PIPE-365 criterion 3).
-INPUTS = ("asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**",
-          "qa_tools/**",
-          "dbt_shared/**", "cli/pipeline.py", "pyproject.toml", "uv.lock",
+INPUTS = ("asset_model/**", "bootstrap/**", "scenarios/**", "generator/**",
+          "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
+          "dbt_shared/**", "pyproject.toml", "uv.lock",
           ".github/workflows/test.yml", "assets/environments.yaml")
 #: What each asset's cache must carry beside its dump - the generated inputs
 #: the tests and the dashboard build read (Keith's 2026-10-06 decision). The
@@ -67,7 +68,7 @@ class TestTheKey:
     list into hashFiles()."""
 
     def test_it_hashes_every_input_criterion_1_names(self):
-        from qa_tools.common import replay_inputs
+        from bootstrap import replay_inputs
 
         assert set(replay_inputs.INPUTS) == set(INPUTS)
 
@@ -110,10 +111,9 @@ class TestTheKey:
         assert "cache-key failed for asset quarterly" in bad.stdout
 
     def test_no_other_cli_file_is_in_it(self):
-        from qa_tools.common import replay_inputs
+        from bootstrap import replay_inputs
 
-        assert not [p for p in replay_inputs.input_files()
-                    if p.startswith("cli/") and p != "cli/pipeline.py"]
+        assert not [p for p in replay_inputs.input_files() if p.startswith("cli/")]
 
     def test_it_is_computed_before_the_restores_and_after_mothman_exists(self):
         assert _index("Sync dependencies") < _index("Key each asset's bootstrap cache")

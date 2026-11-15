@@ -463,7 +463,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
     asset beside the collection, and selects it itself."""
 
     def test_each_stream_process_selects_the_asset_it_was_handed(self, monkeypatch):
-        from qa_tools.common import bootstrap
+        from bootstrap import bootstrap
 
         # The parent knows its asset; its environment no longer says so, so
         # a child that merely inherited the environment would know none.
@@ -479,7 +479,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
     def test_a_stream_process_is_handed_the_layout_too(self, monkeypatch, tmp_path):
         """The groundwork critic: handed the name alone, a child of a
         use_root deployment (#55) looks for the asset in today's tree."""
-        from qa_tools.common import bootstrap
+        from bootstrap import bootstrap
 
         root = _two_assets(tmp_path)
         assets.use_root(root)

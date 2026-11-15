@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: Where product code lives (criterion 8).
 #: asset_model/ joined with REQ-PIPE-380 criterion 17.
-SCANNED = ("asset_model", "qa_tools", "pipeline", "generator", "cli", "dashboard")
+SCANNED = ("asset_model", "bootstrap", "scenarios", "qa_tools", "pipeline", "generator", "cli", "dashboard")
 
 #: EXEMPT, each for its reason (criterion 9, as amended by A18 for the asset
 #: split). qa_tools/collections/ and generator/collections/ are no longer

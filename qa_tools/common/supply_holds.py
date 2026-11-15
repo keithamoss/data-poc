@@ -57,7 +57,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 
-from qa_tools.common import replay_clock as _replay_clock
+from asset_model import asset_time as _clock
 from asset_model.assignment import Assignment
 
 TABLE = "qa.hold"
@@ -497,7 +497,7 @@ def raise_hold(conn, *, dataset_id: str, supply_id: str, kind: str,
         "raised_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (dataset_id, supply_id) DO NOTHING "
         "RETURNING dataset_id",
         [dataset_id, supply_id, kind, json.dumps(reason), raised_by, delivery,
-         _replay_clock.now()]).fetchall()
+         _clock.now()]).fetchall()
     return bool(rows)
 
 
@@ -514,7 +514,7 @@ def raise_again(conn, *, dataset_id: str, supply_id: str, kind: str, reason: dic
         "kind = EXCLUDED.kind, reason = EXCLUDED.reason, raised_by = EXCLUDED.raised_by, "
         "raised_at = EXCLUDED.raised_at, resolved_by = NULL, resolved_at = NULL "
         f"WHERE {TABLE}.resolved_by IS NOT NULL",
-        [dataset_id, supply_id, kind, json.dumps(reason), raised_by, _replay_clock.now()])
+        [dataset_id, supply_id, kind, json.dumps(reason), raised_by, _clock.now()])
 
 
 def resolve(conn, *, dataset_id: str, supply_id: str, decision_id: int) -> bool:
@@ -532,7 +532,7 @@ def resolve(conn, *, dataset_id: str, supply_id: str, decision_id: int) -> bool:
         f"UPDATE {TABLE} SET resolved_by = ?, resolved_at = ? "
         "WHERE dataset_id = ? AND supply_id = ? AND resolved_by IS NULL "
         "RETURNING dataset_id",
-        [decision_id, _replay_clock.now(), dataset_id, supply_id]).fetchall()
+        [decision_id, _clock.now(), dataset_id, supply_id]).fetchall()
     return bool(rows)
 
 

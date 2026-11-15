@@ -108,7 +108,7 @@ class TestWithinTheClaimWindowInAReplay:
     @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
     def test_both_collections_pass_it_on_every_route(self, collection_id, replaying,
                                                       monkeypatch):
-        from qa_tools.common import replay_clock
+        from bootstrap import replay_clock
         from asset_model import schedule
 
         seen = {}

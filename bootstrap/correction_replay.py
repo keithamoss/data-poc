@@ -25,8 +25,10 @@ person's confirmation takes, as the synthetic actor - who holds the asset
 manager role during playback only, on an asset that declares itself
 synthetic (people.require_role). Nothing here writes a move of its own.
 
-Only during a replay (`replay_clock.active()`): the processing pass files
-against the agreement on disk, as a real asset always does.
+Only during a replay: the replay clock stages the agreement for the span of
+each arrival's processing (REQ-PIPE-382 criterion 10), and the real pipeline
+imports nothing of this module (REQ-PIPE-383 criterion 3) - the processing
+pass files against the agreement on disk, as a real asset always does.
 
 WHEN A CORRECTION WAS MERGED AND THE CONFIGURATION AS IT STOOD THEN
 (merge_instant, docs_at) are asset_model/declared_corrections.py
@@ -53,10 +55,12 @@ def staged(instant: datetime):
     return correction_trial.configured(*declared_corrections.docs_at(instant, docs))
 
 
-def for_arrival(arrival):
+def for_instant(received_at):
     """`staged()` for an arrival's receipt, as a context that is always
-    enterable - for arrival_lifecycle.process_all."""
-    return staged(arrival.received_at) or contextlib.nullcontext()
+    enterable - entered by the replay clock for the span of an arrival's
+    processing (REQ-PIPE-382 criterion 10; REQ-PIPE-383 criterion 3)."""
+    return (staged(asset_time.parse_instant(received_at, "an arrival's receipt"))
+            or contextlib.nullcontext())
 
 
 def history_end(conn) -> datetime | None:
@@ -94,20 +98,20 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
     2026-09-22).
 
     AS SCRIPTED (REQ-GEN-205 criteria 6-7): a correction with a scripted
-    confirmation (qa_tools/common/scripted_corrections.py; `scripts`, default
+    confirmation (bootstrap/scripted_corrections.py; `scripts`, default
     the committed file) is confirmed with exactly its keeps and reason, or
     left pending; one with none moves everything, as before. A refused
     script stops the replay naming the scenario, the reference and the
     proposed moves - never confirmed without the keep."""
-    from qa_tools.common import people, replay_clock, scripted_corrections, supply_db
+    from qa_tools.common import people, supply_db
+    from bootstrap import scripted_corrections
     from qa_tools.common.scripted_decisions import ScriptRefused
 
     scripted = scripted_corrections.by_reference(
         scripted_corrections.load() if scripts is None else scripts)
 
     until = until or asset_time.now()
-    at = effective_at or (replay_clock.now() if replay_clock.active()
-                          else asset_time.now()).isoformat()
+    at = effective_at or asset_time.now().isoformat()
     owned = conn is None
     ctx = supply_db.connect(label="mothman:correction-replay") if owned \
         else contextlib.nullcontext(conn)

@@ -155,11 +155,12 @@ class CollectionCLI:
         (REQ-GEN-186 criterion 2): every delivery just written - every stream's
         - is removed before the failure is raised, naming every disagreement.
         The verdict is the promotion gate's own reading of the trial's results
-        (qa_tools/common/target_agreement.py), checked on the supply's own day."""
+        (bootstrap/target_agreement.py), checked on the supply's own day."""
         from cli import target_trial
         from generator import collections as providers
         from generator import driver, targets
-        from qa_tools.common import delivery, run_reads, target_agreement
+        from qa_tools.common import delivery, run_reads
+        from bootstrap import target_agreement
 
         provider = providers.provider(collection_id or self.collection_id)
         say = say or (lambda msg: console.print(msg, style="dim"))

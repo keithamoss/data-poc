@@ -16,8 +16,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from qa_tools.common import bootstrap
+from bootstrap import bootstrap
 from asset_model import schedule
+from qa_tools.common import streams as streams_mod
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,9 @@ def _config(monkeypatch, layout: dict[str, dict[str, str | None | Exception]]):
     """A registry of collections -> {dataset: calendar name, None for "no
     calendar", or an exception to raise} - so the grouping is seen to come
     from configuration rather than from names it knows."""
-    monkeypatch.setattr(bootstrap, "_collection_datasets",
+    # THE GROUPING IS THE PIPELINE'S since REQ-GEN-381 criterion 5
+    # (qa_tools/common/streams.py); the bootstrap asks it.
+    monkeypatch.setattr(streams_mod, "_collection_datasets",
                         lambda short: [_DS(d) for d in layout[short]])
 
     def calendar_of(dataset_id):
@@ -43,7 +46,7 @@ def _config(monkeypatch, layout: dict[str, dict[str, str | None | Exception]]):
                 return value
         raise AssertionError(dataset_id)
 
-    monkeypatch.setattr(bootstrap, "_calendar_name", calendar_of)
+    monkeypatch.setattr(streams_mod, "_calendar_name", calendar_of)
 
 
 class TestStreamsComeFromConfiguration:
@@ -126,7 +129,7 @@ class TestAStreamIsProcessedInTheLivePassesOrder:
             ("emergency-department", "ed_run_2")]
 
     def test_every_collections_decisions_play_before_any_later_arrival(self):
-        from qa_tools.tools import orchestrate
+        from bootstrap import decision_player
 
         played = []
 
@@ -140,7 +143,7 @@ class TestAStreamIsProcessedInTheLivePassesOrder:
             def finish(self):
                 played.append((self.name, "finish"))
 
-        both = orchestrate.StreamPlayer([Player("cp"), Player("ed")])
+        both = decision_player.StreamPlayer([Player("cp"), Player("ed")])
         both.before(_Arrival("ed_run_1", _at(2)))
         both.finish()
         assert played == [("cp", "ed_run_1"), ("ed", "ed_run_1"),
@@ -156,23 +159,23 @@ class TestAStreamRunsOnTheReplayClock:
     corrected calendar, on the wall clock."""
 
     def test_the_replay_clock_is_running_while_a_stream_is_processed(self, monkeypatch):
-        from qa_tools.common import arrival_lifecycle, replay_clock
+        """INSTALLED BY THE BOOTSTRAP AROUND ITS OWN CALL (REQ-PIPE-382
+        criterion 11), with the stream's one combined player passed in
+        (REQ-PIPE-383 criterion 2) - the pipeline installs and builds
+        neither."""
+        from bootstrap import decision_player, replay_clock
         from qa_tools.tools import orchestrate
 
         seen = []
-        monkeypatch.setattr(replay_clock, "_is_synthetic", lambda: True)
-        monkeypatch.setattr(orchestrate, "_begin",
-                            lambda cid, player=None: orchestrate._CollectionRun(
-                                coll=cid, arrivals=[], manifest=[], steps=None,
-                                prepare=None, player=type("P", (), {
-                                    "before": lambda s, a: 0, "finish": lambda s: 0})(),
-                                run_by="t", run_timestamp="t"))
-        monkeypatch.setattr(orchestrate, "_end", lambda run, record_deliveries: {})
-        monkeypatch.setattr(arrival_lifecycle, "process_stream",
-                            lambda *a, **k: seen.append(replay_clock.active()))
-        orchestrate.run_stream(["child-protection", "emergency-department"],
-                               record_deliveries=False)
-        assert seen == [True]
+        monkeypatch.setattr(decision_player, "Player", lambda cid: ("player of", cid))
+        monkeypatch.setattr(orchestrate, "run_stream",
+                            lambda ids, **k: seen.append((replay_clock.active(), ids,
+                                                          k["player"].players)))
+        bootstrap._run_stream("cp+ed", sequential=True)
+        assert seen == [(True, ["child-protection", "emergency-department"],
+                         [("player of", "child-protection"),
+                          ("player of", "emergency-department")])]
+        assert not replay_clock.active()
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

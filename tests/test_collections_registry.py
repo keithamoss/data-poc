@@ -197,7 +197,7 @@ class TestAThirdCollectionAtEverySite:
                             run_by="pytest")
 
     def test_a_checkpoint_resume_is_named_with_its_short(self, third_collection, monkeypatch):
-        from qa_tools.common import checkpoints
+        from bootstrap import checkpoints
 
         copied = []
         monkeypatch.setattr(checkpoints, "_admin", lambda dsn=None: contextlib.nullcontext())
@@ -218,7 +218,7 @@ class TestAThirdCollectionAtEverySite:
             yield conn
 
     def _stub_the_real_collections(self, monkeypatch):
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         dispatched, self.ran = [], []
         import tempfile
@@ -256,7 +256,7 @@ class TestAThirdCollectionAtEverySite:
                             lambda collection_ids, *_, **__: self.ran.extend(collection_ids))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
-        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])
+        monkeypatch.setattr("bootstrap.correction_replay.confirm_due", lambda **k: [])
 
         def run(names, sequential):
             dispatched.append(list(names))
@@ -268,7 +268,7 @@ class TestAThirdCollectionAtEverySite:
                                                                  empty_db, monkeypatch):
         """And criterion 11: every registered collection goes to the
         process-per-collection dispatch together."""
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         dispatched = self._stub_the_real_collections(monkeypatch)
         result = boot.bootstrap(collection="all")
@@ -283,7 +283,7 @@ class TestAThirdCollectionAtEverySite:
 
     def test_a_bootstrap_refuses_one_with_no_adapter_before_anything_runs(
             self, without_adapter, empty_db, monkeypatch):
-        from qa_tools.common import bootstrap as boot
+        from bootstrap import bootstrap as boot
 
         dispatched = self._stub_the_real_collections(monkeypatch)
         result = boot.bootstrap(collection="all")

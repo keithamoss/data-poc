@@ -371,7 +371,8 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
     (PROVISIONAL): a person moved it since, and moving it again from
     somewhere else is not what was confirmed - the manager keeps it or
     clears it by hand."""
-    from qa_tools.common import filing, replay_clock
+    from qa_tools.common import filing
+    from asset_model import asset_time as _clock
 
     from qa_tools.common import refiling
 
@@ -379,7 +380,7 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
     done: list[tuple] = []
     if not found:
         return done
-    at = effective_at or replay_clock.now().isoformat()
+    at = effective_at or _clock.now().isoformat()
     # AS AT ITS CONFIRMATION (Keith, 2026-10-11; delivery-critic #152, 7):
     # a drained move is the deferred tail of a confirmation, so every later
     # correction not yet confirmed is reverted, as confirm() reverts them -

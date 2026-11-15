@@ -131,21 +131,21 @@ def start(conn, *, collection_id: str, period: str, entry: str, delivery: str | 
           package_instant=None, retries: int | None = None) -> int:
     """Record that an application has begun; its results count for nothing
     until settle()."""
-    from qa_tools.common import replay_clock
+    from asset_model import asset_time as _clock
 
     qa_store.ensure_schema(conn)
     return int(conn.execute(
         f"INSERT INTO {TABLE} (collection_id, period, entry, started_at, delivery, "
         "package_instant, retries) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
-        [collection_id, period, entry, replay_clock.now(), delivery, package_instant,
+        [collection_id, period, entry, _clock.now(), delivery, package_instant,
          retries]).fetchone()[0])
 
 
 def _end(conn, application: int, how: str) -> None:
-    from qa_tools.common import replay_clock
+    from asset_model import asset_time as _clock
 
     conn.execute(f"UPDATE {TABLE} SET ended = ?, ended_at = ? WHERE id = ? AND ended IS NULL",
-                 [how, replay_clock.now(), application])
+                 [how, _clock.now(), application])
 
 
 def settle(conn, application: int) -> None:
@@ -272,7 +272,8 @@ def _same_instant(a, b) -> bool:
 def owe_gate(conn, package: Package, *, dataset_id: str, retries: int | None = None) -> int:
     """Owe this package's gate (criterion 3), once: caused by the load of
     its last arrival, or by the application it retries."""
-    from qa_tools.common import recheck, replay_clock
+    from qa_tools.common import recheck
+    from asset_model import asset_time as _clock
 
     found = owed_gate(conn, package)
     if found is not None:
@@ -293,7 +294,7 @@ def owe_gate(conn, package: Package, *, dataset_id: str, retries: int | None = N
         "caused_by_application, delivery, package_instant, owed_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         [recheck.GATE, dataset_id, package.period, load, retries, package.delivery,
-         package.received, replay_clock.now()]).fetchone()[0])
+         package.received, _clock.now()]).fetchone()[0])
 
 
 def waiting_words(package: Package) -> str:
@@ -1646,7 +1647,8 @@ def _completing_instant(conn, package: Package) -> str:
     knock-on's readers are gated against the promotion that caused it, so
     they take effect after it (decision_log.follows), not at their own
     arrival's earlier instant."""
-    from qa_tools.common import arrivals, decision_log, replay_clock
+    from qa_tools.common import arrivals, decision_log
+    from asset_model import asset_time as _clock
     from asset_model import asset_time
     from qa_tools.tools import orchestrate
 
@@ -1674,7 +1676,7 @@ def _completing_instant(conn, package: Package) -> str:
         if keys[-1] in found:
             return at_least_floor(orchestrate.effective_at_of(package.collection_id,
                                                               found[keys[-1]]))
-    return replay_clock.now().isoformat()
+    return _clock.now().isoformat()
 
 
 def _member_item(conn, dataset_id: str, supply: str) -> dict | None:

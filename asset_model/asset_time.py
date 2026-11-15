@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -165,43 +166,194 @@ def zone_now() -> ZoneInfo:
 PINNED_NOW_VARIABLE = "MOTHMAN_PINNED_NOW"
 
 
-class PinnedClockRefused(RuntimeError):
+class ClockRefused(RuntimeError):
+    """The clock was asked to read anything but the wall clock on an asset
+    that does not declare `synthetic: true` (REQ-PIPE-382 criterion 6)."""
+
+
+class PinnedClockRefused(ClockRefused):
     """MOTHMAN_PINNED_NOW was set on an asset that is not synthetic."""
 
 
+class ClockInstallRefused(ClockRefused):
+    """A clock was installed on an asset that is not synthetic."""
+
+
 def declared_synthetic() -> bool:
-    """Whether contract/data-asset.yaml declares the asset synthetic - read
-    here, as the replay clock reads it, rather than through the reset module."""
+    """Whether the selected asset's data-asset.yaml declares it synthetic -
+    THE ONE READER of `synthetic: true` (REQ-PIPE-382 criterion 7, #137 group
+    D): the clock's refusal, the synthetic reset and the dashboard's footer all
+    ask here, so three readers of one declaration cannot come to disagree."""
     raw = config_yaml.load(data_asset_yaml()) or {}
     return raw.get("synthetic") is True
 
 
+# ---- THE ONE CLOCK (REQ-PIPE-382) --------------------------------------------
+#
+# ONE READING, AND ONLY A REPLAY REPLACES IT (criterion 2, B1 SETTLED by Keith
+# 2026-11-14). Every reader of "now" - the instant stamped on a record and the
+# "today" a slot or a due date is judged against - asks now() below, so during
+# a replay every one of them reads the replay's instant and otherwise the wall
+# clock. The single exception is when_effective(), which asks WHEN A DECISION
+# TAKES EFFECT rather than what time it is.
+#
+# THE PIPELINE ONLY ANNOUNCES (criteria 8 and 9; QA SETTLED by Keith
+# 2026-11-14): processing_arrival(), receiving() and taking_effect() say what
+# happened - an arrival received at R is being processed, a delivery or file
+# received at R is being staged or recorded, a decision takes effect at T -
+# unconditionally and with no test of whether a replay is running. The wall
+# clock and a pinned clock ignore every one of them; only an installed clock
+# (the bootstrap's replay clock, REQ-GEN-381) acts on them. Nothing here knows a
+# replay exists, so the real pipeline imports nothing of one.
+#
+# PROCESS-WIDE, NOT PER THREAD (NFR RELIABILITY): a run's four tools write from
+# worker threads, which a context variable would not reach.
+
+
+class Clock:
+    """What the pipeline asks the time of, and announces events to. The base
+    is the wall clock, which ignores every event."""
+
+    def now(self) -> datetime:
+        return real_now()
+
+    @contextmanager
+    def processing_arrival(self, received_at):  # noqa: ARG002 - ignored by design
+        """An arrival received at `received_at` is being processed, for the span
+        of the context (criterion 8)."""
+        yield
+
+    def receiving(self, received_at) -> None:
+        """A delivery or file received at `received_at` is being staged or
+        recorded (criterion 8). Ignored."""
+
+    def taking_effect(self, instant) -> None:
+        """A decision takes effect at `instant`, as it is recorded (criterion
+        8). Ignored."""
+
+    def when_effective(self, received_at, *, run_id: str, next_receipt=None,
+                       claim_window=None) -> datetime:  # noqa: ARG002
+        """When a decision on a supply received at `received_at` takes effect
+        (criterion 3): now, the instant it is made, on every asset."""
+        return self.now()
+
+
+class WallClock(Clock):
+    """The wall clock - what answers when nothing is installed (criterion 5)."""
+
+
+class PinnedClock(Clock):
+    """A clock pinned at one instant (criterion 12): MOTHMAN_PINNED_NOW."""
+
+    def __init__(self, at: datetime):
+        self.at = at
+
+    def now(self) -> datetime:
+        return self.at.astimezone(zone_at(self.at))
+
+
+#: The clock installed for the span of a replay, or None (criterion 6).
+_installed: Clock | None = None
+
+
+def real_now() -> datetime:
+    """The real wall-clock present, in the asset's zone - never pinned and
+    never replayed. What a replay's 'never after the real present' cap reads
+    (criterion 3); everything else asks now()."""
+    return datetime.now(UTC).astimezone(zone_now())
+
+
+def _refusal(what: str) -> str:
+    return (f"{what}, and this data asset does not declare `synthetic: true` - a real "
+            f"asset's clock is never pinned or replayed: its record of when something "
+            f"happened is evidence, and is never invented")
+
+
+def _admitted(clock: Clock, refused: type[ClockRefused], what: str) -> Clock:
+    """THE ONE GATE every clock but the wall clock passes (criteria 6 and 12;
+    Q6 and Q7 SETTLED by Keith 2026-11-02): refused unless the asset declares
+    itself synthetic, here in asset_model/ so the refusal holds where the
+    bootstrap package is absent."""
+    if not declared_synthetic():
+        raise refused(_refusal(what))
+    return clock
+
+
+def ambient() -> Clock:
+    """The clock beneath any installed one: MOTHMAN_PINNED_NOW's pinned clock
+    where it is set (through the same gate an installation passes), else the
+    wall clock."""
+    pinned = os.environ.get(PINNED_NOW_VARIABLE)
+    if pinned:
+        return _admitted(PinnedClock(parse_instant(pinned, PINNED_NOW_VARIABLE)),
+                         PinnedClockRefused, f"{PINNED_NOW_VARIABLE} is set")
+    return WallClock()
+
+
+def current() -> Clock:
+    """The clock in force: the installed one, else ambient()."""
+    return _installed if _installed is not None else ambient()
+
+
+@contextmanager
+def installed(clock: Clock):
+    """THE ONE INSTALLATION CALL (criterion 6): `clock` answers for the span of
+    the context, refused unless the asset declares itself synthetic. The clock
+    it replaces is restored after, so a replay inside a replay's span is one
+    replay."""
+    global _installed
+    _admitted(clock, ClockInstallRefused, "a clock was installed")
+    previous = _installed
+    _installed = clock
+    try:
+        yield clock
+    finally:
+        _installed = previous
+
+
 def now() -> datetime:
-    """The current instant, in the asset's own zone as in force now.
+    """The current instant, in the asset's own zone as in force then.
 
     Aware, always. Nothing in this repo should call `datetime.now()`
     without a timezone, and nothing should call it with `timezone.utc`
     either - a UTC instant is correct but reads as a foreign wall clock
     to whoever opens the file.
 
-    PINNED (REQ-TEST-239 criterion 16): where MOTHMAN_PINNED_NOW names an
-    instant, that instant IS now - so a test, or a person demonstrating a
-    synthetic asset, can run the real commands at a chosen moment and get
-    the same answer every time about which slots have closed and what is
-    still awaiting (tests/test_cli_cp.py pins it this way). It began as the
-    retired equivalence harness's pin (deleted, REQ-TEST-393) and outlives
-    it. Refused on an asset not declared synthetic: a real asset's "now" is
-    evidence, and is never invented.
+    ONE CLOCK (REQ-PIPE-382): the installed clock during a replay, else the
+    pinned instant where MOTHMAN_PINNED_NOW names one (REQ-TEST-239 criterion
+    16 - a test, or a person demonstrating a synthetic asset, runs the real
+    commands at a chosen moment; tests/test_cli_cp.py pins it this way), else
+    the wall clock. Pinned or installed only on an asset declared synthetic.
     """
-    pinned = os.environ.get(PINNED_NOW_VARIABLE)
-    if pinned:
-        if not declared_synthetic():
-            raise PinnedClockRefused(
-                f"{PINNED_NOW_VARIABLE} is set, and this data asset does not declare "
-                f"`synthetic: true` - a real asset's clock is never pinned")
-        at = parse_instant(pinned, PINNED_NOW_VARIABLE)
-        return at.astimezone(zone_at(at))
-    return datetime.now(UTC).astimezone(zone_now())
+    return current().now()
+
+
+def processing_arrival(received_at):
+    """Announce: an arrival received at `received_at` is being processed, for
+    the span of the returned context (criteria 8 and 10)."""
+    return current().processing_arrival(received_at)
+
+
+def receiving(received_at) -> None:
+    """Announce: a delivery or file received at `received_at` is being staged
+    or recorded (criterion 8)."""
+    current().receiving(received_at)
+
+
+def taking_effect(instant) -> None:
+    """Announce: a decision takes effect at `instant`, as it is recorded
+    (criterion 8)."""
+    current().taking_effect(instant)
+
+
+def when_effective(received_at, *, run_id: str, next_receipt=None,
+                   claim_window=None) -> datetime:
+    """THE ONE NEUTRAL QUESTION (criterion 3): a decision on a supply received
+    at `received_at`, run id `run_id`, next receipt `next_receipt`, claim window
+    `claim_window` - when does it take effect? The wall clock and a pinned
+    clock answer now; an installed replay answers from its own rule."""
+    return current().when_effective(received_at, run_id=run_id, next_receipt=next_receipt,
+                                    claim_window=claim_window)
 
 
 def _parse_iso(value, where: str) -> datetime:

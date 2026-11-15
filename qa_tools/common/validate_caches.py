@@ -53,7 +53,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: (REQ-PIPE-369, REQ-GEN-370), keyed below by `assets/*/...` so no asset is named.
 #: asset_model/ joined with REQ-PIPE-380 criterion 17: the shared reading code
 #: moved out of qa_tools/ is still read here.
-SCANNED = ("asset_model", "qa_tools", "pipeline", "generator", "assets")
+SCANNED = ("asset_model", "bootstrap", "scenarios", "qa_tools", "pipeline", "generator", "assets")
 
 #: THE MODULES WHOSE CALLS READ CONFIGURATION, by the name a file binds them
 #: to: a call into one at import builds a value from the file as it stood

@@ -2143,8 +2143,8 @@ def record_run(conn: supply_db.SupplyConnection, *, run_key: str, agency_id: str
 def _stamp():
     """Now - or the replay's own time in a replay of a synthetic history
     (REQ-PIPE-081 criteria 27-31)."""
-    from qa_tools.common import replay_clock
-    return replay_clock.now()
+    from asset_model import asset_time as _clock
+    return _clock.now()
 
 
 def complete_run(conn: supply_db.SupplyConnection, run_key: str) -> None:

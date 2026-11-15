@@ -143,7 +143,7 @@ class TestTheSharedCollectionOption:
     """Criteria 6 and 11 for cli/pipeline.py, cli/debug.py and cli/supply.py."""
 
     def test_pipeline_run_runs_a_third_collection(self, third_collection, monkeypatch):
-        import qa_tools.common.bootstrap as boot
+        import bootstrap.bootstrap as boot
         from cli import dashboard as dashboard_cli
         from cli import pipeline as pipeline_cli
 

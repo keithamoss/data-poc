@@ -205,7 +205,7 @@ def _bootstrap_menu() -> None:
     """The first thing a newcomer needs, and the one they would not know
     to ask for by name - which is why it is on the main menu rather than
     only behind a flag."""
-    from qa_tools.common import bootstrap as boot
+    from bootstrap import bootstrap as boot
 
     console.print("Setting up this environment - generating synthetic data and "
                    "running the real checks over it.", style="dim")
@@ -224,7 +224,9 @@ def _bootstrap_menu() -> None:
             console.print(msg, style="green")
         else:
             console.print(f"{msg}...", style="dim")
-    result = boot.bootstrap(on_step=step)
+    from cli.pipeline import try_targets
+
+    result = boot.bootstrap(on_step=step, try_targets=try_targets)
     if not result.populated:
         console.print(result.reason, style="yellow")
         return

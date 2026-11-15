@@ -59,7 +59,7 @@ CHECKPOINT_BEFORE = {"quarterly": 6, "daily": 2}
 #: it raises, so the bootstrap fails partway with its work so far on disk.
 STOPPED_AFTER_CHECKPOINT = """
 import runpy, sys
-from qa_tools.common import checkpoints
+from bootstrap import checkpoints
 _save = checkpoints.save
 def save(*a, **k):
     cp = _save(*a, **k)

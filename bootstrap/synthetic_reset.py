@@ -37,11 +37,11 @@ class NotSynthetic(Exception):
 
 
 def is_synthetic() -> bool:
-    """Whether contract/data-asset.yaml declares this asset synthetic."""
+    """Whether the asset's data-asset.yaml declares it synthetic - asked of the
+    one reader (REQ-PIPE-382 criterion 7, #137 group D)."""
     from asset_model import asset_time
 
-    raw = config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {}
-    return raw.get("synthetic") is True
+    return asset_time.declared_synthetic()
 
 
 def in_production() -> bool:

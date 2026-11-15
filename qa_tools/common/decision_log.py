@@ -944,12 +944,12 @@ def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
     One rule, no flag saying which of the two this is. Now, where there is no
     cause to follow.
     """
-    # THE REPLAY'S CLOCK in a replay (REQ-PIPE-081 criteria 27-31), where a
-    # cause is recorded as it takes effect, so the lag is the moments the
-    # work took; the wall clock everywhere else, where it always was.
-    from qa_tools.common import replay_clock
+    # THE ONE CLOCK (REQ-PIPE-382): a replay's in a replay, where a cause is
+    # recorded as it takes effect, so the lag is the moments the work took;
+    # the wall clock everywhere else, where it always was.
+    from asset_model import asset_time
 
-    now = replay_clock.now()
+    now = asset_time.now()
     if decision_id is not None:
         rows = conn.execute(f"SELECT effective_at, recorded_at FROM {TABLE} WHERE id = ?",
                             [decision_id]).fetchall()
@@ -964,14 +964,15 @@ def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
 
 
 def _recorded_at(decision: Decision):
-    """When a decision is written down: now - or, in a replay of a synthetic
-    history, as it takes effect (REQ-PIPE-081 criteria 27-31). The replay's
-    clock moves forward to it, so what the decision causes is stamped after
-    it, as it would have been."""
-    from qa_tools.common import replay_clock
-    if replay_clock.active() and decision.effective_at:
-        replay_clock.advance_to(decision.effective_at)
-    return replay_clock.now()
+    """When a decision is written down: the clock in force, told first that the
+    decision takes effect at its instant (REQ-PIPE-382 criterion 8) - announced
+    for every decision, a rule's inside promotion included, with no test of
+    whether a replay runs. A replay's clock moves forward to it, so what the
+    decision causes is stamped after it; the wall clock ignores it."""
+    from asset_model import asset_time
+    if decision.effective_at:
+        asset_time.taking_effect(decision.effective_at)
+    return asset_time.now()
 
 
 def _insert(conn: supply_db.SupplyConnection, decision: Decision) -> int:

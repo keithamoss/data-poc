@@ -357,7 +357,8 @@ class TestTheResetLeavesTheIdentity:
     """Criterion 11."""
 
     def test_reset_synthetic_keeps_it(self, unmarked_dsn):
-        from qa_tools.common import qa_store, synthetic_reset
+        from qa_tools.common import qa_store
+        from bootstrap import synthetic_reset
 
         assert _mark("--confirm", _typed("test")).exit_code == 0
         with supply_db.connect(dsn=unmarked_dsn) as conn:

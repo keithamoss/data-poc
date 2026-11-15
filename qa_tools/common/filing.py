@@ -46,7 +46,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from qa_tools.common import replay_clock as _replay_clock
+from asset_model import asset_time as _clock
 from qa_tools.common import qa_store, supply_db
 from qa_tools.common import verdict as verdict_mod
 from asset_model.assignment import Assignment
@@ -118,7 +118,7 @@ def record(assignment: Assignment, delivery: str | None, conn=None) -> bool:
             f"{delivery!r}, which has no delivery record, so it was not filed.")
     judged = _judged_for(
         assignment.dataset_id, assignment.slot, assignment.received_at)
-    at = _replay_clock.now()
+    at = _clock.now()
     rows = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, "
         "delivery, classification, recorded_at) "
@@ -761,7 +761,7 @@ def refile(conn, dataset_id: str, supply_id: str, to_slot: str, *,
         [dataset_id, supply_id]).fetchall()
     received_at = receipt[0][0] if receipt else None
     judged = _judged_for(dataset_id, to_slot, received_at)
-    at = _replay_clock.now()
+    at = _clock.now()
     # The rule's branch no longer describes where it sits: a person put it
     # here. The delivery link is carried as it stands (REQ-PIPE-144 c17).
     new_id = conn.execute(
@@ -822,7 +822,7 @@ def file_settled(conn, dataset_id: str, supply_id: str, slot: str | None, *,
     earlier row kept - with its verdict judged on THIS file's receipt
     (REQ-PIPE-168). Returns the row's id."""
     judged = _judged_for(dataset_id, slot, received_at)
-    at = _replay_clock.now()
+    at = _clock.now()
     new_id = conn.execute(
         f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, delivery, "
         "classification, refiled_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "

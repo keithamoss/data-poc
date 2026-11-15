@@ -649,14 +649,14 @@ def make_group(conn, period_name: str, *, offset: int, collection_id: str | None
     criteria 1, 2, 5 and 8): the record and the inheritances in one step, by
     the same mechanism and recorded as the same kind of event whichever
     route reached it. Returns whether this call made them."""
-    from qa_tools.common import replay_clock
+    from asset_model import asset_time as _clock
 
     period_schema.ensure_period_schema(conn, period_name)
     with decision_log.decision_transaction(conn):
         inserted = conn.execute(
             f"INSERT INTO {GROUP_TABLE} (period, files_go_to_period, collection_id, route, "
             "made_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING RETURNING period",
-            [period_name, offset, collection_id, route, replay_clock.now()]).fetchall()
+            [period_name, offset, collection_id, route, _clock.now()]).fetchall()
         if not inserted:
             return False
         inherit_into(conn, period_name, effective_at=effective_at, caused_by=caused_by,

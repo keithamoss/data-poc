@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from qa_tools.common import bootstrap
+from bootstrap import bootstrap
 
 
 def test_linkage_alone_brings_the_collections_it_links():
@@ -27,7 +27,7 @@ class TestACheckpointOfACollectionReadingOthersIsRefused:
     collection whose checks read others would replay without them."""
 
     def test_taking_one_is_refused_naming_what_it_reads(self, monkeypatch):
-        from qa_tools.common import checkpoints
+        from bootstrap import checkpoints
 
         called = []
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: called.append(1))
@@ -39,7 +39,7 @@ class TestACheckpointOfACollectionReadingOthersIsRefused:
     def test_resuming_one_is_refused(self, monkeypatch):
         from types import SimpleNamespace
 
-        from qa_tools.common import checkpoints
+        from bootstrap import checkpoints
 
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
         monkeypatch.setattr(checkpoints, "find", lambda name: SimpleNamespace(

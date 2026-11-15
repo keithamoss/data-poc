@@ -167,7 +167,8 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
     one's receipt, oldest receipt first, as a rule re-file owing a re-check -
     the one loop both a schedule-ended hold (REQ-PIPE-154) and a hold on a
     refused dataset (REQ-PIPE-173) are drained by once their cause is gone."""
-    from qa_tools.common import decision_log, filing, placing, qa_store, replay_clock, supply_files
+    from qa_tools.common import decision_log, filing, placing, qa_store, supply_files
+    from asset_model import asset_time as _clock
     from asset_model import hierarchy
 
     done: list[tuple[str, str, str]] = []
@@ -223,7 +224,7 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
                 conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
                 dataset_id=h.dataset_id, supply=h.supply_id, to_period=slot.name,
                 actor=ACTOR, actor_kind=decision_log.RULE,
-                effective_at=replay_clock.now().isoformat(), reason=reason(h, slot.name),
+                effective_at=_clock.now().isoformat(), reason=reason(h, slot.name),
                 owe=not contested)
             say(said(h, slot.name))
             done.append((h.dataset_id, h.supply_id, slot.name))

@@ -10,17 +10,10 @@ import pytest
 
 import equiv_support
 from asset_model import asset_time
-from qa_tools.common import replay_clock
+from bootstrap import replay_clock
 from generator import driver
 
 FIRST_TWO = ("run_001", "run_002")
-
-
-@pytest.fixture(autouse=True)
-def _clock_off():
-    replay_clock.stop()
-    yield
-    replay_clock.stop()
 
 
 class TestTheClock:
@@ -30,34 +23,31 @@ class TestTheClock:
         assert before <= replay_clock.now() <= asset_time.now()
         replay_clock.anchor("2024-01-01T00:00:00+08:00")
         assert replay_clock.now() >= before, "an anchor outside a replay changes nothing"
-
-    def test_in_a_replay_it_runs_on_from_its_anchor(self):
-        replay_clock.start()
-        replay_clock.anchor("2024-01-01T00:00:00+08:00")
-        first, second = replay_clock.now(), replay_clock.now()
-        assert datetime.fromisoformat("2024-01-01T00:00:00+08:00") <= first < second
-        assert second - first < timedelta(seconds=5)
-
-    def test_advance_never_goes_backwards(self):
-        replay_clock.start()
-        replay_clock.anchor("2024-01-02T00:00:00+08:00")
-        replay_clock.advance_to("2024-01-01T00:00:00+08:00")
-        assert replay_clock.now() >= datetime.fromisoformat("2024-01-02T00:00:00+08:00")
-        replay_clock.advance_to("2024-01-03T00:00:00+08:00")
-        assert replay_clock.now() >= datetime.fromisoformat("2024-01-03T00:00:00+08:00")
-
-    def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch):
-        monkeypatch.setattr(replay_clock, "_is_synthetic", lambda: False)
-        with pytest.raises(replay_clock.SimulatedClockRefused):
-            replay_clock.start()
         assert not replay_clock.active()
 
-    def test_a_real_assets_replay_keeps_the_wall_clock(self, monkeypatch):
-        monkeypatch.setattr(replay_clock, "_is_synthetic", lambda: False)
-        with replay_clock.replaying() as simulated:
-            assert simulated is False
+    def test_in_a_replay_it_runs_on_from_its_anchor(self):
+        with replay_clock.replaying():
             replay_clock.anchor("2024-01-01T00:00:00+08:00")
-            assert replay_clock.now().year == asset_time.now().year
+            first, second = replay_clock.now(), replay_clock.now()
+            assert datetime.fromisoformat("2024-01-01T00:00:00+08:00") <= first < second
+            assert second - first < timedelta(seconds=5)
+            assert asset_time.now() >= first, "the one clock reads the replay's instant"
+        assert asset_time.now().year == datetime.now().year, "uninstalled after the replay"
+
+    def test_advance_never_goes_backwards(self):
+        with replay_clock.replaying():
+            replay_clock.anchor("2024-01-02T00:00:00+08:00")
+            replay_clock.advance_to("2024-01-01T00:00:00+08:00")
+            assert replay_clock.now() >= datetime.fromisoformat("2024-01-02T00:00:00+08:00")
+            replay_clock.advance_to("2024-01-03T00:00:00+08:00")
+            assert replay_clock.now() >= datetime.fromisoformat("2024-01-03T00:00:00+08:00")
+
+    def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch):
+        monkeypatch.setattr(asset_time, "declared_synthetic", lambda: False)
+        with pytest.raises(replay_clock.SimulatedClockRefused):
+            with replay_clock.replaying():
+                pass
+        assert not replay_clock.active()
 
 
 @pytest.fixture(scope="module")
@@ -110,9 +100,14 @@ def replayed(corpus, worker_id):
     from qa_tools.tools import orchestrate
 
     root, latest = corpus
+    def replay():
+        # THE BOOTSTRAP INSTALLS THE CLOCK AROUND ITS OWN CALL (REQ-PIPE-382
+        # criterion 11) - the pipeline installs none.
+        with replay_clock.replaying():
+            orchestrate.run_pipeline("civil-registration", sequential=True)
+
     snap = equiv_support.run_into_fresh_database(
-        root, f"replay_clock_{worker_id}",
-        lambda: orchestrate.run_pipeline("civil-registration", sequential=True), inspect=_stamps)
+        root, f"replay_clock_{worker_id}", replay, inspect=_stamps)
     return snap["inspected"], latest
 
 
@@ -120,7 +115,7 @@ class TestAReplayStampsItsOwnTime:
 
     def test_every_stamp_is_the_replays_time_not_today(self, replayed):
         got, latest = replayed
-        # The promotion lag is at most three days (promotion.effective_at_for).
+        # The promotion lag is at most three days (scenarios/promotion_lag.py).
         bound = latest + timedelta(days=4)
         assert bound < asset_time.now() - timedelta(days=7), "the corpus is too recent to tell"
         late = {k: max(v) for k, v in got["stamps"].items() if max(v) > bound}

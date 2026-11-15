@@ -105,7 +105,8 @@ def reset_synthetic_command() -> None:
     synthetic, and only after you type a phrase naming what goes. Follow it
     with `mothman pipeline bootstrap`.
     """
-    from qa_tools.common import supply_db, synthetic_reset
+    from qa_tools.common import supply_db
+    from bootstrap import synthetic_reset
 
     if synthetic_reset.in_production():
         raise click.ClickException("this checkout is acting as `production` - nothing "

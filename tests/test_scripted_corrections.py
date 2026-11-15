@@ -10,14 +10,8 @@ from datetime import timedelta, timezone
 
 import pytest
 
-from qa_tools.common import (
-    correction_apply,
-    correction_replay,
-    decision_log,
-    scenario_map,
-    scripted_corrections,
-    scripted_decisions,
-)
+from qa_tools.common import correction_apply, decision_log, scenario_map, scripted_decisions
+from bootstrap import correction_replay, scripted_corrections
 from asset_model import declared_corrections
 import test_correction_replay as _replay
 
@@ -185,7 +179,8 @@ class TestTheBootstrapRunsWhatTheConfirmationsOwe:
 
     @pytest.fixture
     def owing(self, monkeypatch):
-        from qa_tools.common import bootstrap, recheck, replay_clock
+        from qa_tools.common import recheck
+        from bootstrap import bootstrap, replay_clock
 
         calls: dict = {"rebuilt": []}
         monkeypatch.setattr(correction_replay, "confirm_due", lambda **k: ["CAB-1"])
@@ -205,7 +200,8 @@ class TestTheBootstrapRunsWhatTheConfirmationsOwe:
         return calls
 
     def test_the_owed_runs_are_run_and_announced(self, owing, supply_dsn):
-        from qa_tools.common import bootstrap, recheck
+        from qa_tools.common import recheck
+        from bootstrap import bootstrap
 
         lines, say = _say()
         bootstrap._confirm_corrections(say)
@@ -215,7 +211,8 @@ class TestTheBootstrapRunsWhatTheConfirmationsOwe:
         assert owing["rebuilt"], "results rebuilt after"
 
     def test_a_run_that_does_not_complete_stops_the_bootstrap(self, owing, supply_dsn):
-        from qa_tools.common import bootstrap, recheck
+        from qa_tools.common import recheck
+        from bootstrap import bootstrap
 
         owing["outcomes"] = [recheck.Outcome(7, "cp_run_042", False, "it broke")]
         with pytest.raises(scripted_decisions.ScriptRefused, match="cp_run_042"):
@@ -223,7 +220,8 @@ class TestTheBootstrapRunsWhatTheConfirmationsOwe:
         assert not owing["rebuilt"]
 
     def test_a_run_the_backstop_froze_is_not_a_failure(self, owing, supply_dsn):
-        from qa_tools.common import bootstrap, recheck
+        from qa_tools.common import recheck
+        from bootstrap import bootstrap
 
         owing["outcomes"] = [recheck.Outcome(7, "cp_run_042", False, "frozen", frozen=True)]
         bootstrap._confirm_corrections(lambda _m: None)
@@ -239,8 +237,8 @@ class TestAResumeConfirmsAsABootstrapDoes:
         from types import SimpleNamespace
 
         import cli.pipeline
-        from qa_tools.common import (bootstrap, checkpoints, processing_pass,
-                                     replay_inputs)
+        from qa_tools.common import processing_pass
+        from bootstrap import bootstrap, checkpoints, replay_inputs
 
         order: list[str] = []
         cp = SimpleNamespace(name="ck", collection_id="child-protection", before=3,

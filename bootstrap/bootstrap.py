@@ -37,7 +37,15 @@ from typing import Callable
 
 import psycopg
 
+from bootstrap import generation
+from generator import public as generator
 from qa_tools.common import supply_db
+from qa_tools.common.streams import (  # noqa: F401 - the bootstrap's names for them
+    HISTORY_REFUSAL,
+    StreamRefused,
+    holds_history,
+    streams,
+)
 
 
 @dataclass(frozen=True)
@@ -68,42 +76,6 @@ class BootstrapResult:
     #: The whole bootstrap's wall clock, generation to target agreement
     #: (REQ-PIPE-250 criterion 3) - what the budget line is measured on.
     wall_seconds: float = 0.0
-
-
-#: Why a re-run over recorded history is refused (REQ-PIPE-144 criteria
-#: 38 and 39) - one message for both commands, sited beside each other.
-#: Filings are write-once and the decision log append-only, so a re-run
-#: ADDS to the history rather than replacing it: on 2026-10-02 a forced
-#: bootstrap stacked on top of the last one and promoted 11 supplies
-#: where a clean run promotes dozens, while its help text promised the
-#: same content.
-HISTORY_REFUSAL = (
-    "this database already holds QA history. A re-run would ADD to it rather "
-    "than replace it - filings are write-once and the decision log is "
-    "append-only - so nothing was run and nothing was deleted. To start from "
-    "empty, run `mothman env reset-synthetic` first.")
-
-#: The tables whose rows ARE the recorded history.
-_HISTORY_TABLES = ("run", "delivery", "filing", "decision")
-
-
-def holds_history(conn) -> bool:
-    """Whether this database already holds any recorded QA history.
-
-    Asked of the database, like already_populated(), and true of a qa
-    schema from ANY version - an older one is history too, and is refused
-    by ensure_schema with the same remedy.
-    """
-    from qa_tools.common import qa_store
-
-    for table in _HISTORY_TABLES:
-        if not conn.execute(
-                f"SELECT to_regclass('{qa_store.SCHEMA}.{table}')").fetchall()[0][0]:
-            continue
-        if conn.execute(
-                f'SELECT EXISTS (SELECT 1 FROM "{qa_store.SCHEMA}".{table})').fetchall()[0][0]:
-            return True
-    return False
 
 
 def staged_table_count(conn) -> int:
@@ -146,7 +118,8 @@ def bootstrap(collection: str = "all", force: bool = False,
               sequential: bool = False,
               on_step: Callable[[str], None] | None = None,
               checkpoint_before: int | None = None,
-              skip_target_trial: bool = False) -> BootstrapResult:
+              skip_target_trial: bool = False,
+              try_targets: Callable[[str], object] | None = None) -> BootstrapResult:
     """Ensure this environment's database has data and QA results.
 
     `force` runs even when staging already holds tables - but NEVER over
@@ -154,14 +127,26 @@ def bootstrap(collection: str = "all", force: bool = False,
     with nothing run and nothing deleted, because a re-run would stack
     on top of the history rather than replace it. `--force` NEVER WIPES -
     wiping is `mothman env reset-synthetic`'s alone.
+
+    SYNTHETIC ONLY (REQ-GEN-381 criterion 2; Q5 SETTLED by Keith 2026-11-02):
+    an asset that does not declare `synthetic: true` is refused before
+    anything is generated - a real asset's first run is `mothman pipeline run`.
+
+    `try_targets(collection_id)` runs a collection's target trial - the
+    command's, handed in by cli/, which this package may not import.
     """
     say = on_step or (lambda _msg: None)
     wall_started = time.monotonic()
 
+    refused = not_synthetic()
+    if refused:
+        return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                               refused=True, reason=refused)
+
     # A CHECKPOINT IS OF ONE COLLECTION, on a synthetic asset (REQ-TEST-159):
     # both side by side are never both between arrivals at once.
     if checkpoint_before is not None:
-        from qa_tools.common import checkpoints
+        from bootstrap import checkpoints
         if collection not in _shorts():
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True,
@@ -265,7 +250,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             timings = {}
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
-                _generate(name, trial=not skip_target_trial)
+                _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
                 after_each = None
                 if checkpoint_before is not None:
                     after_each = _checkpoint_hook(name, checkpoint_before, held, say,
@@ -287,7 +272,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             # measured with REQ-PIPE-296's.
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
-                _generate(name, trial=not skip_target_trial)
+                _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
             keys = [_stream_key(g) for g in groups]
             if sequential:
                 # ONE STREAM AFTER ANOTHER (criterion 7): --sequential changes
@@ -391,15 +376,30 @@ def _adapter(short: str):
     return collections.adapter(_collection(short))
 
 
-def _generate(short: str, *, trial: bool) -> None:
-    """Generate one collection's synthetic history through cli/, which is
-    where the generator is reached from (no QA module may import it). Its
-    target trial runs only where its provider declares one (REQ-GEN-246
-    criterion 5) - asking it of one without would be refused."""
-    from cli.pipeline import generate_collection, has_target_trial
+def not_synthetic() -> str | None:
+    """Why the bootstrap is refused on this asset, or None (REQ-GEN-381
+    criterion 2): read through the one reader of `synthetic: true`
+    (REQ-PIPE-382 criterion 7), worded as `mothman env reset-synthetic`'s
+    refusal is."""
+    from asset_model import asset_time, assets
 
+    if asset_time.declared_synthetic():
+        return None
+    return (f"{assets.selected().name} is not declared synthetic in "
+            f"{assets.config_dir()}/data-asset.yaml - the bootstrap replays a synthetic "
+            f"history, and nothing was generated. A real asset's first run is "
+            f"`mothman pipeline run`.")
+
+
+def _generate(short: str, *, trial: bool, try_targets=None, say=print) -> None:
+    """Generate one collection's synthetic history through the generator's
+    public module (REQ-GEN-381 criterion 3). Its target trial runs only where
+    its provider declares one (REQ-GEN-246 criterion 5) - asking it of one
+    without would be refused."""
     collection_id = _collection(short).id
-    generate_collection(collection_id, trial=trial and has_target_trial(collection_id))
+    generation.generate_collection(
+        collection_id, trial=trial and generator.has_target_trial(collection_id),
+        try_targets=try_targets, say=say)
 
 
 def _label(key: str) -> str:
@@ -418,67 +418,28 @@ def _stream_key(group: list[str]) -> str:
     return STREAM_JOIN.join(group)
 
 
-class StreamRefused(ValueError):
-    """A collection's datasets' calendars cannot be resolved, so which
-    stream it belongs to is unknown (REQ-PIPE-262 criterion 9)."""
-
-
-def _collection_datasets(short: str) -> list:
-    from asset_model import hierarchy
-
-    return hierarchy.datasets_in_collection(_collection(short).id)
-
-
-def _calendar_name(dataset_id: str) -> str:
-    from asset_model import schedule
-
-    return schedule.calendar_for_dataset(dataset_id).name
-
-
-def streams(names: list[str]) -> list[list[str]]:
-    """The collections replayed together (REQ-PIPE-262 criteria 1 and 2):
-    two share a stream whenever any dataset of one resolves to a calendar any
-    dataset of the other resolves to, transitively. FROM CONFIGURATION ALONE -
-    no list of collections or calendars is held here. A dataset declared to
-    have no calendar joins nothing. Registry order, within and across
-    streams."""
-    from asset_model import schedule
-
-    calendars: dict[str, set[str]] = {}
-    for name in names:
-        found = set()
-        for d in _collection_datasets(name):
-            try:
-                found.add(_calendar_name(d.dataset_id))
-            except schedule.NoCalendarAgreed:
-                continue
-            except (schedule.ScheduleConfigError, LookupError) as exc:
-                raise StreamRefused(
-                    f"collection {name!r}: the calendar of dataset {d.dataset_id!r} cannot be "
-                    f"resolved ({exc}), so which stream it replays in is unknown - nothing "
-                    f"was run") from exc
-        calendars[name] = found
-    groups: list[list[str]] = []
-    for name in names:
-        joined = [g for g in groups if any(calendars[name] & calendars[o] for o in g)]
-        merged = [n for g in joined for n in g] + [name]
-        groups = [g for g in groups if g not in joined] + [merged]
-    order = {n: i for i, n in enumerate(names)}
-    return sorted((sorted(g, key=order.get) for g in groups), key=lambda g: order[g[0]])
-
-
 def _run_stream(key: str, sequential: bool) -> float:
     """Run one stream's pipeline (REQ-PIPE-262); return how long it took.
     A stream of one collection is that collection's own run. TOP LEVEL, so a
-    spawned process can import it by name."""
+    spawned process can import it by name.
+
+    ON THE REPLAY'S CLOCK, installed here around the bootstrap's own call
+    (REQ-PIPE-382 criterion 11), with ONE COMBINED PLAYER built here and passed
+    in (REQ-PIPE-383 criterion 2): every collection's scripted decisions,
+    played before ANY arrival of the stream received after a decision's
+    instant (REQ-PIPE-262 criterion 4)."""
     names = key.split(STREAM_JOIN)
     if len(names) == 1:
         return _run_collection(names[0], sequential)
     started = time.monotonic()
+    from bootstrap import decision_player, replay_clock
     from qa_tools.tools import orchestrate
 
-    orchestrate.run_stream([_adapter(n).collection_id for n in names],
-                           sequential=sequential, record_deliveries=False)
+    ids = [_adapter(n).collection_id for n in names]
+    with replay_clock.replaying():
+        player = decision_player.StreamPlayer(decision_player.Player(cid) for cid in ids)
+        orchestrate.run_stream(ids, sequential=sequential, record_deliveries=False,
+                               player=player)
     return time.monotonic() - started
 
 
@@ -489,19 +450,16 @@ def targets_agree(names) -> tuple[str, ...]:
     following days, and every ordinary amber, in both collections. Reads
     recorded results only and changes nothing (criterion 6).
 
-    What each supply was built to comes from the generator, by way of cli/
+    What each supply was built to comes from the generator's public module
     (generated_targets), because no QA module may read the generator's
     bookkeeping (REQ-GEN-043 criterion 7)."""
-    from cli.pipeline import generated_targets
-    from qa_tools.common import target_agreement
+    from bootstrap import target_agreement
 
     # Which datasets' targets each collection's replay records - declared
     # once, on its generator provider (REQ-GEN-246 criterion 5).
-    from cli.pipeline import target_datasets
-
-    wanted = {d for n in names for d in target_datasets(_collection(n).id)}
+    wanted = {d for n in names for d in generator.target_datasets(_collection(n).id)}
     try:
-        built = [b for b in generated_targets() if b.dataset_id in wanted]
+        built = [b for b in generator.generated_targets() if b.dataset_id in wanted]
     except ValueError as exc:
         # A RECORD THAT DOES NOT ADD UP is a disagreement, said in one line,
         # not a traceback (post-build-review #157 finding 7).
@@ -514,8 +472,8 @@ def targets_agree(names) -> tuple[str, ...]:
         for r in reported:
             print(f"note: {r}")
         # AND EACH DECLARED GATE OUTCOME (criterion 3), a failure where the
-        # record differs - declared by the scenarios, by way of cli/.
-        from cli.pipeline import generated_gate_outcomes
+        # record differs - declared by the scenarios, read through the
+        # generator's public module.
 
         # BY COLLECTION, NOT BY TARGET DATASET: a declared gate outcome names
         # any table of its package (Notifications held back beside Clients),
@@ -523,7 +481,7 @@ def targets_agree(names) -> tuple[str, ...]:
         # filtering by `wanted` dropped every other dataset's declaration in
         # silence (found building REQ-GEN-273 criterion 4, 2026-10-25).
         replayed = {_collection(n).id for n in names}
-        declared = [o for o in generated_gate_outcomes()
+        declared = [o for o in generator.generated_gate_outcomes()
                     if _collection_of_dataset(o.dataset_id) in replayed]
         failing = [*failing, *target_agreement.gate_outcome_differences(conn, declared)]
         return tuple(str(d) for d in failing)
@@ -539,16 +497,14 @@ def _collection_of_dataset(dataset_id: str) -> str | None:
 
 
 def _confirm_corrections(say) -> None:
-    from qa_tools.common import correction_replay, replay_clock
+    from bootstrap import correction_replay, replay_clock
 
-    # A SYNTHETIC replay stamps where its history ends, not the wall clock
-    # (post-build-review #177); a real asset's confirmation carries when it
-    # was really made.
-    with replay_clock.replaying() as synthetic:
-        end = None
-        if synthetic:
-            with supply_db.connect(label="mothman:bootstrap") as conn:
-                end = correction_replay.history_end(conn)
+    # STAMPED WHERE THE REPLAYED HISTORY ENDS, not the wall clock
+    # (post-build-review #177) - the bootstrap is synthetic-only, so its
+    # confirmations are always on the replay's clock (REQ-GEN-381 criterion 2).
+    with replay_clock.replaying():
+        with supply_db.connect(label="mothman:bootstrap") as conn:
+            end = correction_replay.history_end(conn)
         done = correction_replay.confirm_due(history_end=end, say=say)
         if done:
             _run_what_the_confirmations_owe(say)
@@ -585,26 +541,36 @@ def _run_what_the_confirmations_owe(say) -> None:
 
 
 def _record_deliveries() -> None:
-    from qa_tools.common import delivery_log, replay_clock
+    from bootstrap import replay_clock
+    from qa_tools.common import delivery_log
 
-    # Each delivery stamped as received, on a synthetic asset (REQ-PIPE-081
-    # criteria 27-31) - the replay's first records.
+    # Each delivery stamped as received (REQ-PIPE-081 criteria 27-31) - the
+    # replay's first records.
     with replay_clock.replaying():
         delivery_log.record_all()
 
 
 def _run_collection(name: str, sequential: bool, record_deliveries: bool = False,
-                    **replay) -> float:
+                    *, player=None, **replay) -> float:
     """Run one collection's whole pipeline; return how long it took.
-    `replay` is start_at / after_each / player, for a checkpoint or a resume.
+    `replay` is start_at / after_each, for a checkpoint or a resume.
+
+    ON THE REPLAY'S CLOCK, installed around this call (REQ-PIPE-382 criterion
+    11), with THE COLLECTION'S PLAYER built here - or a resume's, given - and
+    passed in (REQ-PIPE-383 criterion 2): the real pipeline builds none.
 
     TOP LEVEL, so a spawned process can import it by name.
     """
     started = time.monotonic()
+    from bootstrap import decision_player, replay_clock
     from qa_tools.tools import orchestrate
 
-    orchestrate.run_pipeline(_adapter(name).collection_id, sequential=sequential,
-                             record_deliveries=record_deliveries, **replay)
+    collection_id = _adapter(name).collection_id
+    with replay_clock.replaying():
+        orchestrate.run_pipeline(
+            collection_id, sequential=sequential, record_deliveries=record_deliveries,
+            player=player if player is not None else decision_player.Player(collection_id),
+            **replay)
     return time.monotonic() - started
 
 
@@ -613,7 +579,7 @@ def _checkpoint_hook(name: str, before: int, held, say, on_name=None):
     to where its delivery or receipt instant begins - said aloud when it
     moves, and every arrival named with its delivery (#133 B4)."""
     from asset_model import arrivals
-    from qa_tools.common import checkpoints
+    from bootstrap import checkpoints
 
     collection_id = _collection(name).id
     found = arrivals.arrivals_for(collection_id, "")
@@ -652,7 +618,8 @@ def resume(name: str, sequential: bool = False,
     found nothing changed before N. Refusals change nothing."""
     import os
 
-    from qa_tools.common import checkpoints, processing_pass, replay_inputs, scripted_decisions
+    from bootstrap import checkpoints, decision_player, replay_inputs
+    from qa_tools.common import processing_pass, scripted_decisions
 
     say = on_step or (lambda _msg: None)
     try:
@@ -705,10 +672,8 @@ def resume(name: str, sequential: bool = False,
     # resume has a database of its own, so a trial would write - and discard -
     # a run in the database the person was pointed at, which a resume never
     # writes to. The comparison after the replay below still runs.
-    from cli.pipeline import generate_collection, generated_collections
-
-    for collection_id in generated_collections():
-        generate_collection(collection_id, trial=False)
+    for collection_id in generator.generated_collections():
+        generation.generate_collection(collection_id, trial=False, say=say)
     total = len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))
     # SAID BEFORE THE COPY, so a wrong resume can be stopped early (#133 B9).
     say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_label(short)} into "
@@ -721,7 +686,7 @@ def resume(name: str, sequential: bool = False,
     supply_db.release_connections()
     try:
         with processing_pass.pass_lock("resume"):
-            player = scripted_decisions.Player(
+            player = decision_player.Player(
                 cp.collection_id,
                 scripts=[scripted_decisions.Script(**s) for s in cp.pending_scripts])
             say(f"Replaying {_label(short)} from arrival {cp.before}")

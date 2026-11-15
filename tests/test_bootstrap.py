@@ -18,7 +18,7 @@ import dbsupport
 import pytest
 
 from asset_model import collections
-from qa_tools.common import bootstrap as boot
+from bootstrap import bootstrap as boot
 from qa_tools.common import supply_db
 
 #: Every registered collection's short, by id - a bootstrap of "all" runs
@@ -116,7 +116,7 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
                             lambda collection_ids, **k: called.append((_key(collection_ids), k)))
         # The corrections step is its own subject (test_correction_replay.py):
         # over this empty history a committed scripted keep has nothing to keep.
-        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+        monkeypatch.setattr("bootstrap.correction_replay.confirm_due",
                             lambda **k: [])
         _in_process(monkeypatch)
 
@@ -140,7 +140,7 @@ class TestWhatItRuns:
                             lambda collection_ids, **k: called.append(_key(collection_ids)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
-        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+        monkeypatch.setattr("bootstrap.correction_replay.confirm_due",
                             lambda **k: [])
         _in_process(monkeypatch, called)
         return called
@@ -216,7 +216,7 @@ class TestCollectionsRunSideBySide:
                             lambda collection_ids, **k: called.append((_key(collection_ids), k)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
-        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+        monkeypatch.setattr("bootstrap.correction_replay.confirm_due",
                             lambda **k: [])
         dispatched = []
 
@@ -229,7 +229,7 @@ class TestCollectionsRunSideBySide:
     def test_corrections_are_confirmed_once_both_replays_finish(self, spy, monkeypatch):
         """Keith, 2026-10-11, (n): a correction is asset-wide, so the
         bootstrap confirms each due one after BOTH collections replay."""
-        from qa_tools.common import correction_replay
+        from bootstrap import correction_replay
 
         called, _ = spy
         monkeypatch.setattr(correction_replay, "confirm_due",
@@ -242,7 +242,7 @@ class TestCollectionsRunSideBySide:
     def test_one_collection_alone_leaves_them_pending(self, spy, monkeypatch):
         """PROVISIONAL: a correction can move the other collection's supplies,
         which a one-collection bootstrap has not replayed."""
-        from qa_tools.common import correction_replay
+        from bootstrap import correction_replay
 
         called, _ = spy
         monkeypatch.setattr(correction_replay, "confirm_due",
@@ -310,7 +310,7 @@ class TestTheBudgetLine:
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline", lambda cid, **k: None)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream", lambda ids, **k: None)
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
-        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])
+        monkeypatch.setattr("bootstrap.correction_replay.confirm_due", lambda **k: [])
         _in_process(monkeypatch, [])
         said = []
         result = boot.bootstrap(collection="all", on_step=said.append)
