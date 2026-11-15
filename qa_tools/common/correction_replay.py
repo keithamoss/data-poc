@@ -27,6 +27,12 @@ synthetic (people.require_role). Nothing here writes a move of its own.
 
 Only during a replay (`replay_clock.active()`): the processing pass files
 against the agreement on disk, as a real asset always does.
+
+WHEN A CORRECTION WAS MERGED AND THE CONFIGURATION AS IT STOOD THEN
+(merge_instant, docs_at) are asset_model/declared_corrections.py
+(REQ-PIPE-380 criterion 2), which the generator's correction claims read;
+this player half reads the database, and goes to the bootstrap with
+REQ-GEN-381.
 """
 from __future__ import annotations
 import contextlib

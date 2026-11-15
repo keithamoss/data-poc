@@ -928,7 +928,7 @@ table.file-history th, table.file-history td{text-align:left; padding:6px 6px; b
 .retired-note{font-size:11.5px; color:var(--ink-faint); margin-top:6px; font-style:italic;}
 
 /* Phase 5c: check-detail panel's changelog section - one entry per
-   documented definition change (qa_tools/common/check_lifecycle.py's
+   documented definition change (asset_model/check_lifecycle.py's
    own changelog: field), newest first. */
 .changelog-entry{border-left:2px solid var(--line); padding:2px 0 10px 12px; margin-bottom:2px;}
 .changelog-entry:last-child{padding-bottom:0;}
@@ -1958,7 +1958,7 @@ function slaTileHtml(d, dateStr){
 // as unknown rather than as the commonest verdict. It is also why the
 // map carries BOTH spellings of on-time: the dashboard build writes
 // "onTime" (pipeline/cadence.py's classify_arrival) and
-// qa_tools/common/arrival_classification.py writes "on_time", and a
+// asset_model/arrival_classification.py writes "on_time", and a
 // reader should not be told a supply's punctuality is unknown because
 // two modules disagree about a capital letter.
 const ARRIVAL_STATUS_LABEL = {
@@ -2475,7 +2475,7 @@ function groupChecksByCategory(checks){
    when nothing was wrong). Replaced by real per-dataset cadence config
    now in each dataset's participation in contract/calendar.yaml (the
    contract's `slaProperties:` until REQ-PIPE-110), read by
-   qa_tools/common/agreement.py and already folded into each COLLECTION_DATA
+   asset_model/agreement.py and already folded into each COLLECTION_DATA
    dataset's own `sla.cadence` field by pipeline/build_dashboard_data.py. The page used to carry its own JS port of
    pipeline/cadence.py's cycle_start() to turn that cadence into a period
    start; REQ-DASH-054 replaced the port with the embedded period

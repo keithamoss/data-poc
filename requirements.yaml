@@ -8512,7 +8512,7 @@ requirements:
       - asset_model/slots.py::Slot
       - asset_model/slots.py::slots_for_dataset
       - asset_model/slots.py::claimable_until
-      - asset_model/slots.py::claim_window
+      - asset_model/slots.py::widest_claim_window
       - asset_model/slots.py::is_open
       - asset_model/slots.py::is_closed
       - asset_model/slots.py::is_overdue
@@ -25248,7 +25248,7 @@ requirements:
     - 'qa_tools/common/validate_schedule.py::_turn_off_errors'
     - 'asset_model/schedule.py::periods_for_dataset'
     - 'asset_model/schedule.py::claim_window'
-    - 'asset_model/slots.py::_participation_for'
+    - 'asset_model/slots.py::participation_for'
     - 'qa_tools/common/filing.py::held_as_turned_off'
     - 'qa_tools/common/supply_holds.py::reason_for'
     - 'qa_tools/common/supply_holds.py::Held::label'
@@ -26322,7 +26322,7 @@ requirements:
     - '2026-10-11: the behaviour pin (tests/test_calendar_move_pin.py, every slot''s instants to 2028) passed unchanged, so per-period resolution changes nothing for today''s one-version agreement. Full `mothman check` 4044 passed with 2 failures - two e2e tests still asserting contract/data-asset.yaml in the schedule-ended notice, left over from REQ-PIPE-110''s configFile fix - both corrected and the class rerun green (11 passed); `npm test` 581 passed.'
     implemented_by:
     - asset_model/slots.py::slot_instants
-    - asset_model/slots.py::_participation_for
+    - asset_model/slots.py::participation_for
     - asset_model/slots.py::max_days_before
     - asset_model/slots.py::slots_for_dataset
     - asset_model/slots.py::claimable_until
@@ -29949,7 +29949,7 @@ requirements:
     - asset_model/assignment.py::_why_unavailable
     - asset_model/slots.py::Slot
     - asset_model/slots.py::slots_for_dataset
-    - asset_model/slots.py::_calendar_periods
+    - asset_model/slots.py::period_sequence
     - asset_model/slots.py::is_open
     - asset_model/slots.py::is_closed
     - qa_tools/common/promotion.py::should_promote
@@ -45177,7 +45177,7 @@ requirements:
     implemented_by:
     - qa_tools/common/validate_schedule.py::_rise_errors
     - qa_tools/common/validate_schedule.py::fall_lines
-    - asset_model/slots.py::fall_hold
+    - asset_model/assignment.py::fall_hold
     - qa_tools/common/supply_holds.py::Held::doubly_fed
     - qa_tools/common/correction_trial.py::rise_entries
     linked_tests:
@@ -46980,7 +46980,7 @@ requirements:
     - asset_model/amber_setting.py::requires_asset_value
     - asset_model/amber_setting.py::list_setting_keys
     - asset_model/amber_setting.py::standing_problems
-    - asset_model/amber_setting.py::_settings
+    - asset_model/amber_setting.py::stated_settings
     - qa_tools/common/schemas.py::ListSetting
     - qa_tools/common/schemas.py::ListSettingVersion
     - qa_tools/common/validate_schedule.py::_list_setting_errors

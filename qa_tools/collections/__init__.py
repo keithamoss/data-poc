@@ -16,7 +16,8 @@ configuration can never name an arbitrary import path.
 from __future__ import annotations
 
 from asset_model import assets
-from asset_model.collections import ID_PATTERN, Collection, UnknownCollectionError, all_collections, resolve
+from asset_model import collections as declared
+from asset_model.collections import ID_PATTERN, Collection, UnknownCollectionError
 
 
 class NoAdapterError(UnknownCollectionError):
@@ -28,7 +29,7 @@ def adapter_module(collection: Collection | str):
     """The collection's adapter module, loaded by path from the selected
     asset's adapter folder (REQ-PIPE-369 criterion 2) - the id checked against
     the hierarchy's id pattern BEFORE any path is built from it."""
-    c = collection if isinstance(collection, Collection) else resolve(collection)
+    c = collection if isinstance(collection, Collection) else declared.resolve(collection)
     if not ID_PATTERN.fullmatch(c.id):
         raise UnknownCollectionError(
             f"collection id {c.id!r} is not a hierarchy id, so it cannot name an adapter")
@@ -48,7 +49,7 @@ def adapter(collection: Collection | str):
 
 def adapters() -> list:
     """Every collection's adapter, in hierarchy order."""
-    return [adapter(c) for c in all_collections()]
+    return [adapter(c) for c in declared.all_collections()]
 
 
 def adapter_file(collection_id: str) -> str:

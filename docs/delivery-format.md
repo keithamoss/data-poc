@@ -1,7 +1,7 @@
 # The on-disk delivery format
 
 **Status: normative.** This is the format `qa_tools/common/delivery.py`
-writes and reads, and the one delivery recognition (sprint 7) is built
+writes and `asset_model/delivery.py` reads (REQ-PIPE-380 split the two), and the one delivery recognition (sprint 7) is built
 against. It exists because Keith settled, 2026-09-22, that sprint 2
 DEFINES the format sprint 7 consumes — *"it must be a DELIBERATE
 ARTEFACT of this sprint... rather than something sprint 7
@@ -78,7 +78,7 @@ A file's name is the one thing inside a delivery that carries meaning,
 and only through each dataset's **own configured pattern** — an
 `arrival_pattern:` on that dataset in `contract/data-asset.yaml`, as a
 **regular expression**, matched by
-`qa_tools/common/arrival_patterns.py`'s `attribute()`.
+`asset_model/arrival_patterns.py`'s `attribute()`.
 
 It is matched with `re.fullmatch` against the file's **bare name**:
 never the delivery's name, never its path, never the file's position in

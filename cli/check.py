@@ -114,7 +114,7 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a config typo can never leave a dataset expecting nothing", True),
     # REQ-PIPE-058 criterion 13. Half of a PAIR: this catches a careless
     # pattern edit at the moment it is cheapest to fix, and the runtime
-    # hold in qa_tools/common/arrivals.py catches every collision that
+    # hold in asset_model/arrivals.py catches every collision that
     # actually occurs. Neither alone is enough at thirty datasets.
     ("patterns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_arrival_patterns"],
      "one filename can only ever belong to one dataset", False),

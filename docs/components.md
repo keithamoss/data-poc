@@ -80,9 +80,10 @@ real ODCS contracts, SodaCL and Evidently checks - `data-asset.yaml`,
 `people.yaml`'s own role definitions aside),
 `dbt_project/`, `qa_tools/tools/` (the real dbt-core/Soda Core/
 datacontract-cli/Evidently AI run + evaluate logic, one module per tool
-for every collection, and `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`
+for every collection, and `dataset_stats.py`), `asset_model/check_lifecycle.py`
 and `validate_check_lifecycle.py` (check definition/retirement rules),
-`qa_tools/common/dataset_status.py` and the resupply-chain-identification
+`qa_tools/common/dataset_status.py` (with the status order and words it
+reads from `asset_model/statuses.py`) and the resupply-chain-identification
 logic it implements (`plans/conceptual-design.md`'s own real decisions
 on this).
 
@@ -109,7 +110,14 @@ public dashboard reflects it."
 common/qa_results_writer.py`/`qa_results_reader.py`/`git_identity.py`/
 `changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/
 collections/` (the collection registry and each collection's adapter,
-REQ-PIPE-240) and `qa_tools/common/validate_collections.py` (its gate),
+REQ-PIPE-240; its declaration half is `asset_model/collections.py`) and
+`qa_tools/common/validate_collections.py` (its gate), `asset_model/` (the
+shared reading code, REQ-PIPE-380 - its charter is "configuration and the
+delivery tree, never the database": asset time, the hierarchy, the schedule
+and slots, the registry's declarations, the check-file readers, drift
+arithmetic, the declared corrections, the status order and words, and
+arrival recognition; imported by the pipeline, the generator and the
+bootstrap, importing none of them),
 `qa_tools/tools/orchestrate.py` and `results_history.py` (one orchestrator
 and one results rebuild for every collection, REQ-PIPE-243),
 `.github/workflows/deploy-pages.yml`, `aws/`

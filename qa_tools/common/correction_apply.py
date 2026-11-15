@@ -28,6 +28,12 @@ qa.correction_parked, on the outstanding list, until its blocker clears -
 then the pass moves it to the period CONFIRMED, as the rule, naming who
 confirmed it - or the asset manager keeps the supply where it is, with a
 reason, as a keep at confirmation is recorded.
+
+THE DECLARED CORRECTIONS THEMSELVES (Pending, declared) are
+asset_model/declared_corrections.py (REQ-PIPE-380 criterion 2): reading
+what calendar.yaml and data-asset.yaml declare is configuration the
+generator reads too; which are applied, and applying them, read and write
+the database, so they stay here.
 """
 from __future__ import annotations
 import hashlib

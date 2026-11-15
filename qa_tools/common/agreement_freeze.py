@@ -39,6 +39,11 @@ pre-commit hook, comparing the staged file against HEAD), it is now.
 
 CONFIGURATION ONLY (criterion 16): two versions of two files, git, and the
 slot arithmetic - no database and nothing under data/.
+
+THE PURE CORRECTION READERS (corrections_by_owner, owner_label, revert)
+are asset_model/declared_corrections.py (REQ-PIPE-380 criterion 2,
+architect B4): this gate compares the agreement between git refs and runs
+git, so only what reads configuration moved; the git half stays here.
 """
 from __future__ import annotations
 

@@ -28,6 +28,11 @@ not proposed, so nobody reads its absence as an oversight.
 CONFIGURATION AND RECORDED FACTS ONLY (criterion 8): qa.filing_current,
 qa.supply_receipt, qa.verdict and the decision log - never a schema holding
 supply rows.
+
+THE WORKING COPY'S READ (working, readable, Unreadable) is
+asset_model/declared_corrections.py (REQ-PIPE-380 criterion 2): it reads
+configuration on disk. Trialling against recorded filings, and reading the
+configuration at a git ref (at_ref), stay here: the database and git.
 """
 from __future__ import annotations
 import contextlib

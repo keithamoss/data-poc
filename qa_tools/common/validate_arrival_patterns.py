@@ -30,7 +30,7 @@ overlap on a shape of name nobody has sent yet -
 on `cp_clients_part2.csv` - and this stays green until the day that
 file arrives. Proving non-overlap properly is decidable and was
 rejected on cost; the half that cannot be wrong is the RUNTIME HOLD in
-qa_tools/common/arrivals.py, which sees every collision that actually
+asset_model/arrivals.py, which sees every collision that actually
 occurs and does not care whether anyone remembered to run this. The
 protection is the pair. This half is nearly free on top and catches a
 careless edit when it is cheapest to fix.

@@ -42,7 +42,7 @@ version: 2
 # keyed by the test's own file/function name, not nested under a model)
 # rather than a {{ config(meta={...}) }} macro call inside the .sql file
 # itself - keeps every check's lifecycle metadata parseable as plain YAML
-# by qa_tools/common/check_lifecycle.py the same way every generic test
+# by asset_model/check_lifecycle.py the same way every generic test
 # already is, rather than needing a second, Jinja-aware parser for one
 # category of check. A real, pre-existing gap found 2026-09-16 while
 # wiring check_id into the dashboard: check_lifecycle.py's dbt parser

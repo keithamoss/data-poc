@@ -7,7 +7,7 @@ an edited or swapped file was answered for what it used to say, and a test
 that swapped one had to know every cache to clear. plans/post-build-review.md
 #217 is the incident of the list somebody had to keep complete: the tests'
 helper cleared the hierarchy and not the registry built from it. Those nine
-are keyed on their files' content now (qa_tools/common/config_yaml.Built), and
+are keyed on their files' content now (asset_model/config_yaml.Built), and
 this gate is what stops a tenth appearing: a rule in a docstring is the same
 list, kept by nobody.
 

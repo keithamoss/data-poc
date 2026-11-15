@@ -165,6 +165,13 @@ assets/<asset>/              one data asset's configuration (quarterly, daily): 
                                calendar, each agency's contracts and check files, its people,
                                presentation words and its own dbt project (assets/<asset>/dbt/)
 dbt_shared/                  the dbt macros and generic tests both assets' dbt projects use
+asset_model/                 the SHARED READING CODE (REQ-PIPE-380) - its charter is "configuration and
+                               the delivery tree, never the database": asset time and its clock, the
+                               hierarchy, the schedule and its slots, the collection registry's
+                               declarations, the check-file readers, drift arithmetic, the declared
+                               corrections, the status order and words, and arrival recognition. The
+                               real pipeline, the generator and the bootstrap all import it and it
+                               imports none of them; `mothman check`'s imports gate holds that
 generator/                   a real package (generator/__init__.py) - invoked via `mothman bdm/cp
                                generate-synthetic-data` (`cli/`, never a bare `python3 -m generator.<module>`)
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
@@ -189,11 +196,12 @@ generator/                   a real package (generator/__init__.py) - invoked vi
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
                                package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
-  collections/                 the collection registry (REQ-PIPE-240): every collection the hierarchy in
-                               the asset's data-asset.yaml declares, each run through a small adapter module
-                               named by its id - civil_registration.py, child_protection.py. A new collection
-                               is picked up everywhere through it, or refused by name; `mothman check`'s
-                               collections gate fails on one without an adapter
+  collections/                 the collection registry's ADAPTER half (REQ-PIPE-240, REQ-PIPE-380): each
+                               collection the hierarchy declares (asset_model/collections.py) is run
+                               through a small adapter module named by its id, loaded by path from
+                               assets/<asset>/collections/. A new collection is picked up everywhere, or
+                               refused by name; `mothman check`'s collections gate fails on one without an
+                               adapter
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                assets' dbt projects
   common/

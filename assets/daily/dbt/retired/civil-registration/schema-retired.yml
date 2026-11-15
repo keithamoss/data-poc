@@ -5,7 +5,7 @@
 # ["models"]) - verified for real that dbt's parser completely ignores
 # any yml file sitting outside its configured paths, so this file is
 # never scanned/executed by a real `dbt build`, only ever read by
-# qa_tools/common/check_lifecycle.py (which reuses parse_dbt_check_
+# asset_model/check_lifecycle.py (which reuses parse_dbt_check_
 # metadata() unchanged, just pointed at this second path) - the same
 # reason Soda's/the contract's/Evidently's own `-retired` sibling files
 # exist (see each one's own header comment).

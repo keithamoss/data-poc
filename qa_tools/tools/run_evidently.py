@@ -3,7 +3,7 @@ PSI drift checks, all on one dataset, and a relative volume check per table, as 
 Evidently check file declares them (REQ-QAC-241).
 
 The real evidently.Report + DataDriftPreset API, not a reimplementation -
-PSI is computed in qa_tools/common/evidently_common.py. Evidently's PSI
+PSI is computed in asset_model/drift.py. Evidently's PSI
 treats every DISTINCT VALUE observed in the column as its own category, so
 a dirty run with three different invalid codes gets three separate
 categories; PSI is sensitive to that binning (README.md's

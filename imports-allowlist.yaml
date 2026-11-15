@@ -6,8 +6,9 @@
 # every import of that module in that file. The fix for a new finding is to
 # move the code across the boundary, never a new entry here.
 #
-# Who removes what. REQ-PIPE-380 moves the shared reading code into
-# asset_model/ and rewrites its importers (criteria 1, 2 and 15). REQ-GEN-386
+# Who removes what. REQ-PIPE-380 moved the shared reading code into
+# asset_model/ and rewrote its importers (criteria 1, 2 and 15), removing its
+# 58 entries on 2026-11-15. REQ-GEN-386
 # moves the register, map and scripted-decision readers and the promotion lag
 # rule into scenarios/ (criteria 4 and 6) and gives the generator its own
 # delivery writer (criterion 7). REQ-GEN-381 takes the bootstrap off
