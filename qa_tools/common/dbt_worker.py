@@ -34,15 +34,17 @@ import threading
 from types import SimpleNamespace
 
 _lock = threading.Lock()
-_worker = None  # (process, connection, partial-parse directory)
+_worker = None  # (process, connection, partial-parse directory, dbt threads)
 
 
 class WorkerLost(RuntimeError):
     """The dbt worker process died mid-request; the next request starts another."""
 
 
-def _serve(conn, root: str, pp_dir: str) -> None:
-    """The worker's loop: one dbt invocation per request until told to stop."""
+def _serve(conn, root: str, pp_dir: str, threads: int = 1) -> None:
+    """The worker's loop: one dbt invocation per request until told to stop,
+    every one at the `threads` this worker was started with (REQ-PIPE-432
+    criterion 2): one value for the worker's life."""
     os.chdir(root)
     from dbt.cli.main import dbtRunner
 
@@ -59,6 +61,7 @@ def _serve(conn, root: str, pp_dir: str) -> None:
         # env_var()s afresh on every invoke.
         os.environ.clear()
         os.environ.update(env)
+        args = [*args, "--threads", str(threads)]
         if os.path.exists(pp):
             args = [*args, "--partial-parse-file-path", pp]
         os.makedirs(target_path, exist_ok=True)
@@ -103,7 +106,7 @@ def _serve(conn, root: str, pp_dir: str) -> None:
             conn.send((ok, said, f.read()))
 
 
-def _start():
+def _start(threads: int):
     """Launch the worker as ITS OWN MODULE (`python -m`), connected back over
     an authenticated local socket. Not multiprocessing's spawn: that
     re-imports the parent's __main__ in the child, so any caller script
@@ -121,7 +124,7 @@ def _start():
         host, port = listener.address
         proc = subprocess.Popen(
             [sys.executable, "-m", "qa_tools.common.dbt_worker", host, str(port),
-             str(supply_db.ROOT), pp_dir],
+             str(supply_db.ROOT), pp_dir, str(threads)],
             cwd=str(supply_db.ROOT), stdin=subprocess.PIPE,
             env={**os.environ, _KEY_ENV: key.hex()})
         # The key went through the environment, never the command line, which
@@ -143,7 +146,7 @@ def _start():
             proc.kill()
             shutil.rmtree(pp_dir, ignore_errors=True)
             raise WorkerLost(f"the dbt worker did not start (exit {proc.poll()})") from exc
-    return proc, conn, pp_dir
+    return proc, conn, pp_dir, threads
 
 
 #: Carries the socket's key to the worker - out of the process list.
@@ -155,14 +158,22 @@ def invoke(args: list[str], env: dict, target_path: str) -> SimpleNamespace:
     finished subprocess's (returncode, stdout, stderr) for
     dbt_common._refuse_a_build_that_did_not_run."""
     global _worker
+    from qa_tools.common import dbt_common
+
+    # REFUSED BEFORE dbt IS STARTED (REQ-PIPE-432 criterion 3).
+    threads = dbt_common.dbt_threads()
     with _lock:
         if _worker is not None and _worker[0].poll() is not None:
             # DIED WHILE IDLE: let go of its connection and parse directory
             # before starting another (#131 D4 - they leaked).
             stop()
+        if _worker is not None and _worker[3] != threads:
+            # ONE VALUE PER WORKER'S LIFE (criterion 2): a changed setting
+            # gets a new worker, never a different value in the old one.
+            stop()
         if _worker is None:
-            _worker = _start()
-        proc, conn, _pp = _worker
+            _worker = _start(threads)
+        proc, conn, _pp, _threads = _worker
         try:
             conn.send((list(args), dict(env), str(target_path)))
             ok, said, log = conn.recv()
@@ -180,7 +191,7 @@ def stop() -> None:
     global _worker
     if _worker is None:
         return
-    proc, conn, pp_dir = _worker
+    proc, conn, pp_dir, _threads = _worker
     _worker = None
     try:
         conn.send(None)
@@ -201,10 +212,10 @@ atexit.register(stop)
 def _main(argv: list[str]) -> None:
     from multiprocessing.connection import Client
 
-    host, port, root, pp_dir = argv
+    host, port, root, pp_dir, threads = argv
     key = bytes.fromhex(os.environ.pop(_KEY_ENV))
     with Client((host, int(port)), authkey=key) as conn:
-        _serve(conn, root, pp_dir)
+        _serve(conn, root, pp_dir, int(threads))
 
 
 if __name__ == "__main__":

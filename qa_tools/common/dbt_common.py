@@ -32,6 +32,34 @@ FAILING_SAMPLE_LIMIT = sample_keys.FAILING_SAMPLE_LIMIT
 _NUM_RE = re.compile(r"([\d.]+)")
 
 
+#: HOW MANY OF A RUN'S SELECTED NODES dbt RUNS SIDE BY SIDE (REQ-PIPE-432
+#: criterion 2) - passed as dbt's documented `--threads` flag on every
+#: invocation, overriding the profile's `threads: 1`. Read when a worker
+#: starts and constant for that worker's life (dbt_worker), so its partial
+#: parse stays valid; a run's tests are independent reads, and one thread ran
+#: them one after another. The value is a measurement, not a guess - see
+#: REQ-PIPE-432's evidence for 1, 2 and 4 threads with two streams running.
+DBT_THREADS = 4
+
+
+class DbtThreadsRefused(ValueError):
+    """DBT_THREADS holds a value dbt must not be started with (REQ-PIPE-432
+    criterion 3) - refused by name before dbt is invoked, never a dbt
+    traceback."""
+
+
+def dbt_threads() -> int:
+    """DBT_THREADS, checked: a whole number from 1 to this machine's core
+    count, or DbtThreadsRefused naming the setting and the values allowed."""
+    value, cores = DBT_THREADS, os.cpu_count() or 1
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= cores:
+        raise DbtThreadsRefused(
+            f"qa_tools.common.dbt_common.DBT_THREADS is {value!r}, and dbt's threads must "
+            f"be a whole number from 1 to {cores} (this machine's core count). dbt was not "
+            f"started; set DBT_THREADS to one of those values.")
+    return value
+
+
 class DbtRunFailed(RuntimeError):
     """A `dbt` invocation did not produce a result worth reading.
 
@@ -96,6 +124,8 @@ def run_dbt(command: str, select: list[str], target_path: str,
         raise ValueError(
             "run_dbt needs a run_id: dbt's schema is per-run, and sharing one "
             "lets concurrent runs drop each other's models mid-read")
+    # REFUSED BEFORE ANYTHING IS TOUCHED (REQ-PIPE-432 criterion 3).
+    dbt_threads()
     # STABLE NAMES FOR THE PROCESS'S LIFE (REQ-PIPE-157): dbt's partial parse
     # is invalidated by a profile schema that changes, and by a sources
     # schema that changes - which per-run names did, every run. Isolation
