@@ -389,5 +389,134 @@ def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scop
 
     assert "still failing, commented" in sync_dataset("o", "r", scope, _red_dataset())
 
+# --- REQ-GHUB-396: the environment's `ticketing` is the one switch -------
+
+
+class _Tripwire:
+    """Records any report read or gh call main() makes; a refused run must
+    make neither (REQ-GHUB-396 criterion 1, NFR RELIABILITY)."""
+
+    def __init__(self):
+        self.gh_calls: list[list[str]] = []
+        self.reports_read = 0
+
+    def install(self, monkeypatch):
+        def gh(args):
+            self.gh_calls.append(args)
+            raise AssertionError(f"a refused sync-tickets called GitHub: {args}")
+
+        def scopes():
+            self.reports_read += 1
+            raise AssertionError("a refused sync-tickets read a report")
+
+        monkeypatch.setattr(ticket_sync, "_run_gh", gh)
+        monkeypatch.setattr(ticket_sync, "_load_scopes", scopes)
+        return self
+
+
+@pytest.mark.parametrize("env_id", ["sandbox", "local", "ci", "test"])
+def test_sync_tickets_refuses_where_the_environment_turns_ticketing_off(monkeypatch, env_id):
+    """REQ-GHUB-396 criteria 1, 3 and 4: the guard is in ticket_sync.main
+    itself, so any caller of it - not only the command - is refused, with
+    exit 1, naming the environment and the file that switches ticketing."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", env_id)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "o/r")
+    monkeypatch.setenv("GH_TOKEN", "not-a-real-token")
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert not isinstance(refused.value.code, int) or refused.value.code == 1
+    assert repr(env_id) in message
+    assert "ticketing" in message and "assets/environments.yaml" in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+def test_sync_tickets_refuses_where_no_environment_is_stated(monkeypatch):
+    monkeypatch.delenv("MOTHMAN_ENVIRONMENT", raising=False)
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert "MOTHMAN_ENVIRONMENT" in message and "not set" in message
+    assert "assets/environments.yaml" in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+def test_a_mistyped_environment_is_named_not_called_unset(monkeypatch):
+    """post-build-review #325's critic: current_or_none() also swallows an
+    undeclared id, so `prodution` was told MOTHMAN_ENVIRONMENT is not set."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "prodution")
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert "'prodution'" in message and "not a declared environment" in message
+    assert "not set" not in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+@pytest.mark.parametrize("content", [None, "environments: [unclosed\n"])
+def test_a_missing_or_broken_environments_file_refuses_saying_so(monkeypatch, tmp_path, content):
+    from qa_tools.common import environments
+
+    path = tmp_path / "environments.yaml"
+    if content is not None:
+        path.write_text(content)
+    monkeypatch.setattr(environments, "ENVIRONMENTS_PATH", path)
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert message.startswith("sync-tickets refused") and str(path) in message
+    assert "not set" not in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+def test_the_command_exits_1_naming_the_environment(monkeypatch):
+    """The same refusal through `mothman github sync-tickets` itself."""
+    from click.testing import CliRunner
+
+    import cli.github as github_cli
+
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "sandbox")
+    trip = _Tripwire().install(monkeypatch)
+
+    result = CliRunner().invoke(github_cli.github_group, ["sync-tickets"])
+
+    assert result.exit_code == 1, result.output
+    assert "'sandbox'" in result.output and "assets/environments.yaml" in result.output
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+def test_sync_tickets_proceeds_where_the_environment_turns_ticketing_on(monkeypatch):
+    """REQ-GHUB-396 criteria 2 and 4: with ticketing on it runs as it does
+    today - reading the reports and syncing each dataset against the
+    asset's ticket repository. GitHub is faked at _run_gh, never reached."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    seen: dict = {}
+
+    def fake_sync_all(owner, repo, people_config=None):
+        seen["repo"] = f"{owner}/{repo}"
+        return ["synced"]
+
+    monkeypatch.setattr(ticket_sync, "sync_all", fake_sync_all)
+    monkeypatch.setattr(ticket_sync, "_run_gh", FakeGh())
+
+    ticket_sync.main()
+
+    from qa_tools.common import environments
+    assert seen["repo"] == environments.ticket_repository()
+
+
 #: Birth Registrations is the daily asset's (the asset split).
 pytestmark = pytest.mark.asset("daily")

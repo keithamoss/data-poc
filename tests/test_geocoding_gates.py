@@ -227,6 +227,61 @@ class TestATrialsYearChecksSayTrialNotNoPeriod:
                    r["not_evaluated_reason"] for r in records)
 
 
+class TestTheSchemaParsesAreKeyedOnContent:
+    """REQ-PIPE-401 criteria 1, 2 and 5 (REQ-PIPE-254 criteria 2 and 15):
+    post-build-review #318 remembered each dbt schema file by its
+    (path, mtime, size), so an edit keeping all three was answered for what
+    the file used to say."""
+
+    def test_a_same_size_same_mtime_edit_is_seen_by_declared(self, repo):
+        import os
+
+        path = repo / _schema()
+        before = {c.member_setting for c in list_setting_members.declared(repo)}
+        assert "census_years" in before, "precondition - the real schema names census_years"
+        stat = path.stat()
+        text = path.read_text()
+        edited = text.replace("member_setting: census_years", "member_setting: census_yearz")
+        assert len(edited.encode()) == len(text.encode()) and edited != text
+        path.write_text(edited)
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        assert (path.stat().st_size, path.stat().st_mtime_ns) == (stat.st_size, stat.st_mtime_ns)
+
+        after = {c.member_setting for c in list_setting_members.declared(repo)}
+
+        assert "census_yearz" in after and "census_years" not in after
+
+    def test_the_gate_reads_data_asset_yaml_through_config_yaml(self, repo, monkeypatch):
+        """REQ-PIPE-401 criterion 3: the presence gate's read of the asset
+        file goes through config_yaml, where REQ-PIPE-397's pin will act."""
+        from qa_tools.common import config_yaml
+
+        loaded = []
+        real = config_yaml.load
+        monkeypatch.setattr(config_yaml, "load", lambda p: loaded.append(Path(p).name) or real(p))
+
+        assert list_setting_members.problems(repo) == []
+        assert "data-asset.yaml" in loaded
+
+    def test_the_store_is_a_bounded_locked_content_keyed_one(self):
+        from qa_tools.common import config_yaml
+
+        assert isinstance(list_setting_members._SCHEMAS, config_yaml.Built)
+
+    def test_an_unchanged_file_is_not_built_again(self, repo, monkeypatch):
+        list_setting_members.declared(repo)
+        built = []
+        real = list_setting_members._build_checks
+
+        def counting(*args):
+            built.append(args)
+            return real(*args)
+
+        monkeypatch.setattr(list_setting_members, "_build_checks", counting)
+        first = list_setting_members.declared(repo)
+        assert built == [] and first == list_setting_members.declared(repo)
+
+
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
