@@ -49327,7 +49327,7 @@ requirements:
     date_written: '2026-11-02'
     story: As whoever would take this to a real deployment, I want the code that reads each asset's time zone, hierarchy, calendar, checks and delivery tree in one package of its own, so that the real pipeline and the synthetic side read every asset's definitions the same way without either depending on the other.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #134 (2026-10-31; the code half queued behind the asset split, (a)); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1-v3); v4 2026-11-03; v5 2026-11-14; v6 2026-11-14 with the v5 review batch (QB, QD, 380 Q1, B3) and the architect''s B4 closure, re-scanned at 72ec04d7. A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL hold in one top-level package, asset_model/ (SPLIT D1, SETTLED by Keith 2026-11-03), the shared reading code and its whole closure, so that nothing it imports lies outside it (B4). WHOLE MODULES at 72ec04d7: asset_time 387 lines, hierarchy 247, schedule 961, slots 544, assets 610 (less criteria 4 and 5), config_yaml 226, in_force 39, agreement 635, assignment 277, arrival_classification 99, check_bands 520, check_lifecycle 1,065, check_id 324, check_fingerprint 197, frozen_defaults 46, amber_setting 388, linked_datasets 318, every_asset 53, arrival_patterns 171, delivery_boundary 98 and holds 105 - 7,310 lines; plus the parts of modules named in criterion 2. About 9,000 lines in all, the builder re-measuring at build.'
@@ -49364,6 +49364,46 @@ requirements:
     - REQ-TEST-393
     - REQ-QAC-368
     - REQ-GEN-295
+    linked_tests:
+    - 'tests/test_validate_imports.py'
+    - 'tests/test_assets.py'
+    - 'tests/test_collections_registry.py'
+    - 'tests/test_arrivals.py'
+    - 'tests/test_arrivals_from_records.py'
+    - 'tests/test_delivery.py'
+    - 'tests/test_validate_check_lifecycle.py'
+    - 'tests/test_check_bands.py'
+    - 'tests/test_dbt_packages_per_asset.py'
+    - 'tests/test_replay_inputs.py'
+    - 'tests/test_correction_replay.py'
+    - 'tests/test_correction_trial.py'
+    - 'tests/test_geocoding_gates.py'
+    - 'tests/test_generator_providers.py'
+    implemented_by:
+    - 'asset_model/__init__.py'
+    - 'asset_model/collections.py'
+    - 'qa_tools/collections/__init__.py::adapter_file'
+    - 'qa_tools/collections/__init__.py::adapter_module'
+    - 'asset_model/check_sources.py::working_tree_checks'
+    - 'qa_tools/common/validate_check_lifecycle.py::collect_checks'
+    - 'asset_model/drift.py'
+    - 'qa_tools/common/evidently_common.py::recorded_stats'
+    - 'asset_model/file_check_definitions.py'
+    - 'asset_model/arrivals.py'
+    - 'qa_tools/common/arrivals.py::arrivals_from_records'
+    - 'asset_model/delivery.py'
+    - 'qa_tools/common/delivery.py::write_delivery'
+    - 'asset_model/declared_corrections.py'
+    - 'asset_model/set_member_checks.py'
+    - 'asset_model/statuses.py'
+    - 'asset_model/amber_setting.py::AMBER_SETTINGS'
+    - 'qa_tools/common/dbt_common.py::dbt_project_ready'
+    - 'qa_tools/common/validate_caches.py::SCANNED'
+    - 'qa_tools/common/validate_collections.py::SCANNED'
+    - 'qa_tools/common/replay_inputs.py::INPUTS'
+    - 'cli/check.py::COVERAGE_PACKAGES'
+    evidence:
+    - 'EVIDENCE-PENDING'
     decisions:
     - THE PACKAGE IS asset_model/ (SPLIT D1, SETTLED by Keith 2026-11-03), replacing domain/ (Q2, SETTLED by Keith 2026-11-02), because domain/ read as though it held the definitions, which stay in each asset's folder. REJECTED shared/, model/ and core/.
     - 'THE CUT IS RIGHT (SPLIT D1, SETTLED by Keith 2026-11-03): each asset defines its own hierarchy, calendar and time zone in assets/<asset>/; the shared code that only reads those definitions sits in one package the real pipeline and the generator both import; the generator, the bootstrap and scenarios/ stay out of a real deployment.'
@@ -49387,6 +49427,12 @@ requirements:
     - 'BUILD ORDER (the architect''s, captures removed under QD): 393, then 384 and 388; 380 with 376 and 390; 383, 382 and 381; 386 and 391; 385 and 379; 377 then 378 then 394; 387; 389; 392 last. 377''s report-to-Keith criterion lands before 392, so a disagreement between copies is settled before the history is regenerated.'
     - '#137 GROUP A IS NOT A DEPENDENCY (Keith, 2026-11-02): it has landed; line counts here are re-taken at build.'
     - 'THE DELIVERY WRITER STAYS IN THE PIPELINE, THE READER MOVES (v6 Q1, SETTLED by Keith 2026-11-14): write_delivery and write_receipts stay in the real pipeline, which hand_filing.py (line 275) uses; the generator gets a writer of its own, an accepted second copy of the delivery format (REQ-GEN-386 criterion 7, kept in agreement by its test). REJECTED moving them into asset_model/, which would widen it from reading the tree to writing it. The READ half still moves under QB, because arrivals_for - which the generator checks its placements with - reads deliveries and receipts through it; Keith''s answer rejected writing, not reading.'
+    - 'THE SPLIT HALVES TAKE DISTINCT ROLES, NOT NEW NAMES WHERE THE PIPELINE KEEPS ONE (builder, 2026-11-15): the pipeline half keeps its module path - qa_tools/collections/ (adapters), qa_tools/common/arrivals.py (arrivals_from_records), qa_tools/common/delivery.py (the writer) - because the generator''s REQ-GEN-386 allowlist entries name qa_tools.common.delivery, and renaming the writer would have been a new forbidden edge on a shrink-only list. The asset_model halves with a pipeline twin are asset_model/collections.py, arrivals.py and delivery.py; a file needing both binds the asset_model one as declared_collections, arrival_tree or delivery_tree. Halves with no twin got names of their own: drift, file_check_definitions, set_member_checks, declared_corrections, statuses, check_sources.'
+    - 'collect_checks'' WORKING-TREE READ IS asset_model/check_sources.py (builder, from criterion 12): the source list, the dbt-SQL scan and the working-tree collection. validate_check_lifecycle keeps the git-ref read and hands its file contents to the same sources() and dbt_definitions(), so there is one parser; check_bands'' catalogue reads check_sources.working_tree_checks(), which removed asset_model''s last import of the pipeline.'
+    - 'agreement_drift._load_docs AND correction_trial._working_docs BECAME ONE declared_corrections.load_docs (builder): both read the two committed files and correction_trial.working() needed it; tests that patched either now patch it, and agreement_drift and turned_off call it through the module.'
+    - 'dbt READINESS MOVED TO qa_tools/common/dbt_common.py (criterion 5): dbt_project_ready and DbtPackagesMissing sit beside packages_installed, the rule they apply.'
+    - 'STATUS RANKINGS: VERDICT_ORDER BESIDE ORDERED_STATUSES (REQ-PIPE-390, builder): the three former copies ranked green, amber and red only, with nodata unranked, so they read VERDICT_ORDER, which is ORDERED_STATUSES less nodata, rather than the whole order.'
+    - 'THE PERFORMANCE NFR WAS NOT MEASURED in this build: a bootstrap from empty per asset, before and after, did not fit the session (said in the evidence rather than claimed).'
     open_questions: []
     signed_off:
       by: Keith
@@ -49740,7 +49786,7 @@ requirements:
     date_written: '2026-11-03'
     story: As whoever maintains the pipeline, I want each function in the shared schedule code to have one name that says what it does and to be public if anything else calls it, so that a reader does not mistake one claim window for another or rely on a private name that may change without warning.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #137 group B (2026-11-02, ''renames ride the #134 move''). Drafted by delivery-scoper 2026-11-03 (v4); v5 2026-11-14; v6 2026-11-14, the underscore-name test made a rule of REQ-TEST-384''s gate (architect) and the compare removed (QD). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - WHEN schedule.py and slots.py move into asset_model/ (REQ-PIPE-380), THE SYSTEM SHALL rename slots.claim_window (line 234, the widest window a dataset has ever had) to slots.widest_claim_window, keeping schedule.claim_window (line 757, the window in force on a date) as it is, and rewrite every caller in the same change.
@@ -49761,6 +49807,25 @@ requirements:
     - REQ-PIPE-051
     - REQ-PIPE-106
     - REQ-PIPE-378
+    linked_tests:
+    - 'tests/test_hierarchy.py'
+    - 'tests/test_validate_imports.py'
+    - 'tests/test_slots.py'
+    - 'tests/test_schedule.py'
+    - 'tests/test_files_go_to_period_change.py'
+    - 'tests/test_no_calendar.py'
+    - 'tests/test_two_asset_gates.py'
+    implemented_by:
+    - 'asset_model/slots.py::widest_claim_window'
+    - 'asset_model/slots.py::period_sequence'
+    - 'asset_model/slots.py::participation_for'
+    - 'asset_model/schedule.py::_authored_periods'
+    - 'asset_model/schedule.py::agreement_to_read'
+    - 'asset_model/assignment.py::fall_hold'
+    - 'asset_model/hierarchy.py::_build'
+    - 'qa_tools/common/validate_imports.py::private_names'
+    evidence:
+    - 'EVIDENCE-PENDING'
     decisions:
     - 'RENAMES RIDE THE #134 MOVE (#137 group B, Keith 2026-11-02): every importer is rewritten once, when its module changes address, rather than twice.'
     - 'THE NEW NAMES ARE THE SCOPER''S PROPOSAL (delivery-scoper, 2026-11-03): widest_claim_window, period_sequence and _authored_periods say what each returns. Keith may change any of them at sign-off; the criterion is that the two pairs stop sharing names.'
@@ -49770,6 +49835,10 @@ requirements:
     - '_version_in_force IS REMOVED, NOT RENAMED (delivery-scoper, v5): Q6 of 2026-11-14 ends its fallback, which is all it adds to Calendar.version_in_force.'
     - 'THE UNDERSCORE RULE IS A RULE OF THE IMPORTS GATE (architect, non-blocking, 2026-11-14): one syntax-tree walker, not a second scanner. It reads source for an architecture rule with no behaviour to observe, which CLAUDE.md''s test rule allows when said.'
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5''s criterion 9 and BEHAVIOUR-PRESERVING NFR are gone.'
+    - 'THE NEW PUBLIC NAMES (builder, 2026-11-15; PROVISIONAL where the scoper named none): schedule._agreement -> agreement_to_read (it returns the agreement to read, its docstring''s words; a bare `agreement` would shadow the module of that name), _as_date -> as_date, hierarchy._require -> require, _from_text -> from_text, linked_datasets._asset_folder -> asset_folder, _walk -> walk, _soda_bodies -> soda_bodies, _columns -> contract_columns (`columns` is a word used in its own messages), amber_setting._doc -> load_doc, _resolve_on -> resolve_on, _settings -> stated_settings, _versions -> versions_by_date, agreement._turn_off -> turn_off, slots._participation_for -> participation_for. Only names a module outside their own uses at this build were renamed; schedule._timing, _parse_version, _load and _files_go_to_period_errors had no outside use by then, and tests may still read private names (criterion 3''s own exemption).'
+    - 'schedule._version_in_force BECAME version_in_force_or_first (PROVISIONAL, builder): criterion 3 says REQ-PIPE-378 criterion 1 removes it and that whichever lands first it is not left private and used. This landed first, so it was given a public name saying what it adds over Calendar.version_in_force (a date before the first version takes the first); REQ-PIPE-378 criterion 1 now removes version_in_force_or_first.'
+    - 'THE DUPLICATE-TABLE REFUSAL NAMES BOTH COLLECTIONS TOO (builder): the hierarchy loads before the two-asset gate''s own check, so the refusal had to carry what that gate''s refusal named (tests/test_two_asset_gates.py).'
+    - 'THE UNDERSCORE RULE IS NEVER ALLOWLISTABLE (builder): it reports problems, not findings, so the fix is always a public name in asset_model/; it reads imports, attribute reads, getattr/setattr names and dotted asset_model.x._y, and leaves dunders alone.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50047,7 +50116,7 @@ requirements:
     date_written: '2026-11-03'
     story: As whoever maintains the pipeline, I want one definition of which status is worse than which, and one set of words for them, so that a re-check, a target trial, a planned verdict and the scenario map cannot rank or name green, amber and red differently from the dashboard.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, the split overview''s decision 4 (SPLIT D4, 2026-11-03, Perth: ''the status order moves into asset_model/''). Drafted by delivery-scoper 2026-11-03 (v4); v5 2026-11-14; v6 2026-11-14 with status_words (B3) and the ranking test made a rule of the imports gate (architect). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6''s own questions.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL hold the order of the dataset statuses (nodata below green below amber below red, dataset_status.ORDERED_STATUSES today, line 62) once, in asset_model/, and the pipeline, the bootstrap and the providers SHALL read it there: dataset_status.py line 62, rechecking.py line 117, target_agreement.py line 25 and assets/quarterly/synthetic/collections/linkage_products.py line 345.'
@@ -50061,6 +50130,20 @@ requirements:
     dependencies:
     - REQ-PIPE-380
     - REQ-TEST-384
+    linked_tests:
+    - 'tests/test_status_order_readers.py'
+    - 'tests/test_validate_imports.py'
+    - 'tests/test_status_parity.py'
+    implemented_by:
+    - 'asset_model/statuses.py::ORDERED_STATUSES'
+    - 'asset_model/statuses.py::VERDICT_ORDER'
+    - 'asset_model/statuses.py::status_words'
+    - 'qa_tools/common/dataset_status.py::worst_of'
+    - 'qa_tools/common/rechecking.py::is_worse'
+    - 'qa_tools/common/target_agreement.py::responsible'
+    - 'qa_tools/common/validate_imports.py::status_rankings'
+    evidence:
+    - 'EVIDENCE-PENDING'
     decisions:
     - 'THE STATUS ORDER JOINS #134 (SPLIT D4, SETTLED by Keith 2026-11-03). REJECTED status order only (without the generator''s near-copies), and waiting.'
     - 'status_words MOVES WITH THE ORDER (B3, SETTLED by Keith 2026-11-14): the scenario map''s writer, which the generator keeps, imports it (scenario_map.py line 56), and the generator may import only asset_model/ and scenarios/.'
@@ -50068,6 +50151,9 @@ requirements:
     - 'THE PAGE''S OWN THREE INTERNAL COPIES STAY AS THEY ARE (SPLIT RISK 6, SETTLED by Keith 2026-11-03): RECHECK_RANK, xtStatusCounts'' order list and XT_WORD (''No result'') are left alone. REJECTED reading STATUS_ORDER from both repeats, and one wording everywhere.'
     - 'THE RANKING RULE IS A RULE OF THE IMPORTS GATE (architect, non-blocking): one syntax-tree walker, not another scanner.'
     - 'NO EQUIVALENCE COMPARE (QD, Keith 2026-11-14): v5''s compare in criterion 2 and its BEHAVIOUR-PRESERVING NFR are gone; the per-reader tests are the proof.'
+    - 'VERDICT_ORDER IS THE THREE VERDICTS (builder, 2026-11-15): rechecking, target_agreement and the Linkage Products provider ranked {green: 0, amber: 1, red: 2} and treated anything else - nodata included - as no verdict; reading the whole ORDERED_STATUSES would have ranked nodata below green and changed that. VERDICT_ORDER is derived from ORDERED_STATUSES, so the order is still held once.'
+    - 'THE RANKING RULE READS A DICTIONARY OF STATUS WORDS TO NUMBERS (builder): two or more of nodata, green, amber and red as keys, every value a number - the shape every former copy had. A mapping to words (labels) is not a ranking and passes. It is a problem, never allowlistable. Checked against the three copies at 6cc3eb55: it reports each.'
+    - 'STATUS_ORDER AND UnknownStatusError MOVED WITH THE ORDER (builder): the alias callers index and the error status_words raises sit beside them; dataset_status imports both, so its rollups raise the same class.'
     open_questions: []
     signed_off:
       by: Keith

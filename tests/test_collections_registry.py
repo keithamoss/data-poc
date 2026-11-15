@@ -204,7 +204,8 @@ class TestAThirdCollectionAtEverySite:
         monkeypatch.setattr(checkpoints, "_copy", lambda _a, src, dst: copied.append(dst))
         cp = SimpleNamespace(name="mothman_ckpt_fk_003_x", collection_id=FAKE_ID, before=3)
         checkpoints.copy_for_resume(cp, "postgresql://u:p@localhost:5432/anything")
-        assert copied and copied[0].startswith(f"{checkpoints.RESUME_PREFIX}{FAKE_SHORT}_003_")
+        # <prefix><asset>_<short>_<NNN>_ since split T3 named checkpoints per asset
+        assert copied and copied[0].startswith(f"{checkpoints._own(checkpoints.RESUME_PREFIX)}{FAKE_SHORT}_003_")
 
     @pytest.fixture
     def empty_db(self, monkeypatch):

@@ -46,7 +46,9 @@ class TestOneInputList:
         # and the shared dbt package into dbt_shared/ (post-build-review);
         # REQ-PIPE-365 criterion 3 keys it on the selected asset's folder and
         # assets/environments.yaml, never another asset's.
-        assert set(ri.INPUTS) == {"generator/**", "synthetic_data_generator/**", "pipeline/**",
+        # asset_model/ joined with REQ-PIPE-380 criterion 17 (the shared
+        # reading code moved out of qa_tools/).
+        assert set(ri.INPUTS) == {"asset_model/**", "generator/**", "synthetic_data_generator/**", "pipeline/**",
                                   "qa_tools/**", "dbt_shared/**", "cli/pipeline.py",
                                   "pyproject.toml", "uv.lock", ".github/workflows/test.yml",
                                   "assets/environments.yaml"}

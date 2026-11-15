@@ -15149,3 +15149,43 @@ twice. It deliberately did not re-find the `TypeError`.
        runs the step's shell with `uv` stood in for; against 3aa2d022's
        workflow it failed (exit 0 with the failing asset), and passes now.
        Not run on a GitHub runner.
+
+350. **[done, 2026-11-15]** **[Pipeline & publishing]** **Two datasets naming one table: the hierarchy kept the first.**
+     REQ-PIPE-376 criterion 7, the delivery-scoper's confirmed sighting
+     (2026-11-03). `hierarchy._build` filled its table index with
+     `by_table.setdefault`, so a hierarchy where two datasets named the same
+     table loaded, and `dataset_for_table` answered for whichever came first -
+     not the inverse its docstring claims. No configuration has one today, so
+     no current behaviour changes.
+     - **Fix** (defect, failing test first): the build refuses the hierarchy,
+       naming both datasets, their collections and the table.
+       `tests/test_hierarchy.py::TestFailsLoudly::test_two_datasets_naming_one_table_are_refused_naming_both`
+       failed against the unfixed build (`DID NOT RAISE ValueError`) and
+       passes now. `tests/test_two_asset_gates.py`'s
+       `test_a_table_declared_in_two_collections`, which expects the refusal
+       to name the second collection, failed on the first wording (it named
+       datasets only) and passes now the message names both collections.
+     - **Ran**: tests/test_hierarchy.py, test_validate_hierarchy.py,
+       test_two_asset_gates.py - 64 passed.
+
+351. **[done, 2026-11-15]** **[Testing & dev tooling]** **Split halves that imported moved names by value would have hidden a test's patch.**
+     Found building REQ-PIPE-380, before anything was pushed, by checking
+     every test monkeypatch on an `asset_model` module against product code
+     importing that name by value. Where a module was split, the half left in
+     the pipeline first imported the moved functions by name (`from
+     asset_model.delivery import default_deliveries_dir`, `from
+     asset_model.collections import all_collections`, `from
+     asset_model.file_check_definitions import definitions`), so a test
+     patching the `asset_model` module would not have reached the pipeline
+     half - a patch that passes testing nothing, the architect's warning on
+     moved monkeypatches.
+     - **Fix** (build defect, never shipped): the delivery writer, the
+       registry's adapter half and the file-check runner reach those functions
+       through the module (`tree.`, `declared.`, `defs.`) at call time. The
+       check found one live case afterwards (`tests/test_dataset_blockers.py`
+       and `tests/test_settle_tui.py` patching
+       `asset_model.collections.all_collections`) and none once fixed.
+     - **Not done**: each of the ~57 re-pointed monkeypatches was not broken
+       one by one to see it fail. Each was rewritten onto the same module
+       object the code under test now reads, and the by-value scan above is
+       what stands in for that; said here rather than claimed.

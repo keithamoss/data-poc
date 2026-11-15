@@ -488,7 +488,7 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
 
 
 def collections_registry():
-    from qa_tools import collections
+    from asset_model import collections
 
     return collections
 
