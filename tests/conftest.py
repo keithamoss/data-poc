@@ -1218,7 +1218,8 @@ NEEDS_DEPLOYMENT = "needs_deployment"
 
 
 #: Tests too slow for every run, kept in the repository and run when their
-#: subject changes (Keith, 2026-10-04: the bootstrap equivalence test).
+#: subject changes (Keith, 2026-10-04) - tests/test_a_collection_is_a_small_adapter.py,
+#: say, which bootstraps a copy of the tree.
 ON_DEMAND = "on_demand"
 
 def pytest_addoption(parser):

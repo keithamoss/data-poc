@@ -26,18 +26,17 @@ uv run playwright install --with-deps chromium
 echo "==> Marking each asset's warehouse database as this dev container's (REQ-PIPE-107)"
 # Every connection checks the database's recorded identity and refuses one
 # with none. MOTHMAN_ENVIRONMENT is `local` here (devcontainer.json). ONE
-# DATABASE PER ASSET, supply_<asset> on the same server MOTHMAN_SUPPLY_DSN
-# names (REQ-PIPE-343 criteria 4 and 7), each marked for its own asset, one
+# DATABASE PER ASSET, supply_<asset> (REQ-PIPE-343 criteria 4 and 7), made by
+# docker-compose.yml's init script and found by each command from
+# MOTHMAN_ASSET on the server devcontainer.json's PGHOST names - no
+# MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15). Each marked for its own asset, one
 # process each, typing both ids as anyone marking a database does.
-server="${MOTHMAN_SUPPLY_DSN%/*}"
 for asset in $(cd assets && ls -d */ | tr -d /); do
-  MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${server}/supply_${asset}" \
-    uv run mothman env mark --confirm "${asset}/local" \
+  MOTHMAN_ASSET="$asset" uv run mothman env mark --confirm "${asset}/local" \
     || echo "    Could not mark supply_${asset} - run 'MOTHMAN_ASSET=${asset} uv run mothman env mark' once it exists."
 done
 
 echo
 echo "Ready. Each asset's warehouse is empty until you populate it:"
-echo "    MOTHMAN_ASSET=<asset> MOTHMAN_SUPPLY_DSN=${server}/supply_<asset> \\"
-echo "      uv run mothman pipeline bootstrap"
+echo "    MOTHMAN_ASSET=<asset> uv run mothman pipeline bootstrap"
 echo "which generates that asset's collections and runs the real checks."

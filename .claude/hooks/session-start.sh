@@ -43,12 +43,8 @@ if command -v pg_isready >/dev/null 2>&1; then
         "CREATE ROLE \"${PGUSER_NAME}\" LOGIN SUPERUSER CREATEDB PASSWORD '${PGPASS}';" \
         >/dev/null 2>&1 && say "Created the '${PGUSER_NAME}' role."
     fi
-    if ! sudo -n -u postgres psql -tAc \
-        "SELECT 1 FROM pg_database WHERE datname='supply'" 2>/dev/null | grep -q 1; then
-      sudo -n -u postgres psql -q -c \
-        "CREATE DATABASE supply OWNER \"${PGUSER_NAME}\";" \
-        >/dev/null 2>&1 && say "Created the 'supply' database."
-    fi
+    # NO `supply` DATABASE: it belongs to no asset since the split. Each
+    # asset's own, supply_<asset>, is created and marked further down.
     say "PostgreSQL is up."
     PG_UP=1
   else
@@ -58,7 +54,13 @@ fi
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
-    echo "export MOTHMAN_SUPPLY_DSN=\"postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply\""
+    # NO MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15): each command opens its
+    # asset's own supply_<asset>, found from MOTHMAN_ASSET, on the server
+    # PostgreSQL's own settings name - these, which name no database.
+    echo 'export PGHOST="localhost"'
+    echo 'export PGPORT="5432"'
+    echo "export PGUSER=\"${PGUSER_NAME}\""
+    echo "export PGPASSWORD=\"${PGPASS}\""
     echo "export MOTHMAN_TEST_DSN=\"postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/postgres\""
     # WHICH DEPLOYMENT THIS IS. Declared in contract/environments.yaml;
     # a session container is 'sandbox'. Set here rather than defaulted
@@ -133,8 +135,9 @@ if [ "${PG_UP:-}" = "1" ]; then
       sudo -n -u postgres psql -q -c \
         "CREATE DATABASE \"supply_${asset}\" OWNER \"${PGUSER_NAME}\";" >/dev/null 2>&1
     fi
-    if MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET="$asset" \
-       MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply_${asset}" \
+    # Found from MOTHMAN_ASSET, as every command finds it - no DSN.
+    if env -u MOTHMAN_SUPPLY_DSN MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET="$asset" \
+       PGHOST=localhost PGPORT=5432 PGUSER="${PGUSER_NAME}" PGPASSWORD="${PGPASS}" \
        uv run mothman env mark --confirm "${asset}/sandbox" >/dev/null 2>&1; then
       say "supply_${asset} is marked as this sandbox's."
     else

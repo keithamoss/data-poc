@@ -2,12 +2,13 @@
 
 Everything here runs in a COPY of the tracked tree with twenty-eight more
 collections registered (tests/thirty_collections.py) - no database, no
-bootstrap, nothing written to the repository's own contract/, data/ or
+bootstrap, nothing written to the repository's own assets/, data/ or
 reports/ (criterion 15). Help and the menus read configuration only.
 
-Today's two collections keep their exact text, which the equivalence
-capture's S7 surface proves; the tests at the bottom hold the threshold
-itself.
+The tests at the bottom hold the threshold itself. That the real
+collections kept their exact text was proved when this was built, by the
+equivalence capture's S7 surface (criterion 20); that capture has since been
+deleted (REQ-TEST-393).
 """
 from __future__ import annotations
 

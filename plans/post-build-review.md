@@ -14810,12 +14810,90 @@ twice. It deliberately did not re-find the `TypeError`.
        `supply_<asset>` databases (docker-compose makes only `supply`), so on a
        fresh dev container each mark fails with its hint until they exist; and
        `MOTHMAN_SUPPLY_DSN` there, as in the session hook, still names the
-       pre-split `supply`, which neither asset can open.
+       pre-split `supply`, which neither asset can open. Both answered by Keith 2026-11-15 and built in #334.
 
-332. **[todo]** **[Data generation]** **The providers gate names a provider by its pre-split path.**
-     A sighting from split T1, not fixed: `generator/validate_providers.py`'s
-     `declaration_problems()` names a provider as
+332. **[done, 2026-11-15]** **[Data generation]** **The providers gate names a provider by its pre-split path.**
+     A sighting from split T1: `generator/validate_providers.py`'s
+     `declaration_problems()` named a provider as
      `generator/collections/<module>.py`, where providers have lived in
      `assets/<asset>/synthetic/collections/` since the split, so its messages
-     point at a file that does not exist. `orphan_problems()` beside it already
-     names the real path. Minor wording; one line.
+     pointed at a file that does not exist. `orphan_problems()` beside it already
+     named the real path. Minor wording.
+     - **Fix** (test first): the provider is named by the selected asset's
+       providers folder, shown from the repository root by the one helper both
+       functions now share (`_shown`).
+     - **Ran**: `tests/test_generator_providers.py::...::test_a_bad_declaration_names_the_providers_real_file`
+       failed first (`generator/collections/child_protection.py's dataset_id
+       ...`, no such file), then the module 39 passed.
+
+333. **[done, 2026-11-15]** **[Testing & dev tooling]** **The on-demand small-adapter test had not run since the asset split.**
+     `tests/test_a_collection_is_a_small_adapter.py` (REQ-TEST-249) and its
+     `tests/fake_collection.py` still installed the fake Widget Register into
+     the pre-split `contract/`, `dbt_project/models/`, `qa_tools/collections/`
+     and `generator/collections/`, with `data-asset-1` check ids, and read
+     `reports/` and `data/deliveries/` without the asset folder - the same
+     shape as #324. Every test but one erred in setup (`contract/data-asset.yaml`
+     not found), at any git depth; the one that passed asserted the old paths.
+     Nothing noticed because the module is on demand.
+     - **Fix** (the failing module was the test, failing first): the fake's
+       files moved under `tests/fake_collection_files/assets/quarterly/`
+       (agency folder, `dbt/models/`, `collections/`, `synthetic/collections/`),
+       check ids `quarterly.`, the copy run with `MOTHMAN_ASSET=quarterly`, its
+       dbt packages linked at `assets/quarterly/dbt/dbt_packages`, results read
+       from `reports/quarterly/` and the kept supply from
+       `data/quarterly/deliveries/`. One real change of shape: `collections:` is
+       no longer the last list in the asset's `presentation.yaml`, so the
+       collection's words now go at the end of `collections:` rather than the
+       end of the file, still as one whole inserted block.
+     - **Ran**: `pytest tests/test_a_collection_is_a_small_adapter.py --run-on-demand -n0`:
+       before, 1 failed, 10 errors, 1 passed; after, 12 passed in 39s (bootstrap
+       18.5s, qa 8.2s).
+
+334. **[done, 2026-11-15]** **[Testing & dev tooling]** **[Pipeline & publishing]** **No MOTHMAN_SUPPLY_DSN default, and the dev container makes each asset's database.**
+     #331's two open items, on Keith's two answers of 2026-11-15
+     (docs/drafts/decisions-2026-11-01.md, "Split T1's questions"): a compose
+     init script, and export nothing.
+     - **What changed**: with `MOTHMAN_SUPPLY_DSN` unset,
+       `supply_db.supply_db_dsn()` names the selected asset's own database,
+       `supply_<data_asset_id>`, and nothing else - the server comes from
+       PostgreSQL's own client settings (PGHOST, PGPORT, PGUSER, PGPASSWORD,
+       ~/.pgpass), and `connection_fields()` fills what the string leaves out
+       from the live connection, so dbt, Soda Core and datacontract-cli get
+       whole details. Set, the variable still wins (tests, CI, a deployment).
+       Neither set refuses, naming both variables. The session hook writes
+       PGHOST/PGPORT/PGUSER/PGPASSWORD and no `MOTHMAN_SUPPLY_DSN`, marks each
+       asset's database through the same lookup, and no longer creates the
+       `supply` database no asset owns; devcontainer.json the same with
+       PGHOST=db; docker-compose drops POSTGRES_DB, mounts `../assets`
+       read-only and runs `.devcontainer/create-asset-databases.sh`, which
+       creates `supply_<data_asset_id>` per asset folder holding a
+       data-asset.yaml; post-create.sh marks each without a DSN; README's
+       setup block the same.
+     - **PROVISIONAL, for Keith**: where the SERVER comes from was not part of
+       his answer. PostgreSQL's own PG* variables were chosen over a new
+       project variable (CI's `MOTHMAN_PG` is that shape) because they name no
+       database and every PostgreSQL client already reads them. And the
+       lookup relies on the name `supply_<data_asset_id>` in shipped code,
+       which REQ-PIPE-343 criterion 7 says nothing shipped may do - his answer
+       changes that, so the criterion needs his rewording.
+     - **Not run**: docker - no daemon here. The compose file and the init
+       script's asset list are tested from the files (`--list` against the
+       real assets/ and a fixture); the init script's CREATE DATABASE, the
+       healthcheck over TCP, and post-create.sh were not run. An existing
+       dev-container volume keeps its databases: the init script runs only on
+       an empty volume.
+     - **Ran**: `tests/test_supply_db.py` (4 new or changed tests failing first,
+       then 36 passed), `tests/test_devcontainer.py` and `tests/test_db_identity.py`
+       (4 new failing first, then 41 passed); by hand, a read-only connection
+       into `supply_quarterly` with the variable unset and PG* set, which
+       passed the identity check.
+
+335. **[todo]** **[Testing & dev tooling]** **The thirty-linked-datasets fixture files its collections' words under `datasets:`.**
+     A sighting while fixing #333, not fixed: `tests/thirty_linked_datasets.py`
+     appends its six fake collections' presentation entries to the END of
+     `assets/quarterly/presentation.yaml`, which since REQ-DASH-299 ends with
+     `datasets:` rather than `collections:` - so in the copy `lk-source-1` and
+     the rest parse as datasets' words and no collection of theirs has an
+     entry. Confirmed by parsing the copy's file. Its tests pass, so whatever
+     reads the words tolerates the gap there; #333's fixture now inserts at the
+     end of `collections:` instead, and the same change would fix this one.

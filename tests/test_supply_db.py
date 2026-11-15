@@ -16,6 +16,8 @@ load-bearing for a workaround that has been removed.
 """
 from __future__ import annotations
 
+import os
+
 import psycopg
 import pytest
 
@@ -277,12 +279,15 @@ class TestWhereItRefusesToGuess:
         with pytest.raises(supply_db.SupplyDbError):
             supply_db.staged_table("cp clients; drop", "run_001")
 
-    def test_an_unset_dsn_is_an_error_naming_the_variable(self, monkeypatch):
-        """There is no default and no file to fall back to, so the only
-        useful thing to say is which variable is missing."""
+    def test_an_unset_dsn_and_no_asset_is_an_error_naming_both_variables(self, monkeypatch):
+        """With neither, there is nothing to find a database from, so the
+        useful thing to say is which variables are missing."""
         monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
-        with pytest.raises(supply_db.SupplyDbError, match=supply_db.SUPPLY_DSN_ENV):
-            supply_db.connect()
+        monkeypatch.delenv("MOTHMAN_ASSET", raising=False)
+        with pytest.raises(supply_db.SupplyDbError) as exc:
+            supply_db.supply_db_dsn()
+        assert supply_db.SUPPLY_DSN_ENV in str(exc.value)
+        assert "MOTHMAN_ASSET" in str(exc.value)
 
     def test_an_unreachable_database_says_so_and_names_the_host(self, monkeypatch):
         """REQ-PIPE-087 criterion 12: loud, naming where it tried, and
@@ -311,6 +316,60 @@ class TestWhereItRefusesToGuess:
         project used to have to care."""
         with pytest.raises(supply_db.SupplyDbError, match="63-byte identifier limit"):
             supply_db._ident("x" * 64, "table name")
+
+
+class TestWithNoDsnACommandFindsItsAssetsDatabase:
+    """MOTHMAN_SUPPLY_DSN unset (Keith, 2026-11-15: the session hook and the
+    dev container export none): the database is the selected asset's own,
+    supply_<data_asset_id> (REQ-PIPE-343 criterion 7), on the server
+    PostgreSQL's own client settings name - PGHOST, PGPORT, PGUSER,
+    PGPASSWORD or ~/.pgpass - so nothing names a default database."""
+
+    def test_it_names_the_quarterly_assets_database_and_no_server(self, monkeypatch):
+        from psycopg import conninfo
+
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
+        assert conninfo.conninfo_to_dict(supply_db.supply_db_dsn()) == {
+            "dbname": "supply_quarterly"}
+
+    @pytest.mark.asset("daily")
+    def test_it_names_the_daily_assets_database_under_the_daily_asset(self, monkeypatch):
+        from psycopg import conninfo
+
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
+        assert conninfo.conninfo_to_dict(supply_db.supply_db_dsn()) == {
+            "dbname": "supply_daily"}
+
+    def test_a_stated_dsn_still_wins(self, monkeypatch):
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, "postgresql://u@h:1/elsewhere")
+        assert supply_db.supply_db_dsn() == "postgresql://u@h:1/elsewhere"
+
+    def test_a_command_connects_and_hands_the_tools_whole_details(self, monkeypatch):
+        """A real connection with the variable unset, the server taken from
+        libpq's own settings - and the details dbt, Soda Core and
+        datacontract-cli are handed filled in from that connection, since
+        none of them is in the connection string. The worker's own database
+        stands in for supply_quarterly, which a test never opens."""
+        from psycopg import conninfo
+
+        worker = conninfo.conninfo_to_dict(os.environ[supply_db.SUPPLY_DSN_ENV])
+        monkeypatch.setattr(supply_db, "asset_database", lambda: worker["dbname"])
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV)
+        for key, var in (("host", "PGHOST"), ("port", "PGPORT"), ("user", "PGUSER"),
+                         ("password", "PGPASSWORD")):
+            if worker.get(key):
+                monkeypatch.setenv(var, str(worker[key]))
+        supply_db.release_connections()
+        try:
+            with supply_db.connect(read_only=True, label="test-no-dsn") as conn:
+                (name,) = conn.execute("SELECT current_database()").fetchone()
+            fields = supply_db.connection_fields()
+        finally:
+            supply_db.release_connections()
+        assert name == worker["dbname"]
+        assert fields["dbname"] == worker["dbname"]
+        assert fields["user"] == worker["user"] and fields["user"]
+        assert fields["host"] and fields["port"]
 
 
 class TestItNeverWaitsForeverForALock:

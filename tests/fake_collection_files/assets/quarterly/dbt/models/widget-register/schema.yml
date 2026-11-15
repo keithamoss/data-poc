@@ -9,7 +9,7 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.widget-agency.widget-register.widgets.widget_id.unique_dbt
+                check_id: quarterly.widget-agency.widget-register.widgets.widget_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2026-10-18"
                 description: >
@@ -21,7 +21,7 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.widget-agency.widget-register.widgets.colour.not_null_dbt
+                check_id: quarterly.widget-agency.widget-register.widgets.colour.not_null_dbt
                 category: completeness
                 introduced_date: "2026-10-18"
                 description: >

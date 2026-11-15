@@ -10,6 +10,8 @@ one, a scenario naming a dataset no provider makes.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import collection_modules
 
 import json
@@ -402,6 +404,21 @@ class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
         monkeypatch.setattr(sys.modules[PROVIDER_MODULE].PROVIDER, attr, value)
         problems = validate_providers.problems()
         assert any(expected in p for p in problems), problems
+
+    def test_a_bad_declaration_names_the_providers_real_file(self, monkeypatch):
+        """post-build-review #332: since the asset split a provider lives in
+        assets/<asset>/synthetic/collections/, and the message named the
+        pre-split generator/collections/ path, a file that does not exist."""
+        from generator import validate_providers
+        from qa_tools.common import assets
+
+        monkeypatch.setattr(providers.provider("child-protection"), "dataset_id", "nonsense")
+        [problem] = [p for p in validate_providers.declaration_problems() if "nonsense" in p]
+        where = problem.split("'s dataset_id")[0]
+        root = Path(__file__).resolve().parent.parent
+        assert (root / where).is_file(), problem
+        assert (root / where).resolve() == (assets.selected().providers
+                                            / "child_protection.py").resolve()
 
     def test_a_target_trial_naming_no_target_datasets_fails(self, monkeypatch):
         """REQ-GEN-298 criterion 10 lifted the one-table rule; a trial still

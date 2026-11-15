@@ -162,6 +162,20 @@ releases:
               daily/sandbox, to mark a database. The environment alone marks
               nothing, so one asset's database cannot be marked from a
               terminal set up for the other.
+          - headline: Each asset finds its database
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              With MOTHMAN_SUPPLY_DSN unset, a command opens its own asset's
+              database, supply_<asset>, on the server PostgreSQL's PGHOST and
+              PGUSER name. Sandboxes and dev containers no longer set one
+              pointing at the old shared database.
+          - headline: Dev container makes both databases
+            components: ["Testing & dev tooling"]
+            description: >
+              A new dev container now creates supply_quarterly and
+              supply_daily from the asset folders, so marking and
+              bootstrapping each asset works first time rather than failing
+              until you create them by hand.
           - headline: Each failure names its asset
             components: ["Testing & dev tooling"]
             description: >

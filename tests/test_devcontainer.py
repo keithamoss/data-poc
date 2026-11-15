@@ -68,9 +68,64 @@ def test_it_supplies_a_postgres_the_suite_connects_to():
     # 1's "takes a connection string for a PostgreSQL that already
     # exists" is only true if something sets it.
     assert env["MOTHMAN_TEST_DSN"].startswith("postgresql://")
-    assert env["MOTHMAN_SUPPLY_DSN"].startswith("postgresql://")
     assert "@db:" in env["MOTHMAN_TEST_DSN"], \
         "the DSN must name the compose service, not localhost"
+
+
+def test_it_names_a_server_and_no_supply_database():
+    """Keith, 2026-11-15: the dev container exports no MOTHMAN_SUPPLY_DSN -
+    each command finds its asset's database, supply_<asset>, from
+    MOTHMAN_ASSET - so what it states is the SERVER, in PostgreSQL's own
+    client settings, and never a database a command would default to."""
+    env = _devcontainer_json()["remoteEnv"]
+    assert "MOTHMAN_SUPPLY_DSN" not in env
+    assert "MOTHMAN_ASSET" not in env
+    assert "PGDATABASE" not in env, "a default database by another name"
+    assert env["PGHOST"] == "db" and env["PGUSER"] and env["PGPASSWORD"]
+    post_create = (DEVCONTAINER / "post-create.sh").read_text()
+    assert "MOTHMAN_SUPPLY_DSN=" not in post_create and "${MOTHMAN_SUPPLY_DSN" not in post_create
+    db = _compose()["services"]["db"]
+    assert "POSTGRES_DB" not in (db.get("environment") or {}), \
+        "compose still creates a database no asset owns"
+    assert "supply" not in " ".join(db["healthcheck"]["test"])
+
+
+INIT_SCRIPT = DEVCONTAINER / "create-asset-databases.sh"
+
+
+def _init_script_lists(assets_dir: Path) -> list[str]:
+    import subprocess
+
+    done = subprocess.run(["bash", str(INIT_SCRIPT), "--list"], capture_output=True,
+                          text=True, check=True, env={"MOTHMAN_ASSETS_DIR": str(assets_dir),
+                                                      "PATH": "/usr/bin:/bin"})
+    return done.stdout.split()
+
+
+def test_compose_creates_one_database_per_asset_from_the_mounted_asset_folders():
+    """Keith, 2026-11-15: a compose init script, with assets/ mounted
+    read-only into the database container, creates supply_<asset> per asset
+    folder that has a data-asset.yaml (REQ-PIPE-343 criterion 7)."""
+    db = _compose()["services"]["db"]
+    mounts = db["volumes"]
+    assert any(m.startswith("../assets:") and m.endswith(":ro") for m in mounts), mounts
+    init = [m for m in mounts if ":/docker-entrypoint-initdb.d/" in m]
+    assert init and init[0].split(":")[0] == f"./{INIT_SCRIPT.name}", mounts
+    assets_at = next(m.split(":")[1] for m in mounts if m.startswith("../assets:"))
+    assert f'MOTHMAN_ASSETS_DIR:-{assets_at}' in INIT_SCRIPT.read_text()
+
+    want = sorted(f"supply_{yaml.safe_load((d / 'data-asset.yaml').read_text())['data_asset_id']}"
+                  for d in (ROOT / "assets").iterdir() if (d / "data-asset.yaml").is_file())
+    assert want, "no asset folder has a data-asset.yaml - the comparison would prove nothing"
+    assert sorted(_init_script_lists(ROOT / "assets")) == want
+
+
+def test_a_folder_with_no_data_asset_yaml_gets_no_database(tmp_path):
+    (tmp_path / "alpha").mkdir()
+    (tmp_path / "alpha" / "data-asset.yaml").write_text("# an asset\ndata_asset_id: alpha   # its id\n")
+    (tmp_path / "beta").mkdir()  # no data-asset.yaml: not an asset
+    (tmp_path / "environments.yaml").write_text("environments: []\n")
+    assert _init_script_lists(tmp_path) == ["supply_alpha"]
 
 
 def test_the_dev_container_and_ci_pin_the_same_postgres_major():

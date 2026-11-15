@@ -3,7 +3,7 @@ checks for widgets:
   - row_count:
       fail: when < 50
       attributes:
-        check_id: data-asset-1.widget-agency.widget-register.widgets.row_count_soda
+        check_id: quarterly.widget-agency.widget-register.widgets.row_count_soda
         category: completeness
         introduced_date: "2026-10-18"
         description: >
@@ -17,7 +17,7 @@ checks for widgets:
       fail: when > 3
       samples limit: 100
       attributes:
-        check_id: data-asset-1.widget-agency.widget-register.widgets.colour.missing_count_soda
+        check_id: quarterly.widget-agency.widget-register.widgets.colour.missing_count_soda
         category: completeness
         introduced_date: "2026-10-18"
         description: >

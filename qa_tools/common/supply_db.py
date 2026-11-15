@@ -126,6 +126,16 @@ SUPPLY_DSN_ENV = "MOTHMAN_SUPPLY_DSN"
 #: database - and the one thing worse than failing to connect is
 #: connecting to the wrong environment. REQ-PIPE-093 makes this a
 #: first-class rule for every operation; this is where it starts.
+#:
+#: UNSET, THE SELECTED ASSET'S OWN DATABASE (Keith, 2026-11-15: the session
+#: hook and the dev container export no MOTHMAN_SUPPLY_DSN; each command
+#: finds its asset's database from MOTHMAN_ASSET). That is still no default:
+#: the asset has none either, so the database is named by what the person
+#: stated - supply_<data_asset_id> (REQ-PIPE-343 criterion 7) - and the
+#: server by PostgreSQL's own client settings (PGHOST, PGPORT, PGUSER,
+#: PGPASSWORD, ~/.pgpass), which name no database. The identity check
+#: (REQ-PIPE-343 criterion 2) still refuses one that belongs elsewhere.
+ASSET_DATABASE_PREFIX = "supply_"
 
 #: Where a supply lands before anything has decided which slot it fills.
 STAGING_SCHEMA = "staging"
@@ -244,23 +254,40 @@ class SupplyDbError(RuntimeError):
     reasonable-looking default."""
 
 
-def supply_db_dsn() -> str:
-    """The connection string for the one database.
+def asset_database() -> str:
+    """The selected asset's own database name, supply_<data_asset_id>
+    (REQ-PIPE-343 criterion 7) - what supply_db_dsn() names when
+    MOTHMAN_SUPPLY_DSN is unset."""
+    from qa_tools.common import hierarchy
 
-    Raises rather than guessing where it is unset, which is the whole
-    point - see SUPPLY_DSN_ENV's own note. The error names the variable
-    and what to do, because the person who hits this is usually setting
-    the project up for the first time.
+    return f"{ASSET_DATABASE_PREFIX}{hierarchy.data_asset_id()}"
+
+
+def supply_db_dsn() -> str:
+    """The connection string for the selected asset's database.
+
+    MOTHMAN_SUPPLY_DSN when it is set; otherwise the selected asset's own
+    database, by name only, on the server libpq's own settings name (see
+    ASSET_DATABASE_PREFIX's note). Raises rather than guessing when neither
+    the variable nor an asset is stated, naming both, because the person who
+    hits this is usually setting the project up for the first time.
     """
     dsn = os.environ.get(SUPPLY_DSN_ENV)
-    if not dsn:
+    if dsn:
+        return dsn
+    from psycopg import conninfo
+
+    from qa_tools.common import assets
+
+    why = assets.why_not_selected()
+    if why is not None:
         raise SupplyDbError(
-            f"{SUPPLY_DSN_ENV} is not set, and there is no default - this "
-            f"pipeline has no local database file to fall back to. Set it to a "
-            f"real PostgreSQL connection string, e.g. "
-            f"postgresql://user@host:5432/supply. A dev container and CI each "
-            f"supply one; see README's Development section.")
-    return dsn
+            f"{SUPPLY_DSN_ENV} is not set, and no asset is selected to find a "
+            f"database from: {why} With an asset selected, its own database "
+            f"supply_<asset> is opened on the server PostgreSQL's PGHOST, PGPORT, "
+            f"PGUSER and PGPASSWORD name; or set {SUPPLY_DSN_ENV} to a real "
+            f"PostgreSQL connection string.")
+    return conninfo.make_conninfo(dbname=asset_database())
 
 
 def _translate(sql: str, params) -> str:
@@ -731,14 +758,20 @@ def connection_fields() -> dict[str, str]:
     # 10): dbt, Soda Core and datacontract-cli connect themselves and cannot
     # run our check, so these exact details are checked first, here, on the
     # one path every one of them takes.
-    connect(read_only=True, label="mothman-identity-check").close()
+    checked = connect(read_only=True, label="mothman-identity-check")
+    # WHAT THE CONNECTION STRING LEAVES OUT, from the connection libpq just
+    # made: with MOTHMAN_SUPPLY_DSN unset it names only the asset's database,
+    # and the server comes from PGHOST and the rest, which the tools' own
+    # drivers are not asked to read.
+    live = checked._raw.info
+    checked.close()
     info = conninfo.conninfo_to_dict(supply_db_dsn())
     return {
-        "host": str(info.get("host", "localhost")),
-        "port": str(info.get("port", 5432)),
-        "user": str(info.get("user", "")),
-        "password": str(info.get("password", "")),
-        "dbname": str(info.get("dbname", "")),
+        "host": str(info.get("host") or live.host or "localhost"),
+        "port": str(info.get("port") or live.port or 5432),
+        "user": str(info.get("user") or live.user or ""),
+        "password": str(info.get("password") or live.password or ""),
+        "dbname": str(info.get("dbname") or live.dbname or ""),
     }
 
 

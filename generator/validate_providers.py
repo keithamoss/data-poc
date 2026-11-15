@@ -21,6 +21,15 @@ from pathlib import Path
 
 
 
+def _shown(path: Path) -> str:
+    """`path` from the repository root - or in full, outside it."""
+    root = Path(__file__).resolve().parent.parent
+    try:
+        return str(path.resolve().relative_to(root))
+    except ValueError:
+        return str(path)
+
+
 def declaration_problems() -> list[str]:
     """What a provider declares that only a new collection would trip over
     (post-build-review #232): a provider filed under another collection's
@@ -32,6 +41,7 @@ def declaration_problems() -> list[str]:
     from generator import collections
     from generator.collections.base import CLIENT_POSTCODES, NULL_RATE
     from qa_tools import collections as registry
+    from qa_tools.common import assets
 
     out: list[str] = []
     levers: dict[str, str] = {}
@@ -40,7 +50,8 @@ def declaration_problems() -> list[str]:
             provider = collections.provider(coll.id)
         except collections.NoProviderError:
             continue
-        where = f"generator/collections/{coll.module_name}.py"
+        # WHERE THE PROVIDER IS, since the asset split (post-build-review #332).
+        where = _shown(assets.selected().providers / f"{coll.module_name}.py")
         if provider.collection_id != coll.id:
             out.append(f"{where} names collection {provider.collection_id!r}, not {coll.id!r}")
             continue
@@ -82,16 +93,8 @@ def orphan_problems(package: Path | None = None) -> list[str]:
     from qa_tools.common import assets
 
     package = Path(package) if package is not None else assets.selected().providers
-    root = Path(__file__).resolve().parent.parent
-
-    def shown(path: Path) -> str:
-        try:
-            return str(path.resolve().relative_to(root))
-        except ValueError:
-            return str(path)
-
     declared = {c.module_name for c in registry.all_collections()}
-    return [f"{shown(p)} names no declared collection"
+    return [f"{_shown(p)} names no declared collection"
             for p in sorted(package.glob("*.py"))
             if p.stem not in ("__init__", "base") and p.stem not in declared]
 
