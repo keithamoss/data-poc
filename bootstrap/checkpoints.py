@@ -241,6 +241,15 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
     short = collections.by_id(collection_id).short
     name = _named_for(PREFIX, short, before)
     supply_db.release_connections()
+    # THE TOOL WORKERS' CONNECTIONS TOO (post-build-review #363): a copy is
+    # refused while anything is connected to the source, and speed batch A's
+    # persistent datacontract-cli worker (REQ-PIPE-431) holds a connection of
+    # its own in another process, which release_connections cannot reach. A
+    # stopped worker starts again on the next call that needs it.
+    from qa_tools.common import datacontract_worker, dbt_worker
+
+    datacontract_worker.stop()
+    dbt_worker.stop()
     cp = Checkpoint(name=name, collection_id=collection_id, before=before,
                     taken_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     source=source, recorded=recorded, pending_scripts=pending_scripts)

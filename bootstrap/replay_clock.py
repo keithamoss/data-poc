@@ -99,6 +99,11 @@ class ReplayClock(asset_time.Clock):
     def taking_effect(self, instant) -> None:
         self.advance_to(instant)
 
+    def stamp_in_pass(self, pass_instant: datetime) -> datetime:  # noqa: ARG002
+        """Each run of a replayed pass at its arrival's replayed time, as a
+        replay always stamped (REQ-PIPE-081 criteria 27-31)."""
+        return self.now()
+
     def when_effective(self, received_at, *, run_id: str, next_receipt=None,
                        claim_window=None) -> datetime:
         """Receipt plus Keith's 2026-10-02 lag seeded off the run id, spread

@@ -242,6 +242,12 @@ class Clock:
         (criterion 3): now, the instant it is made, on every asset."""
         return self.now()
 
+    def stamp_in_pass(self, pass_instant: datetime) -> datetime:
+        """The instant a run of a batch pass begun at `pass_instant` is stamped
+        with: the pass's own instant, so one pass is one QA event
+        (post-build-review #359)."""
+        return pass_instant
+
 
 class WallClock(Clock):
     """The wall clock - what answers when nothing is installed (criterion 5)."""
@@ -290,8 +296,11 @@ def ambient() -> Clock:
     wall clock."""
     pinned = os.environ.get(PINNED_NOW_VARIABLE)
     if pinned:
-        return _admitted(PinnedClock(parse_instant(pinned, PINNED_NOW_VARIABLE)),
-                         PinnedClockRefused, f"{PINNED_NOW_VARIABLE} is set")
+        # THE GATE FIRST, THE PARSE SECOND (post-build-review #362): on a real
+        # asset any pin is refused as a pin, malformed or not.
+        if not declared_synthetic():
+            raise PinnedClockRefused(_refusal(f"{PINNED_NOW_VARIABLE} is set"))
+        return PinnedClock(parse_instant(pinned, PINNED_NOW_VARIABLE))
     return WallClock()
 
 
@@ -349,6 +358,15 @@ def taking_effect(instant) -> None:
     """Announce: a decision takes effect at `instant`, as it is recorded
     (criterion 8)."""
     current().taking_effect(instant)
+
+
+def stamp_in_pass(pass_instant: datetime) -> datetime:
+    """A NEUTRAL QUESTION (post-build-review #359): the instant a run of a
+    batch pass begun at `pass_instant` is stamped with. The wall clock and a
+    pinned clock answer the pass's own instant - one pass, one instant, as
+    the processing pass stamps and the QA activity feed groups; an installed
+    replay answers its own time, each arrival's replayed receipt."""
+    return current().stamp_in_pass(pass_instant)
 
 
 def when_effective(received_at, *, run_id: str, next_receipt=None,

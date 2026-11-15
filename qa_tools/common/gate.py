@@ -1650,7 +1650,6 @@ def _completing_instant(conn, package: Package) -> str:
     they take effect after it (decision_log.follows), not at their own
     arrival's earlier instant."""
     from qa_tools.common import arrivals, decision_log
-    from asset_model import asset_time as _clock
     from asset_model import asset_time
     from qa_tools.tools import orchestrate
 
@@ -1678,7 +1677,7 @@ def _completing_instant(conn, package: Package) -> str:
         if keys[-1] in found:
             return at_least_floor(orchestrate.effective_at_of(package.collection_id,
                                                               found[keys[-1]]))
-    return _clock.now().isoformat()
+    return asset_time.now().isoformat()
 
 
 def _member_item(conn, dataset_id: str, supply: str) -> dict | None:

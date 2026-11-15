@@ -615,9 +615,10 @@ def run_pipeline(collection_id: str, sequential: bool = False,
     run = _begin(collection_id, player)
 
     # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME, through the one per-arrival
-    # lifecycle; EACH ARRIVAL STAGED AS IT COMES (REQ-TEST-159) and STAMPED AS
-    # IT STARTS (run_timestamp None) - on the clock in force, so a replay's
-    # arrival carries its receipt and a real run's the moment it ran.
+    # lifecycle; EACH ARRIVAL STAGED AS IT COMES (REQ-TEST-159). run_timestamp
+    # None: the lifecycle takes ONE pass instant from the clock at the first
+    # arrival (post-build-review #359), so a real batch is one QA event and a
+    # replay's clock stamps each run with its replayed receipt.
     arrival_lifecycle.process_all(
         run.arrivals, steps=run.steps, run_by=run.run_by, run_timestamp=None,
         player=run.player, prepare=run.prepare, start_at=start_at, after_each=after_each)

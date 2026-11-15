@@ -123,15 +123,20 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
     promotion (parallel_orchestrate.run_manifest's docstring
     has the measurement).
 
-    `run_timestamp` None stamps each arrival as it starts, which is what
-    a person filing by hand sees; the batch passes one instant for the
-    whole pass, as it always has.
+    `run_timestamp` None: ONE INSTANT FOR THE PASS, taken from the clock at
+    the first arrival's processing (post-build-review #359) and stamped
+    through asset_time.stamp_in_pass - so a real batch is one QA event, as
+    the processing pass is and as the activity feed groups, while a replay's
+    clock stamps each run with its arrival's replayed time. Taken at the
+    first arrival rather than when the pass is set up, because a replay's
+    clock reads the clock beneath it until its first event.
     """
     arrivals = list(arrivals)
     if exclusive:
         return _exclusively(arrivals, steps=steps, run_by=run_by,
                             run_timestamp=run_timestamp, on_step=on_step)
     results: list[dict] = []
+    stamps = _PassStamp(run_timestamp)
     for position, arrival in enumerate(arrivals, start=1):
         # A RESUME STARTS PART-WAY (REQ-TEST-159): the arrivals before
         # `start_at` are already in the checkpoint it was copied from.
@@ -139,7 +144,7 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
             continue
         with asset_time.processing_arrival(arrival.received_at):
             _one_of_many(arrival, arrivals, position, steps=steps, run_by=run_by,
-                         run_timestamp=run_timestamp, on_step=on_step, player=player,
+                         run_timestamp=stamps, on_step=on_step, player=player,
                          prepare=prepare, after_each=after_each, results=results)
     if player is not None:
         player.finish()
@@ -153,16 +158,39 @@ def process_stream(order, runs: dict, *, player, results: dict) -> None:
     stream. `order` is [(collection id, arrival)]; `runs` maps a collection
     id to (its arrivals, steps, prepare, run_by, run_timestamp)."""
     positions = {cid: 0 for cid in runs}
+    stamps = _PassStamp(None)
     for collection_id, arrival in order:
         arrivals, steps, prepare, run_by, run_timestamp = runs[collection_id]
         positions[collection_id] += 1
         with asset_time.processing_arrival(arrival.received_at):
             _one_of_many(arrival, arrivals, positions[collection_id], steps=steps,
-                         run_by=run_by, run_timestamp=run_timestamp, on_step=None,
+                         run_by=run_by, run_timestamp=stamps.given(run_timestamp),
+                         on_step=None,
                          player=player, prepare=prepare, after_each=None,
                          results=results[collection_id])
     if player is not None:
         player.finish()
+
+
+class _PassStamp:
+    """What one pass's runs are stamped with (post-build-review #359): the
+    instant the caller gave, else one taken from the clock at the first
+    arrival processed and handed to asset_time.stamp_in_pass for each run."""
+
+    def __init__(self, given: str | None):
+        self._given = given
+        self._first = None
+
+    def given(self, run_timestamp: str | None) -> "_PassStamp":
+        """This pass's stamp, or a fixed one where a caller gives its own."""
+        return self if run_timestamp is None else _PassStamp(run_timestamp)
+
+    def stamp(self) -> str:
+        if self._given is not None:
+            return self._given
+        if self._first is None:
+            self._first = asset_time.now()
+        return asset_time.stamp_in_pass(self._first).isoformat()
 
 
 def _one_of_many(arrival, arrivals, position, *, steps, run_by, run_timestamp, on_step,
@@ -185,7 +213,7 @@ def _one_of_many(arrival, arrivals, position, *, steps, run_by, run_timestamp, o
     # run is then stamped by the clock in force - per arrival where the caller
     # passes no pass-wide instant.
     asset_time.receiving(arrival.received_at)
-    stamp = run_timestamp or asset_time.now().isoformat()
+    stamp = run_timestamp.stamp()
     results.extend(process(arrival, steps=steps, among=arrivals,
                            run_timestamp=stamp, run_by=run_by,
                            on_step=on_step))

@@ -15271,27 +15271,20 @@ twice. It deliberately did not re-find the `TypeError`.
        on `DbtPackagesMissing`, because the fix's worktree has no dbt
        packages installed. It is environmental, not this change.
 
-355. **[in-progress, 2026-11-15]** **[Pipeline & publishing]** **Under one clock a batch run stamps each arrival as it starts, on every asset.**
-     Found building REQ-PIPE-382 (step 3 of #134), and a change to agreed
-     behaviour, so it is Keith's to confirm. The batch used to stamp every
-     run of a pass with one instant taken at its start (`_begin`'s
-     `run_timestamp`), and a replay replaced it per arrival only because
-     `replay_clock.active()` said so. With that flag gone (criterion 11) and
-     one clock (criterion 2), the pass-wide instant is taken before a
-     replay's first event, so it is the clock beneath the replay - the wall
-     clock - and a replayed history would have stamped every run with today.
-     - **What was built (PROVISIONAL)**: `orchestrate.run_pipeline` and
-       `run_stream` pass no pass-wide instant, so the lifecycle stamps each
-       arrival as it starts on whichever clock is in force: a replay's
-       receipt, a real run's own moment. On a real asset a `pipeline run`'s
-       runs now carry when each started rather than when the pass did, as
-       the hand-filed path and the processing pass already did.
-     - **Shown by**: `tests/test_replay_clock.py::TestAReplayStampsItsOwnTime`
-       (every stamp the replay's, not today's) and
-       `tests/test_one_clock.py`.
-     - **For Keith**: accept per-arrival stamps for a real batch, or ask for a
-       pass-wide instant back - which would need the pipeline to ask the
-       clock for one at the first arrival rather than at `_begin`.
+355. **[superseded, 2026-11-16]** **[Pipeline & publishing]** **Under one clock a batch run stamped each arrival as it started - superseded by #359.**
+     Found building REQ-PIPE-382 (step 3 of #134). The batch used to stamp
+     every run of a pass with one instant taken at `_begin`, and a replay
+     replaced it per arrival only because `replay_clock.active()` said so.
+     With that flag gone and one clock, an instant taken at `_begin` is the
+     clock beneath a replay - the wall clock - so the first build passed no
+     pass-wide instant and stamped each arrival as it started, on every
+     asset. Its justification, that "the hand-filed path and the processing
+     pass already did", was WRONG for the processing pass: `processing_pass`
+     takes ONE `run_timestamp` for its whole pass, so the two real batch
+     paths would have disagreed. The critic on f6264d73 also showed the cost:
+     `changelog.py` groups the QA activity feed by (collection,
+     run_timestamp), so a real first run of ~30 arrivals would have flooded
+     the 30-entry feed. Fixed by #359.
 
 356. **[in-progress, 2026-11-15]** **[Data generation]** **The target trial is handed to the bootstrap by cli/.**
      Found building REQ-GEN-381 criterion 3: the bootstrap may import the
@@ -15337,6 +15330,86 @@ twice. It deliberately did not re-find the `TypeError`.
      effect at the instant they are made, which changes what an inherit sees);
      the fixture's 2026-Q1 is a shared real period, so the likely fix is a
      private database or a made-up period for it. Not fixed here.
+     - **The critic's note (2026-11-16)**: it could not reproduce it either.
+       Every non-replay promotion now takes effect at the wall clock rather
+       than receipt plus lag (REQ-PIPE-382), which may change what
+       inheritance's `_most_recent_promoted(before=...)` sees. A private
+       period for the fixture is not cheap: `conftest._file_and_overlay_cp`'s
+       2026-Q1 and 2026-Q2 are shared by several module fixtures, and a
+       period schema must be on its asset's baseline (#340). Left open.
+
+359. **[done, 2026-11-16]** **[Pipeline & publishing]** **A real batch stamps one instant for its pass again; a replay still stamps each run's replayed time.**
+     The critic on f6264d73 (MEDIUM), correcting #355. PROVISIONAL, the
+     coordinator's call for Keith's morning (Q13.5): restore one pass-wide
+     instant for a real batch.
+     - **Fix** (defect, failing test first): the lifecycle takes ONE instant
+       from the clock at the first arrival's processing (`_PassStamp`), not at
+       `_begin`, and stamps each run through a new neutral question,
+       `asset_time.stamp_in_pass(pass_instant)`: the wall clock and a pinned
+       clock answer the pass's instant; the replay clock answers its own time,
+       each arrival's replayed receipt. So the pipeline still asks no "is a
+       replay running" question, a real batch is one QA event per collection
+       as the processing pass is, and a replay stamps as before.
+     - **Seen failing first**: `tests/test_one_clock.py::TestABatchPassStampsOneInstant`
+       - the real batch and real stream tests failed (three distinct stamps)
+       against the per-arrival build; the replay test passed both before and
+       after, so it guards the replay half.
+     - **Choice made**: the coordinator asked for the instant "from the clock
+       at the first arrival's processing_arrival"; taken literally that would
+       also stamp every run of a REPLAY with its first receipt, collapsing the
+       demo's activity feed to one event per collection. Asking the clock
+       instead keeps both - flagged for Keith in case he meant otherwise.
+
+360. **[done, 2026-11-16]** **[Pipeline & publishing]** **A bootstrap's correction confirmation compared freezes with the real present.**
+     The critic on f6264d73 (LOW-MED). `correction_trial`'s `frozen_changes`,
+     `trial` and `preview` defaulted `at` to `datetime.now(UTC)`, and a
+     bootstrap reaches them with no `at` (`bootstrap/correction_replay.confirm_due`
+     -> `correction_apply.confirm` -> `trial_for`), so an item frozen after
+     the replay's instant but before today counted as frozen.
+     - **Fix** (defect, failing test first): the three default to
+       `asset_time.now()` - the replay's instant in a replay, the wall clock
+       otherwise. The git gate's drafts (`drafts_for` -> `agreement_freeze`)
+       keep their wall-clock "today": they run against a git ref, never inside
+       a replay.
+     - **Seen failing first**: `tests/test_one_clock.py::TestACorrectionTrialReadsTheOneClock`
+       listed the change under an installed replay clock before the fix.
+
+361. **[done, 2026-11-16]** **[Testing & dev tooling]** **Small items from the critic on f6264d73.**
+     - `tests/test_bootstrap_package.py::test_a_change_to_a_moved_package_moves_the_key`
+       now edits a file's hash under the package and asserts the cache key
+       moves (it stopped at "is an input").
+     - `bootstrap/replay_inputs.py`'s comment over the `generator.public`
+       import said "through cli"; reworded.
+     - `gate._completing_instant` imported `asset_time` twice; one import.
+     - README's quick-start: the merge with the main tree already runs the
+       bootstrap once per asset with `MOTHMAN_ASSET` set, which is the fix
+       the critic asked for.
+
+362. **[done, 2026-11-16]** **[Pipeline & publishing]** **A malformed MOTHMAN_PINNED_NOW on a real asset raised a parse error, not the refusal.**
+     The critic on f6264d73 (LOW). `asset_time.ambient` parsed the pin before
+     the gate. Fixed test-first: the gate now runs first, so any pin on a real
+     asset raises `PinnedClockRefused`;
+     `tests/test_one_clock.py::TestAMalformedPinOnARealAsset` raised
+     `ValueError` before the fix.
+
+363. **[done, 2026-11-16]** **[Testing & dev tooling]** **A checkpoint was refused while the datacontract-cli worker held a connection.**
+     Found by the fast half after merging the main tree into step 3: both
+     cases of `tests/test_one_asset_beside_another.py::test_each_command_leaves_the_other_assets_folders_byte_for_byte`
+     failed, the checkpoint copy refused with "cannot be copied while
+     anything is connected to it - connected now: mothman-identity-check".
+     Speed batch A's persistent datacontract-cli worker (REQ-PIPE-431,
+     `qa_tools/common/datacontract_worker.py`) runs `supply_db_details`'
+     identity check in its own process and keeps that connection, which
+     `supply_db.release_connections` in the bootstrap's process cannot
+     reach. The same code is on the main tree (its `checkpoints.save` is
+     unchanged), so the main tree likely has this failure too - worth
+     checking there.
+     - **Fix**: `bootstrap/checkpoints.save` stops the datacontract-cli and dbt
+       workers after releasing its own connections, before the copy; each
+       starts again on the next call that needs it.
+     - **Seen failing first**: the fast half on the merged tree (both cases);
+       then `tests/test_one_asset_beside_another.py` and
+       `tests/test_checkpoints.py` 43 passed with the fix.
 
 370. **[done, 2026-11-16]** **[Pipeline & publishing]** **Ctrl-C during a run was recorded as a dbt or datacontract-cli crash.**
      The post-build critic on wip/speed-a at 31579f9e (REQ-PIPE-431's

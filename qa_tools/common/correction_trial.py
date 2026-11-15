@@ -208,11 +208,10 @@ def frozen_changes(base: tuple[dict, dict], work: tuple[dict, dict],
     """Every frozen item that differs (criterion 1), by the gate's own
     comparison (REQ-PIPE-111) - an appended date, or anything not yet
     frozen at `at`, is not a correction and is not listed."""
-    from datetime import UTC
 
     from qa_tools.common import agreement_freeze
 
-    at = at or datetime.now(UTC)
+    at = at or _now()
     out = []
     for key, (item, old, new, frozen_at) in sorted(
             agreement_freeze.changed(base[0], work[0], base[1], work[1]).items()):
@@ -221,6 +220,18 @@ def frozen_changes(base: tuple[dict, dict], work: tuple[dict, dict],
         out.append(FrozenChange(key, item.owner, old, new))
     return tuple(out)
 
+
+
+def _now() -> datetime:
+    """When a trial is taken where no instant is given: the one clock
+    (REQ-PIPE-382; post-build-review #360) - a replay's instant during a
+    bootstrap's confirmation (correction_replay.confirm_due -> confirm ->
+    trial_for), the wall clock otherwise. The git gate's drafts (drafts_for,
+    agreement_freeze) keep their own wall-clock "today": they run against a
+    git ref, never inside a replay."""
+    from asset_model import asset_time
+
+    return asset_time.now()
 
 # ---- the recorded facts --------------------------------------------------
 
@@ -314,12 +325,11 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
     """What changing the agreement from `base` to `work` would change, for
     every dataset (or `dataset_ids`), against the recorded facts `conn`
     reads. Computed and returned; nothing is written (criterion 10)."""
-    from datetime import UTC
 
     from asset_model import assignment, asset_time, hierarchy
     from qa_tools.common import verdict
 
-    at = at or datetime.now(UTC)
+    at = at or _now()
     changes = frozen_changes(base, work, at)
     if not changes:
         return Trial()
@@ -563,14 +573,13 @@ def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
     state cannot be read, and supply_db.SupplyDbError where the recorded
     facts cannot be reached (criterion 9): an impact computed from
     configuration alone is not complete, so none is offered."""
-    from datetime import UTC
 
     from qa_tools.common import supply_db
     from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
 
     ref = ref or diff_base(root=validate_schedule.ROOT)
-    at = at or datetime.now(UTC)
+    at = at or _now()
     base, work = at_ref(ref), declared_corrections.working()
     with supply_db.connect(read_only=True, label="mothman:correction-preview") as conn:
         t = trial(conn, base, work, at=at)

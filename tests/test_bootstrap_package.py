@@ -157,11 +157,19 @@ class TestTheCacheKeyFollowsTheCode:
 
     @pytest.mark.parametrize("package", ["bootstrap", "scenarios", "asset_model"])
     def test_a_change_to_a_moved_package_moves_the_key(self, package, monkeypatch):
+        """A file under the package is an input, so editing it changes the
+        cache key (post-build-review #361: this used to stop at 'is an
+        input'). The edit is a changed content hash, as the test of an edited
+        check file does in tests/test_replay_inputs.py."""
         from bootstrap import replay_inputs
 
         files = replay_inputs.input_files(replay_inputs.inputs("quarterly"))
-        mine = [f for f in files if f.startswith(f"{package}/")]
+        mine = sorted(f for f in files if f.startswith(f"{package}/"))
         assert mine, f"nothing under {package}/ is an input"
+        before = replay_inputs.cache_key("quarterly")
+        edited = dict(files, **{mine[0]: "edited"})
+        monkeypatch.setattr(replay_inputs, "input_files", lambda patterns=None: dict(edited))
+        assert replay_inputs.cache_key("quarterly") != before
 
 
 #: The data asset this module's tests act for (C11, Keith 2026-11-02).

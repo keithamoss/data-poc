@@ -342,5 +342,93 @@ class TestOneReaderOfTheDeclaration:
                 checkpoints.require_synthetic()
 
 
+def _recording_steps(log):
+    from qa_tools.common import arrival_lifecycle
+
+    return arrival_lifecycle.Steps(
+        file_and_overlay=lambda a, among: None,
+        entry_for=lambda a: {"run_id": a.run_id},
+        run_one=lambda entry, ts, run_by, on_step=None: log.append((entry["run_id"], ts)) or [],
+        promote_after=lambda a, got, run_by: None)
+
+
+def _three():
+    return [SimpleNamespace(run_id=f"r{n}", received_at=LONG_AGO + timedelta(days=n),
+                            delivery_name=f"d{n}", sequence=1) for n in (1, 2, 3)]
+
+
+class TestABatchPassStampsOneInstant:
+    """post-build-review #359 (the critic on f6264d73): a real batch stamps
+    every run of its pass with ONE instant, as processing_pass does and as the
+    QA activity feed groups by (changelog.py: one event per run_timestamp);
+    a replay still stamps each run with its arrival's replayed time."""
+
+    def test_a_real_batch_stamps_one_instant_for_the_whole_pass(self):
+        from qa_tools.common import arrival_lifecycle
+
+        log = []
+        before = asset_time.now()
+        arrival_lifecycle.process_all(_three(), steps=_recording_steps(log), run_by="t")
+        stamps = {ts for _r, ts in log}
+        assert len(log) == 3 and len(stamps) == 1, log
+        assert datetime.fromisoformat(stamps.pop()) >= before
+
+    def test_a_real_stream_stamps_one_instant_too(self):
+        from qa_tools.common import arrival_lifecycle
+
+        log = []
+        cp, ed = _three()[:2], _three()[2:]
+        steps = _recording_steps(log)
+        arrival_lifecycle.process_stream(
+            [("cp", a) for a in cp] + [("ed", a) for a in ed],
+            {"cp": (cp, steps, None, "t", None), "ed": (ed, steps, None, "t", None)},
+            player=None, results={"cp": [], "ed": []})
+        assert len(log) == 3 and len({ts for _r, ts in log}) == 1, log
+
+    def test_a_replay_stamps_each_run_with_its_replayed_time(self):
+        from qa_tools.common import arrival_lifecycle
+
+        log = []
+        with replay_clock.replaying():
+            arrival_lifecycle.process_all(_three(), steps=_recording_steps(log), run_by="t")
+        assert len(log) == 3
+        for (run_id, ts), arrival in zip(log, _three()):
+            at = datetime.fromisoformat(ts)
+            assert arrival.received_at <= at < arrival.received_at + timedelta(seconds=5), run_id
+
+
+class TestACorrectionTrialReadsTheOneClock:
+    """post-build-review #360 (the critic on f6264d73): correction_trial
+    defaulted `at` to datetime.now(UTC), so a bootstrap's confirmation
+    (bootstrap/correction_replay.confirm_due -> correction_apply.confirm ->
+    trial_for, with no `at`) compared freezes with the real present rather
+    than the replay's instant."""
+
+    def test_the_frozen_at_comparison_uses_the_replays_instant(self, monkeypatch):
+        from qa_tools.common import agreement_freeze, correction_trial
+
+        frozen_at = datetime(2025, 1, 1, tzinfo=PERTH)
+        item = SimpleNamespace(owner=("calendar", "x"))
+        monkeypatch.setattr(agreement_freeze, "changed",
+                            lambda *a: {"k": (item, "old", "new", frozen_at)})
+        docs = ({}, {})
+        assert correction_trial.frozen_changes(docs, docs), "wall clock: frozen, so listed"
+        with replay_clock.replaying():
+            replay_clock.anchor("2024-06-01T09:00:00+08:00")
+            assert correction_trial.frozen_changes(docs, docs) == ()
+
+
+class TestAMalformedPinOnARealAsset:
+    """post-build-review #362 (the critic on f6264d73): the pinned value was
+    parsed before the gate, so a malformed MOTHMAN_PINNED_NOW on a real asset
+    raised a parse error rather than the refusal a real asset owes."""
+
+    def test_it_is_refused_as_a_pin_not_reported_as_a_bad_timestamp(self, monkeypatch):
+        monkeypatch.setattr(asset_time, "declared_synthetic", lambda: False)
+        monkeypatch.setenv(asset_time.PINNED_NOW_VARIABLE, "not-a-date")
+        with pytest.raises(asset_time.PinnedClockRefused, match="synthetic: true"):
+            asset_time.now()
+
+
 #: The data asset this module's tests act for (C11, Keith 2026-11-02).
 pytestmark = pytest.mark.asset("quarterly")

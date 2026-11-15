@@ -196,9 +196,9 @@ def regenerated_print(collection_id: str) -> list[ArrivalPrint]:
     import io
     import warnings
 
-    # THROUGH cli, NEVER generator DIRECTLY: no pipeline module may import the
-    # generator package (tests/test_arrivals.py's wall), and cli is where the
-    # pipeline already reaches it from - as bootstrap does.
+    # THROUGH THE GENERATOR'S ONE PUBLIC MODULE (REQ-GEN-381 criterion 3): the
+    # bootstrap may import the generator, but only generator/public.py, and
+    # never cli/ (the imports gate, REQ-TEST-384).
     from generator.public import generated_into
 
     # QUIET: the generators narrate every delivery they write, which is
