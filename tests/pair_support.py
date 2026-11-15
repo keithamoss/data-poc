@@ -17,7 +17,8 @@ def free_day(conn, start: date, span: int = 300) -> date:
     day holds a pair already - a test database keeps every pair the earlier
     tests left, and a re-file into a period holding an open one is refused
     (post-build-review #170). SETTLED pairs count too (#172): a settled
-    pair's supplies on the same day can be another test's latest arrival."""
+    pair's supplies on the same day can be another test's latest arrival.
+    And so do OPENED periods (#354)."""
     import random
 
     from qa_tools.common import dataset_blockers
@@ -28,10 +29,16 @@ def free_day(conn, start: date, span: int = 300) -> date:
             found = supply_files.resolve(conn, DS, blocker.supply)
             if found is not None and found.period:
                 taken.add(found.period)
+    from qa_tools.common import period_schema
+
     for _ in range(200):
         day = start + timedelta(days=random.randrange(span))
-        if not {day.isoformat(), (day + timedelta(days=1)).isoformat(),
-                (day + timedelta(days=2)).isoformat()} & taken:
+        near = {day.isoformat(), (day + timedelta(days=1)).isoformat(),
+                (day + timedelta(days=2)).isoformat()}
+        # AN OPENED PERIOD IS TAKEN TOO (post-build-review #354): a test that
+        # asserts its settlement opened nothing fails beside one an earlier
+        # test on the same worker opened.
+        if not near & taken and not any(period_schema.opened(conn, p) for p in near):
             return day
     raise AssertionError("no free day for a pair - the test database is full of them")
 

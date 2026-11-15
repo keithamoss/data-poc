@@ -15252,3 +15252,21 @@ twice. It deliberately did not re-find the `TypeError`.
        one by one to see it fail. Each was rewritten onto the same module
        object the code under test now reads, and the by-value scan above is
        what stands in for that; said here rather than claimed.
+
+354. **[done, 2026-11-16]** **[Testing & dev tooling]** **The pair helper's "free day" could sit next to a period another test had opened.**
+     Found by the full suite on 06a850d7, the #134 step 2 merge:
+     `test_carry_forward_review.py::TestADecisionThatDoesNotStandOpensNothing::test_a_failed_settlement_opens_nothing`
+     failed on `assert not period_schema.opened(conn, '2026-11-02')`. It had
+     passed on 4240a263 and passes on its own, with nothing in the step 2
+     diff touching its logic. The cause: `tests/pair_support.py`'s
+     `free_day` picks a random day and skips days that hold a pair, but not
+     periods that earlier tests on the same worker database had OPENED. The
+     merge added test modules, which reshuffled which modules share a worker,
+     and the random day landed beside one of those periods.
+     - **Fix** (defect, failing test first): `free_day` also treats an
+       opened period as taken. `tests/test_pair_support.py::test_a_day_next_to_an_opened_period_is_not_free`
+       failed against 06a850d7 ("DID NOT RAISE") and passes now. The six
+       modules that use the helper: 242 passed and 1 failed. That failure is
+       `test_choose_file_runs.py::test_each_settled_supply_is_checked_on_its_own_file`
+       on `DbtPackagesMissing`, because the fix's worktree has no dbt
+       packages installed. It is environmental, not this change.
