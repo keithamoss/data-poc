@@ -325,10 +325,10 @@ class TestACollectionWithNoDriftChecksRuns:
     def test_collection_checks_has_no_psi(self, monkeypatch):
         """Linkage Products declared none until its geocoding tables gained
         drift checks (REQ-QAC-297), so an empty file is stood in for."""
-        from asset_model import check_lifecycle, drift as evidently_common
+        from asset_model import check_lifecycle, drift
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {})
-        got = evidently_common.collection_checks("linkage-products")
+        got = drift.collection_checks("linkage-products")
         assert got.psi == () and got.row_drop == {}
 
     def test_evaluate_runs_nothing_and_records_nothing_red(self, monkeypatch):

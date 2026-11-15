@@ -25,19 +25,15 @@ from asset_model import assets as _assets
 
 
 def _docs_either_side(reference: str, docs):
-    from asset_model import (
-        declared_corrections as correction_apply,
-        declared_corrections as correction_replay,
-        declared_corrections,
-    )
+    from asset_model import declared_corrections
 
     docs = docs or declared_corrections.working()
-    p = next((p for p in correction_apply.declared(*docs) if p.reference == reference), None)
+    p = next((p for p in declared_corrections.pending_corrections(*docs) if p.reference == reference), None)
     if p is None:
         return None, None, None
-    at = correction_replay.merge_instant(p)
-    return (p, correction_replay.docs_at(at - timedelta(microseconds=1), docs),
-            correction_replay.docs_at(at, docs))
+    at = declared_corrections.merge_instant(p)
+    return (p, declared_corrections.docs_at(at - timedelta(microseconds=1), docs),
+            declared_corrections.docs_at(at, docs))
 
 
 def _slots(dataset_id: str, cal: dict, until: date) -> dict:

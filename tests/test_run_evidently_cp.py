@@ -120,7 +120,7 @@ class TestACollectionWithNoEvidentlyCheck:
         assert got == [] and written == {"verified": []}
 
     def test_a_file_with_checks_but_no_drift_check_is_still_refused(self, tmp_path, monkeypatch):
-        from asset_model import check_lifecycle, drift as evidently_common
+        from asset_model import check_lifecycle, drift
 
         monkeypatch.setattr(check_lifecycle, "load_evidently_checks", lambda path: {
             "quarterly.department-of-health.linkage-products.linkage-keys.row_drop_evidently":
@@ -128,7 +128,7 @@ class TestACollectionWithNoEvidentlyCheck:
         import pytest
 
         with pytest.raises(ValueError, match="at least one psi check"):
-            evidently_common.collection_checks("linkage-products")
+            drift.collection_checks("linkage-products")
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

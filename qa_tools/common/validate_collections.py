@@ -648,12 +648,12 @@ def line_report(adapters: Path | None = None, providers: Path | None = None) -> 
 
 
 def main() -> int:
-    from asset_model import linked_datasets, set_member_checks as list_setting_members
+    from asset_model import linked_datasets, set_member_checks
     from qa_tools.common import run_reads
 
     problems = (config_problems() + check_file_problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
-                + list_setting_members.problems())
+                + set_member_checks.problems())
     for line in line_report():  # reported whether or not the gate passes
         print(f"  {line}")
     if problems:

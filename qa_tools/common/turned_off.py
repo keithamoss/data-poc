@@ -188,16 +188,12 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
     its level and the date it was AUTHORED - the newest declared correction
     that set or moved that effective_to where there is one, else the newest
     changelog entry carrying turns_off: true. Configuration only."""
-    from asset_model import (
-        declared_corrections,
-        declared_corrections as agreement_drift,
-        schedule,
-    )
+    from asset_model import declared_corrections, schedule
 
     agr = schedule.agreement_to_read(agreement)
     if not agr.ever_turned_off(dataset_id):
         return []
-    cal_doc, asset_doc = docs or agreement_drift.load_docs()
+    cal_doc, asset_doc = docs or declared_corrections.load_docs()
     corrected: dict[str, str] = {}
     for entries in declared_corrections.corrections_by_owner(cal_doc, asset_doc).values():
         for corr in entries:
