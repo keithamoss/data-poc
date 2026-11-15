@@ -245,7 +245,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
@@ -296,7 +296,7 @@ jobs:
         # deployment tests reach.
         run: |
           uv run pytest -m "not needs_deployment" -rs \
-            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
             --cov-report= --cov-fail-under=0
 
       - name: Keep this half's coverage for the combine
@@ -364,7 +364,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
@@ -490,7 +490,7 @@ jobs:
         run: |
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman env mark --confirm ci
+              uv run mothman env mark --confirm "${asset}/ci"
           done
 
       # EACH ASSET'S OWN dbt PROJECT (assets/<asset>/dbt), one process each.
@@ -576,7 +576,7 @@ jobs:
           for asset in $(cd assets && ls -d */ | tr -d /); do
             MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
               uv run pytest -m needs_deployment --only-asset "$asset" -rs \
-                --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+                --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
                 --cov-append --cov-report= --cov-fail-under=0
           done
 

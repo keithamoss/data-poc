@@ -93,7 +93,7 @@ jobs:
       - name: Install this asset's dbt packages
         run: uv run mothman env dbt-deps
       - name: Mark this asset's warehouse database as CI's
-        run: uv run mothman env mark --confirm ci
+        run: uv run mothman env mark --confirm "${MOTHMAN_ASSET}/ci"
       # Moved here from test.yml's fast half (post-build-review): seconds of
       # work, and push CI's only check for a duplicate YAML key.
       # Repository-wide, so one leg runs it.

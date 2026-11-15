@@ -144,9 +144,10 @@ def reset_synthetic_command() -> None:
 
 
 @env_group.command("mark")
-@click.option("--confirm", "typed", metavar="ENVIRONMENT_ID", default=None,
-              help="The environment id, typed on the command line - for a setup script "
-                   "with no terminal. Without it you are asked to type it.")
+@click.option("--confirm", "typed", metavar="DATA_ASSET/ENVIRONMENT", default=None,
+              help="The data asset id and the environment id, as <data asset>/<environment> "
+                   "(e.g. daily/sandbox), typed on the command line - for a setup script "
+                   "with no terminal. Without it you are asked to type them.")
 def mark_command(typed: str | None) -> None:
     """Record in the database which data asset and environment it belongs to.
 
@@ -154,7 +155,8 @@ def mark_command(typed: str | None) -> None:
     or differs from this checkout's (REQ-PIPE-107), and none of them ever
     writes it - this is the only way it gets there. The identity written is
     this checkout's: the data asset in assets/<asset>/data-asset.yaml and the
-    environment stated in MOTHMAN_ENVIRONMENT, which you type to confirm.
+    environment stated in MOTHMAN_ENVIRONMENT, both of which you type to
+    confirm, as <data asset>/<environment> (REQ-PIPE-343 criterion 1).
     """
     from cli import common
     from qa_tools.common import db_identity, environments, supply_db
@@ -165,16 +167,25 @@ def mark_command(typed: str | None) -> None:
         raise click.ClickException(str(exc)) from None
     if typed is None:
         try:
-            common.require_tty("pass --confirm <environment id>")
+            common.require_tty("pass --confirm <data asset>/<environment>")
         except common.NotInteractive as exc:
             raise click.ClickException(str(exc)) from None
         typed = common._ask_text(
-            f"Type the environment id to mark this database as {want}") or ""
-    # TYPED, NOT DEFAULTED (criterion 2): the stated environment is what gets
-    # written, and the person has to say it back.
-    if typed.strip() != want.environment:
+            f"Type the data asset and environment ids, as <data asset>/<environment>, to "
+            f"mark this database as {want}") or ""
+    # TYPED, NOT DEFAULTED (REQ-PIPE-107 criterion 2): the stated environment
+    # is what gets written, and the person has to say it back - and, since the
+    # asset split, the asset too (REQ-PIPE-343 criterion 1), so marking one
+    # asset's database from a checkout selected for the other is caught here.
+    # The same <data asset>/<environment> form replacing an identity asks for.
+    if "/" not in typed:
         raise click.ClickException(
-            f"that did not read {want.environment!r}, so nothing was marked.")
+            "type both the data asset id and the environment id, as "
+            "<data asset>/<environment> - nothing was marked.")
+    if typed.strip() != f"{want.data_asset_id}/{want.environment}":
+        raise click.ClickException(
+            f"that did not read {want.data_asset_id}/{want.environment}, so nothing was "
+            f"marked.")
     with supply_db.connect(label="mothman:env-mark", for_marking=True) as conn:
         try:
             _, found = db_identity.read(conn)

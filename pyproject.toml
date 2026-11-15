@@ -171,7 +171,15 @@ markers = [
 # (dbt-generated), not synthetic_data_generator/ (deliberately out of
 # Phase 6's scope - plans/publishing-and-history.md/plans/data-
 # generation.md #8 - dormant/unwired code, not worth a coverage floor yet).
-source = ["qa_tools", "pipeline", "generator", "dashboard", "cli"]
+source = ["qa_tools", "pipeline", "generator", "dashboard", "cli", "assets"]
+# THE ADAPTERS AND PROVIDERS ARE LOADED BY PATH (REQ-PIPE-369 criterion 6,
+# REQ-TEST-353 criterion 9): assets/ is not a package and holds no
+# __init__.py, so coverage would not walk into it to find a file no test
+# loaded - this makes it, so moving them out of qa_tools/collections/ and
+# generator/collections/ neither drops them from the figure nor moves
+# fail_under. (`include` is ignored once `source` is set - Keith's
+# amendment, 2026-11-01.)
+include_namespace_packages = true
 
 [tool.coverage.report]
 exclude_also = [

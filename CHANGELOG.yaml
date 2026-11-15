@@ -111,9 +111,10 @@ intro: >
 releases:
   - date: "2026-11-15"
     summary: >
-      Two new checks keep the code's boundaries and the two assets' dbt
-      packages in line, ticket sync posts nothing unless your environment
-      turns ticketing on, and five out-of-date developer commands are gone.
+      New checks keep the code's boundaries, the two assets' dbt packages and
+      the assets/ folder in line, ticket sync posts nothing unless your
+      environment turns ticketing on, and five out-of-date developer commands
+      are gone.
     changes:
       - category: New
         items:
@@ -138,6 +139,12 @@ releases:
               Run by hand, mothman github sync-tickets could open issues from a
               sandbox or a laptop. It now stops first, naming your environment,
               unless that environment turns ticketing on in its settings.
+          - headline: Two duplicates are refused
+            components: ["QA checks & contract"]
+            description: >
+              Within one asset, a collection id declared twice, or one table
+              declared by two datasets of the same collection, used to pass
+              the checks. Both now fail, naming the two entries.
       - category: Improved
         items:
           - headline: Fewer, truer commands
@@ -148,6 +155,25 @@ releases:
               gone. Their help described designs that no longer exist, and one
               could quietly overwrite a shared test file. `mothman supply load`
               does what `build-warehouses` did.
+          - headline: Mark a database with both ids
+            components: ["Testing & dev tooling"]
+            description: >
+              You now type the data asset and the environment together, as
+              daily/sandbox, to mark a database. The environment alone marks
+              nothing, so one asset's database cannot be marked from a
+              terminal set up for the other.
+          - headline: Each failure names its asset
+            components: ["Testing & dev tooling"]
+            description: >
+              When mothman check runs a gate once for each asset, every line
+              of each run starts with the asset's name, and the summary says
+              which asset a gate failed for.
+          - headline: A stray folder is caught
+            components: ["Testing & dev tooling", "QA checks & contract"]
+            description: >
+              A file or a folder with no data-asset.yaml at the top of
+              assets/, or a collection's own file left in the shared code, now
+              fails mothman check, named, instead of being quietly ignored.
   - date: "2026-11-14"
     summary: >
       The Feedback tab now gathers its cards from a second road-testing file

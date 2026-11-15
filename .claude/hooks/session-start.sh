@@ -135,7 +135,7 @@ if [ "${PG_UP:-}" = "1" ]; then
     fi
     if MOTHMAN_ENVIRONMENT=sandbox MOTHMAN_ASSET="$asset" \
        MOTHMAN_SUPPLY_DSN="postgresql://${PGUSER_NAME}:${PGPASS}@localhost:5432/supply_${asset}" \
-       uv run mothman env mark --confirm sandbox >/dev/null 2>&1; then
+       uv run mothman env mark --confirm "${asset}/sandbox" >/dev/null 2>&1; then
       say "supply_${asset} is marked as this sandbox's."
     else
       say "WARNING: could not mark supply_${asset} as 'sandbox' - run"
@@ -144,29 +144,34 @@ if [ "${PG_UP:-}" = "1" ]; then
   done
 fi
 
-# --- Is there any data here? ------------------------------------------
-STAGED=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d supply -tAc \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema='staging'" 2>/dev/null)
-if [ "${STAGED:-0}" -gt 0 ] 2>/dev/null; then
-  say "Warehouse has ${STAGED} staged table(s)."
-else
-  say "Warehouse is EMPTY. Run 'uv run mothman pipeline bootstrap' to populate it"
-  say "(a few minutes), or pick it from the 'mothman' menu."
-fi
-
-# --- Is the period-table guard installed? (REQ-PIPE-129 criterion 18) ---
-# Asked wherever the qa schema exists - not only where tables are staged
-# (#113): a guard missing from a built schema is worth saying either way.
-HAS_QA=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d supply -tAc \
-  "SELECT to_regclass('qa.schema_version') IS NOT NULL" 2>/dev/null)
-if [ "${HAS_QA}" = "t" ]; then
-  GUARDS=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d supply -tAc \
-    "SELECT count(*) FROM pg_event_trigger WHERE evtname IN ('period_table_guard','period_view_drop_guard') AND evtenabled <> 'D'" 2>/dev/null)
-  if [ "${GUARDS:-0}" != "2" ]; then
-    say "WARNING: the database guard on period tables is NOT installed; the other two"
-    say "guards still run (REQ-PIPE-129). 'uv run mothman supply install-guard' puts it back."
+# --- Is there any data here? One count per asset (REQ-PIPE-352 c4) ---
+# Each asset's own database, supply_<asset>, named in what is said - the
+# pre-split `supply` database belongs to neither asset (REQ-PIPE-343: its
+# identity is data-asset-1, which both refuse), so it is not counted.
+# The period-table guard (REQ-PIPE-129 criterion 18) is asked of each too,
+# wherever its qa schema exists - not only where tables are staged (#113).
+for asset in $(cd assets && ls -d */ | tr -d /); do
+  db="supply_${asset}"
+  STAGED=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d "$db" -tAc \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema='staging'" 2>/dev/null)
+  if [ "${STAGED:-0}" -gt 0 ] 2>/dev/null; then
+    say "${asset}: ${db} has ${STAGED} staged table(s)."
+  else
+    say "${asset}: ${db} is EMPTY. Run 'MOTHMAN_ASSET=${asset} uv run mothman pipeline"
+    say "bootstrap' to populate it (minutes), or pick it from the 'mothman' menu."
   fi
-fi
+  HAS_QA=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d "$db" -tAc \
+    "SELECT to_regclass('qa.schema_version') IS NOT NULL" 2>/dev/null)
+  if [ "${HAS_QA}" = "t" ]; then
+    GUARDS=$(PGPASSWORD="${PGPASS}" psql -h localhost -U "${PGUSER_NAME}" -d "$db" -tAc \
+      "SELECT count(*) FROM pg_event_trigger WHERE evtname IN ('period_table_guard','period_view_drop_guard') AND evtenabled <> 'D'" 2>/dev/null)
+    if [ "${GUARDS:-0}" != "2" ]; then
+      say "WARNING: ${asset}: the database guard on period tables is NOT installed in ${db};"
+      say "the other two guards still run (REQ-PIPE-129). 'MOTHMAN_ASSET=${asset} uv run"
+      say "mothman supply install-guard' puts it back."
+    fi
+  fi
+done
 
 echo "Ready."
 exit 0

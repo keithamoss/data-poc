@@ -114,7 +114,8 @@ def check(setconfig, want: Identity | None = None) -> Identity:
         raise IdentityRefused(
             f"this database carries no recorded identity, so nothing says it belongs to "
             f"{want} - refusing rather than assuming it. If it is the right one, mark it "
-            f"with `mothman env mark` (it asks you to type {want.environment!r}).")
+            f"with `mothman env mark` (it asks you to type "
+            f"'{want.data_asset_id}/{want.environment}').")
     if found != want:
         raise IdentityRefused(
             f"this database belongs to {found}, but this checkout is configured for "
@@ -142,5 +143,14 @@ def mark(conn, identity: Identity) -> None:
         "ON CONFLICT (only_row) DO UPDATE SET data_asset_id = EXCLUDED.data_asset_id, "
         "environment = EXCLUDED.environment, marked_at = now()",
         [identity.data_asset_id, identity.environment])
+    # A CONNECTION POOLED BEFORE THIS IS VOUCHED FOR THE OLD IDENTITY
+    # (supply_db's idle connections are keyed by what their check vouched for,
+    # and handed out again without re-reading it), so a database re-marked
+    # for another asset would be reached through one unchecked - found by
+    # REQ-PIPE-343 criterion 8's test. Every idle connection goes, and the
+    # next connect checks the identity afresh.
+    from qa_tools.common import supply_db
+
+    supply_db.release_connections()
 
 

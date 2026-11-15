@@ -103,8 +103,13 @@ def declaration_problems(declared: dict[str, list[str]] | None = None,
             continue
         for table in tables:
             if table not in owners:
+                # Naming the asset folder checked, and never looking in
+                # another asset's (REQ-PIPE-364 criterion 4).
+                from qa_tools.common import assets
+
                 out.append(f"{check_id} declares a read of {table!r}, which no dataset in "
-                           f"the hierarchy owns (REQ-PIPE-331 criterion 2).")
+                           f"the hierarchy owns ({assets.config_dir()}/data-asset.yaml; "
+                           f"REQ-PIPE-331 criterion 2).")
                 continue
             owner = owners[table]
             if owner.collection_id == parsed.collection:

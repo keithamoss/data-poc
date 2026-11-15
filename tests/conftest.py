@@ -234,7 +234,8 @@ def _mark_worker_db_for(asset: str) -> None:
         # another asset's test left - a Birth Registrations hold read by a
         # quarterly reader that cannot name the dataset. Every data schema
         # goes, the identity's own among them, and is marked afresh below;
-        # the database itself stays, so pooled connections live on.
+        # the database itself stays. Marking it drops this process's idle
+        # pooled connections, which vouched for the old asset (db_identity.mark).
         found = conn.execute(
             "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\\_%' "
             "AND nspname NOT IN ('information_schema', 'public')").fetchall()
