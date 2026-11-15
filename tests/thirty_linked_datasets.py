@@ -248,7 +248,7 @@ class _Source(Provider):
         return [("the quarter", SEED + 1, SEED + 1)]
 
     def generated_periods(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         return [p for p in schedule.periods_for_dataset(self.dataset_id) if p.name == {PERIOD!r}]
 
@@ -274,13 +274,13 @@ class _Source(Provider):
                 for n, d in enumerate(deliveries, start=1)]
 
     def received_at(self, plan, job, n, delivery_obj, entry):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         return asset_time.isoformat(asset_time.wall_clock(
             delivery_obj.received_date, delivery_obj.at.strftime("%H:%M")))
 
     def files(self, plan, job, n, delivery_obj, entry, name):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         out = {{}}
         for table, rows in delivery_obj.payload.items():
@@ -540,7 +540,7 @@ SEED = 3_399_000
 
 
 def linked():
-    from qa_tools.common import hierarchy
+    from asset_model import hierarchy
 
     return hierarchy.dataset(DATASET_ID).linked
 
@@ -559,7 +559,7 @@ class _Product(Provider):
 
     @property
     def depends_on(self):
-        from qa_tools.common import hierarchy
+        from asset_model import hierarchy
 
         return tuple(dict.fromkeys(hierarchy.dataset(d).collection_id for d, _c, _x in linked()))
 
@@ -570,7 +570,7 @@ class _Product(Provider):
         return (Stream("linkage", (DATASET_ID,)), Stream("geocoding", tuple(g for g, _t, _s in GEO)))
 
     def generated_periods(self):
-        from qa_tools.common import schedule
+        from asset_model import schedule
 
         return [p for p in schedule.periods_for_dataset(DATASET_ID) if p.name == {PERIOD!r}]
 
@@ -586,7 +586,7 @@ class _Product(Provider):
                     state={{"sources": sources}})
 
     def _at(self, job):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         return asset_time.wall_clock(job.period.round_date,
                                      "18:05" if job.stream == "geocoding" else "17:05")
@@ -594,7 +594,7 @@ class _Product(Provider):
     def _geocodes(self, plan, job):
         """Each fake geocoding table: one row per source record, its
         identifiers in id_1 onward, placed by postcode."""
-        from qa_tools.common import asset_time, hierarchy
+        from asset_model import asset_time, hierarchy
 
         at = self._at(job)
         out = {{}}
@@ -614,7 +614,7 @@ class _Product(Provider):
         return out
 
     def slot(self, plan, job):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         at = self._at(job)
         if job.stream == "geocoding":
@@ -645,12 +645,12 @@ class _Product(Provider):
                 for n, d in enumerate(deliveries, start=1)]
 
     def received_at(self, plan, job, n, delivery_obj, entry):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         return asset_time.isoformat(self._at(job))
 
     def files(self, plan, job, n, delivery_obj, entry, name):
-        from qa_tools.common import asset_time
+        from asset_model import asset_time
 
         if job.stream == "geocoding":
             out = {{}}

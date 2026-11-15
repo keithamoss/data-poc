@@ -2507,11 +2507,11 @@ def corrections_flow(waiting: list) -> None:
         p = labels[choice]
     actor = actor_at_the_keyboard()
     with supply_db.connect(label="mothman:confirm-correction") as conn:
-        from asset_model import declared_corrections as correction_trial
+        from asset_model import declared_corrections
 
         try:
             p, t = correction_apply.trial_for(conn, p.reference)
-        except (decision_log.DecisionRefused, correction_trial.Unreadable) as exc:
+        except (decision_log.DecisionRefused, declared_corrections.Unreadable) as exc:
             _show(str(exc), title="Cannot open it", style="red")
             return
         key = supply_cli._show_correction(p, t)

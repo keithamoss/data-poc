@@ -235,10 +235,10 @@ def _correction_date(change_reference: str) -> date | None:
     """The date a declared correction counts from, or None if undeclared."""
     from asset_model import (
         declared_corrections as correction_apply,
-        declared_corrections as correction_trial,
+        declared_corrections,
     )
 
-    for p in correction_apply.declared(*correction_trial.working()):
+    for p in correction_apply.declared(*declared_corrections.working()):
         if p.reference == change_reference:
             return date.fromisoformat(p.date[:10])
     return None

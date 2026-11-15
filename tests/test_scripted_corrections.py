@@ -103,9 +103,8 @@ class TestValidationRefusesEachFault:
         assert any("correction 1 already names 'CAB-2'" in p for p in found), found
 
     def test_the_committed_file_passes(self):
-        from asset_model import declared_corrections as correction_trial
 
-        declared = {p.reference for p in declared_corrections.declared(*correction_trial.working())}
+        declared = {p.reference for p in declared_corrections.declared(*declared_corrections.working())}
         from generator import scenario_injection
 
         assert scripted_corrections.problems(scripted_corrections.load(), declared=declared,

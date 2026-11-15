@@ -170,7 +170,7 @@ class TestTheRulesCatchWhatTheyAreFor:
         assert hard_coded(source) == []
 
     def test_a_lookup_at_import_time_is_caught(self):
-        source = ("from qa_tools.common import assets, delivery\n"
+        source = ("from asset_model import assets\nfrom qa_tools.common import delivery\n"
                   "DELIVERIES = assets.deliveries_dir()\n"
                   "class C:\n    WHERE = delivery.bookkeeping_path()\n"
                   "def f(where=assets.reports_path('x')):\n    return where\n")
@@ -178,7 +178,7 @@ class TestTheRulesCatchWhatTheyAreFor:
             "bookkeeping_path", "deliveries_dir", "reports_path"]
 
     def test_a_lookup_at_call_time_is_not(self):
-        source = ("from qa_tools.common import assets\n"
+        source = ("from asset_model import assets\n"
                   "def deliveries():\n    return assets.deliveries_dir()\n"
                   "class C:\n    def m(self):\n        return assets.data_path('x')\n")
         assert import_time_lookups(source) == []

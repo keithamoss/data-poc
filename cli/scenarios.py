@@ -123,13 +123,13 @@ def validate_command() -> None:
     # the declared corrections.
     from asset_model import (
         declared_corrections as correction_apply,
-        declared_corrections as correction_trial,
+        declared_corrections,
     )
     from qa_tools.common import scripted_corrections
 
     confirmations = scripted_corrections.load()
     found += scripted_corrections.problems(confirmations, declared={
-        p.reference for p in correction_apply.declared(*correction_trial.working())},
+        p.reference for p in correction_apply.declared(*declared_corrections.working())},
         injections=scenario_injection.this_assets_injections())
     if found:
         for problem in found:

@@ -249,9 +249,9 @@ def area_codes(dataset_id: str, record: str, year) -> tuple[str, str]:
 def member_setting_of(dataset_id: str) -> tuple[str, str]:
     """(the member column, the list setting) the dataset's set-member checks
     name - which years a record is written for is that setting's in force."""
-    from asset_model import set_member_checks as list_setting_members
+    from asset_model import set_member_checks
 
-    found = {(c.column, c.member_setting) for c in list_setting_members.declared()
+    found = {(c.column, c.member_setting) for c in set_member_checks.declared()
              if c.dataset_id == dataset_id and c.column and c.member_setting}
     if len(found) != 1:
         raise CannotGenerate(f"{dataset_id}'s set-member checks name {sorted(found) or 'no'} "
@@ -365,21 +365,21 @@ def value_counts(rows, column: str, dataset_id: str) -> list[list]:
     """A column's `[[value, count], ...]` exactly as dataset_stats records it
     and the real drift check rebuilds its reference from: every known value,
     zeros included, anything else folded into '(invalid code)'
-    (evidently_common.fold_value_counts, shared)."""
-    from asset_model import drift as evidently_common
+    (drift.fold_value_counts, shared)."""
+    from asset_model import drift
 
     pairs = ([] if rows is None or not len(rows) or column not in rows.columns
              else [[v, int(n)] for v, n in rows[column].astype(str).value_counts().items()])
-    return evidently_common.fold_value_counts(pairs, known_values(dataset_id, column))
+    return drift.fold_value_counts(pairs, known_values(dataset_id, column))
 
 
 def _drift_entry(dataset_id: str) -> dict | None:
     """The geocoding dataset's drift check, as its Evidently check file
     declares it - its column, excluded values and thresholds - or None where
     it declares none."""
-    from asset_model import drift as evidently_common
+    from asset_model import drift
 
-    found = [m for i, m in evidently_common.collection_checks(COLLECTION_ID).checks.items()
+    found = [m for i, m in drift.collection_checks(COLLECTION_ID).checks.items()
              if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
     if len(found) > 1:
         raise CannotGenerate(f"{dataset_id} declares {len(found)} drift checks - one is needed "
@@ -392,15 +392,15 @@ def drift_verdict(dataset_id: str, rows, reference_rows) -> str:
     (REQ-GEN-295 criterion 7 as AMENDED 2026-11-02, Keith, morning report
     A2): computed from the inputs the real check reads - the file's value
     counts and its reference's - by the check's own PSI, exclusions and
-    thresholds (evidently_common.psi_of_counts), so it predicts the check
+    thresholds (drift.psi_of_counts), so it predicts the check
     from what the check reads. green where there is no reference, or nothing
     placed to compare."""
-    from asset_model import drift as evidently_common
+    from asset_model import drift
 
     entry = _drift_entry(dataset_id)
     if entry is None or reference_rows is None:
         return "green"
-    _psi, status = evidently_common.psi_of_counts(
+    _psi, status = drift.psi_of_counts(
         value_counts(rows, entry["column"], dataset_id),
         value_counts(reference_rows, entry["column"], dataset_id), entry)
     return {"fail": "red", "warn": "amber"}.get(status, "green")

@@ -415,9 +415,9 @@ def _mixed(n_suburb, n_postcode, start=0):
 
 
 def _drift_entry(dataset_id):
-    from asset_model import drift as evidently_common
+    from asset_model import drift
 
-    found = [m for i, m in evidently_common.collection_checks("linkage-products").checks.items()
+    found = [m for i, m in drift.collection_checks("linkage-products").checks.items()
              if m.get("method") == "psi" and i.split(".")[3] == dataset_id]
     assert len(found) == 1
     return found[0]
@@ -436,14 +436,14 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         assert lp.drift_verdict(CP, rows, _rows(_mixed(300, 100, start=900))) == "green"
 
     def test_a_shifted_mix_plans_the_checks_own_band(self):
-        from asset_model import drift as evidently_common
+        from asset_model import drift
 
         entry = _drift_entry(CP)
         reference = _rows(_mixed(300, 100))
         seen = set()
         for n_postcode in (100, 160, 250, 380):
             current = _rows(_mixed(400 - n_postcode, n_postcode, start=900))
-            psi, status = evidently_common.psi_of_counts(
+            psi, status = drift.psi_of_counts(
                 lp.value_counts(current, entry["column"], CP),
                 lp.value_counts(reference, entry["column"], CP), entry)
             want = {"pass": "green", "warn": "amber", "fail": "red"}[status]
@@ -478,7 +478,7 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         """The generator's counts are the drift reference's shape exactly:
         every known value, zeros included, and anything else folded into
         '(invalid code)' - dataset_stats' own folding, shared."""
-        from asset_model import drift as evidently_common
+        from asset_model import drift
 
         rows = _rows(_mixed(300, 100))
         rows.loc[rows.index[:5], "match_level"] = "rooftop"
@@ -486,7 +486,7 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
         pairs = [[v, int(n)] for v, n in rows["match_level"].value_counts().items()]
         known = lp.known_values(CP, "match_level")
         assert known and "rooftop" not in known
-        assert got == evidently_common.fold_value_counts(pairs, known)
+        assert got == drift.fold_value_counts(pairs, known)
         assert got[-1] == ["(invalid code)", 5]
         assert [k for k, _n in got[:-1]] == list(known), "every known value, zeros included"
 

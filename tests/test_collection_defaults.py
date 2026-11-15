@@ -678,10 +678,10 @@ class TestCriticFindingsOn181:
         """Every dataset is on the baseline (REQ-PIPE-345), so none is left out
         as on a calendar of its own."""
         from qa_tools.common import correction_apply
-        from asset_model import declared_corrections as asset_model_declared_corrections
+        from asset_model import declared_corrections
 
         doc = _unshare(_doc())
-        p = asset_model_declared_corrections.Pending(
+        p = declared_corrections.Pending(
             reference="CAB-2", owner=("collection", "child-protection"), label="l",
             date="2026-10-11", reason="r", approver="a",
             changes=(("collection child-protection participation_defaults 2023-01-01", None,

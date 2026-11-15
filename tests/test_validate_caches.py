@@ -85,11 +85,11 @@ class TestItFailsOnAPlantedCache:
 #: ticket_sync.DATASET_SCOPE was the hierarchy as it stood when the module was
 #: first imported.
 IMPORT_TIME = {
-    "a comprehension over the hierarchy": "from qa_tools.common import hierarchy\n\n"
+    "a comprehension over the hierarchy": "from asset_model import hierarchy\n\n"
         "SCOPE = {d.dataset_id: d.agency_id for d in hierarchy.all_datasets()}\n",
     "a plain call into the registry": "from qa_tools import collections\n\n"
         "PLANTED = collections.all_collections()\n",
-    "an annotated read of the calendar": "from qa_tools.common import agreement\n\n"
+    "an annotated read of the calendar": "from asset_model import agreement\n\n"
         "PLANTED: object = agreement.current()\n",
 }
 
@@ -106,7 +106,7 @@ class TestItFailsOnAValueBuiltFromConfigurationAtImport:
 
     def test_a_read_inside_a_function_is_not_one(self, tree):
         (tree / "qa_tools/common/planted.py").write_text(
-            "from qa_tools.common import hierarchy\n\n"
+            "from asset_model import hierarchy\n\n"
             "def scope():\n    return {d.dataset_id for d in hierarchy.all_datasets()}\n"
             "PLANTED = lambda: hierarchy.all_datasets()\n"
             "if __name__ == \"__main__\":\n    print(hierarchy.all_datasets())\n")
@@ -115,7 +115,7 @@ class TestItFailsOnAValueBuiltFromConfigurationAtImport:
 
     def test_a_content_keyed_store_is_not_one(self, tree):
         (tree / "qa_tools/common/planted.py").write_text(
-            "from qa_tools.common import config_yaml\n\n_BUILT = config_yaml.Built()\n")
+            "from asset_model import config_yaml\n\n_BUILT = config_yaml.Built()\n")
         assert _gate(tree).returncode == 0
 
 

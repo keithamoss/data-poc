@@ -61,7 +61,7 @@ class TestTheGate:
          "reg.adapter_module('x')"),
         ("from generator import collections as gc\n_p = gc.provider('emergency-department')",
          "gc.provider('emergency-department')"),
-        ("from qa_tools.common import assets\n_m = assets.load('adapter', 'x')",
+        ("from asset_model import assets\n_m = assets.load('adapter', 'x')",
          "assets.load('adapter', 'x')"),
         ("import importlib", "import importlib"),
         ("from importlib import import_module", "from importlib import import_module"),
@@ -81,7 +81,7 @@ class TestTheGate:
 
     def test_shared_code_and_the_standard_library_pass(self, adapters):
         _imports(adapters, "import re\nfrom qa_tools.collections.base import CollectionAdapter\n"
-                           "from qa_tools.common import hierarchy\nfrom generator.collections.base import Plan")
+                           "from asset_model import hierarchy\nfrom generator.collections.base import Plan")
         assert gate.adapter_import_problems() == []
 
     def test_the_gate_reports_it(self, adapters):

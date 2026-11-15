@@ -189,7 +189,7 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
     that set or moved that effective_to where there is one, else the newest
     changelog entry carrying turns_off: true. Configuration only."""
     from asset_model import (
-        declared_corrections as agreement_freeze,
+        declared_corrections,
         declared_corrections as agreement_drift,
         schedule,
     )
@@ -199,7 +199,7 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
         return []
     cal_doc, asset_doc = docs or agreement_drift.load_docs()
     corrected: dict[str, str] = {}
-    for entries in agreement_freeze.corrections_by_owner(cal_doc, asset_doc).values():
+    for entries in declared_corrections.corrections_by_owner(cal_doc, asset_doc).values():
         for corr in entries:
             corr = corr or {}
             for change in corr.get("changes") or []:

@@ -115,7 +115,7 @@ def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], tuple[dict, dict
     covered, ahead of that correction's confirmation (REQ-PIPE-170). BOTH
     DOCUMENTS (post-build-review #199 F2): a timezone correction is reverted
     in the asset document, so the caller reads slots under both."""
-    from asset_model import declared_corrections as agreement_freeze, declared_corrections
+    from asset_model import declared_corrections
     from qa_tools.common import correction_apply
 
     docs = declared_corrections.working()
@@ -124,7 +124,7 @@ def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], tuple[dict, dict
         return {}, None
     cal, asset = docs
     for p in reversed(pending):
-        cal, asset = agreement_freeze.revert(cal, asset, list(p.changes))
+        cal, asset = declared_corrections.revert(cal, asset, list(p.changes))
     waiting: dict[str, list[str]] = {}
     for p in pending:
         for dataset_id in correction_apply.affected_datasets(p, docs[0]):

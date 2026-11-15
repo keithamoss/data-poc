@@ -30,7 +30,6 @@ from asset_model import (
     asset_time,
     assignment,
     declared_corrections,
-    declared_corrections as asset_model_declared_corrections,
     schedule,
 )
 from test_correction_apply import _docs, _grace, _move_q3
@@ -68,28 +67,28 @@ def _q3_date(agr=None) -> date:
 def two(monkeypatch):
     """CAB-1 moves the 2023-Q3 round (cp-clients' 2023-Q4) to 20 October, merged 2026-01-10; CAB-2 shortens
     cp-clients' grace, merged 2026-02-10."""
-    from asset_model import declared_corrections as asset_model_declared_corrections
+    from asset_model import declared_corrections
 
     docs = _declare(_docs(), _move_q3, "CAB-1", "2026-01-10")
     docs = _declare(docs, _grace, "CAB-2", "2026-02-10")
-    monkeypatch.setattr(asset_model_declared_corrections, "working", lambda: docs)
+    monkeypatch.setattr(declared_corrections, "working", lambda: docs)
     return docs
 
 
 class TestTheAgreementAsItStood:
     def test_a_correction_counts_from_the_start_of_its_date(self, two):
         [cab1] = [p for p in declared_corrections.declared(*two) if p.reference == "CAB-1"]
-        assert asset_model_declared_corrections.merge_instant(cab1) == asset_time.start_of_day(
+        assert declared_corrections.merge_instant(cab1) == asset_time.start_of_day(
             date(2026, 1, 10))
 
     def test_before_its_merge_date_it_is_reverted(self, two):
         from qa_tools.common import correction_trial
-        from asset_model import declared_corrections as asset_model_declared_corrections
+        from asset_model import declared_corrections
 
         before = asset_time.start_of_day(date(2026, 1, 10)) - timedelta(seconds=1)
-        with correction_trial.configured(*asset_model_declared_corrections.docs_at(before)):
+        with correction_trial.configured(*declared_corrections.docs_at(before)):
             assert _q3_date() != date(2023, 10, 20)
-        with correction_trial.configured(*asset_model_declared_corrections.docs_at(
+        with correction_trial.configured(*declared_corrections.docs_at(
                 asset_time.start_of_day(date(2026, 1, 10)))):
             assert _q3_date() == date(2023, 10, 20)
 

@@ -135,7 +135,7 @@ def current_checks() -> dict:
 def the_check(check_id: str, checks: dict | None = None):
     """The check a bulk re-check names, or Refused: unknown, retired
     (criterion 4) or a file check (criterion 5)."""
-    from asset_model import file_check_definitions as file_checks
+    from asset_model import file_check_definitions
 
     checks = checks if checks is not None else current_checks()
     check = checks.get(check_id)
@@ -147,7 +147,7 @@ def the_check(check_id: str, checks: dict | None = None):
         raise Refused(f"{check_id} is retired (as of {check.retired_as_of}), and a retired "
                       f"check's results no longer judge any supply, so there is nothing to "
                       f"re-check them for. Nothing was recorded.")
-    if check.tool == file_checks.TOOL:
+    if check.tool == file_check_definitions.TOOL:
         # NO COMMAND TO PASTE (PROVISIONAL, coordinator for Keith, 2026-10-25,
         # Q2 = B): staging an unchanged delivery again records nothing, so the
         # only thing that runs a file check again is the supply being resent.
@@ -207,7 +207,7 @@ def stale_fingerprints(conn, checks: dict) -> dict[str, set[str]]:
     results themselves. A SUPERSET of what any supply's newest result carries:
     results_about decides that for each supply afterwards."""
     from asset_model import check_fingerprint as fp
-    from asset_model import file_check_definitions as file_checks
+    from asset_model import file_check_definitions
 
     s = qa_store.SCHEMA
     rows = conn.execute(
@@ -223,7 +223,7 @@ def stale_fingerprints(conn, checks: dict) -> dict[str, set[str]]:
     out: dict[str, set[str]] = {}
     for check_id, stored in rows:
         check = checks.get(check_id)
-        if check is None or check.retired_as_of or check.tool == file_checks.TOOL:
+        if check is None or check.retired_as_of or check.tool == file_check_definitions.TOOL:
             continue
         try:
             differs = fp.differs(stored, check)

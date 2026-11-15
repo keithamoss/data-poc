@@ -8,7 +8,7 @@ import pytest
 import test_correction_apply as T
 from pipeline import corrections
 from qa_tools.common import correction_apply
-from asset_model import declared_corrections as correction_trial
+from asset_model import declared_corrections
 
 # The confirmation tests' own fixtures, bound by name so pytest finds them.
 conn = T.conn
@@ -24,7 +24,7 @@ def by_supply(monkeypatch):
 
 
 def _declared(monkeypatch, docs):
-    monkeypatch.setattr(correction_trial, "working", lambda: docs)
+    monkeypatch.setattr(declared_corrections, "working", lambda: docs)
 
 
 def test_a_re_judged_supply_carries_original_correction_and_approver(

@@ -12,7 +12,7 @@ import pytest
 import asset_params
 
 from asset_model import collections
-from asset_model import drift as evidently_common
+from asset_model import drift
 from qa_tools.common import supply_db
 from qa_tools.tools import run_evidently
 
@@ -22,7 +22,7 @@ COLLECTIONS = ["civil-registration", "child-protection"]
 def _entry(collection_id):
     """The collection's drift check entry, its column changed - as an edit to
     the check file would change it."""
-    checks = evidently_common.collection_checks(collection_id)
+    checks = drift.collection_checks(collection_id)
     entry = dict(checks.checks[checks.psi[0]], column="some_other_column")
     return collections.by_id(collection_id), entry, checks.psi[0]
 

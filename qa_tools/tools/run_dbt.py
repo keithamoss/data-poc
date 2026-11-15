@@ -56,9 +56,9 @@ def _project_dir() -> str:
     """The selected asset's dbt project, resolved now and refused before dbt
     is invoked when its packages are not installed (REQ-QAC-368 criteria 3
     and 6). It was the import-time constant DBT_PROJECT_DIR."""
-    from qa_tools.common import dbt_common as assets
+    from qa_tools.common import dbt_common
 
-    return str(assets.dbt_project_ready())
+    return str(dbt_common.dbt_project_ready())
 
 
 #: Row-shaped audit tables (the full failing row kept) are counted; the

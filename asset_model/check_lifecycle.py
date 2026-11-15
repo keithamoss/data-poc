@@ -742,7 +742,7 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
     older ref's file: an id derived for a dataset that has since been
     removed is a disappearance the hierarchy gate already reports.
     """
-    from asset_model import file_check_definitions as file_checks, hierarchy
+    from asset_model import file_check_definitions, hierarchy
 
     with open(file_checks_yaml_path) as f:
         doc = config_yaml.parse(f) or {}
@@ -758,11 +758,11 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
         # (REQ-QAC-176 criterion 22): worked out once, from the definition
         # alone - never from the dataset - so a change to it moves every
         # copy at once and no other check.
-        defined = _definition(file_checks.TOOL, name, config, f"file check {name!r}")
+        defined = _definition(file_check_definitions.TOOL, name, config, f"file check {name!r}")
         for dataset in hierarchy.all_datasets():
             out.append(CheckMetadata(
-                check_id=file_checks.check_id_for(dataset, name), category=category,
-                tool=file_checks.TOOL, **defined,
+                check_id=file_check_definitions.check_id_for(dataset, name), category=category,
+                tool=file_check_definitions.TOOL, **defined,
                 source_file=source, **_lifecycle_fields(meta)))
     return out
 

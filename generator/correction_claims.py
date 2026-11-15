@@ -28,10 +28,10 @@ def _docs_either_side(reference: str, docs):
     from asset_model import (
         declared_corrections as correction_apply,
         declared_corrections as correction_replay,
-        declared_corrections as correction_trial,
+        declared_corrections,
     )
 
-    docs = docs or correction_trial.working()
+    docs = docs or declared_corrections.working()
     p = next((p for p in correction_apply.declared(*docs) if p.reference == reference), None)
     if p is None:
         return None, None, None

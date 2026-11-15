@@ -270,10 +270,10 @@ class TestItWaitsForACorrectionsConfirmation:
         file's zone is back."""
         import copy
 
-        from asset_model import asset_time, declared_corrections as correction_trial
+        from asset_model import asset_time, declared_corrections
         from qa_tools.common import schedule_ended
 
-        cal, asset = correction_trial.working()
+        cal, asset = declared_corrections.working()
         confirmed_asset = copy.deepcopy(asset)
         confirmed_asset["timezone"]["versions"][0]["zone"] = "Pacific/Auckland"
         seen = []
@@ -291,7 +291,7 @@ class TestItWaitsForACorrectionsConfirmation:
     def test_unreadable_corrections_leave_every_hold_held(self, conn, monkeypatch):
         """#199 F4: a working copy that cannot be read is said, and nothing
         is re-filed this pass - never an exception out of the pass."""
-        from asset_model import declared_corrections as correction_trial
+        from asset_model import declared_corrections
         from qa_tools.common import schedule_ended
 
         supply = f"cp-carers@{AFTER:%Y%m%d}u"
@@ -299,7 +299,7 @@ class TestItWaitsForACorrectionsConfirmation:
         self._covered_only_by_the_correction(monkeypatch, {})
 
         def unreadable(conn):
-            raise correction_trial.Unreadable("the working copy cannot be read")
+            raise declared_corrections.Unreadable("the working copy cannot be read")
         monkeypatch.setattr(schedule_ended, "_awaiting_confirmation", unreadable)
         said = []
         done = schedule_ended.refile_covered(say=said.append)

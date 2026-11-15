@@ -27,7 +27,7 @@ import psycopg
 
 from asset_model import collections
 from qa_tools.common import asked_for, drift_reference, left_out, supply_db
-from asset_model import drift as evidently_common, hierarchy
+from asset_model import drift, hierarchy
 from qa_tools.common.evidently_common import ENGINE_TAG, recorded_row_counts, reference_value_counts
 from asset_model.drift import (
     NO_REFERENCE,
@@ -54,7 +54,7 @@ def drift_dataset(collection_id: str) -> str | None:
 def _excluding(frame, entry: dict):
     """evidently_common.excluding - the one copy, shared with the
     generator's drift planning (REQ-GEN-295 criterion 7 as amended)."""
-    return evidently_common.excluding(frame, entry)
+    return drift.excluding(frame, entry)
 
 
 def _table_of(check_id: str) -> str:
