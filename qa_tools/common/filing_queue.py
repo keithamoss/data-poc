@@ -97,6 +97,13 @@ ANOTHER_VERSION_WAITING = "another-version-waiting"
 #: person does outside this tool.
 REPROCESS = "fix the fault and reprocess the delivery"
 
+#: A supply whose check nobody could finish - timed out, crashed or did not
+#: finish (REQ-PIPE-417 criterion 6). Listed in the queue ITSELF, as
+#: COULD_NOT_LOAD is, kept out of the slots' own states, and offered REJECT
+#: alone; RETRY is said beside it, as REPROCESS is.
+COULD_NOT_CHECK = "could-not-be-checked"
+RETRY = "the next `mothman pipeline process` retries it"
+
 #: A promoted supply whose re-check came back worse than the verdict it was
 #: promoted on (REQ-PIPE-164 criterion 15): its own heading in the queue,
 #: 'Promoted, then re-checked <verdict>', in place of the slot's plain
@@ -155,6 +162,39 @@ def could_not_load(conn: supply_db.SupplyConnection,
     return out
 
 
+def could_not_check(conn: supply_db.SupplyConnection,
+                    collection_id: str) -> list[slot_state.SlotState]:
+    """Every open 'Could not be checked' in this collection whose supply was
+    FILED to a period - a queue entry offering reject alone (REQ-PIPE-417
+    criterion 6), its reason how the newest try ended. Read from the one
+    derived blocker (dataset_blockers), so the terminal, the TUI and tickets
+    offer what the dashboard's item names."""
+    from asset_model import hierarchy
+    from qa_tools.common import dataset_blockers, filing
+
+    out = []
+    for b in dataset_blockers.could_not_check(conn):
+        if not b.is_open:
+            continue
+        try:
+            entry = hierarchy.dataset(b.dataset_id)
+        except hierarchy.UnknownDatasetError:
+            continue
+        if entry.collection_id != collection_id:
+            continue
+        period = filing.period_for_key(b.dataset_id, arrival_key_of(b.supply))
+        if not period:
+            continue
+        tries = b.tries or {}
+        # '<how the newest try ended>, <tool>, <error type>' (REQ-TEST-418
+        # criterion 3) - the tool is in how it ended where there is one.
+        how = dataset_blockers.tried_words(tries)
+        out.append(slot_state.SlotState(
+            dataset_id=b.dataset_id, period=period, state=COULD_NOT_CHECK, supply=b.supply,
+            reason=how + (f", {tries['errorType']}" if tries.get("errorType") else "")))
+    return out
+
+
 def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
              now: datetime | None = None) -> list[slot_state.SlotState]:
     """The standing queue: supplies waiting on a person (criterion 16).
@@ -169,6 +209,12 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
     sorts first alphabetically.
     """
     failed = could_not_load(conn, collection_id)
+    # AND EACH SUPPLY NOBODY COULD CHECK (REQ-PIPE-417 criterion 6), listed in
+    # the queue itself and kept out of the slots' own states, as a failed
+    # load is.
+    failed += [s for s in could_not_check(conn, collection_id)
+               if (s.dataset_id, arrival_key_of(s.supply))
+               not in {(f.dataset_id, arrival_key_of(f.supply)) for f in failed}]
     unloadable = {(f.dataset_id, arrival_key_of(f.supply)) for f in failed}
     every = slot_state.states_for(conn, collection_id, now=now)
     states = [s for s in every
@@ -366,6 +412,10 @@ def supplies_in(conn: supply_db.SupplyConnection,
     failed = {arrival_key_of(f.supply): f.reason
               for f in could_not_load(conn, hierarchy.dataset(ds).collection_id)
               if f.dataset_id == ds and f.period == period}
+    # AND EACH SUPPLY NOBODY COULD CHECK (REQ-PIPE-417 criterion 6).
+    unchecked = {arrival_key_of(f.supply): f.reason
+                 for f in could_not_check(conn, hierarchy.dataset(ds).collection_id)
+                 if f.dataset_id == ds and f.period == period}
     # THE SUPPLY IN PLACE, from the log rather than from the slot's state
     # (post-build-review #201 F1 and F2): an open pair over a promoted period
     # reads TWO_FILES, and a supply rejected then promoted carries a reject.
@@ -405,6 +455,10 @@ def supplies_in(conn: supply_db.SupplyConnection,
             own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
                                        state=COULD_NOT_LOAD,
                                        reason=failed[arrival_key_of(supply)])
+        elif arrival_key_of(supply) in unchecked:
+            own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
+                                       state=COULD_NOT_CHECK,
+                                       reason=unchecked[arrival_key_of(supply)])
         elif supply == slot.supply and slot.state != slot_state.TWO_FILES:
             own = slot
         elif in_place:
@@ -564,7 +618,7 @@ def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     recorded fact read from the database, not part of the slot's state."""
     from qa_tools.common import excuse
 
-    if not state.supply or state.state == COULD_NOT_LOAD:
+    if not state.supply or state.state in (COULD_NOT_LOAD, COULD_NOT_CHECK):
         # A FAILED LOAD IS OFFERED REJECT ALONE (REQ-GHUB-229 criterion 16,
         # REQ-PIPE-153 criteria 5 and 6) - its punctuality is not the question.
         return ()
@@ -743,6 +797,11 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         # 'settle' and 'reject both' are both choose-file - the TUI words the
         # second - and no other operation is offered on any door.
         return (filing_decisions.CHOOSE_FILE,), ()
+    if state.state == COULD_NOT_CHECK:
+        # REJECT ONLY (REQ-PIPE-417 criterion 6): nothing is known about its
+        # data, and the other response - the next pass retrying it - happens
+        # by itself, said beside it (RETRY).
+        return (filing_decisions.REJECT,), ()
     if state.state == COULD_NOT_LOAD:
         # REJECT ONLY (REQ-PIPE-153 criteria 5 and 6): promoting it is
         # refused on every route, and the other response - fix and

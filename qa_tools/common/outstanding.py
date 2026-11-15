@@ -97,6 +97,9 @@ SEVERITY_ORDER = (NEEDS_ACTION, WARNING, INFORMATIONAL)
 #: the severity is how loudly it asks.
 HELD_SUPPLY = "held-supply"
 FAILED_LOAD = "failed-load"
+#: A supply nobody could check - its check timed out, crashed or did not
+#: finish (REQ-PIPE-417 criterion 5).
+COULD_NOT_CHECK = "could-not-check"
 CONTESTED_FILE = "contested-file"
 #: TWO FILES FOR ONE DATASET in one delivery (REQ-PIPE-115 criterion 8,
 #: REQ-PIPE-105 criterion 6) - the OPPOSITE of CONTESTED_FILE, which is
@@ -507,6 +510,35 @@ def _from_loads(skip: frozenset = frozenset()) -> list[Item]:
     return items
 
 
+def _from_could_not_check(blockers) -> list[Item]:
+    """REQ-PIPE-417 criterion 5: one blocking 'needs a person' item per supply
+    whose 'Could not be checked' is open, built as the failed-load item is -
+    how the newest try ended, when, the tool, how many tries failed, that
+    nothing is known yet, what happens next and what a person can do. Never
+    the error's message (TA Q5): `mothman supply failures` shows it."""
+    from asset_model import hierarchy
+    from qa_tools.common import dataset_blockers
+
+    items = []
+    for b in blockers:
+        if b.kind != dataset_blockers.COULD_NOT_CHECK or not b.is_open:
+            continue
+        agency, collection = _scope_of(b.dataset_id)
+        table = hierarchy.dataset(b.dataset_id).table
+        items.append(Item(
+            kind=COULD_NOT_CHECK, severity=NEEDS_ACTION, blocking=True,
+            headline=f"{table} could not be checked",
+            detail=(f"Our check of {table}'s supply did not finish: "
+                    f"{dataset_blockers.tried_words(b.tries)}. Nothing is yet known about this "
+                    "supply's data. The next processing pass retries it; if it keeps "
+                    "failing, a person can reject the supply. `mothman supply failures` "
+                    "shows the full error."),
+            agency_id=agency, collection_id=collection, dataset_id=b.dataset_id,
+            observed_at=b.opened_at,
+            responses=("let the next processing pass retry it", "reject the supply")))
+    return items
+
+
 def _from_in_flight(observations_dir: Path | None = None) -> list[Item]:
     """REQ-PIPE-057's in-flight delivery - INFORMATIONAL, and framed as
     at the last regeneration.
@@ -551,7 +583,9 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
     """
     from qa_tools.common import filing_queue, slot_state
 
-    skip = {slot_state.TWO_FILES, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD}
+    skip = {slot_state.TWO_FILES, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD,
+            # _from_could_not_check raises its own item (REQ-PIPE-417).
+            filing_queue.COULD_NOT_CHECK}
     by_dataset: dict[str, list] = {}
     worse: list = []
     found_worse: list = []
@@ -841,6 +875,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_holds(conn)
               + _from_contested_tables(blockers, conn)
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
+              + _from_could_not_check(blockers)
               + _from_inheritance_refusals()
               + _from_carry_forward_warnings()
               + _from_awaiting_decisions(conn)

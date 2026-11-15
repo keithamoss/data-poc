@@ -192,6 +192,8 @@ _HOW_IT_READS = {
     slot_state.AMBER_WAITING: "[yellow]warning, waiting for a person (warn setting: hold)[/yellow]",
     slot_state.AWAITING_ACKNOWLEDGEMENT: "[yellow]promoted, awaiting acknowledgement[/yellow]",
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
+    # REQ-TEST-418 criterion 3: _words() adds how its newest try ended.
+    filing_queue.COULD_NOT_CHECK: "[red]could not be checked[/red]",
     filing_queue.ANOTHER_VERSION_WAITING:
         "[yellow]another version waiting - the period holds a promoted one[/yellow]",
     # REQ-PIPE-164 criterion 15 - _words() gives its new verdict from the reason.
@@ -212,6 +214,7 @@ _LISTED_AS = {
     slot_state.AMBER_WAITING: "warning and held for a person",
     filing_queue.ANOTHER_VERSION_WAITING: "waiting behind the promoted supply",
     filing_queue.COULD_NOT_LOAD: "could not be loaded",
+    filing_queue.COULD_NOT_CHECK: "could not be checked",
     slot_state.REJECTED: "turned down",
     filing_queue.SUPERSEDED: "superseded",
     slot_state.TWO_FILES: "an open pair",
@@ -1059,6 +1062,10 @@ def queue_table(states, *, held=frozenset()) -> Table:
             # ITS OWN HEADING WITH BOTH VERDICTS AND THE RE-CHECK
             # (REQ-PIPE-164 criterion 15; post-build-review #192 F1).
             state = escape(s.reason)
+        elif s.state == filing_queue.COULD_NOT_CHECK and s.reason:
+            # HOW ITS NEWEST TRY ENDED, its tool and its error's type
+            # (REQ-TEST-418 criterion 3) - never its message.
+            state = f"{_HOW_IT_READS[s.state]} - {escape(s.reason)}"
         else:
             state = _HOW_IT_READS.get(s.state, s.state)
         # 'For <period> · received <instant>' (REQ-PIPE-327 criterion 3), the
@@ -1300,10 +1307,11 @@ def listed_words(entry: "filing_queue.FiledSupply") -> str:
                  + filing_queue.rechecked_worse_heading(s.verdict).lower())
     elif s.state == slot_state.TWO_FILES:
         words = f"{words} - {' and '.join(s.files)}" if s.files else words
-    elif s.state in (filing_queue.COULD_NOT_LOAD, slot_state.REJECTED,
-                     filing_queue.SUPERSEDED) and s.reason:
-        words = f"{words} - {s.reason}" if s.state == filing_queue.COULD_NOT_LOAD \
-            else f"{words} {s.reason}"
+    elif s.state in (filing_queue.COULD_NOT_LOAD, filing_queue.COULD_NOT_CHECK,
+                     slot_state.REJECTED, filing_queue.SUPERSEDED) and s.reason:
+        words = (f"{words} - {s.reason}"
+                 if s.state in (filing_queue.COULD_NOT_LOAD, filing_queue.COULD_NOT_CHECK)
+                 else f"{words} {s.reason}")
     return words
 
 
@@ -1408,6 +1416,12 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
         # The recorded reason, and the response that is not a control.
         console.print(f"{state.supply} could not be loaded: {state.reason}. Reject it "
                        f"here, or {filing_queue.REPROCESS}.", style="yellow")
+    if state.state == filing_queue.COULD_NOT_CHECK:
+        # REQ-TEST-418 criterion 3: how its newest try ended, and the retry
+        # that happens by itself - never a control.
+        console.print(f"{state.supply} could not be checked: {state.reason}. Reject it "
+                       f"here, or let {filing_queue.RETRY}. `mothman supply failures` "
+                       "shows the full error.", style="yellow", markup=False)
     words = dict(_WHAT_IT_DOES)
     if state.state == filing_queue.ANOTHER_VERSION_WAITING:
         words.update(_WHAT_IT_DOES_TO_ANOTHER_VERSION)
@@ -2094,7 +2108,8 @@ def period_flow(collection_id: str) -> None:
         except filing_queue.LogUnreachable as exc:
             say_unreachable(exc)
             return
-        if len(entries) == 1 and entries[0].state.state == filing_queue.COULD_NOT_LOAD:
+        if len(entries) == 1 and entries[0].state.state in (filing_queue.COULD_NOT_LOAD,
+                                                             filing_queue.COULD_NOT_CHECK):
             own = entries[0].state
             _decide_on(own, offer=_offers(own, filing_queue.operations_for(own)[0]))
             return

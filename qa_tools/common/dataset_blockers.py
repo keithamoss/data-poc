@@ -34,6 +34,10 @@ HELD = "held"
 CONTESTED = "contested"
 #: A supply that arrived and could not be loaded (REQ-DASH-148).
 REFUSED = "refused"
+#: A supply whose newest own run nobody could check - its tries timed out,
+#: crashed or did not finish (REQ-PIPE-417). Named after COULD_NOT_LOAD and
+#: kept clear of processing_pass.UNCHECKED and the page's 'Not checked' (N6).
+COULD_NOT_CHECK = "could-not-check"
 
 
 @dataclass(frozen=True)
@@ -82,6 +86,11 @@ class Blocker:
     #: 2026-10-15): {"action", "actorKind", "actor", "at", "toPeriod",
     #: "reason"} - the page words it; None while open.
     ended: dict | None = None
+    #: A supply that could not be checked (REQ-PIPE-417): its run and how its
+    #: tries went - {"runId", "outcome", "tool", "errorType", "beganAt",
+    #: "endedAt", "failed"} for the newest try that did not complete, and
+    #: how many tries failed. Never an error's message (TA Q5).
+    tries: dict | None = None
     #: A contested pair's own staged tables, in file-name order (REQ-PIPE-279,
     #: PROVISIONAL 2026-10-23): what a reader's contested read names, so the
     #: page keys a cross-table row on the pair rather than on a time.
@@ -118,7 +127,8 @@ class Blocker:
                 # WHERE IT IS SETTLED, for the page's own wording on any date
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
                 "settleAt": self.settle_at if self.kind == CONTESTED else None,
-                "tables": list(self.tables)}
+                "tables": list(self.tables),
+                "tries": self.tries}
 
 
 def _settle_at(dataset_id: str, conn=None) -> str:
@@ -433,12 +443,150 @@ def _refused_in_contests(db) -> set[tuple[str, str]]:
     return out
 
 
+#: How the newest failed try ended, in the reason's words (REQ-PIPE-417
+#: criterion 1) - the tool where there is one, never the message.
+_ENDED_WORDS = {"TIMED-OUT": "timed out", "CRASHED": "crashed",
+                "TOOL-ERROR": "failed in {tool}", "INTERRUPTED": "was stopped"}
+
+
+def tried_words(tries: dict) -> str:
+    """How the newest try ended and when, and how many failed - the one
+    wording the reason, the 'needs a person' item and the terminal share."""
+    from qa_tools.common import display_time
+
+    outcome = tries.get("outcome")
+    if outcome is None or tries.get("endedAt") is None:
+        said = (f"a check began {display_time.format_instant(tries['beganAt'])} "
+                "and has not finished")
+    else:
+        said = (f"its newest try {_ENDED_WORDS.get(outcome, 'crashed').format(tool=tries.get('tool'))}"
+                f" on {display_time.format_instant(tries['endedAt'])}")
+    if tries.get("failed", 0) > 1:
+        said += f" - it could not be checked on {tries['failed']} tries"
+    return said
+
+
+def _decision_instants(db, actions) -> dict[tuple[str, str], str]:
+    """(dataset, arrival key) -> the earliest effective_at of any of
+    `actions` about that supply."""
+    out: dict[tuple[str, str], str] = {}
+    for dataset_id, supply, effective_at in db.execute(
+            "SELECT dataset_id, supply, effective_at FROM qa.decision "
+            f"WHERE action IN ({', '.join('?' for _ in actions)}) ORDER BY effective_at, id",
+            list(actions)).fetchall():
+        out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
+    return out
+
+
+def _could_not_check(db) -> list[Blocker]:
+    """Every supply nobody could check, over its whole life (REQ-PIPE-417
+    criteria 1 to 3 and 7) - DERIVED from the record of attempts when read,
+    never recorded, as a failed load is (N5).
+
+    A RUN COUNTS where it is the supply's arrival run, or a full re-check
+    caused by a decision or by a reload, of no trial and in no gate
+    application (REQ-PIPE-411 criterion 4's runs - a readers-only run, a gate
+    re-check and a trial never do, criterion 7); and a try of it ended other
+    than COMPLETED with no completed try after it.
+
+    OPENED at the supply's receipt for an arrival run, at its decision's
+    effective time for a decision's re-check, at the reload's recorded instant
+    for a reload's (criterion 2; TR1, TV1) - or, for a run that had completed
+    and was reopened, when the first try after that completion began
+    (PROVISIONAL, 2026-11-16: its earlier verdict stood until then).
+    CLOSED at the earliest of a try of the run completing, a person's
+    rejection of the supply, a decision superseding or re-filing it, and a
+    later own run of the supply completing (criterion 3; the last PROVISIONAL,
+    2026-11-16 - a newer verdict of the supply replaces this run's)."""
+    from qa_tools.common import decision_log, qa_results_reader, qa_store
+
+    runs = qa_results_reader.attempts_by_run(db)
+    rejected = _rejections(db)
+    moved = _decision_instants(db, (decision_log.SUPERSEDE, decision_log.REFILE))
+    effective = {i: _iso(at) for i, at in db.execute(
+        "SELECT id, effective_at FROM qa.decision").fetchall()}
+    reloaded = {i: at for i, at in db.execute(
+        "SELECT id, recorded_at FROM qa.load_outcome").fetchall()}
+    completions: dict[tuple[str, str], list[tuple[int, str]]] = {}
+    for ra in runs.values():
+        if ra.supply_id is not None and ra.scope != "readers" and not ra.trial:
+            for a in ra.attempts:
+                if a["outcome"] == qa_store.COMPLETED:
+                    completions.setdefault((ra.dataset_id, ra.supply_id), []).append(
+                        (a["run_seq"], _iso(a["ended_at"])))
+    out = []
+    for ra in sorted(runs.values(), key=lambda r: r.attempts[0]["run_seq"]):
+        if (ra.supply_id is None or ra.trial or ra.gate_application is not None
+                or not (ra.scope == "arrival" or (ra.scope == "full" and (
+                    ra.caused_by_decision is not None or ra.caused_by_load is not None)))):
+            continue
+        attempts = list(ra.attempts)
+        last_done = max((i for i, a in enumerate(attempts)
+                         if a["outcome"] == qa_store.COMPLETED), default=None)
+        newest = attempts[-1]
+        if newest["outcome"] == qa_store.COMPLETED:
+            before = max((i for i, a in enumerate(attempts[:-1])
+                          if a["outcome"] == qa_store.COMPLETED), default=-1)
+            failed = attempts[before + 1:-1]
+            closing = _iso(newest["ended_at"])
+            reopened = before >= 0
+        else:
+            failed = attempts[(last_done + 1) if last_done is not None else 0:]
+            closing = None
+            reopened = last_done is not None
+        if not failed:
+            continue
+        arrival = ra.supply_id.split("@", 1)[-1]
+        if reopened:
+            opened = _iso(failed[0]["began_at"])
+        elif ra.scope == "arrival":
+            opened = _iso(ra.received_instant) or _iso(failed[0]["began_at"])
+        elif ra.caused_by_decision is not None:
+            opened = effective.get(ra.caused_by_decision) or _iso(failed[0]["began_at"])
+        else:
+            opened = reloaded.get(ra.caused_by_load) or _iso(failed[0]["began_at"])
+        first_seq = failed[0]["run_seq"]
+        later_done = [at for seq, at in completions.get((ra.dataset_id, ra.supply_id), ())
+                      if seq > first_seq and at is not None]
+        rejection = rejected.get((ra.dataset_id, arrival))
+        resolved = closing
+        for at in (rejection["at"] if rejection else None,
+                   moved.get((ra.dataset_id, arrival)), *later_done):
+            if at is not None and datetime.fromisoformat(at) >= datetime.fromisoformat(opened):
+                resolved = _earlier(resolved, at)
+        unfinished = [a for a in failed if a["outcome"] is not None and a["ended_at"]]
+        last = failed[-1]
+        tries = {"runId": ra.run_key, "outcome": last["outcome"], "tool": last["tool"],
+                 "errorType": last["error_type"], "beganAt": _iso(last["began_at"]),
+                 "endedAt": _iso(last["ended_at"]), "failed": len(failed),
+                 "ended": len(unfinished)}
+        out.append(Blocker(
+            kind=COULD_NOT_CHECK, dataset_id=ra.dataset_id, supply=ra.supply_id,
+            opened_at=opened, resolved_at=resolved,
+            reason=(f"Could not be checked: {tried_words(tries)}. Nothing is yet known about "
+                    f"this supply's data; the next processing pass retries it, and a person "
+                    f"can reject the supply if it keeps failing."),
+            delivery=ra.delivery,
+            rejected=(rejection if rejection and resolved == rejection["at"] else None),
+            tries=tries))
+    return out
+
+
 def all_blockers(conn=None) -> list[Blocker]:
-    """Every held supply, contested pair and failed load, open or resolved."""
+    """Every held supply, contested pair, failed load and supply that could
+    not be checked (REQ-PIPE-417), open or resolved."""
     from qa_tools.common import delivery_log
 
     with delivery_log._db(conn) as db:
-        return _holds(db) + _contested(db) + _failed_loads(db)
+        return _holds(db) + _contested(db) + _failed_loads(db) + _could_not_check(db)
+
+
+def could_not_check(conn=None) -> list[Blocker]:
+    """Every supply that could not be checked, open or resolved."""
+    from qa_tools.common import delivery_log
+
+    with delivery_log._db(conn) as db:
+        return _could_not_check(db)
 
 
 def contests(conn=None) -> list[Blocker]:

@@ -382,17 +382,57 @@ def failures_command() -> None:
     found = dataset_blockers.unsettled_failures()
     if not found:
         console.print("No supply is waiting because it could not be loaded.")
+    else:
+        console.print(f"[red]{len(found)} supply/supplies could not be loaded[/red] "
+                       f"[dim]- reject the supply, or fix and reprocess[/dim]\n")
+        table = Table("Delivery", "Dataset", "Recorded", "Why", box=None, pad_edge=False)
+        for record in found:
+            table.add_row(
+                record.delivery, record.dataset_id,
+                display_time.format_instant(
+                    asset_time.parse_instant(record.recorded_at, "processing log")),
+                record.reason or "unrecorded")
+        console.print(table)
+    _say_could_not_check()
+
+
+def _say_could_not_check() -> None:
+    """BESIDE THE LOADS THAT FAILED, THE SUPPLIES NOBODY COULD CHECK
+    (REQ-TEST-418 criterion 1): each with its dataset, its supply, how many
+    tries failed and EVERY try - its number, when it began and ended, how it
+    ended, its tool, its run time, its error's type and its FULL stored
+    message, which the published page never carries (TA Q5) - and the two
+    responses."""
+    from qa_tools.common import dataset_blockers, display_time, qa_results_reader
+    from qa_tools.common import run_summary
+
+    stuck = [b for b in dataset_blockers.could_not_check() if b.is_open]
+    if not stuck:
+        console.print("No supply is waiting because it could not be checked.")
         return
-    console.print(f"[red]{len(found)} supply/supplies could not be loaded[/red] "
-                   f"[dim]- reject the supply, or fix and reprocess[/dim]\n")
-    table = Table("Delivery", "Dataset", "Recorded", "Why", box=None, pad_edge=False)
-    for record in found:
-        table.add_row(
-            record.delivery, record.dataset_id,
-            display_time.format_instant(
-                asset_time.parse_instant(record.recorded_at, "processing log")),
-            record.reason or "unrecorded")
-    console.print(table)
+    console.print(f"\n[red]{len(stuck)} supply/supplies could not be checked[/red] "
+                  "[dim]- reject the supply, or let the next `mothman pipeline process` "
+                  "retry it[/dim]")
+    runs = qa_results_reader.attempts_by_run(run_keys=[b.tries["runId"] for b in stuck])
+    for b in stuck:
+        ra = runs.get(b.tries["runId"])
+        console.print(f"\n[bold]{b.dataset_id}[/bold] {b.supply} - could not be checked on "
+                      f"{b.tries['failed']} tr{'y' if b.tries['failed'] == 1 else 'ies'}",
+                      highlight=False)
+        for n, a in enumerate(ra.attempts if ra else (), start=1):
+            began = display_time.format_instant(a["began_at"])
+            ended = (display_time.format_instant(a["ended_at"]) if a["ended_at"]
+                     else "no recorded end")
+            how = run_summary.how_it_ended(a["outcome"], tool=a["tool"],
+                                           elapsed_ms=a["elapsed_ms"])
+            console.print(f"  try {n}: began {began}, ended {ended} - {how}"
+                          + (f" ({a['error_type']})" if a["error_type"] else ""),
+                          markup=False, highlight=False)
+            for line in (a["error_message"] or "").splitlines():
+                console.print(f"      {line}", markup=False, highlight=False)
+    console.print("\nReject the supply in Filing decisions (`mothman supply queue`), or let "
+                  "the next `mothman pipeline process` retry it.", markup=False,
+                  highlight=False)
 
 
 @supply_group.command("history")
@@ -435,7 +475,17 @@ def history_command(dataset_id: str, limit: int) -> None:
                    "sprint, and reporting the latest arrival as promoted is the conflation "
                    "this deliberately avoids.[/dim]\n")
 
-    table = Table("Arrival", "Received", "Delivery", "Arrived with", box=None, pad_edge=False)
+    # EACH ARRIVAL'S RUN TIME (REQ-TEST-418 criterion 2): its arrival run's,
+    # in the shared format, empty where it has none.
+    from qa_tools.common import qa_results_reader, run_summary
+
+    took: dict[str, str] = {}
+    for ra in sorted(qa_results_reader.attempts_by_run(dataset_ids=[dataset_id]).values(),
+                     key=lambda r: r.attempts[-1]["run_seq"]):
+        if ra.scope == "arrival" and ra.supply_id is not None:
+            took[ra.supply_id] = run_summary.run_time(ra.run_time_ms)
+    table = Table("Arrival", "Received", "Delivery", "Arrived with", "Run time", box=None,
+                  pad_edge=False)
     for entry in reversed(found[-limit:]):
         others = [d for d in arrival_history.delivery_companions(entry.delivery)
                    if d != dataset_id]
@@ -444,7 +494,8 @@ def history_command(dataset_id: str, limit: int) -> None:
             display_time.format_instant(
                 asset_time.parse_instant(entry.received_at, "arrival history")),
             entry.delivery,
-            f"{len(others)} other dataset(s)" if others else "[dim]on its own[/dim]")
+            f"{len(others)} other dataset(s)" if others else "[dim]on its own[/dim]",
+            took.get(entry.supply_id, ""))
     console.print(table)
 
 
@@ -882,6 +933,10 @@ def queue_command(collection_id: str) -> None:
         with filing_tui.open_log() as conn:
             waiting = filing_queue.awaiting(conn, collection_id)
             owed_now = _owed_in(conn, collection_id)
+            # LISTED ONCE (REQ-TEST-418 criterion 5): a supply that could not
+            # be checked and is also owed its re-check is the queue's line,
+            # with the owed re-check's last try folded into it.
+            waiting, owed_now = _fold_owed_into_unchecked(waiting, owed_now)
             carry = filing_tui.carry_forward_warnings(conn, collection_id)
             held = [h for h in filing_queue.held_in(conn, collection_id) if not h.turned_off]
             # THE SAME GROUPING AND THE SAME RENDERER AS THE FILING DECISIONS
@@ -936,6 +991,31 @@ def _owed_in(conn, collection_id: str) -> list:
     return [o for o in recheck.owed(conn) if o.dataset_id in mine]
 
 
+def _fold_owed_into_unchecked(waiting: list, owed_now: list) -> tuple[list, list]:
+    """(waiting, owed) with each owed re-check of a supply that could not be
+    checked folded into that supply's queue line - its last try said there -
+    and left out of the owed list (REQ-TEST-418 criterion 5)."""
+    from dataclasses import replace
+
+    from qa_tools.common import filing_queue
+
+    unchecked = {(s.dataset_id, s.supply): i for i, s in enumerate(waiting)
+                 if s.state == filing_queue.COULD_NOT_CHECK}
+    if not unchecked:
+        return waiting, owed_now
+    waiting, kept = list(waiting), []
+    for o in owed_now:
+        at = unchecked.get((o.dataset_id, getattr(o, "supply_id", None)))
+        if at is None:
+            kept.append(o)
+            continue
+        if o.last_failure:
+            s = waiting[at]
+            waiting[at] = replace(s, reason=f"{s.reason}; owed re-check's last try: "
+                                            f"{o.last_failure}")
+    return waiting, kept
+
+
 def _say_owed(owed_now: list, conn=None) -> None:
     """WHILE OWED, SHOWN AS OWED (REQ-PIPE-121 criterion 16): a re-check a
     run left undone is otherwise invisible until the processing pass
@@ -961,7 +1041,9 @@ def _say_owed(owed_now: list, conn=None) -> None:
         what = _owed_words(o, conn)
         cause = (f" (owed to decision {o.caused_by_decision})" if o.caused_by_decision
                  else "")
-        why = f" - last attempt: {o.last_failure}" if o.last_failure else ""
+        # 'TRY', THE TERMINAL'S ONE WORD FOR ONE THING (REQ-TEST-418
+        # criterion 4) - 'attempt' stays the resupply's.
+        why = f" - last try: {o.last_failure}" if o.last_failure else ""
         console.print(f"  {what}{cause}{why}", markup=False, highlight=False)
     console.print("mothman pipeline process", soft_wrap=True, markup=False, highlight=False)
 
