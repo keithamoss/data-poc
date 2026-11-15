@@ -277,9 +277,11 @@ class TestWhereTheDataItself_Lands:
         one of them to forget."""
         import pathlib
 
-        for name in ("assignment", "slots", "period_schema", "backlog", "outstanding",
-                     "runway", "landed_on_accepted"):
-            source = pathlib.Path("qa_tools/common", f"{name}.py").read_text()
+        for name in ("asset_model/assignment", "asset_model/slots",
+                     "qa_tools/common/period_schema", "qa_tools/common/backlog",
+                     "qa_tools/common/outstanding", "qa_tools/common/runway",
+                     "qa_tools/common/landed_on_accepted"):
+            source = pathlib.Path(f"{name}.py").read_text()
             assert "SAMPLE_SCHEMA" not in source, name
             assert "sample_data" not in source, name
 

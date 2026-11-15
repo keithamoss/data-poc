@@ -102,7 +102,7 @@ def _resolver_names(tree: ast.AST) -> set[str]:
     (asset_model.assets) by."""
     names = {"assets", _RESOLVER}
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "qa_tools.common":
+        if isinstance(node, ast.ImportFrom) and node.module == "asset_model":
             names |= {a.asname or a.name for a in node.names if a.name == "assets"}
         elif isinstance(node, ast.Import):
             names |= {a.asname for a in node.names if a.name == _RESOLVER and a.asname}
