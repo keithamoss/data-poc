@@ -15270,3 +15270,71 @@ twice. It deliberately did not re-find the `TypeError`.
        `test_choose_file_runs.py::test_each_settled_supply_is_checked_on_its_own_file`
        on `DbtPackagesMissing`, because the fix's worktree has no dbt
        packages installed. It is environmental, not this change.
+
+370. **[done, 2026-11-16]** **[Pipeline & publishing]** **Ctrl-C during a run was recorded as a dbt or datacontract-cli crash.**
+     The post-build critic on wip/speed-a at 31579f9e (REQ-PIPE-431's
+     three lanes), confirmed against the code. SIGINT reaches the terminal's
+     whole process group, so both tool workers died with the run's process;
+     their lanes raised `QaRunFailure` carrying a `.tool`, which
+     `parallel_orchestrate.side_by_side`'s rank put ahead of the foreground's
+     `KeyboardInterrupt` (no `.tool`). The attempt was then recorded CRASHED,
+     with "the supply's data was not the cause", rather than INTERRUPTED.
+     - **Fix** (defect, failing test first): `side_by_side` raises any lane's
+       non-Exception (`KeyboardInterrupt`, `SystemExit`) before ranking, and
+       `tool_worker.spawn` starts each worker with `start_new_session=True`,
+       so only the run's process sees Ctrl-C and stops its workers itself
+       (atexit or the caller's `stop()`; the test checks `stop()` reaps it).
+       `tests/test_tools_beside.py::test_a_keyboard_interrupt_outranks_a_lane_that_failed_by_tool`
+       and `tests/test_datacontract_worker.py::TestCriticFindings::test_the_workers_are_out_of_the_terminals_process_group`
+       failed against 31579f9e and pass now.
+     - **PROVISIONAL (overnight 2026-11-15)**: both the stop-first rule and a
+       session of their own for the workers, rather than either alone.
+
+371. **[done, 2026-11-16]** **[Pipeline & publishing]** **A worker that could not be launched skipped REQ-PIPE-431 criterion 6's wording.**
+     Same critic. `subprocess.Popen` sat outside `tool_worker.spawn`'s try, so
+     a fork or exec failure (`BlockingIOError`, `OSError`) escaped as itself
+     rather than as `WorkerDidNotStart`, and datacontract-cli's "did not start
+     ... will fail the same way" message never appeared.
+     - **Fix** (defect, failing test first): an `OSError` from `Popen` is
+       `WorkerDidNotStart`, naming its type.
+       `TestCriticFindings::test_a_worker_that_cannot_be_launched_did_not_start`
+       (both cases) failed against 31579f9e and passes now.
+
+372. **[done, 2026-11-16]** **[Pipeline & publishing]** **An error from the datacontract-cli worker that could not be rebuilt surfaced as a misleading TypeError.**
+     Same critic. The worker checked only that an exception pickled; one with
+     a constructor of its own (datacontract's `DataContractException` is one)
+     pickles but cannot be unpickled, so the run's process raised a TypeError
+     about the constructor instead of the tool's error.
+     - **Fix** (defect, failing test first): the worker round-trips the
+       exception (`pickle.loads(pickle.dumps(exc))`) and falls back to
+       `RuntimeError("<type>: <message>")`.
+       `TestCriticFindings::test_an_error_that_cannot_be_rebuilt_here_travels_as_its_text`
+       failed against 31579f9e and passes now.
+
+373. **[done, 2026-11-16]** **[Pipeline & publishing]** **[Testing & dev tooling]** **The same critic's wording findings and REQ-PIPE-431 criterion 9's test gaps.**
+     - **Wording** (polish): `tool_worker.spawn`'s comment said a worker that
+       never connects "is reported rather than waited on" - it waits
+       START_TIMEOUT_S, and now says so. `--sequential`'s help on `pipeline
+       run`, `bootstrap` and `resume` now says dbt stays in its own worker
+       either way (the help test asserts it). cli/common.py's on_step comment
+       claimed the bar never reports unfinished work; with three lanes dbt and
+       datacontract-cli are announced as their lanes start, so it can run
+       ahead, and both that comment and orchestrate's now say so.
+       **PROVISIONAL (overnight 2026-11-15)**: the announcement order (dbt,
+       datacontract-cli, Soda Core, Evidently) is left as it is.
+     - **Criterion 9 gap** (coverage): `test_a_killed_worker_fails_only_its_step_through_the_three_lanes`
+       drives a worker lost mid-request through the orchestrator's three
+       lanes - the run fails as datacontract-cli and dbt, Soda Core and
+       Evidently all finish. It passed against 31579f9e (coverage, not a
+       defect). REQ-PIPE-431's evidence now notes that
+       `test_datacontract_scoped.py::TestWhatTheToolIsHanded` covers the
+       sequential path only.
+     - **Left for Keith** (morning report, not this builder's): criterion
+       6's "the supply's data was not the cause" wording, and DBT_THREADS = 2
+       refusing on a one-core machine.
+     - **Ran** (#370-#373): tests/test_tools_beside.py,
+       test_datacontract_worker.py, test_dbt_worker.py, test_dbt_threads.py,
+       test_parallel_orchestrate.py, test_chain_progress.py,
+       test_orchestrate_reference_run.py, test_datacontract_scoped.py,
+       test_run_datacontract_cp.py, test_run_datacontract_bdm.py,
+       test_asked_for.py - 129 passed; ruff clean.

@@ -50996,7 +50996,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want datacontract-cli's share of each run to overlap the other tools rather than follow them, so that once dbt is no longer the longest step a run takes only as long as its slowest tool.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, SA Q3 (SETTLED 2026-11-14, option (b)): the datacontract time sink of REQ-PIPE-250''s profile, and its speed-up (2) (''run the four tools of one run side by side''), into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL send only each run''s datacontract-cli library call (datacontract_common.run_against_warehouse, called at qa_tools/tools/run_datacontract.py line 96) to a long-lived worker process, one per pipeline process, started on first use and reused, spawned rather than forked, its start, lock, request and restart code shared with dbt_worker through one helper rather than copied, and returning a picklable result (per check: type, model, diagnostics and quality definition) (architect B5).'
@@ -51017,6 +51017,37 @@ requirements:
     - REQ-PIPE-432
     - REQ-PIPE-250
     - REQ-TEST-116
+    linked_tests:
+    - tests/test_datacontract_worker.py::TestTheLibraryCallRunsInAWorker
+    - tests/test_datacontract_worker.py::TestALostWorker
+    - tests/test_datacontract_worker.py::TestSequential
+    - tests/test_datacontract_worker.py::TestThreeLanes
+    - tests/test_datacontract_worker.py::test_sequential_help_names_datacontract_cli_too
+    - tests/test_datacontract_worker.py::TestCriticFindings
+    - tests/test_datacontract_worker.py::test_a_killed_worker_fails_only_its_step_through_the_three_lanes
+    - tests/test_tools_beside.py::test_a_keyboard_interrupt_outranks_a_lane_that_failed_by_tool
+    - tests/test_tools_beside.py::test_the_background_failure_wins_when_both_fail
+    - tests/test_datacontract_scoped.py::TestWhatTheToolIsHanded
+    implemented_by:
+    - qa_tools/common/tool_worker.py::Worker
+    - qa_tools/common/tool_worker.py::spawn
+    - qa_tools/common/tool_worker.py::connect_back
+    - qa_tools/common/datacontract_worker.py::run_against_warehouse
+    - qa_tools/common/datacontract_worker.py::_serve
+    - qa_tools/common/datacontract_worker.py::DatacontractWorkerFailed
+    - qa_tools/common/dbt_worker.py::invoke
+    - qa_tools/common/parallel_orchestrate.py::side_by_side
+    - qa_tools/common/parallel_orchestrate.py::beside
+    - qa_tools/tools/orchestrate.py::_run_one_inner
+    - qa_tools/tools/orchestrate.py::_tool_rank
+    - qa_tools/tools/orchestrate.py::_run_step
+    - qa_tools/tools/run_datacontract.py::evaluate
+    - cli/pipeline.py::resume_command
+    evidence:
+    - '2026-11-15 (Perth 2026-11-16), tests/test_datacontract_worker.py written first and run with the two new modules present but orchestrate, run_datacontract and parallel_orchestrate as at e7b8781d: 10 failed, 4 passed - the call ran in-process (no worker), the sequential test''s in-process spy was bypassed, and the three lanes did not overlap; the four that passed are the failure-order cases and the sequential order, which held already with one foreground.'
+    - '2026-11-15 (Perth 2026-11-16), this commit''s tree, -n 2, basetemp in the scratchpad: tests/test_dbt_threads.py, test_dbt_worker.py, test_datacontract_worker.py, test_tools_beside.py, test_datacontract_scoped.py, test_run_datacontract_cp.py, test_run_datacontract_bdm.py, test_run_dbt_cp.py, test_run_dbt_bdm.py, test_dbt_scoped.py, test_parallel_orchestrate.py, test_orchestrate_reference_run.py, test_collections_registry.py, test_asked_for.py, test_dbt_failure_is_loud.py, test_chain_progress.py, test_orchestrate_single_run.py, test_cli_debug.py, test_check_read_and_attempts.py - 281 passed. An earlier run of the same set found the worker kept across an asset switch (OneAssetPerProcess on Birth Registrations after Child Protection), fixed by keying the worker on the asset and database; nine test_collections_registry failures in that run came from a --basetemp inside the repository, which the module''s path assertions do not allow for, and pass with it outside (127 passed).'
+    - The time per run before and after is REQ-PIPE-403's to measure (this requirement's PERFORMANCE NFR); not measured here.
+    - "2026-11-16 (Perth), post-build critic fixes (post-build-review #370-#373): a stop outranks every lane's failure and the workers run in sessions of their own; a failed Popen is WorkerDidNotStart; an exception that cannot be rebuilt travels as its text; criterion 9 is also driven through the three lanes (test_a_killed_worker_fails_only_its_step_through_the_three_lanes). tests/test_datacontract_scoped.py::TestWhatTheToolIsHanded covers the SEQUENTIAL path only (it spies on DataContract in-process). Ran tests/test_tools_beside.py, test_datacontract_worker.py, test_dbt_worker.py, test_dbt_threads.py, test_parallel_orchestrate.py, test_chain_progress.py, test_orchestrate_reference_run.py, test_datacontract_scoped.py, test_run_datacontract_cp.py, test_run_datacontract_bdm.py, test_asked_for.py: 129 passed; ruff clean."
     decisions:
     - ADDED TO THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)). REJECTED building S1-S3 only, and revisiting the budget.
     - 'A WORKER PROCESS, NOT A THREAD (delivery-scoper, from the code): Soda Core, datacontract-cli and Evidently run in-process and stay one after another because none was written to share an interpreter concurrently (parallel_orchestrate.beside''s docstring), and Soda rewrites os.environ; the only safe way to overlap one with the others is a process, which is how dbt already runs beside them (REQ-TEST-116 criterion 3, REQ-PIPE-157). REJECTED threads for the in-process tools.'
@@ -51024,6 +51055,14 @@ requirements:
     - 'AFTER REQ-PIPE-432 (delivery-scoper): with dbt the critical path, overlapping the foreground changes nothing until dbt is shorter; building it second makes its effect measurable.'
     - 'ONLY THE LIBRARY CALL MOVES (architect B5, correcting v1): evaluate depends on state that lives only in the pipeline process - the asked-for scope, the trial-owner registry whose docstring says it works because the tools run in one process, left_out''s per-process notes, the replay clock and the staged agreement. Moved whole, records would carry the wall clock, LeftOutMismatch would raise and re-check trials would lose their scope.'
     - NOTHING THAT RECORDS RUNS IN A WORKER (architect, 'done well' point 5).
+    - 'PROVISIONAL (overnight 2026-11-15): --sequential runs datacontract-cli''s call in the run''s process and leaves dbt in its worker, as --sequential always did - ''in this process'' read as the in-process tools''.'
+    - 'PROVISIONAL (overnight 2026-11-15): the worker is restarted when the asset or the database it serves changes, as dbt''s is when its threads change - one asset and one database per worker, as per process (supply_db''s OneAssetPerProcess), which a test session switching assets found.'
+    - 'PROVISIONAL (overnight 2026-11-15): an error the tool raises in the worker (SelectionRefused, a missing password) is pickled back and raised in the run''s process as itself, so it reads exactly as in-process; only a dead or unstartable worker is DatacontractWorkerFailed, with criterion 6''s wording.'
+    - 'PROVISIONAL (overnight 2026-11-15): the worker hands back each check''s fields as plain values, its failed samples as the tool gave them (key types kept, so samples sort as before), and the raw output json-round-tripped with default=str - exactly what qa_store already wrote for it.'
+    - 'PROVISIONAL (overnight 2026-11-15): each request carries the run process''s whole environment and its assets.handoff(), as dbt''s carries its environment, so the worker reads the database and the asset as the run does; credentials never reach a command line.'
+    - 'PROVISIONAL (overnight 2026-11-15): two lanes'' failures are ranked by a `tool` attribute _run_step sets on QaRunFailure; parallel_orchestrate.side_by_side takes the ranking, and beside is its one-background case.'
+    - 'PROVISIONAL (overnight 2026-11-15): with the lanes overlapping, the progress steps are announced dbt, datacontract-cli, Soda Core, Evidently - the count is unchanged, so the bar is too.'
+    - 'ONE WORKER HELPER (the MAINTAINABILITY NFR): tool_worker holds the spawn, the authenticated connect-back, the lock, the dead-or-changed restart and the stop; dbt_worker keeps only its partial-parse folder and its loop, and datacontract_worker only its loop. The socket key''s variable is now MOTHMAN_TOOL_WORKER_KEY for both (it was MOTHMAN_DBT_WORKER_KEY).'
     open_questions: []
     signed_off:
       by: Keith
@@ -51033,7 +51072,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want each run's dbt step to stop being the longest part of every run, so that the replay's critical path shortens rather than only the work that already finishes first.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, SA Q3 (SETTLED 2026-11-14, option (b)): the dbt time sink of REQ-PIPE-250''s profile, and its speed-up (3) (''the dbt worker round trip, about half the stream''s active samples''), into this batch; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - BEFORE this requirement's first change, THE SYSTEM SHALL record in its evidence one profile of a quarterly run's dbt step inside the worker (qa_tools/common/dbt_worker.py _serve), split into partial parse, compile, opening the database connection, running the selected nodes and writing run_results.json and manifest.json, over at least ten consecutive runs of one collection.
@@ -51052,12 +51091,45 @@ requirements:
     - REQ-PIPE-157
     - REQ-PIPE-250
     - REQ-PIPE-403
+    linked_tests:
+    - tests/test_dbt_threads.py::TestTheThreadsSetting
+    - tests/test_dbt_threads.py::TestVerdictsWithThreadsAboveOne
+    - tests/test_dbt_worker.py::TestALostWorker
+    - tests/test_dbt_worker.py::TestNamesAndLeaks
+    implemented_by:
+    - qa_tools/common/dbt_common.py::DBT_THREADS
+    - qa_tools/common/dbt_common.py::dbt_threads
+    - qa_tools/common/dbt_common.py::DbtThreadsRefused
+    - qa_tools/common/dbt_common.py::run_dbt
+    - qa_tools/common/dbt_worker.py::invoke
+    - qa_tools/common/dbt_worker.py::_serve
+    - qa_tools/common/dbt_worker.py::_start
+    - qa_tools/tools/run_dbt.py::evaluate
+    evidence:
+    - '2026-11-15 16:31-16:34 UTC (Perth 2026-11-16 00:31), BEFORE the first change (tree 06a850d7), criterion 1: profiled by bench432 (a scratch harness, not product code) over the 12 newest real Child Protection arrival runs of supply_quarterly - their asked dbt checks read read-only - against bench432_quarterly, a scratch copy of period_2026_q3/q4''s cp_* tables (pg_dump, read-only), through the real dbt_common.run_dbt, with dbt_worker._serve run in the harness process behind a fake connection and wall-clock timers round dbt''s own phase functions. Three passes (12, 24 and 24 consecutive runs, one thread, load average 5.7-6.4 with a full test suite running). The 24-run pass, steady-state medians per run: the whole run_dbt 1.08s; dbtRunner.invoke 1.02s, of which partial parse 0.05s (dbt reported PartialParsingSkipParsing on 24 of 25 invokes, a full parse only on the first), graph and selection 0.02s, before_run 0.17s (create schemas 0.09s, populate the adapter cache 0.07s), running the selected nodes 0.57s (compiling them 0.11s of it), writing manifest.json 0.05s and run_results.json under 0.01s, and dbt''s own start-up before the task about 0.10s; 18 database connections opened per run (dbt closes each on release), 0.23s in all; mothman''s own schema preparation 0.03s. So a run''s dbt step costs about 1.1s, not REQ-PIPE-157''s 3.8s, and half of it is running about ten tests one after another.'
+    - '2026-11-15 17:05-17:15 UTC, criterion 2, two streams at once (two harness processes, each its own 24 runs and its own worker), threads interleaved 1,2,4 / 4,1,2 / 2,4,1 over three reps, load average 8.3-10 with other sessions'' suites running: mean per run 1.96s at 1 thread, 1.50s at 2, 1.53s at 4 (dbt''s own elapsed_time 1.20s, 0.86s, 0.78s). An earlier identical pass (16:38-16:51 UTC: 1.53s, 1.39s, 1.37s) is not used because its last rep fell in the 16:50-17:05 UTC disk-full window. Chosen: 2 - see decisions.'
+    - '2026-11-15 17:15-17:21 UTC, criterion 4, two streams at four threads, interleaved over two reps: dbt''s documented --no-populate-cache 1.34s, --cache-selected-only 1.36s and --log-level-file none 1.19s against 1.30s as is; --log-level-file none re-measured at two threads over three interleaved reps, 1.25s against 1.17s as is. None is a consistent saving, so none is adopted; the partial parse is already skipped every run and no documented option keeps dbt''s connections open across invocations.'
+    - '2026-11-15 17:42-17:44 UTC, criterion 6 (per run), the phase profile above at 1 and 2 threads interleaved twice, one stream, load average 6.4-8.5: the whole run_dbt 0.96s and 0.97s at 1 thread, 0.83s and 0.86s at 2; invoke 0.92s/0.94s against 0.79s/0.83s; running the nodes 0.50s/0.51s against 0.39s/0.40s. Two streams (above): 1.96s against 1.50s, about a quarter less.'
+    - '2026-11-15 (Perth 2026-11-16), criteria 3, 5 and 7: tests/test_dbt_threads.py written first and run against the product code as at 06a850d7 - 12 failed (DBT_THREADS absent; the recorded order followed dbt''s: reversing run_results.json on disk changed what was recorded). After: the modules named in REQ-PIPE-431''s evidence, 281 passed.'
     decisions:
     - ADDED TO THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)). REJECTED building S1-S3 only, and revisiting the budget.
     - 'DBT FIRST OF THE THREE (delivery-scoper): it is the critical path of every run - the main thread waits on it after Soda, datacontract and Evidently have finished - so every second cut here is a second off the replay, which is not true of the foreground tools.'
     - 'THREADS ARE THE FIRST LEVER, MEASURED NOT ASSUMED (delivery-scoper, from the code): the profile runs dbt with threads 1, so a run''s tests execute one at a time though they are independent reads; criterion 2 measures 1, 2 and 4 with both streams running before choosing, because on four cores more threads can cost more than they save.'
     - 'PROFILE THE INVOCATION BEFORE CUTTING IT (delivery-scoper): REQ-PIPE-157 already removed process start and the full re-parse; what is left of 3.8s is not yet known by phase, so criterion 1 comes before criterion 4. This profiles one step inside a settled build, not the ''profile first, decide later'' Keith rejected for S2.'
     - 'THE FLAG, NOT THE PROFILE (architect, non-blocking): --threads is documented, and one constant read by the worker keeps every invocation of a worker''s life at one value, which the partial parse needs.'
+    - 'PROVISIONAL (overnight 2026-11-15): DBT_THREADS = 2. Two and four threads measured the same (1.50s and 1.53s a run with two streams; 1.39s and 1.37s in the discarded first pass), both about a quarter below one thread, so the lower value, which opens half the connections (the COST NFR) and leaves cores for the datacontract-cli worker REQ-PIPE-431 adds. Keith may prefer 4.'
+    - 'PROVISIONAL (overnight 2026-11-15): the setting is a module constant in dbt_common, read and checked on every invocation; dbt_worker starts its worker with it as an argument and appends --threads to every command, and a changed value stops the worker and starts another - which is what keeps it constant for a worker''s life. REJECTED an environment variable (nothing asked for one) and editing profiles.yml''s threads: 1, which the criterion rules out.'
+    - 'PROVISIONAL (overnight 2026-11-15): run_results.json''s results are sorted by unique_id in place right after they are read, so both the verdicts and the raw output recorded beside them are in that order. One thread already ran ties in unique_id order, which post-build-review #303 item 2 found the dashboard''s check order resting on; more threads would have broken it silently.'
+    - 'CRITERION 4 CUT NOTHING, AND SAYS WHY (builder, from the measurement): the profile''s repeated work is the partial parse (already skipped every run by REQ-PIPE-157''s kept parse), the per-node compile (dbt has no documented option to reuse one), the adapter cache and schema creation (--no-populate-cache and --cache-selected-only measured no faster) and eighteen connections a run (dbt closes each on release by design, base/connections.py, with no documented pooling). --log-level-file none was faster in one pass and slower in the next. Threads overlap the node runs and their connections, which is where the saving is.'
+    - 'PROFILED IN A HARNESS, NOT WITH py-spy (builder): py-spy is not installed here; the harness runs the real dbt_worker._serve loop in its own process with wall-clock timers round dbt''s phase functions, on a scratch database copied read-only from supply_quarterly, never the real databases.'
+    - 'THE 3.8s FIGURE IS STALE (builder, from the measurement): a run''s dbt step measured about 1.1s on one thread here, so the profile''s 49% waiting on dbt (REQ-PIPE-250, 2026-10-26) may now overstate dbt''s share; REQ-PIPE-403''s profile is what will say.'
+    unmet_criteria:
+    - criterion: 'Criterion 6''s second half: the share of the stream''s samples spent waiting on the dbt worker, against the profile''s 49%.'
+      why: 'It is a profile of a bootstrap''s replay, which is REQ-PIPE-403''s after measurement: a from-empty bootstrap on a quiet machine, which waits on #134 step 3. The dbt time per run before and after is recorded above.'
+      owner: REQ-PIPE-403
+      blocked_by:
+        requirements:
+        - REQ-PIPE-403
     open_questions: []
     signed_off:
       by: Keith

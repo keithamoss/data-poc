@@ -30,9 +30,11 @@ from asset_model.check_lifecycle import name_by_check_id, parse_contract_check_m
 from qa_tools.common.datacontract_common import (
     DIMENSION_BY_METRIC, ENGINE_TAG, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     check_id_from_quality_definition, fail_threshold_from_quality_definition,
-    failing_sample_keys, names_no_row_from_quality_definition, run_against_warehouse,
-    selection_for,
+    failing_sample_keys, names_no_row_from_quality_definition, selection_for,
 )
+# THE LIBRARY CALL ALONE RUNS IN A WORKER (REQ-PIPE-431): everything else of
+# evaluate below stays in the run's own process.
+from qa_tools.common.datacontract_worker import run_against_warehouse
 from qa_tools.common.qa_results_writer import _declared_reads_tables, run_owner, write_qa_result
 
 __all__ = ["ENGINE_TAG", "evaluate"]

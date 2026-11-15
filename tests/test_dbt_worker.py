@@ -170,7 +170,7 @@ class TestNamesAndLeaks:
         # THE DIRTY RUN, because TestNothingIsLeftBehind above tidies the
         # reference run's schemas away and this file runs in order.
         run_dbt.evaluate("child-protection", CP_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
-        proc, _conn, pp_dir = dbt_worker._worker
+        proc, _conn, pp_dir, _threads = dbt_worker._worker
         proc.kill()
         proc.wait()
         run_dbt.evaluate("child-protection", CP_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
