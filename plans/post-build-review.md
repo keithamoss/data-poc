@@ -14914,7 +14914,7 @@ twice. It deliberately did not re-find the `TypeError`.
        empty volume.
      - **Ran**: see the commit message for this change's runs.
 
-335. **[todo]** **[Testing & dev tooling]** **The thirty-linked-datasets fixture files its collections' words under `datasets:`.**
+335. **[todo, 2026-11-15]** **[Testing & dev tooling]** **The thirty-linked-datasets fixture files its collections' words under `datasets:`.**
      A sighting while fixing #333, not fixed: `tests/thirty_linked_datasets.py`
      appends its six fake collections' presentation entries to the END of
      `assets/quarterly/presentation.yaml`, which since REQ-DASH-299 ends with
