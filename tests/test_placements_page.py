@@ -135,4 +135,5 @@ class TestThePromotionTimelineSaysPlaced:
 
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
-pytestmark = pytest.mark.asset("quarterly")
+# Recorded verdicts for made-up periods would leak between tests (REQ-PIPE-345 c5).
+pytestmark = [pytest.mark.asset("quarterly"), pytest.mark.usefixtures("no_recorded_filings")]

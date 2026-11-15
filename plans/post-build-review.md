@@ -15022,14 +15022,13 @@ twice. It deliberately did not re-find the `TypeError`.
        refused), then the module 48 passed; `[quarterly]` and `[daily]
        providers OK` on the real providers.
 
-340. **[in-progress, 2026-11-15]** **[Pipeline & publishing]** **[QA checks & contract]** **The critic on REQ-PIPE-345 (split T2, da5bd1d4): c5, two loose ends, and one design point.**
+340. **[done, 2026-11-15]** **[Pipeline & publishing]** **[QA checks & contract]** **The critic on REQ-PIPE-345 (split T2, da5bd1d4): c5, two loose ends, and one design point.**
      The critic confirmed every live criterion but c5 met, period output
      byte-identical to the base for every dataset of both assets, every
      deleted test one of retired behaviour, and test_distribution_groups'
      failure present on the base too (not this change). Its findings, verified
      against the code before acting:
-     - **c5, Keith's option (a), 2026-11-15 - guard built, test migration NOT
-       finished**: `ensure_period_schema`,
+     - **c5, Keith's option (a), 2026-11-15 - built**: `ensure_period_schema`,
        the one place a period schema is created, refuses a period its asset's
        baseline does not name - naming the period, the asset and the baseline -
        before anything reaches the database (`schedule.on_baseline`). The
@@ -15040,15 +15039,26 @@ twice. It deliberately did not re-find the `TypeError`.
        `test_baseline` fixture declares named ones). No conftest exemption. Test
        first: `tests/test_baseline_calendar.py::TestNoSchemaForAPeriodOffTheBaseline`
        reached `CREATE SCHEMA period_2023_m03` against the old code.
-       Of the 43 modules the guard first broke, 37 pass with their periods
-       declared. Six do not yet - test_carry_forward_review, test_period_opening,
-       test_placements_page, test_withdrawal, test_door_flag_parity and
-       test_place_held_supply (the last runs past a 7-minute limit) - because a
-       made-up period on the baseline is a REAL period: it gets slots, due
-       instants and recorded verdict fingerprints, and an append-only verdict
-       left by one test makes the drift backstop refuse the next test's
-       dataset when that test's copy lacks the period. Open, with the
-       coordinator.
+       A made-up period on the baseline is a REAL period - slots, due
+       instants, fingerprinted verdicts - and six modules noticed. Keith chose
+       (2026-11-15) to rework their setup, never their assertions:
+       test_carry_forward_review, test_period_opening, test_placements_page,
+       test_place_held_supply (and test_withdrawal, test_door_flag_parity).
+       The carry-forward world is dated in months Case Workers owes and in 2100,
+       after every instant its tests act at, so no period opens by time;
+       door/flag parity's minted slots replace the calendar's slot of the same
+       name; and the modules whose append-only verdicts would leak into the
+       next test's drift backstop truncate this worker's filings first (the
+       `no_recorded_filings` fixture, requested per module). No assertion
+       changed.
+     - **Slowness, not a product defect**: test_place_held_supply ran past seven
+       minutes because the held-supply door evaluated `label_at` over every
+       held supply earlier tests had leaked; on the daily asset a 2099 test
+       version ended the cadence rule there, so each unbounded
+       `slots_for_dataset` built ~27,000 daily slots (door/flag parity's
+       two-files case, 184s). Fixed in the test setup: leaked filings are
+       truncated, and on a cadence-rule baseline undated test periods fall two
+       years from today. Two-files 184s to 14s; place_held_supply ~16s.
      - **Defect (LOW): the gate's expects-nothing check still read a dataset's
        own `dates:`, and the merged view kept a hierarchy `dates:`**, which got
        only the generic unknown-key error. Fixed: the read is gone, the merged

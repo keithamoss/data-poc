@@ -58,7 +58,10 @@ def world(monkeypatch) -> World:
     # ON THE TEST BASELINE (REQ-PIPE-345 criterion 5), dated in months Case
     # Workers owes (February and August) for Q2 and Q3, so the calendar agrees
     # with the patched date_of and with "it takes part in Q3"; Q4 is not owed.
-    order = {w.q2: date(2099, 2, 1), w.q3: date(2099, 8, 1), w.q4: date(2099, 11, 1)}
+    # In 2100, after every instant these tests act at (2099), so no round's due
+    # instant has passed and no period opens by time (REQ-PIPE-323) - only by
+    # the filings and promotions the tests make, as before the periods were real.
+    order = {w.q2: date(2100, 2, 1), w.q3: date(2100, 8, 1), w.q4: date(2100, 11, 1)}
     baseline_periods.declare(*order, dates=order)
     real_not_expected, real_date_of = schedule.not_expected_periods, schedule.date_of
     monkeypatch.setattr(

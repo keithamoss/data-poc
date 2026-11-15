@@ -48402,7 +48402,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever maintains the delivery agreement, I want each asset to nominate one baseline calendar that every dataset fits around, owing all or some of its periods, so that a period means one thing within an asset and nothing can quietly run on a faster cadence than the asset's releases.
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48444,8 +48444,36 @@ requirements:
     - 'RETIRED WITH THEIR TESTS (NFR MAINTAINABILITY, CLAUDE.md test rule 2): per-dataset authored dates (schedule.dataset_dates_override, agreement._own_dates and DatasetAgreement.own_dates, the schema''s OwnDates, the freeze gate''s own_version/own_date items and their revert, drift''s own_date kind, validate_schedule''s criterion-35 name clash and REQ-PIPE-320 criterion 13''s own-dates refusal); collection and dataset calendar resolution (Agreement.collections, defaults_for''s own-calendar branch, correction_apply._on_own_calendar, REQ-PIPE-181 criterion 9''s refusal); the unknown-calendar error with its typo hint and the shared-cause line in the report (ConfigError.cause/cause_hint), which only an unknown calendar name produced. A freeze membership item is now the baseline''s name or no calendar, so removing `calendar: quarterly` from the collections changed no frozen item; reverting a membership to a calendar name writes no `calendar:`.'
     - 'NOT RETIRED HERE, for T5''s amendments: the calendar_differs code (unrunnable.CALENDAR_DIFFERS, build_dashboard_data''s branch) and linked_datasets'' ''never on the calendar'' clause are now unreachable for two calendared datasets (A13, A14); their two tests that put a dataset on its own calendar were removed, since the configuration they wrote is refused. The criteria this retires in other requirements - REQ-PIPE-049 c1 and c7, REQ-PIPE-110 c10, c11 and c25, REQ-PIPE-181 c9, REQ-PIPE-320 c13 - are not edited here (this builder touched REQ-PIPE-345 only).'
     - 'c5 NOT MET, QUESTION FOR KEITH: one schema per baseline period holds by construction (period_schema() names one schema per period name, and every product caller of ensure_period_schema takes its period from a filing, which takes it from the baseline). But nothing REFUSES a schema for a period off the baseline: a test feeding ensure_period_schema `2023-M03` on the quarterly asset reached CREATE SCHEMA. A guard there (built, then removed) breaks the suite''s convention of per-test synthetic periods (`2099-A<tag>` and similar, about forty test modules), so where the guard goes is a choice, not a fix.'
-    - 'c5, KEITH''S ANSWER (2026-11-15): option (a) - a guard in ensure_period_schema refusing a period not on the asset''s baseline, naming the period, the asset and the baseline, with the suite''s made-up periods moved onto a TEST BASELINE that declares them (tests/baseline_periods.py, the test_baseline fixture); no conftest exemption. REJECTED (b) a reserved-year exemption and (c) detecting rather than preventing. IN PROGRESS: the guard and its test-first test are built; the test migration is not finished (see the coordinator report) - a made-up period on the baseline acquires real slots and recorded verdict fingerprints, which changes what several tests exercise.'
+    - 'c5, KEITH''S ANSWER (2026-11-15): option (a) - a guard in ensure_period_schema refusing a period not on the asset''s baseline, naming the period, the asset and the baseline, with the suite''s made-up periods moved onto a TEST BASELINE that declares them (tests/baseline_periods.py, the test_baseline fixture); no conftest exemption. REJECTED (b) a reserved-year exemption and (c) detecting rather than preventing. BUILT 2026-11-15: schedule.on_baseline and the guard; tests/baseline_periods.py (declare, made_up) and the test_baseline fixture.'
+    - 'MADE-UP PERIODS ARE REAL PERIODS NOW, AND THE SIX TESTS THAT NOTICED WERE REWORKED, NOT THEIR ASSERTIONS (Keith''s option 1, 2026-11-15): a declared period gets slots, due instants and fingerprinted verdicts. The carry-forward world is dated in months Case Workers owes and in 2100, after every instant its tests act at, so no period opens by time; door/flag parity''s minted slots replace the calendar''s own slot of the same name; and the modules whose recorded verdicts would leak into the next test''s drift backstop (qa.verdict is append-only) truncate this worker''s filings first (the no_recorded_filings fixture, requested per module).'
+    - 'NOT A PRODUCT PERFORMANCE DEFECT (test_place_held_supply''s and test_door_flag_parity''s slowness): the held-supply door evaluated label_at for every held supply leaked by earlier tests, and on the daily asset a test version in 2099 ended the cadence rule there, so each unbounded slots_for_dataset built about 27,000 daily slots. Fixed in the test setup: leaked filings are truncated, and on a cadence-rule baseline undated test periods fall two years from today. The two-files case went 184s to 14s; place_held_supply runs in about 16s.'
     open_questions: []
+    linked_tests:
+    - tests/test_baseline_calendar.py
+    - tests/test_no_calendar.py
+    - tests/test_validate_schedule.py
+    - tests/test_correction_revert.py
+    - tests/test_calendar_move_pin.py
+    - tests/test_agreement_freeze.py
+    implemented_by:
+    - qa_tools/common/schedule.py::baseline
+    - qa_tools/common/schedule.py::on_baseline
+    - qa_tools/common/schedule.py::calendar_for_dataset
+    - qa_tools/common/schedule.py::Calendar
+    - qa_tools/common/agreement.py::Agreement
+    - qa_tools/common/agreement.py::from_doc
+    - qa_tools/common/validate_schedule.py::_baseline_errors
+    - qa_tools/common/validate_schedule.py::_merged_view
+    - qa_tools/common/period_schema.py::ensure_period_schema
+    - qa_tools/common/agreement_freeze.py::revert
+    - generator/scenario_injection.py::_lands_in
+    evidence:
+    - 'c1, c3, c7: tests/test_baseline_calendar.py::TestTheGateRefusesAnythingButOneBaseline - a monthly calendar beside the quarterly baseline, a collection naming it, a dataset with its own dates, and a hierarchy calendar, each refused with criterion 3''s words; seen failing first (16 of 17 against 647861ed).'
+    - 'c2, c4: TestEveryDatasetIsOnTheBaseline - every calendared dataset on the one baseline, a collection''s calendar not read, two calendars refused rather than guessed; tests/test_no_calendar.py - an asset with no calendar passes only where every dataset declares none.'
+    - 'c5: TestNoSchemaForAPeriodOffTheBaseline - the guard refuses `2023-M03` before any SQL, naming the period, the asset and the baseline; seen failing first (it reached CREATE SCHEMA).'
+    - 'c6: TestSharedCodeNamesNoCalendar - the baseline renamed in a copy, and scenario_injection._lands_in and the Child Protection provider answer as before; both failed against the base code.'
+    - 'c8: tests/test_calendar_move_pin.py passes against the unchanged pin.'
+    - 'RUNS, 70 affected test modules each run alone (-n0, not needs_deployment), 2026-11-15 on the tree that flipped this to built: 1962 passed, 0 failed, 0 skipped; mothman check --no-pytest green; the full suite not run.'
   - id: REQ-PIPE-346
     title: A dataset owes a subset of its baseline's periods, named in the baseline's own terms - delivery months on an authored calendar, weekdays on a daily one
     date_written: '2026-10-31'
