@@ -418,32 +418,59 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
-      # THE BOOTSTRAP IS CACHED, KEYED ON EVERY INPUT THAT SHAPES IT
-      # (REQ-TEST-117). The list is qa_tools/common/replay_inputs.py's -
-      # the same one a checkpoint replay compares (REQ-TEST-160), so it is
-      # held once rather than copied here. It hashes what git considers
-      # part of the checkout (ignored files excluded), so dbt deps and
-      # .venv cannot move it. cli/pipeline.py and no other cli/ file: the
-      # bootstrap enters through it, and a terminal change must not cost
-      # a full bootstrap. EXACT KEY ONLY - no restore-keys, so a dump made
-      # from different inputs is never used (criterion 3): a new check
-      # can turn a supply red and change every filing after it.
-      - name: Key the bootstrap cache
+      # EACH ASSET'S BOOTSTRAP IS CACHED ON ITS OWN, KEYED ON EVERY INPUT
+      # THAT SHAPES IT (REQ-TEST-117; REQ-TEST-353 criterion 1). The list is
+      # qa_tools/common/replay_inputs.py's - the same one a checkpoint replay
+      # compares (REQ-TEST-160), so it is held once rather than copied here:
+      # the shared inputs and that asset's own folder, never another asset's
+      # (REQ-PIPE-365 criterion 3), so a daily-only edit rebuilds only the
+      # daily bootstrap. It hashes what git considers part of the checkout
+      # (ignored files excluded), so dbt deps and .venv cannot move it.
+      # cli/pipeline.py and no other cli/ file: the bootstrap enters through
+      # it, and a terminal change must not cost a full bootstrap. EXACT KEY
+      # ONLY - no restore-keys, so a dump made from different inputs is never
+      # used (criterion 3): a new check can turn a supply red and change
+      # every filing after it.
+      #
+      # ONE RESTORE AND ONE SAVE STEP PER ASSET, written out, because a cache
+      # step cannot loop: tests/test_ci_bootstrap_cache.py fails when an asset
+      # folder has none, and so does the restore step below, on the runner.
+      - name: Key each asset's bootstrap cache
         id: key
-        run: echo "key=$(uv run mothman pipeline cache-key)" >> "$GITHUB_OUTPUT"
+        run: |
+          for asset in $(cd assets && ls -d */ | tr -d /); do
+            # INTO A VARIABLE FIRST (post-build-review #349): inside the echo, a
+            # failing cache-key would write an empty key and the step pass.
+            key=$(MOTHMAN_ASSET="$asset" uv run mothman pipeline cache-key) || {
+              echo "::error::mothman pipeline cache-key failed for asset ${asset}"
+              exit 1
+            }
+            echo "${asset}=${key}" >> "$GITHUB_OUTPUT"
+          done
 
-      - name: Restore the bootstrapped database, if these inputs made one
-        id: cache
+      - name: Restore the quarterly bootstrap, if these inputs made one
+        id: cache-quarterly
         uses: actions/cache/restore@v4
         with:
-          key: ${{ steps.key.outputs.key }}
-          # Each asset's own state tree, data/<asset>/ (the asset split).
+          key: ${{ steps.key.outputs.quarterly }}
           path: |
-            ci-cache
-            data/*/deliveries
-            data/*/receipts
-            data/*/generator_bookkeeping.json
-            data/*/scenario_placements.json
+            ci-cache/supply_quarterly.dump
+            data/quarterly/deliveries
+            data/quarterly/receipts
+            data/quarterly/generator_bookkeeping.json
+            data/quarterly/scenario_placements.json
+
+      - name: Restore the daily bootstrap, if these inputs made one
+        id: cache-daily
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ steps.key.outputs.daily }}
+          path: |
+            ci-cache/supply_daily.dump
+            data/daily/deliveries
+            data/daily/receipts
+            data/daily/generator_bookkeeping.json
+            data/daily/scenario_placements.json
 
       # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
       # log after every step, and the API returns only a job's last 5000
@@ -464,24 +491,43 @@ jobs:
             -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
             -c 'SELECT pg_reload_conf()'
 
-      # A HIT RESTORES THE DUMP, identity row and all (it is a qa.identity
-      # row since qa schema 31), so the marking below is a no-op after it.
-      - name: Restore the cached database
-        if: steps.cache.outputs.cache-hit == 'true'
+      # A HIT RESTORES THAT ASSET'S DUMP, identity row and all (it is a
+      # qa.identity row since qa schema 31), so the marking below is a no-op
+      # after it - each asset by its own cache, so one asset's hit never
+      # restores into the other's database. REQ-TEST-117 criterion 4 and
+      # REQ-TEST-353 criterion 5: one line PER ASSET, plainly, with its key,
+      # whichever it was. The assets that missed are handed on as
+      # REBUILT_ASSETS, which the bootstrap, dump and save steps read.
+      - name: Restore each cached database, saying per asset whether it was restored or rebuilt
+        env:
+          KEYS: ${{ toJSON(steps.key.outputs) }}
+          HITS: >-
+            quarterly=${{ steps.cache-quarterly.outputs.cache-hit }}
+            daily=${{ steps.cache-daily.outputs.cache-hit }}
         run: |
+          hit_of() {
+            for pair in $HITS; do
+              if [ "${pair%%=*}" = "$1" ]; then echo "${pair#*=}"; return 0; fi
+            done
+            return 1
+          }
+          rebuilt=""
           for asset in $(cd assets && ls -d */ | tr -d /); do
-            PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
-              --dbname "supply_${asset}" --no-owner --exit-on-error "ci-cache/supply_${asset}.dump"
+            key=$(jq -r --arg a "$asset" '.[$a] // empty' <<<"$KEYS")
+            if ! hit=$(hit_of "$asset"); then
+              echo "::error::asset ${asset} has no cache steps of its own - add its restore and save steps (REQ-TEST-353 criterion 1)"
+              exit 1
+            fi
+            if [ "$hit" = "true" ]; then
+              PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
+                --dbname "supply_${asset}" --no-owner --exit-on-error "ci-cache/supply_${asset}.dump"
+              echo "${asset}: bootstrap RESTORED from cache key ${key}"
+            else
+              echo "${asset}: bootstrap REBUILT - no cache for key ${key}"
+              rebuilt="${rebuilt} ${asset}"
+            fi
           done
-
-      # CRITERION 4: plainly, and with the key, whichever it was.
-      - name: Say whether the database was restored or rebuilt
-        run: |
-          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
-            echo "Bootstrap RESTORED from cache key ${{ steps.key.outputs.key }}"
-          else
-            echo "Bootstrap REBUILT - no cache for key ${{ steps.key.outputs.key }}"
-          fi
+          echo "REBUILT_ASSETS=${rebuilt# }" >> "$GITHUB_ENV"
 
       # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
       # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
@@ -527,38 +573,64 @@ jobs:
       # been allowed to generate its own synthetic supplies; that is
       # what the fixtures do.
       - name: Generate the QA history the suite reads
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: env.REBUILT_ASSETS != ''
         # ONE PROCESS PER ASSET, each with its own asset and database
-        # (REQ-PIPE-343 criterion 5).
+        # (REQ-PIPE-343 criterion 5), SIDE BY SIDE (REQ-TEST-353 criterion
+        # 2): every asset that missed its cache starts at once, its lines
+        # prefixed with its name, and the step fails naming each that failed.
+        # Safe together because neither reads or writes the other's data/
+        # or reports/ folder (REQ-PIPE-365 criterion 5).
         run: |
-          for asset in $(cd assets && ls -d */ | tr -d /); do
-            MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
-              uv run mothman pipeline bootstrap
+          pids=(); names=()
+          for asset in $REBUILT_ASSETS; do
+            ( set -o pipefail
+              MOTHMAN_ASSET="$asset" MOTHMAN_SUPPLY_DSN="${MOTHMAN_PG}/supply_${asset}" \
+                uv run mothman pipeline bootstrap 2>&1 | sed -u "s/^/[${asset}] /" ) &
+            pids+=("$!"); names+=("$asset")
           done
+          failed=""
+          for i in "${!pids[@]}"; do
+            wait "${pids[$i]}" || failed="${failed} ${names[$i]}"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::the bootstrap failed for:${failed}"
+            exit 1
+          fi
 
       # ON A MISS, KEEP WHAT WAS JUST MADE for the next run with the same
       # inputs - in GitHub's cache, never the repository (criterion 5).
-      - name: Dump the bootstrapped database
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Dump each rebuilt database
+        if: env.REBUILT_ASSETS != ''
         run: |
           mkdir -p ci-cache
-          for asset in $(cd assets && ls -d */ | tr -d /); do
+          for asset in $REBUILT_ASSETS; do
             PGPASSWORD=ci-not-a-secret pg_dump -h localhost -U postgres \
               --format custom --no-owner --file "ci-cache/supply_${asset}.dump" "supply_${asset}"
           done
 
-      - name: Save the bootstrapped database
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Save the quarterly bootstrap
+        if: steps.cache-quarterly.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          key: ${{ steps.key.outputs.key }}
-          # Each asset's own state tree, data/<asset>/ (the asset split).
+          key: ${{ steps.key.outputs.quarterly }}
           path: |
-            ci-cache
-            data/*/deliveries
-            data/*/receipts
-            data/*/generator_bookkeeping.json
-            data/*/scenario_placements.json
+            ci-cache/supply_quarterly.dump
+            data/quarterly/deliveries
+            data/quarterly/receipts
+            data/quarterly/generator_bookkeeping.json
+            data/quarterly/scenario_placements.json
+
+      - name: Save the daily bootstrap
+        if: steps.cache-daily.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.key.outputs.daily }}
+          path: |
+            ci-cache/supply_daily.dump
+            data/daily/deliveries
+            data/daily/receipts
+            data/daily/generator_bookkeeping.json
+            data/daily/scenario_placements.json
 
       - name: Build the dashboard data the suite reads
         run: |

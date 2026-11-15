@@ -25,11 +25,24 @@ database the person had been using.
 ONE COLLECTION AT A TIME: a bootstrap runs both side by side in separate
 processes, so there is no instant when both are between arrivals and neither
 is connected. And only on an asset declared synthetic.
+
+EACH ASSET SEES ITS OWN ONLY (REQ-PIPE-365 criterion 2). Both assets'
+databases share one server, so both assets' checkpoints do too; every name
+carries the asset (mothman_ckpt_<asset>_..., mothman_resume_<asset>_...), and
+listing, finding, deleting and pruning read the selected asset's names alone.
+
+BY THE NAME'S SHAPE, NEVER BY A PREFIX ALONE (post-build-review #347): an
+asset's name has no underscore (assets.NAME_PATTERN), so one asset's names
+never match another's. A copy made BEFORE the split is
+mothman_ckpt_<short>_<NNN>_<stamp> - one segment fewer - so an asset named
+like a collection short (an asset "cp") can never take it for its own. Those
+belong to no asset: listed apart, deletable from either asset, never pruned.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -115,6 +128,59 @@ class Checkpoint:
                        recorded=replay_inputs.Recorded(collection_id="", readable=False))
 
 
+#: PostgreSQL's identifier limit: a longer database name is truncated
+#: silently, which would lose the stamp that tells two checkpoints apart.
+_MAX_NAME = 63
+
+
+def _asset() -> str:
+    """The selected asset - refused, as every reader refuses, without one."""
+    from qa_tools.common import assets
+
+    return assets.selected().name
+
+
+def _own(prefix: str, asset: str | None = None) -> str:
+    """The name prefix of the selected asset's checkpoints (PREFIX) or
+    resumes (RESUME_PREFIX)."""
+    return f"{prefix}{asset or _asset()}_"
+
+
+#: The stamp and arrival number every name ends with.
+_TAIL = r"_\d{3}_\d{14}"
+
+
+def _is_own(name: str, prefix: str, asset: str | None = None) -> bool:
+    """`name` is one of the asset's checkpoints (PREFIX) or resumes
+    (RESUME_PREFIX): <prefix><asset>_<short>_<NNN>_<stamp>."""
+    return re.fullmatch(re.escape(_own(prefix, asset)) + r".+" + _TAIL, name) is not None
+
+
+def is_legacy(name: str) -> bool:
+    """A checkpoint or resume made before the asset split,
+    <prefix><short>_<NNN>_<stamp>, which belongs to no asset (#347)."""
+    return any(re.fullmatch(re.escape(prefix) + r"[^_]+" + _TAIL, name)
+               for prefix in (PREFIX, RESUME_PREFIX))
+
+
+def _named_for(prefix: str, short: str, before: int) -> str:
+    name = f"{_own(prefix)}{short}_{before:03d}_{_stamp()}"
+    if len(name) > _MAX_NAME:
+        raise CheckpointRefused(
+            f"a checkpoint of this asset would be named {name!r}, longer than PostgreSQL's "
+            f"{_MAX_NAME} characters - nothing was copied")
+    return name
+
+
+def require_names_fit(short: str, before: int) -> None:
+    """Refuse UP FRONT (post-build-review #346) a checkpoint, or a resume of
+    one, whose database name would pass PostgreSQL's limit - before minutes
+    of replay, not at the copy. The resume's prefix is the longer, so it is
+    the one measured."""
+    for prefix in (PREFIX, RESUME_PREFIX):
+        _named_for(prefix, short, before)
+
+
 def _with_dbname(dsn: str, dbname: str) -> str:
     info = psycopg.conninfo.conninfo_to_dict(dsn)
     info["dbname"] = dbname
@@ -173,7 +239,7 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
     from qa_tools import collections
 
     short = collections.by_id(collection_id).short
-    name = f"{PREFIX}{short}_{before:03d}_{_stamp()}"
+    name = _named_for(PREFIX, short, before)
     supply_db.release_connections()
     cp = Checkpoint(name=name, collection_id=collection_id, before=before,
                     taken_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -187,17 +253,33 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
 
 
 def listed(dsn: str | None = None, prefix: str = PREFIX) -> list[Checkpoint]:
-    """Criterion 7: every checkpoint on this server, oldest first."""
-    with _admin(dsn) as admin:
-        rows = admin.execute(
-            "SELECT datname, shobj_description(oid, 'pg_database') FROM pg_database "
-            "WHERE datname LIKE %s ORDER BY datname", [prefix.replace("_", r"\_") + "%"]).fetchall()
-    found = [Checkpoint.from_comment(name, comment) for name, comment in rows]
+    """Criterion 7: every checkpoint OF THE SELECTED ASSET on this server,
+    oldest first - never another asset's (REQ-PIPE-365 criterion 2)."""
+    asset = _asset()
+    found = [Checkpoint.from_comment(name, comment) for name, comment in _rows(dsn, prefix)
+             if _is_own(name, prefix, asset)]
     return sorted(found, key=lambda c: (c.taken_at, c.name))
 
 
+def _rows(dsn: str | None, prefix: str) -> list[tuple[str, str | None]]:
+    with _admin(dsn) as admin:
+        return admin.execute(
+            "SELECT datname, shobj_description(oid, 'pg_database') FROM pg_database "
+            "WHERE datname LIKE %s ORDER BY datname",
+            [prefix.replace("_", r"\_") + "%"]).fetchall()
+
+
+def legacy(dsn: str | None = None) -> list[str]:
+    """Every checkpoint and resume database made before the asset split,
+    which belongs to no asset (#347): shown apart by `checkpoint list`,
+    deletable by name, never pruned."""
+    return [name for prefix in (PREFIX, RESUME_PREFIX) for name, _ in _rows(dsn, prefix)
+            if is_legacy(name)]
+
+
 def resumes(dsn: str | None = None) -> list[Checkpoint]:
-    """Every resume's database on this server (#133 B8). Listed, never
+    """Every resume's database of the selected asset on this server (#133
+    B8; REQ-PIPE-365 criterion 2). Listed, never
     pruned: a person may be pointed at one. A resume carries no description
     of its own, so only its name is meaningful."""
     return listed(dsn, RESUME_PREFIX)
@@ -245,6 +327,15 @@ def delete(name: str, dsn: str | None = None) -> None:
     if not name.startswith((PREFIX, RESUME_PREFIX)):
         raise CheckpointRefused(f"{name!r} is not a checkpoint or a resume's database - "
                                 "nothing was deleted")
+    # ANOTHER ASSET'S IS NOT THIS ONE'S TO DELETE (REQ-PIPE-365 criterion 2),
+    # refused before the server is asked, so it reads the same whether or
+    # not that database exists.
+    asset = _asset()
+    if not (_is_own(name, PREFIX, asset) or _is_own(name, RESUME_PREFIX, asset)
+            or is_legacy(name)):
+        raise CheckpointRefused(
+            f"{name!r} is not one of asset {asset!r}'s checkpoints or resumes - nothing was "
+            f"deleted; `mothman pipeline checkpoint list` shows this asset's")
     with _admin(dsn) as admin:
         # A NAME THAT IS NOT THERE IS REFUSED, never reported deleted - a typo
         # must not read as success (post-build-review #133 B7).
@@ -272,7 +363,7 @@ def copy_for_resume(cp: Checkpoint, dsn: str | None = None) -> str:
     from qa_tools import collections
 
     short = collections.by_id(cp.collection_id).short
-    name = f"{RESUME_PREFIX}{short}_{cp.before:03d}_{_stamp()}"
+    name = _named_for(RESUME_PREFIX, short, cp.before)
     with _admin(dsn) as admin:
         _copy(admin, cp.name, name)
     return _with_dbname(dsn or supply_db.supply_db_dsn(), name)

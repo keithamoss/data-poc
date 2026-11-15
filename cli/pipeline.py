@@ -410,8 +410,10 @@ def generated_gate_outcomes():
 
 @pipeline_group.command("cache-key")
 def cache_key_command() -> None:
-    """Print the key CI caches a bootstrapped database under (REQ-TEST-117):
-    one digest of every input that shapes a bootstrap. The input list is
+    """Print the key CI caches this asset's bootstrapped database under
+    (REQ-TEST-117): one digest of every input that shapes its bootstrap - the
+    shared inputs and this asset's own folder, never another asset's
+    (REQ-PIPE-365 criterion 3). The input list is
     qa_tools/common/replay_inputs.py's, which a checkpoint replay compares
     too (REQ-TEST-160) - one list, two readers. Needs no database."""
     from qa_tools.common import replay_inputs
@@ -506,14 +508,16 @@ def checkpoint_group() -> None:
 
 @checkpoint_group.command("list")
 def checkpoint_list_command() -> None:
-    """Every checkpoint on this server, oldest first, then every resume's
-    database."""
+    """This asset's checkpoints on this server, oldest first, then its
+    resumes' databases - never another asset's (REQ-PIPE-365) - then any
+    made before the asset split, which belong to no asset."""
+    from qa_tools.common import assets as _assets
     from qa_tools.common import checkpoints
 
     found = checkpoints.listed()
     if not found:
-        console.print("No checkpoints. Take one with `mothman pipeline bootstrap "
-                      "--collection cp --checkpoint-before N`.")
+        console.print(f"No checkpoints of asset {_assets.selected().name!r}. Take one with "
+                      "`mothman pipeline bootstrap --collection cp --checkpoint-before N`.")
     for cp in found:
         if not cp.collection_id:
             console.print(f"{cp.name}  (its description cannot be read - a resume from it "
@@ -533,6 +537,14 @@ def checkpoint_list_command() -> None:
         console.print("Resume databases (never removed automatically):")
         for r in made:
             console.print(f"  {r.name}")
+    # MADE BEFORE THE SPLIT (post-build-review #347): named for no asset, so
+    # shown apart from every asset's, never pruned, deletable by name.
+    old = checkpoints.legacy()
+    if old:
+        console.print("Made before the asset split - belongs to no asset (delete with "
+                      "`mothman pipeline checkpoint delete NAME`):")
+        for name in old:
+            console.print(f"  {name}")
 
 
 @checkpoint_group.command("arrivals")

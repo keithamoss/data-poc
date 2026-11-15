@@ -43,20 +43,28 @@ class TestOneInputList:
 
     def test_the_list_is_criterion_1s(self):
         # The asset split moved contract/ and dbt_project/ into assets/<asset>/
-        # and the shared dbt package into dbt_shared/ (post-build-review).
+        # and the shared dbt package into dbt_shared/ (post-build-review);
+        # REQ-PIPE-365 criterion 3 keys it on the selected asset's folder and
+        # assets/environments.yaml, never another asset's.
         assert set(ri.INPUTS) == {"generator/**", "synthetic_data_generator/**", "pipeline/**",
-                                  "qa_tools/**", "assets/**", "dbt_shared/**", "cli/pipeline.py",
-                                  "pyproject.toml", "uv.lock", ".github/workflows/test.yml"}
+                                  "qa_tools/**", "dbt_shared/**", "cli/pipeline.py",
+                                  "pyproject.toml", "uv.lock", ".github/workflows/test.yml",
+                                  "assets/environments.yaml"}
+        assert set(ri.inputs("daily")) == set(ri.INPUTS) | {"assets/daily/**"}
+        assert set(ri.replay_patterns("daily")) == (
+            set(ri.REPLAY_INPUTS) | {"assets/daily/**", "!assets/daily/synthetic/collections/**"})
+        assert set(ri.REPLAY_INPUTS) == set(ri.INPUTS) - {"generator/**",
+                                                           "synthetic_data_generator/**"}
 
     def test_a_replay_compares_it_less_the_generators(self):
-        files = ri.input_files(ri.REPLAY_INPUTS)
+        files = ri.input_files(ri.replay_patterns())
         assert files and not any(p.startswith(("generator/", "synthetic_data_generator/"))
                                  for p in files)
-        # Every asset's configuration and the shared dbt package (the asset
-        # split moved both), and no asset's generator providers, whose effect
-        # is compared as the deliveries they produce.
-        for asset in ("daily", "quarterly"):
-            assert f"assets/{asset}/data-asset.yaml" in files, asset
+        # The selected asset's configuration and the shared dbt package (the
+        # asset split moved both), and none of its generator providers, whose
+        # effect is compared as the deliveries they produce.
+        assert "assets/quarterly/data-asset.yaml" in files
+        assert "assets/environments.yaml" in files
         assert any(p.startswith("dbt_shared/") for p in files)
         assert not any("/synthetic/collections/" in p for p in files)
         assert "cli/pipeline.py" in files
@@ -66,13 +74,27 @@ class TestOneInputList:
         """A check file under an asset is an input, so editing one changes the
         cache key - the regression the asset split introduced, when the list
         still named contract/ and matched no file at all."""
-        files = ri.input_files(ri.INPUTS)
+        files = ri.input_files(ri.inputs())
         checks = [p for p in files if p.startswith("assets/") and p.endswith("-soda-checks.yml")]
         assert checks, "no asset's check file is an input"
         before = ri.cache_key()
         edited = dict(files, **{checks[0]: "edited"})
         monkeypatch.setattr(ri, "input_files", lambda patterns=ri.INPUTS: dict(edited))
         assert ri.cache_key() != before
+
+    def test_only_the_selected_assets_folder_is_an_input(self):
+        """REQ-PIPE-365 criterion 3: never another asset's folder, for the
+        cache key or for a replay."""
+        for asset, other in (("quarterly", "daily"), ("daily", "quarterly")):
+            for files in (ri.input_files(ri.inputs(asset)),
+                          ri.input_files(ri.replay_patterns(asset))):
+                assert f"assets/{asset}/data-asset.yaml" in files, asset
+                assert not any(p.startswith(f"assets/{other}/") for p in files), asset
+
+    def test_the_key_is_the_selected_assets(self):
+        assert ri.cache_key() == ri.cache_key("quarterly")
+        assert ri.cache_key("quarterly").startswith(ri.KEY_PREFIX + "quarterly-")
+        assert ri.cache_key("daily").startswith(ri.KEY_PREFIX + "daily-")
 
     def test_ignored_files_are_not_inputs(self):
         """dbt deps installs dbt_packages/ under dbt_project/, and a key that
@@ -84,7 +106,7 @@ class TestOneInputList:
     def test_ci_keys_its_cache_on_the_same_list(self):
         workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text()
         assert "mothman pipeline cache-key" in workflow
-        assert "hashFiles(" not in workflow.split("Key the bootstrap cache", 1)[1].split("- name:", 1)[0]
+        assert "hashFiles(" not in workflow.split("Key each asset's bootstrap cache", 1)[1].split("- name:", 1)[0]
 
     def test_the_key_never_touches_a_database(self, monkeypatch):
         """CI computes it before its database exists (tests/test_db_identity
@@ -104,6 +126,83 @@ class TestOneInputList:
         assert ri.cache_key() == before
         files["contract/b.yaml"] = "3"
         assert ri.cache_key() != before
+
+
+class TestAnEditToOneAssetLeavesTheOthersKey:
+    """REQ-PIPE-365 criterion 3 and REQ-TEST-353 criterion 1, on a checkout
+    of its own: each asset's key moves with its own folder and the shared
+    inputs, and with nothing of the other asset's."""
+
+    @pytest.fixture
+    def checkout(self, tmp_path, monkeypatch):
+        import subprocess
+
+        for rel in ("assets/quarterly/data-asset.yaml", "assets/daily/data-asset.yaml",
+                    "assets/environments.yaml", "qa_tools/a.py",
+                    "assets/daily/synthetic/collections/p.py", "docs/notes.md"):
+            (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / rel).write_text(rel)
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        monkeypatch.setattr(ri, "ROOT", tmp_path)
+        return tmp_path
+
+    def _keys(self):
+        return ri.cache_key("quarterly"), ri.cache_key("daily")
+
+    def test_the_two_keys_differ(self, checkout):
+        quarterly, daily = self._keys()
+        assert quarterly != daily
+
+    def test_a_daily_edit_moves_only_dailys_key(self, checkout):
+        before = self._keys()
+        (checkout / "assets/daily/data-asset.yaml").write_text("edited")
+        after = self._keys()
+        assert after[0] == before[0] and after[1] != before[1]
+
+    def test_a_quarterly_edit_moves_only_quarterlys_key(self, checkout):
+        before = self._keys()
+        (checkout / "assets/quarterly/data-asset.yaml").write_text("edited")
+        after = self._keys()
+        assert after[0] != before[0] and after[1] == before[1]
+
+    @pytest.mark.parametrize("rel", ["assets/environments.yaml", "qa_tools/a.py"])
+    def test_a_shared_edit_moves_both(self, checkout, rel):
+        before = self._keys()
+        (checkout / rel).write_text("edited")
+        after = self._keys()
+        assert after[0] != before[0] and after[1] != before[1]
+
+    def test_a_provider_edit_is_in_the_key_and_not_the_replays_inputs(self, checkout):
+        """Providers are compared as deliveries by a replay (A43), but CI's
+        key still moves with them - they shape what is generated."""
+        replay = ri.input_files(ri.replay_patterns("daily"))
+        assert replay, "the fixture checkout has no replay inputs - this checked nothing"
+        before = self._keys()
+        (checkout / "assets/daily/synthetic/collections/p.py").write_text("edited")
+        assert self._keys()[1] != before[1]
+        assert ri.input_files(ri.replay_patterns("daily")) == replay
+
+    def test_a_file_outside_every_input_moves_neither(self, checkout):
+        before = self._keys()
+        (checkout / "docs/notes.md").write_text("edited")
+        assert self._keys() == before
+
+
+class TestTheCommandPrintsTheSelectedAssetsKey:
+    """REQ-PIPE-365 criterion 3: `mothman pipeline cache-key`, run as CI runs
+    it, once per asset with MOTHMAN_ASSET."""
+
+    @pytest.mark.parametrize("asset", ["quarterly", "daily"])
+    def test_each_asset(self, asset):
+        import os
+        import subprocess
+
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("MOTHMAN_SUPPLY_DSN", "MOTHMAN_PG")}
+        env["MOTHMAN_ASSET"] = asset
+        out = subprocess.run(["uv", "run", "mothman", "pipeline", "cache-key"], cwd=ROOT,
+                             env=env, check=True, capture_output=True, text=True).stdout
+        assert out.strip() == ri.cache_key(asset)
 
 
 class TestTheDeliveriesPrint:
