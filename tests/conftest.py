@@ -1244,6 +1244,14 @@ def pytest_addoption(parser):
 #: whole on one worker, exactly as `--dist loadfile` kept it.
 SPREAD_BY_CLASS = frozenset({"test_dashboard_e2e.py"})
 
+# MODULES THAT WRITE TO THE DEPLOYMENT DATABASE, AND MODULES THAT COUNT ITS ROWS,
+# SHARE ONE WORKER (post-build-review #323). test_recheck_trial runs a real trial
+# on the deployment - a trial run written and then removed - and
+# test_target_agreement asserts that reading changes no row count. On two workers
+# the count can land mid-trial and read one run too many. One group runs them one
+# after the other. Keith, 2026-11-15: the fix without a regression test.
+SHARE_THE_DEPLOYMENT = frozenset({"test_recheck_trial.py", "test_target_agreement.py"})
+
 # A CONSEQUENCE WORTH KNOWING (post-build-review #271): with the browser tests
 # on every worker, every worker carries pytest-playwright's session-scoped sync
 # Playwright from its first browser test to the end of its session - and with
@@ -1270,6 +1278,8 @@ def _distribution_group(item) -> str:
     file's group.
     """
     path = item.nodeid.split("::", 1)[0]
+    if item.path.name in SHARE_THE_DEPLOYMENT:
+        return "deployment-writers-and-counters"
     if item.path.name in SPREAD_BY_CLASS and getattr(item, "cls", None) is not None:
         return f"{path}::{item.cls.__name__}"
     return path

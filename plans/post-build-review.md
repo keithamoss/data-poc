@@ -14593,7 +14593,7 @@ twice. It deliberately did not re-find the `TypeError`.
        before its source is held. Recorded here; no criterion depends on it now
        that TS-107 has moved.
 
-323. **[todo, 2026-11-14]** **[Testing & dev tooling]** **Two deployment-half modules race on the shared deployment database.**
+323. **[done, 2026-11-14]** **[Testing & dev tooling]** **Two deployment-half modules race on the shared deployment database.**
      Seen 2026-11-14 running `pytest -m needs_deployment` after #322's
      regeneration: tests/test_target_agreement.py's
      `test_every_targeted_supply_in_the_deployment_agrees_and_nothing_changes`
@@ -14608,5 +14608,12 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Likely fix**: one shared distribution group for the deployment
        modules that write (trials) and those that count rows. A
        scheduling/wiring bug, so per CLAUDE.md the regression test is Keith's
-       call before it is written. Not fixed yet.
+       call before it is written.
+     - **Keith, 2026-11-15: the fix, no regression test.** tests/conftest.py's
+       SHARE_THE_DEPLOYMENT puts both modules in one xdist group
+       (`deployment-writers-and-counters`), so they run one after the other.
+       Ran: the two modules together 61 passed; `-n 2 -v` shows every test of
+       both in that group; `-m needs_deployment` (no browser) 138 passed,
+       1 xfailed, the comparison included. A future module writing to the
+       deployment is not caught by anything; Keith's call.
 
