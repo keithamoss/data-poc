@@ -447,6 +447,41 @@ def test_sync_tickets_refuses_where_no_environment_is_stated(monkeypatch):
     assert trip.gh_calls == [] and trip.reports_read == 0
 
 
+def test_a_mistyped_environment_is_named_not_called_unset(monkeypatch):
+    """post-build-review #325's critic: current_or_none() also swallows an
+    undeclared id, so `prodution` was told MOTHMAN_ENVIRONMENT is not set."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "prodution")
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert "'prodution'" in message and "not a declared environment" in message
+    assert "not set" not in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
+@pytest.mark.parametrize("content", [None, "environments: [unclosed\n"])
+def test_a_missing_or_broken_environments_file_refuses_saying_so(monkeypatch, tmp_path, content):
+    from qa_tools.common import environments
+
+    path = tmp_path / "environments.yaml"
+    if content is not None:
+        path.write_text(content)
+    monkeypatch.setattr(environments, "ENVIRONMENTS_PATH", path)
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    trip = _Tripwire().install(monkeypatch)
+
+    with pytest.raises(SystemExit) as refused:
+        ticket_sync.main()
+
+    message = str(refused.value.code)
+    assert message.startswith("sync-tickets refused") and str(path) in message
+    assert "not set" not in message
+    assert trip.gh_calls == [] and trip.reports_read == 0
+
+
 def test_the_command_exits_1_naming_the_environment(monkeypatch):
     """The same refusal through `mothman github sync-tickets` itself."""
     from click.testing import CliRunner

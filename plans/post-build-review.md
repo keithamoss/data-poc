@@ -14652,8 +14652,18 @@ twice. It deliberately did not re-find the `TypeError`.
        tests/test_ticket_sync.py FAILED against the old code ("a refused
        sync-tickets read a report"); the ticketing-on test passed before and
        after, as it should. Re-enabling ticket-sync.yml as it stands would now
-       be refused, since a runner is `ci` (ticketing off) - correct, and
+       be refused: it sets no MOTHMAN_ENVIRONMENT, so on the unset branch
+       (and a runner's own `ci` has ticketing off too) - correct, and
        Keith's to change if that workflow ever comes back.
+     - **Critic fix, same day (test-first).** The first guard read
+       `current_or_none()`, which also answers None for an undeclared id, so
+       `MOTHMAN_ENVIRONMENT=prodution` was told the variable was unset. It now
+       calls `environments.current()` and passes its message through - the
+       unset variable, the undeclared id, and a missing or unparsable
+       environments.yaml each named for what they are, still exit 1.
+       `test_a_mistyped_environment_is_named_not_called_unset` and
+       `test_a_missing_or_broken_environments_file_refuses_saying_so` (two
+       cases) FAILED against the first guard, and pass now.
      - **REQ-PIPE-401.** #318 remembered `list_setting_members`' dbt schema
        parses by (path, mtime_ns, size) in an unbounded, unlocked dict -
        REQ-PIPE-254 criterion 15 forbids that. Now a `config_yaml.Built` store

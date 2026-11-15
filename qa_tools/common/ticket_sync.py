@@ -376,14 +376,24 @@ def refuse_unless_ticketing_on() -> None:
     It reads committed configuration and one variable, and runs before
     any report is read or GitHub is called, so a refused run has no
     partial effect."""
+    import yaml
+
     from qa_tools.common import environments
 
-    env = environments.current_or_none()
-    if env is None:
+    # environments.current(), not current_or_none(): the latter answers None
+    # for an unset variable AND for an undeclared id, and a refusal that told
+    # `prodution` the variable was unset would send the reader to the wrong
+    # line (post-build-review #325). Its own message names which it is.
+    try:
+        env = environments.current()
+    except environments.EnvironmentError_ as exc:
         raise SystemExit(
-            f"sync-tickets refused: {environments.ENVIRONMENT_ENV} is not set, so this "
-            f"deployment names no environment and ticketing is off. Set it to an "
-            f"environment that turns ticketing on in assets/environments.yaml.")
+            f"sync-tickets refused - ticketing is off: {exc}. Ticketing is switched on "
+            f"per environment in assets/environments.yaml.") from None
+    except (OSError, yaml.YAMLError) as exc:
+        raise SystemExit(
+            f"sync-tickets refused - ticketing is off: {environments.ENVIRONMENTS_PATH}, "
+            f"which switches it per environment, cannot be read - {exc}") from None
     if not env.ticketing:
         raise SystemExit(
             f"sync-tickets refused: the {env.id!r} environment turns ticketing off in "
