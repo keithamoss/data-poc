@@ -165,6 +165,11 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
     let go of the pass lock; every pooled connection is closed here."""
     require_synthetic()
     source = _dbname(dsn or supply_db.supply_db_dsn())
+    # THE SOURCE'S IDENTITY FIRST (post-build-review #334, the critic's M2):
+    # the copy and the prune below go through the admin connection, which
+    # checks nothing, so a process that lost its DSN would otherwise copy -
+    # and prune the checkpoints of - another environment's supply_<asset>.
+    supply_db.connect(dsn=dsn, read_only=True, label="mothman:checkpoints").close()
     from qa_tools import collections
 
     short = collections.by_id(collection_id).short

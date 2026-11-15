@@ -6,9 +6,8 @@ and a presentation entry, is built, embedded and linked with no code of its
 own (criteria 1, 6, 9 and 17); one with no recorded runs is built with an
 empty history (criterion 6); one with no file refuses the embed, writing no
 page (criterion 7); and one with no presentation entry fails the gate before
-any build (criterion 8). Today's two collections keep their tests in
-test_build_dashboard_data.py and test_build_dashboard_child_protection.py,
-and their output is proved unchanged by the equivalence capture.
+any build (criterion 8). The real collections keep their own tests in
+test_build_dashboard_data.py and test_build_dashboard_child_protection.py.
 """
 from __future__ import annotations
 

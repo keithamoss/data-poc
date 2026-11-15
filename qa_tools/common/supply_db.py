@@ -126,6 +126,18 @@ SUPPLY_DSN_ENV = "MOTHMAN_SUPPLY_DSN"
 #: database - and the one thing worse than failing to connect is
 #: connecting to the wrong environment. REQ-PIPE-093 makes this a
 #: first-class rule for every operation; this is where it starts.
+#:
+#: UNSET, THE SELECTED ASSET'S OWN DATABASE ON THE SERVER MOTHMAN_PG NAMES
+#: (Keith, 2026-11-15: the session hook and the dev container export
+#: MOTHMAN_PG and no MOTHMAN_SUPPLY_DSN; REQ-PIPE-343 criterion 7). That is
+#: still no default: MOTHMAN_PG names a server and no database, the asset
+#: has no default either, and the database is supply_<data_asset_id> of
+#: the asset the person stated. With neither variable set it refuses,
+#: naming both. REJECTED libpq's PG* variables (Keith, the same day). The
+#: identity check (REQ-PIPE-343 criterion 2) still refuses a database that
+#: belongs elsewhere.
+SERVER_ENV = "MOTHMAN_PG"
+ASSET_DATABASE_PREFIX = "supply_"
 
 #: Where a supply lands before anything has decided which slot it fills.
 STAGING_SCHEMA = "staging"
@@ -244,23 +256,64 @@ class SupplyDbError(RuntimeError):
     reasonable-looking default."""
 
 
-def supply_db_dsn() -> str:
-    """The connection string for the one database.
+def asset_database() -> str:
+    """The selected asset's own database name, supply_<data_asset_id>
+    (REQ-PIPE-343 criterion 7) - what supply_db_dsn() names when
+    MOTHMAN_SUPPLY_DSN is unset."""
+    from qa_tools.common import hierarchy
 
-    Raises rather than guessing where it is unset, which is the whole
-    point - see SUPPLY_DSN_ENV's own note. The error names the variable
-    and what to do, because the person who hits this is usually setting
+    return f"{ASSET_DATABASE_PREFIX}{hierarchy.data_asset_id()}"
+
+
+def on_server(server: str, dbname: str) -> str:
+    """`dbname` on the server the postgresql:// URL `server` names - which
+    must name no database, so that MOTHMAN_PG can never be a default
+    database by another name. Never puts `server` in an error: it may hold a
+    password."""
+    from urllib.parse import parse_qs, urlsplit, urlunsplit
+
+    parts = urlsplit(server)
+    if parts.scheme not in ("postgresql", "postgres") or not parts.netloc:
+        raise SupplyDbError(
+            f"{SERVER_ENV} must be a postgresql:// URL naming a server and no database, "
+            f"e.g. postgresql://user:password@localhost:5432")
+    if parts.path.strip("/") or "dbname" in parse_qs(parts.query):
+        raise SupplyDbError(
+            f"{SERVER_ENV} names a database, and it must name only the server - each "
+            f"asset's database, supply_<asset>, is chosen from MOTHMAN_ASSET. Drop the "
+            f"database from it, e.g. postgresql://user:password@localhost:5432, or set "
+            f"{SUPPLY_DSN_ENV} to name one database outright.")
+    return urlunsplit((parts.scheme, parts.netloc, f"/{dbname}", parts.query, ""))
+
+
+def supply_db_dsn() -> str:
+    """The connection string for the selected asset's database.
+
+    MOTHMAN_SUPPLY_DSN when it is set; otherwise the selected asset's own
+    database, supply_<data_asset_id>, on the server MOTHMAN_PG names (see
+    SERVER_ENV's note). Raises rather than guessing when neither variable is
+    set, naming both, because the person who hits this is usually setting
     the project up for the first time.
     """
     dsn = os.environ.get(SUPPLY_DSN_ENV)
-    if not dsn:
+    if dsn:
+        return dsn
+    server = os.environ.get(SERVER_ENV)
+    if not server:
         raise SupplyDbError(
-            f"{SUPPLY_DSN_ENV} is not set, and there is no default - this "
-            f"pipeline has no local database file to fall back to. Set it to a "
-            f"real PostgreSQL connection string, e.g. "
-            f"postgresql://user@host:5432/supply. A dev container and CI each "
-            f"supply one; see README's Development section.")
-    return dsn
+            f"Neither {SUPPLY_DSN_ENV} nor {SERVER_ENV} is set, and there is no default. "
+            f"Set {SERVER_ENV} to the PostgreSQL server, a postgresql:// URL with no "
+            f"database (e.g. postgresql://user:password@localhost:5432), and each "
+            f"command opens its asset's own supply_<asset> there; or set "
+            f"{SUPPLY_DSN_ENV} to one database's connection string. A dev container "
+            f"and the session hook set {SERVER_ENV}; see README's Development section.")
+    from qa_tools.common import assets
+
+    why = assets.why_not_selected()
+    if why is not None:
+        raise SupplyDbError(f"{SUPPLY_DSN_ENV} is not set, and no asset is selected to "
+                            f"find a database on {SERVER_ENV}'s server from: {why}")
+    return on_server(server, asset_database())
 
 
 def _translate(sql: str, params) -> str:

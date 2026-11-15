@@ -4,12 +4,13 @@ The fake Widget Register (tests/fake_collection.py) is added to a COPY of
 the tracked working tree - its configuration, check files, dbt models, QA
 adapter and generator provider, nothing else - and followed from generation
 to a rendered dataset page, with `mothman` run from the copy against a
-scratch database of its own. The repository's own contract/, data/ and
-reports/ are never touched (criterion 6).
+scratch database of its own. The repository's own assets/, data/ and
+reports/ are never touched (criterion 6). The fake joins the quarterly asset
+(post-build-review #333).
 
-ON DEMAND (the requirement's TEST COST NFR): it bootstraps, so it runs in
-CI's on-demand job beside the bootstrap-equivalence test, never in the fast
-half. The copy reuses this checkout's interpreter, dbt packages and browser.
+ON DEMAND (the requirement's TEST COST NFR): it bootstraps, so it runs only in
+CI's on-demand job (or with `--run-on-demand`), never in the fast half. The copy reuses this checkout's
+interpreter, dbt packages and browser.
 """
 
 # READS ONLY ITS OWN REPORTS: every reports/ file here is one this module
@@ -67,7 +68,7 @@ class Copy:
     def __init__(self, tree: Path, dsn: str):
         self.tree, self.dsn = tree, dsn
         self.env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn, "MOTHMAN_ENVIRONMENT": "test",
-                    "NO_COLOR": "1", "COLUMNS": "200"}
+                    "MOTHMAN_ASSET": fake_collection.ASSET, "NO_COLOR": "1", "COLUMNS": "200"}
         self.seconds: dict[str, float] = {}
 
     def mothman(self, *argv: str, step: str) -> subprocess.CompletedProcess:
@@ -79,7 +80,8 @@ class Copy:
         return done
 
     def results(self) -> list[dict]:
-        doc = json.loads((self.tree / "reports" / "results_wdg_widget-register.json").read_text())
+        doc = json.loads((self.tree / "reports" / fake_collection.ASSET
+                          / "results_wdg_widget-register.json").read_text())
         return doc["results"] if isinstance(doc, dict) else doc
 
 
@@ -94,7 +96,8 @@ def copy(tmp_path_factory):
 
     # What a person adding a collection already has: this checkout's dbt
     # packages, and a repository to commit to (the build links to a commit).
-    (tree / "dbt_project" / "dbt_packages").symlink_to(ROOT / "dbt_project" / "dbt_packages")
+    dbt_packages = f"{fake_collection.A}/dbt/dbt_packages"
+    (tree / dbt_packages).symlink_to(ROOT / dbt_packages)
     git = ["git", "-c", "user.email=t@example.com", "-c", "user.name=t"]
     subprocess.run(["git", "init", "-q"], cwd=tree, check=True)
     subprocess.run([*git, "add", "-A"], cwd=tree, check=True, capture_output=True)
@@ -107,7 +110,8 @@ def copy(tmp_path_factory):
     c.bootstrapped = c.results()
 
     kept = tmp_path_factory.mktemp("kept") / f"{fake_collection.TABLE}.csv"
-    newest = sorted((tree / "data" / "deliveries").glob(f"*/{fake_collection.TABLE}.csv"))[-1]
+    newest = sorted((tree / "data" / fake_collection.ASSET / "deliveries")
+                    .glob(f"*/{fake_collection.TABLE}.csv"))[-1]
     kept.write_bytes(newest.read_bytes())
     c.qa = c.mothman(fake_collection.SHORT, "qa", "--file", str(kept), "--commit",
                      "--originally-received", "not-known", step="qa")
@@ -125,12 +129,12 @@ class TestTheCopyIsTheTreeWithACollectionAdded:
     """Criteria 1 and 3."""
 
     def test_the_fake_is_kept_under_tests_in_a_collections_own_places(self):
-        files = fake_collection.own_files()
+        files, a = fake_collection.own_files(), fake_collection.A
         for kind in ("contract.yaml", "soda-checks.yml", "evidently-checks.yml"):
-            assert f"contract/widget-agency/widget-register-{kind}" in files
-        assert any(f.startswith("dbt_project/models/widget-register/") for f in files)
-        assert "qa_tools/collections/widget_register.py" in files
-        assert "generator/collections/widget_register.py" in files
+            assert f"{a}/widget-agency/widget-register-{kind}" in files
+        assert any(f.startswith(f"{a}/dbt/models/widget-register/") for f in files)
+        assert f"{a}/collections/widget_register.py" in files
+        assert f"{a}/synthetic/collections/widget_register.py" in files
         assert all(f.startswith(fake_collection.OWN_PATHS) for f in files)
 
     def test_it_differs_by_additions_only(self, copy):
@@ -138,7 +142,7 @@ class TestTheCopyIsTheTreeWithACollectionAdded:
 
     def test_the_check_would_catch_an_edit_to_a_real_collection(self, tmp_path):
         tree = fake_collection.install(tree_copy.copy_tracked_tree(tmp_path / "tree"))
-        hierarchy = tree / "contract" / "data-asset.yaml"
+        hierarchy = tree / fake_collection.A / "data-asset.yaml"
         hierarchy.write_text(hierarchy.read_text().replace("short: cp ", "short: cpx", 1))
         (tree / "qa_tools" / "tools" / "stray.py").write_text("")
         said = fake_collection.additions_only(tree)

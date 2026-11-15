@@ -1,10 +1,12 @@
 """The fake Widget Register, added to a copy of the repository (REQ-TEST-249).
 
 THE FILES ARE IN tests/fake_collection_files/ (criterion 1): its contract and
-check files under contract/widget-agency/, its dbt models under
-dbt_project/models/widget-register/, its QA adapter and its generator
-provider - laid out exactly where a real collection's would go - plus
-inserts/, the blocks it adds to the asset-wide configuration.
+check files under assets/quarterly/widget-agency/, its dbt models under
+assets/quarterly/dbt/models/widget-register/, its QA adapter under
+assets/quarterly/collections/ and its generator provider under
+assets/quarterly/synthetic/collections/ - laid out exactly where a real
+quarterly collection's would go since the asset split - plus inserts/, the
+blocks it adds to the asset's configuration.
 
 `install(tree)` copies the files into a copy made by tests/tree_copy.py and
 inserts each block WHOLE, as text, so every pre-existing line of the file it
@@ -12,11 +14,12 @@ lands in stays where it was (criterion 3). `additions_only(tree)` is that
 criterion's check, and holds for any copy, not only this one's.
 
 THREE CONFIGURATION FILES TAKE AN INSERT, not one. Criterion 3 names only
-contract/data-asset.yaml, but a dataset with no entry in contract/calendar.yaml
-is refused outright, and REQ-DASH-244 put every collection's words in
-contract/presentation.yaml, whose gate fails a collection with no entry. So the
+the hierarchy (data-asset.yaml), but a dataset with no entry in the asset's
+calendar.yaml is refused outright, and REQ-DASH-244 put every collection's words
+in its presentation.yaml, whose gate fails a collection with no entry. So the
 criterion covers all three, by the same rule (Keith, 2026-10-18, amending it;
-plans/running-thoughts.md #106).
+plans/running-thoughts.md #106). All three are the quarterly asset's
+(post-build-review #333).
 """
 from __future__ import annotations
 
@@ -33,14 +36,17 @@ INSERTS = FILES / "inserts"
 
 COLLECTION_ID, SHORT, AGENCY_ID = "widget-register", "wreg", "widget-agency"
 DATASET_ID, TABLE = "widgets", "widgets"
+#: The asset the fake joins, and its folder (post-build-review #333).
+ASSET = "quarterly"
+A = f"assets/{ASSET}"
 
 #: Where a collection's own new files may go (criterion 3).
-OWN_PATHS = (f"contract/{AGENCY_ID}/", f"dbt_project/models/{COLLECTION_ID}/",
-             f"dbt_project/tests/{COLLECTION_ID}/", "qa_tools/collections/",
-             "generator/collections/")
+OWN_PATHS = (f"{A}/{AGENCY_ID}/", f"{A}/dbt/models/{COLLECTION_ID}/",
+             f"{A}/dbt/tests/{COLLECTION_ID}/", f"{A}/collections/",
+             f"{A}/synthetic/collections/")
 
 #: The asset-wide files that take an insert, and where each block lands.
-EDITED = ("contract/data-asset.yaml", "contract/calendar.yaml", "contract/presentation.yaml")
+EDITED = (f"{A}/data-asset.yaml", f"{A}/calendar.yaml", f"{A}/presentation.yaml")
 
 
 def own_files() -> list[str]:
@@ -75,12 +81,12 @@ def install(tree: Path) -> Path:
         shutil.copy2(FILES / rel, dest)
 
     # The hierarchy's agencies are the file's last list: the block goes at the end.
-    path = tree / "contract/data-asset.yaml"
+    path = tree / f"{A}/data-asset.yaml"
     path.write_text(path.read_text().rstrip("\n") + "\n" + _block("data-asset.yaml"))
 
     # The calendar: a collection entry before the datasets' heading comment,
     # a dataset entry at the end (the datasets list is last).
-    path = tree / "contract/calendar.yaml"
+    path = tree / f"{A}/calendar.yaml"
     lines = path.read_text().splitlines(keepends=True)
     heading = next(i for i, line in enumerate(lines) if "EACH DATASET'S PARTICIPATION" in line) - 1
     while not lines[heading - 1].strip():
@@ -88,11 +94,18 @@ def install(tree: Path) -> Path:
     lines = _insert(lines, heading, _block("calendar-collections.yaml"))
     path.write_text("".join(lines).rstrip("\n") + "\n" + _block("calendar-datasets.yaml"))
 
-    # Presentation: an agency before `collections:`, a collection at the end.
-    path = tree / "contract/presentation.yaml"
+    # Presentation: an agency before `collections:`, a collection at the end
+    # of `collections:` - before the comment heading the next key, since
+    # `collections:` is no longer the file's last list.
+    path = tree / f"{A}/presentation.yaml"
     lines = path.read_text().splitlines(keepends=True)
     lines = _insert(lines, _index(lines, "collections:"), _block("presentation-agencies.yaml"))
-    path.write_text("".join(lines).rstrip("\n") + "\n" + _block("presentation-collections.yaml"))
+    after = _index(lines, "collections:") + 1
+    end = next((i for i in range(after, len(lines))
+                if lines[i].strip() and not lines[i].startswith(" ")), len(lines))
+    while end > after and (not lines[end - 1].strip() or lines[end - 1].startswith("#")):
+        end -= 1
+    path.write_text("".join(_insert(lines, end, _block("presentation-collections.yaml"))))
 
     for rel in EDITED:  # each still parses, and now names the fake
         assert COLLECTION_ID in (tree / rel).read_text(), rel

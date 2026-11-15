@@ -502,6 +502,14 @@ def supply_dsn(worker_id, stated_test_environment):
     # populated database since REQ-PIPE-089. A worker's database is
     # empty by design, so building from it produces an empty dashboard.
     globals()["DEPLOYMENT_SUPPLY_DSN"] = before
+    # AND THE SERVER, for a session the hook started: it exports MOTHMAN_PG
+    # and no DSN (Keith, 2026-11-15), so a deployment database is
+    # supply_<asset> there (deployment_dsn_for; post-build-review #334 H1).
+    # Taken OUT of the environment for the session, so a test - or a
+    # process it spawns - that loses its DSN reaches no real database by
+    # the lookup every command makes; a test wanting a server sets its own.
+    server_before = os.environ.pop(supply_db.SERVER_ENV, None)
+    globals()["DEPLOYMENT_SERVER"] = server_before
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
     _WORKER_DB.update(dsn=dsn, asset=TEST_ASSET)
     yield dsn
@@ -509,6 +517,8 @@ def supply_dsn(worker_id, stated_test_environment):
         os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
     else:
         os.environ[supply_db.SUPPLY_DSN_ENV] = before
+    if server_before is not None:
+        os.environ[supply_db.SERVER_ENV] = server_before
 
 
 @pytest.fixture
@@ -772,7 +782,7 @@ def deployment_history(supply_dsn, monkeypatch):
     """
     dsn = deployment_dsn_for(os.environ.get(_assets.ASSET_ENV))
     if not dsn:
-        pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
+        pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN or MOTHMAN_PG)")
     monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
     use_deployment_environment(monkeypatch)
     return dsn
@@ -786,10 +796,30 @@ def deployment_dsn_for(asset: str | None) -> str | None:
     own server where it exists (REQ-PIPE-343 criterion 7 - each asset's
     database by that name, the sandbox's and CI's alike), else the deployment
     database the session was given (MOTHMAN_SUPPLY_DSN). CI's per-asset runs
-    are handed supply_<asset> directly, so both routes agree there."""
+    are handed supply_<asset> directly, so both routes agree there.
+
+    WITH NO DSN, supply_<asset> on MOTHMAN_PG's server where it exists - the
+    lookup every command makes (post-build-review #334 H1: a session the hook
+    started sets only MOTHMAN_PG, and every deployment test skipped)."""
     import psycopg
 
+    from qa_tools.common import supply_db
+
     base = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    server = globals().get("DEPLOYMENT_SERVER")
+    if not base and server and asset:
+        base = supply_db.on_server(server, "postgres")
+        if asset not in _DEPLOYMENT_BY_ASSET:
+            found = None
+            try:
+                with psycopg.connect(base, autocommit=True, connect_timeout=5) as conn:
+                    if conn.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                                    [f"supply_{asset}"]).fetchone():
+                        found = supply_db.on_server(server, f"supply_{asset}")
+            except psycopg.Error:
+                pass
+            _DEPLOYMENT_BY_ASSET[asset] = found
+        return _DEPLOYMENT_BY_ASSET[asset]
     if not base or not asset:
         return base
     if asset not in _DEPLOYMENT_BY_ASSET:
@@ -1218,7 +1248,8 @@ NEEDS_DEPLOYMENT = "needs_deployment"
 
 
 #: Tests too slow for every run, kept in the repository and run when their
-#: subject changes (Keith, 2026-10-04: the bootstrap equivalence test).
+#: subject changes (Keith, 2026-10-04) - tests/test_a_collection_is_a_small_adapter.py,
+#: say, which bootstraps a copy of the tree.
 ON_DEMAND = "on_demand"
 
 def pytest_addoption(parser):

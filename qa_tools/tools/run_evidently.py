@@ -238,7 +238,8 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
                                        run_timestamp, reference_run_id)
                            for c in checks.psi if _table_of(c) == psi_table)
     # EACH DRIFT CHECK'S SNAPSHOT BY ITS ID (REQ-QAC-231): read by nothing, and
-    # left out of the equivalence capture, so the shape is free to say which.
+    # never compared (tests/equiv_support.py leaves tool_output.raw_output out
+    # of its snapshot), so the shape is free to say which.
     raw_output = {"psi": {r["check_id"]: r.pop("_snapshot") for r in results} or None}
     results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
     evaluated = {r["check_id"] for r in results}

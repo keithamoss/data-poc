@@ -264,11 +264,12 @@ for asset in quarterly daily; do MOTHMAN_ASSET=$asset uv run mothman env dbt-dep
                             # one-time, per asset: installs dbt_utils (see the top
                             # of this README for why a real-tool dbt build needs it)
 
-# Where the pipeline's own warehouse lives. NO DEFAULT, on purpose: there is
-# no local file to fall back to, so a default would have to name somebody's
-# database - and the one thing worse than failing to connect is connecting
-# to the wrong environment.
-export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+# Where the pipeline's own warehouse lives. Each asset has its own database,
+# supply_<asset>, which a command finds from MOTHMAN_ASSET (no default either)
+# on the server MOTHMAN_PG names - a URL naming no database. With neither
+# MOTHMAN_PG nor MOTHMAN_SUPPLY_DSN set a command refuses; the DSN, when set,
+# names one database outright instead.
+export MOTHMAN_PG="postgresql://user:password@localhost:5432"
 
 # Where the TEST SUITE connects. It creates a database per test worker and
 # never starts a server itself - a suite that starts its own server tests a

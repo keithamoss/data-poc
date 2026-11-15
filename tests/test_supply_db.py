@@ -16,6 +16,8 @@ load-bearing for a workaround that has been removed.
 """
 from __future__ import annotations
 
+import os
+
 import psycopg
 import pytest
 
@@ -277,12 +279,16 @@ class TestWhereItRefusesToGuess:
         with pytest.raises(supply_db.SupplyDbError):
             supply_db.staged_table("cp clients; drop", "run_001")
 
-    def test_an_unset_dsn_is_an_error_naming_the_variable(self, monkeypatch):
-        """There is no default and no file to fall back to, so the only
-        useful thing to say is which variable is missing."""
+    def test_neither_a_dsn_nor_a_server_is_an_error_naming_both_variables(self, monkeypatch):
+        """With neither, there is nothing to find a database from, so the
+        useful thing to say is which variables are missing (Keith,
+        2026-11-15; the critic's L3)."""
         monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
-        with pytest.raises(supply_db.SupplyDbError, match=supply_db.SUPPLY_DSN_ENV):
+        monkeypatch.delenv(supply_db.SERVER_ENV, raising=False)
+        with pytest.raises(supply_db.SupplyDbError) as exc:
             supply_db.connect()
+        assert supply_db.SUPPLY_DSN_ENV in str(exc.value)
+        assert supply_db.SERVER_ENV in str(exc.value)
 
     def test_an_unreachable_database_says_so_and_names_the_host(self, monkeypatch):
         """REQ-PIPE-087 criterion 12: loud, naming where it tried, and
@@ -311,6 +317,167 @@ class TestWhereItRefusesToGuess:
         project used to have to care."""
         with pytest.raises(supply_db.SupplyDbError, match="63-byte identifier limit"):
             supply_db._ident("x" * 64, "table name")
+
+
+class TestWithNoDsnACommandFindsItsAssetsDatabase:
+    """MOTHMAN_SUPPLY_DSN unset (Keith, 2026-11-15: the session hook and the
+    dev container export MOTHMAN_PG and no DSN): the database is the selected
+    asset's own, supply_<data_asset_id> (REQ-PIPE-343 criterion 7), on the
+    server MOTHMAN_PG names - a postgresql:// URL that names no database."""
+
+    @pytest.fixture
+    def no_dsn(self, monkeypatch):
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
+        return monkeypatch
+
+    def test_it_names_the_quarterly_assets_database_on_the_server(self, no_dsn):
+        no_dsn.setenv(supply_db.SERVER_ENV, "postgresql://u:pw@db.example:6543")
+        assert supply_db.supply_db_dsn() == "postgresql://u:pw@db.example:6543/supply_quarterly"
+
+    @pytest.mark.asset("daily")
+    def test_it_names_the_daily_assets_database_under_the_daily_asset(self, no_dsn):
+        no_dsn.setenv(supply_db.SERVER_ENV, "postgresql://u@db.example:6543/")
+        assert supply_db.supply_db_dsn() == "postgresql://u@db.example:6543/supply_daily"
+
+    def test_the_servers_options_are_kept(self, no_dsn):
+        no_dsn.setenv(supply_db.SERVER_ENV, "postgresql://u@h:1?sslmode=require")
+        assert supply_db.supply_db_dsn() == "postgresql://u@h:1/supply_quarterly?sslmode=require"
+
+    @pytest.mark.parametrize("server", ["postgresql://u:hunter2@h:1/supply",
+                                        "postgresql://u:hunter2@h:1?dbname=supply"])
+    def test_a_server_naming_a_database_is_refused(self, no_dsn, server):
+        """Otherwise MOTHMAN_PG would be a default database by another name."""
+        no_dsn.setenv(supply_db.SERVER_ENV, server)
+        with pytest.raises(supply_db.SupplyDbError, match="names a database") as exc:
+            supply_db.supply_db_dsn()
+        assert "hunter2" not in str(exc.value) and supply_db.SERVER_ENV in str(exc.value)
+
+    @pytest.mark.parametrize("server", ["host=h user=u", "h:5432"])
+    def test_a_server_that_is_not_a_url_is_refused(self, no_dsn, server):
+        no_dsn.setenv(supply_db.SERVER_ENV, server)
+        with pytest.raises(supply_db.SupplyDbError, match="postgresql:// URL"):
+            supply_db.supply_db_dsn()
+
+    def test_a_stated_dsn_still_wins(self, monkeypatch):
+        monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, "postgresql://u@h:1/elsewhere")
+        monkeypatch.setenv(supply_db.SERVER_ENV, "postgresql://v@k:2")
+        assert supply_db.supply_db_dsn() == "postgresql://u@h:1/elsewhere"
+
+    def test_the_tools_get_the_servers_details_not_the_defaults(self, no_dsn):
+        """What dbt, Soda Core and datacontract-cli are handed comes whole from
+        the URL - host, port and password included, none of them the
+        defaults connection_fields() would fall back to (L2). The identity
+        check is stubbed: nothing listens on this host."""
+        no_dsn.setenv(supply_db.SERVER_ENV, "postgresql://u:pw@db.example:6543")
+        no_dsn.setattr(supply_db, "connect", lambda **kw: type(
+            "C", (), {"close": lambda self: None})())
+        assert supply_db.connection_fields() == {
+            "host": "db.example", "port": "6543", "user": "u", "password": "pw",
+            "dbname": "supply_quarterly"}
+
+    def test_two_servers_never_share_scratch_or_a_label(self, no_dsn):
+        """L7: what is keyed on the DSN is keyed on the resolved one - the
+        server as well as the asset's database - so the same asset on two
+        servers gets two scratch folders, and the correction preview names
+        the server it read rather than a bare database name."""
+        from qa_tools.common import correction_trial
+
+        seen = {}
+        for host in ("one.example", "two.example"):
+            no_dsn.setenv(supply_db.SERVER_ENV, f"postgresql://u:pw@{host}:5432")
+            seen[host] = (supply_db.scratch_dir(), correction_trial.database_label())
+        assert seen["one.example"][0] != seen["two.example"][0]
+        assert seen["one.example"][1] == "supply_quarterly on one.example"
+        assert seen["two.example"][1] == "supply_quarterly on two.example"
+
+    def test_a_command_connects_with_no_dsn(self, monkeypatch):
+        """A real connection with the variable unset. The worker's own
+        database stands in for supply_quarterly, which a test never opens,
+        and the server is named by 127.0.0.1 - not the default localhost -
+        so the details are seen to come from MOTHMAN_PG."""
+        from psycopg import conninfo
+
+        worker = conninfo.conninfo_to_dict(os.environ[supply_db.SUPPLY_DSN_ENV])
+        assert worker.get("password"), "the test server's DSN carries no password"
+        monkeypatch.setattr(supply_db, "asset_database", lambda: worker["dbname"])
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV)
+        monkeypatch.setenv(supply_db.SERVER_ENV,
+                      f"postgresql://{worker['user']}:{worker['password']}@127.0.0.1:"
+                      f"{worker.get('port', 5432)}")
+        supply_db.release_connections()
+        try:
+            with supply_db.connect(read_only=True, label="test-no-dsn") as conn:
+                (name,) = conn.execute("SELECT current_database()").fetchone()
+            fields = supply_db.connection_fields()
+        finally:
+            supply_db.release_connections()
+        assert name == worker["dbname"]
+        assert fields == {"host": "127.0.0.1", "port": str(worker.get("port", 5432)),
+                          "user": worker["user"], "password": worker["password"],
+                          "dbname": worker["dbname"]}
+
+
+@pytest.fixture
+def sandbox_marked_scratch(supply_dsn, worker_id):
+    """A private supply_<something> database on the test server, marked for
+    the `sandbox` environment as a real supply_<asset> is in a session -
+    never one of the real supply_* databases (M2)."""
+    from psycopg import conninfo
+
+    from qa_tools.common import db_identity, hierarchy
+
+    admin = os.environ["MOTHMAN_TEST_DSN"]
+    name = f"supply_fu_scratch_{worker_id}"
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+    info = conninfo.conninfo_to_dict(admin)
+    with psycopg.connect(conninfo.make_conninfo(**dict(info, dbname=name)),
+                         autocommit=True) as conn:
+        db_identity.mark(conn, db_identity.Identity(hierarchy.data_asset_id(), "sandbox"))
+    server = f"postgresql://{info['user']}:{info.get('password', '')}@{info.get('host', 'localhost')}:{info.get('port', 5432)}"
+    yield name, server
+    supply_db.release_connections()
+    with psycopg.connect(admin, autocommit=True) as conn:
+        # Any checkpoint a regression took of it goes too, so a failure here
+        # leaves nothing behind for the next run to count.
+        for (ckpt,) in conn.execute(
+                "SELECT datname FROM pg_database WHERE starts_with(datname, 'mothman_ckpt_') "
+                "AND strpos(shobj_description(oid, 'pg_database'), %s) > 0", [name]).fetchall():
+            conn.execute(f'DROP DATABASE IF EXISTS "{ckpt}" WITH (FORCE)')
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+class TestALostDsnIsRefusedByAnotherEnvironmentsDatabase:
+    """M2: a process that lost its DSN - a test's child, say - now reaches
+    supply_<asset> on MOTHMAN_PG's server. Under environment `test` a
+    database marked for `sandbox` refuses it before any statement runs."""
+
+    def test_connect_is_refused(self, sandbox_marked_scratch, monkeypatch):
+        name, server = sandbox_marked_scratch
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV)
+        monkeypatch.setenv(supply_db.SERVER_ENV, server)
+        monkeypatch.setattr(supply_db, "asset_database", lambda: name)
+        supply_db.release_connections()
+        with pytest.raises(supply_db.SupplyDbError, match="environment 'sandbox'"):
+            supply_db.connect(read_only=True, label="test-lost-dsn")
+
+    def test_a_checkpoint_is_refused_and_nothing_is_copied(self, sandbox_marked_scratch,
+                                                           monkeypatch):
+        """checkpoints.save() opens its own admin connection, not connect(),
+        so it used to copy - and prune the checkpoints of - whatever database
+        it was pointed at with no identity check at all."""
+        from qa_tools.common import checkpoints, replay_inputs
+
+        name, server = sandbox_marked_scratch
+        monkeypatch.delenv(supply_db.SUPPLY_DSN_ENV)
+        monkeypatch.setenv(supply_db.SERVER_ENV, server)
+        monkeypatch.setattr(supply_db, "asset_database", lambda: name)
+        supply_db.release_connections()
+        with pytest.raises(supply_db.SupplyDbError, match="environment 'sandbox'"):
+            checkpoints.save("child-protection", 2, recorded=replay_inputs.Recorded("x"),
+                             pending_scripts=[])
+        assert [c for c in checkpoints.listed() if c.source == name] == []
 
 
 class TestItNeverWaitsForeverForALock:

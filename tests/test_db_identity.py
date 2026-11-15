@@ -382,11 +382,38 @@ class TestEveryPlaceMarksItsOwn:
         assert count.count('-d "$db"') == 3 and "-d supply " not in count
         assert 'say "${asset}: ${db} has ${STAGED} staged table(s)."' in count
 
+    def test_the_sandbox_hook_exports_a_server_and_no_supply_database(self, tmp_path):
+        """Keith, 2026-11-15: the session exports no MOTHMAN_SUPPLY_DSN - a
+        command finds its asset's database from MOTHMAN_ASSET - so the block
+        that writes the session's environment, run on its own, writes the
+        server as MOTHMAN_PG and no database."""
+        import subprocess
+
+        text = (ROOT / ".claude/hooks/session-start.sh").read_text()
+        start = text.index('if [ -n "${CLAUDE_ENV_FILE:-}" ]; then')
+        end = text.index("\nfi\n", start) + 4
+        env_file = tmp_path / "env"
+        head = text[text.index('PGUSER_NAME="user"'):text.index("\n", text.index('SERVER="'))]
+        subprocess.run(["bash", "-c", head + "\n" + text[start:end]],
+                       env={"CLAUDE_ENV_FILE": str(env_file), "PATH": "/usr/bin:/bin"},
+                       check=True)
+        written = env_file.read_text()
+        assert "MOTHMAN_SUPPLY_DSN" not in written and "/supply" not in written
+        assert "export PG" not in written, "libpq's variables, rejected by Keith"
+        assert 'export MOTHMAN_PG="postgresql://user:password@localhost:5432"' in written
+        assert "export MOTHMAN_TEST_DSN=" in written
+        # And the hook's own mark goes by MOTHMAN_PG too, never a DSN.
+        assert 'MOTHMAN_PG="${SERVER}"' in text and "PGHOST=" not in text
+        # Nor does the hook make a database no asset owns.
+        assert "datname='supply'" not in text
+
     def test_the_dev_container(self):
         text = (ROOT / ".devcontainer/post-create.sh").read_text()
         loop = text.index(self._EACH_ASSET)
         mark = text.index('mothman env mark --confirm "${asset}/local"')
-        assert loop < mark and 'MOTHMAN_SUPPLY_DSN="${server}/supply_${asset}"' in text
+        # NO MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15): the mark finds the asset's
+        # own database from MOTHMAN_ASSET, on the server devcontainer.json names.
+        assert loop < mark and 'MOTHMAN_ASSET="$asset"' in text[loop:mark]
 
     def test_every_ci_job_with_a_database(self):
         import yaml

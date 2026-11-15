@@ -31,14 +31,14 @@ schema:
         unique: true
         description: "The register's own widget number - primary key of this table."
         quality:
-          - id: data-asset-1:widget-agency:widget-register:widgets:widget_id:nullValues_datacontract
+          - id: quarterly:widget-agency:widget-register:widgets:widget_id:nullValues_datacontract
             metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.widget-agency.widget-register.widgets.widget_id.nullValues_datacontract
+                value: quarterly.widget-agency.widget-register.widgets.widget_id.nullValues_datacontract
               - property: introduced_date
                 value: "2026-10-18"
               - property: description
@@ -55,14 +55,14 @@ schema:
         required: true
         description: "The widget's colour, one of red, green or blue."
         quality:
-          - id: data-asset-1:widget-agency:widget-register:widgets:colour:nullValues_datacontract
+          - id: quarterly:widget-agency:widget-register:widgets:colour:nullValues_datacontract
             metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.widget-agency.widget-register.widgets.colour.nullValues_datacontract
+                value: quarterly.widget-agency.widget-register.widgets.colour.nullValues_datacontract
               - property: introduced_date
                 value: "2026-10-18"
               - property: description

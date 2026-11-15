@@ -3,8 +3,8 @@
 The batch and the terminal's hand-filed routes both go through
 arrival_lifecycle.process(); these pin what that function promises,
 without the real tools, so the contract is checked in milliseconds and
-the real-tool behaviour is left to the orchestrator and equivalence
-tests.
+the real-tool behaviour is left to the orchestrator's tests and
+tests/test_kept_routes_agree.py (one delivery kept three ways).
 """
 from __future__ import annotations
 

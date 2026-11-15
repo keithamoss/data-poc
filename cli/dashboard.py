@@ -149,6 +149,16 @@ def validate_dbt_packages_command() -> None:
         raise click.ClickException("dbt packages validation failed - see output above.")
 
 
+@dashboard_group.command("validate-layout")
+def validate_layout_command() -> None:
+    """Gate: only environments.yaml and asset folders at the top of assets/,
+    and no collection's file in the shared code tree (REQ-PIPE-342 criterion
+    10, REQ-PIPE-364 criterion 5). Repository-wide: it reads no asset."""
+    from qa_tools.common.validate_layout import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("layout validation failed - see output above.")
+
+
 @dashboard_group.command("validate-hierarchy")
 def validate_hierarchy_command() -> None:
     """Gate: every dataset contract agrees with the one hierarchy (REQ-QAC-039)."""

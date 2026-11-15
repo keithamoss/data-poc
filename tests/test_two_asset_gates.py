@@ -231,5 +231,37 @@ class TestTheSharedTree:
         assert len(found) == 1 and "stg_birth_registrations" in found[0]
 
 
+class TestTheLayoutGateIsAMothmanCommand:
+    """CLAUDE.md: every entry point is a mothman subcommand - so `mothman
+    check`'s layout gate runs `mothman dashboard validate-layout`, as its
+    neighbours run theirs, never `python3 -m` on the module."""
+
+    def test_the_command_passes_over_this_repository(self):
+        from click.testing import CliRunner
+
+        from cli.dashboard import dashboard_group
+
+        result = CliRunner().invoke(dashboard_group, ["validate-layout"])
+        assert result.exit_code == 0, result.output
+        assert "layout OK" in result.output
+
+    def test_the_command_fails_when_the_gate_does(self, monkeypatch):
+        from click.testing import CliRunner
+
+        from cli.dashboard import dashboard_group
+
+        monkeypatch.setattr(vl, "assets_top_problems", lambda: ["assets/stray.yaml sits here"])
+        result = CliRunner().invoke(dashboard_group, ["validate-layout"])
+        assert result.exit_code != 0
+        assert "assets/stray.yaml sits here" in result.output
+        assert "layout validation failed" in result.output
+
+    def test_mothman_check_runs_it_through_the_command(self):
+        import cli.check as check_cli
+
+        argv = {g[0]: g[1] for g in check_cli._GATES}["layout"]
+        assert argv == ["uv", "run", "mothman", "dashboard", "validate-layout"]
+
+
 #: The fixture's assets are copies of this one (tests/two_assets.py).
 pytestmark = pytest.mark.asset("daily")

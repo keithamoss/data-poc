@@ -22,14 +22,23 @@ services:
     # The same major CI runs. See devcontainer.json's own note.
     image: postgres:16
     restart: unless-stopped
+    # NO POSTGRES_DB: the database the image would make, `supply`, belongs
+    # to no asset since the split. Each asset's own, supply_<asset>, is made
+    # by create-asset-databases.sh from the asset folders mounted read-only
+    # beside it (Keith, 2026-11-15), once, when the volume is first
+    # initialised - an existing volume needs `docker compose down -v` first.
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: supply
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ../assets:/mothman-assets:ro
+      - ./create-asset-databases.sh:/docker-entrypoint-initdb.d/create-asset-databases.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d supply"]
+      # OVER TCP, not the socket: while the init scripts run, the image's
+      # temporary server listens on the socket only, so this is not healthy
+      # until they have finished.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U user -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10

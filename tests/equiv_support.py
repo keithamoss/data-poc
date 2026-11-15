@@ -373,10 +373,6 @@ def differences(a: dict, b: dict, limit: int = 5) -> list[str]:
     return out
 
 
-def summary(snap: dict) -> dict[str, int]:
-    return {k: sum(rows.values()) for k, (_c, rows) in snap.items()}
-
-
 # --------------------------------------------------------------------------
 # One route into a database of its own (tests/test_kept_routes_agree.py,
 # tests/test_replay_clock.py).
@@ -403,28 +399,18 @@ def drop_database(name: str) -> None:
 
 def run_into_fresh_database(tree: Path, db_name: str, run, inspect=None) -> dict:
     """`run()` against a new, empty database with every on-disk path under
-    `tree`; that database's snapshot. The database is dropped afterwards."""
-    dsn = fresh_database(db_name)
-    try:
-        return run_into_database(tree, dsn, run, inspect, ensure_schema=True)
-    finally:
-        drop_database(db_name)
-
-
-def run_into_database(tree: Path, dsn: str, run, inspect=None, *,
-                      ensure_schema: bool = False) -> dict:
-    """`run()` against the database at `dsn` - an existing one, such as a
-    resume's copy of a checkpoint (REQ-TEST-159) - with every on-disk path
-    under `tree`; its snapshot. Scripted decisions are switched off - they
-    replay the synthetic scenarios over the whole corpus and refuse a
-    cut-down history for missing the rest. `inspect(dsn)`, when given, is
-    called and its answer kept under "inspected"."""
+    `tree`; that database's snapshot. The database is dropped afterwards.
+    Scripted decisions are switched off - they replay the synthetic
+    scenarios over the whole corpus and refuse a cut-down history for
+    missing the rest. `inspect(dsn)`, when given, is called and its answer
+    kept under "inspected"."""
     import shutil
 
     import pytest
 
     from qa_tools.common import supply_db
 
+    dsn = fresh_database(db_name)
     mp = pytest.MonkeyPatch()
     original = apply_redirects(tree)
     scratch = None
@@ -433,10 +419,9 @@ def run_into_database(tree: Path, dsn: str, run, inspect=None, *,
         supply_db.release_connections()
         scratch = supply_db.scratch_dir()
         mp.delenv("GITHUB_REPOSITORY", raising=False)
-        if ensure_schema:
-            with supply_db.connect(label="test-kept-routes") as conn:
-                from qa_tools.common import qa_store
-                qa_store.ensure_schema(conn)
+        with supply_db.connect(label="test-kept-routes") as conn:
+            from qa_tools.common import qa_store
+            qa_store.ensure_schema(conn)
         run()
         snap = snapshot(dsn)
         if inspect is not None:
@@ -448,3 +433,4 @@ def run_into_database(tree: Path, dsn: str, run, inspect=None, *,
         restore(original)
         if scratch is not None:
             shutil.rmtree(scratch, ignore_errors=True)
+        drop_database(db_name)

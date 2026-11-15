@@ -85,7 +85,7 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # REQ-PIPE-342 criterion 10 and REQ-PIPE-364 criterion 5: no collection's
     # file in the shared code tree, and only environments.yaml and asset
     # folders at the top of assets/. Repository-wide: it reads no asset.
-    ("layout", ["uv", "run", "python3", "-m", "qa_tools.common.validate_layout"],
+    ("layout", ["uv", "run", "mothman", "dashboard", "validate-layout"],
      "only asset folders at the top of assets/, and no collection's file in shared code",
      False),
     # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds

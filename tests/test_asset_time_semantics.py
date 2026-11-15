@@ -26,7 +26,7 @@ deleted (REQ-TEST-395): it collected only the selected asset's datasets and
 then rewrote the whole file, which would have dropped the other asset's
 pinned arrivals. The procedure now, one asset at a time:
 
-  a. Count the deliveries first (`ls data/deliveries | wc -l`, no
+  a. Count the deliveries first (`ls data/<asset>/deliveries | wc -l`, no
      `handfiled-*`), and rebuild that asset's reports from its own history:
      `MOTHMAN_ASSET=<asset> uv run mothman dashboard rebuild`.
   b. For every dataset in that asset's `reports/` dashboard files, replace
@@ -185,7 +185,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     So: before extending this golden, count the deliveries. The per-asset
     re-capture in this module's docstring is the recorded procedure (the
     command that used to be it was deleted, REQ-TEST-395), and
-    `ls data/deliveries | wc -l` is the question to ask first.
+    `ls data/<asset>/deliveries | wc -l` is the question to ask first.
 
     RE-CAPTURED AGAIN THE SAME NIGHT for post-build-review #172 (pairs spaced
     out, 85 days): 117 deliveries, zero `handfiled-*`, rebuilt first; Child
