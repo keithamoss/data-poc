@@ -1107,14 +1107,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # 2), in rank order - the run-time trend's points and each row's
         # re-check note read these, and the slow mark is judged over them
         # (REQ-PIPE-412). A not-checked run is among them, with its tries.
+        # A NOT-CHECKED RUN (REQ-PIPE-411 criterion 4) is among them, flagged
+        # not_checked, with its supply, cause, rank and tries - and no check
+        # result. (A separate notChecked list was dropped as unread,
+        # post-build-review #407.)
         "runTimes": run_times(dataset_id, facts),
-        # THE SUPPLIES NOBODY COULD CHECK (REQ-PIPE-411 criterion 4): each run
-        # with its supply, cause, rank and tries - and no check result.
-        "notChecked": [{"run_id": key, **{k: f[k] for k in (
-                            "supply_id", "cause", "rank", "scope", "run_time_ms", "ended_at")},
-                        "attempts": f.get("attempts")}
-                       for key, f in sorted(facts.items(), key=lambda kv: kv[1]["rank"])
-                       if f.get("not_checked") and f["dataset_id"] == dataset_id],
         "columns": columns_out,
         "_provenance": presented["provenance"].format(
             table_description=table_description(coll, dataset)),

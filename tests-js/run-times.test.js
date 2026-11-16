@@ -142,11 +142,12 @@ describe("a run that needed another try (414)", () => {
     expect(w.triesAsAt(tries({outcome: "CRASHED", began: 9, ended: 10}), "2026-03-04")).toEqual([]);
   });
 
-  it("is not shown for a run with one try that completed, and leaves its status alone", () => {
+  // ITS STATUS IS THE COMPLETED TRY'S: held at the build, where the verdicts
+  // are made (tests/test_attempts_in_the_build.py::TestAFailedTryNeverRaisesAStatus,
+  // post-build-review #408) - the page reads no try when judging a status.
+  it("is not shown for a run with one try that completed", () => {
     const w = load();
     expect(w.triesNote(run(1, 1000, {attempts: null}), null)).toBe("");
-    // THE STATUS COMES FROM THE CHECKS' RESULTS, never from the tries.
-    expect(w.rollupStatuses(["green", "green"])).toBe("green");
   });
 
   it("uses the shared duration format", () => {

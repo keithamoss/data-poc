@@ -821,6 +821,54 @@ class TestARepeatedRejectIsAlreadySo:
 
 # post-build-review #188 (delivery-critic on REQ-PIPE-163) - each written first.
 
+class TestARecheckOwedByAMoveThatCrashedIsRed:
+    """post-build-review #400 (REQ-PIPE-417 criteria 2 and 3): the decision
+    that caused a re-check is not a move that closes the re-check's own red."""
+
+    def _crash(self, supply, decision_id):
+        from qa_tools.common import qa_results_writer
+
+        run_id = f"cp_recheck__{uuid.uuid4().hex[:10]}"
+        qa_results_writer.open_run("child-protection-family-support", "child-protection",
+                                   run_id, WHEN, "tests@example.gov.au",
+                                   purpose={"dataset_id": DS, "supply_id": supply,
+                                            "scope": "full",
+                                            "caused_by_decision": decision_id})
+        qa_results_writer.close_attempt(run_id, RuntimeError("the re-check crashed"))
+
+    def _open(self, conn, supply):
+        from qa_tools.common import dataset_blockers
+
+        return [b for b in dataset_blockers.could_not_check(conn)
+                if b.supply == supply and b.is_open]
+
+    def test_a_placement(self, conn, period, target):
+        from qa_tools.common import placing
+
+        supply, _ = _held(conn, period)
+        entry: list = []
+        with dl.decision_transaction(conn):
+            placing.place(conn, agency_id="child-protection-family-support",
+                          collection_id="child-protection", dataset_id=DS, supply=supply,
+                          to_period=target, actor=REAL_PERSON, actor_kind=dl.PERSON,
+                          reason="the supplier's Q3 file", effective_at=WHEN, entry_out=entry)
+        self._crash(supply, entry[0])
+        assert self._open(conn, supply), "the placement's crashed re-check reads red"
+
+    def test_a_refile(self, conn, period, target):
+        supply, _ = _filed(conn, period, "2026-05-02T01:00:00+00:00")
+        with dl.decision_transaction(conn):
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="child-protection-family-support",
+                    collection_id="child-protection", dataset_id=DS, action=dl.REFILE,
+                    supply=supply, actor=REAL_PERSON, actor_kind=dl.PERSON,
+                    effective_at=WHEN, from_slot=period, to_slot=target,
+                    reason="it belongs to the next quarter")) as entry_id:
+                filing.refile(conn, DS, supply, target, decision_id=entry_id)
+        self._crash(supply, entry_id)
+        assert self._open(conn, supply), "the re-file's crashed re-check reads red"
+
+
 class TestCriticFindingsOnPlacement:
 
     def test_d1_wait_is_accepted_for_un_supersede_which_owes_a_run(self, cli):

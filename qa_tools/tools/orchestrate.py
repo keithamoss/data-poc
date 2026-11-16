@@ -99,8 +99,10 @@ def _run_step(collection: str, tool: str, run_id: str, call):
         # unfinished run" (REQ-TEST-416 criterion 8): the run step's summary
         # line says how the attempt ended, once.
         raise QaRunFailure(
-            f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: {exc}. "
-            f"{NEXT_STEP}", tool=tool, cause=exc) from exc
+            # ONE FULL STOP, whatever the tool's own message ends with
+            # (post-build-review #406).
+            f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: "
+            f"{str(exc).rstrip().rstrip('.')}. {NEXT_STEP}", tool=tool, cause=exc) from exc
 
 
 #: The order a run's tools record in, and report a failure in (REQ-PIPE-431

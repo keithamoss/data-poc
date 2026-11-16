@@ -225,7 +225,7 @@ class TestNoMessageIsPublished:
         payload = history.results_file()
         page = history.page()
         assert SECRET not in json.dumps(payload) and SECRET not in json.dumps(page)
-        assert page["notChecked"] and page["runTimes"], "nothing about the runs was built"
+        assert [t for t in page["runTimes"] if t["not_checked"]], "nothing was built"
         assert "error_message" not in json.dumps(page)
 
     def test_the_record_still_holds_it_for_the_terminal(self, history):
@@ -243,7 +243,7 @@ class TestTheDashboardData:
         page = history.page()
         (row,) = [r for r in page["runs"] if r["run_id"] == done]
         assert isinstance(row["run_time_ms"], int) and row["attempts"]["count"] == 2
-        assert [n["run_id"] for n in page["notChecked"]] == [stuck]
+        assert [t["run_id"] for t in page["runTimes"] if t["not_checked"]] == [stuck]
         assert {t["run_id"] for t in page["runTimes"]} == {done, stuck}
 
 
@@ -262,7 +262,8 @@ class TestARefusedOlderFile:
 
     def test_a_null_run_time_is_accepted(self, history):
         _tries(_run_id(), "Y", supply=_supply())
-        assert history.page()["notChecked"][0]["run_time_ms"] is None
+        (stuck,) = [t for t in history.page()["runTimes"] if t["not_checked"]]
+        assert stuck["run_time_ms"] is None
 
 
 class TestTheSameHistoryBuildsTheSameBytes:
@@ -273,6 +274,44 @@ class TestTheSameHistoryBuildsTheSameBytes:
         _tries(_run_id(), "T", supply=_supply())
         first = json.dumps(history.page(), sort_keys=True, default=str)
         assert first == json.dumps(history.page(), sort_keys=True, default=str)
+
+
+class TestAFailedTryNeverRaisesAStatus:
+    """REQ-DASH-414 criterion 6 at the build (post-build-review #408): a
+    supply checked on its second try carries exactly the verdicts a supply
+    checked on its first does."""
+
+    def _page_with(self, history, outcomes):
+        from test_build_from_the_record import CHECK, _record
+
+        run_id = _run_id()
+        stated = {"dataset_id": DS, "supply_id": _supply(), "scope": "arrival"}
+        for outcome in outcomes:
+            qa_results_writer.open_run(AGENCY, CP, run_id, WHEN, BY, purpose=stated)
+            if outcome == "X":
+                qa_results_writer.close_attempt(run_id, RuntimeError("first try"))
+                continue
+            qa_results_writer.write_qa_result(
+                AGENCY, CP, run_id, WHEN, "dataset_stats",
+                {"arrival_record": {"run_id": run_id, "received_at": "2099-01-01T01:00:00+00:00",
+                                    "delivery": "d"},
+                 "row_counts": {}, "value_counts": {}, "check_aggregates": {}}, run_by=BY)
+            qa_results_writer.write_qa_result(
+                AGENCY, CP, run_id, WHEN, "dbt", {}, verified=[dict(_record(
+                    f"{CHECK}.cp-clients.cp_client_id.unique_dbt", DS, status="fail",
+                    column_name="cp_client_id"), run_id=run_id)])
+            qa_results_writer.finish_run(run_id)
+        page = history.page()
+        return {c["name"]: [(k.get("check_id"), k.get("current_status")) for k in c["checks"]]
+                for c in page["columns"]}
+
+    def test_the_second_tries_verdicts_are_the_first_tries(self, history):
+        retried = self._page_with(history, "XC")
+        with supply_db.connect(label="test-attempts-build") as conn:
+            conn.execute('TRUNCATE "qa".run, "qa".run_attempt CASCADE')
+        once = self._page_with(history, "C")
+        assert retried == once
+        assert any(s == "red" for checks in once.values() for _c, s in checks)
 
 
 class TestPackageGatingReadsTheOneReader:

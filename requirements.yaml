@@ -51659,6 +51659,8 @@ requirements:
       and the cross-table runs_by_supply leave it out): it recorded no result.'
     - NFR 'DASHBOARD WEIGHT' asks for the page size measured on the bootstrapped build as evidence; not measured here - it needs
       the cache-miss bootstrap (N11), which this builder may not run against the real databases.
+    - 'The per-dataset notChecked list was dropped as unread (post-build-review #407); a not-checked run is in runTimes with not_checked
+      true.'
     linked_tests:
     - tests/test_attempts_in_the_build.py::TestEachRunsRunTimeAndTries
     - tests/test_attempts_in_the_build.py::TestWhichRunsAreNotChecked
@@ -51687,6 +51689,11 @@ requirements:
       failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
+      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
+      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
+      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
+      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51764,6 +51771,18 @@ requirements:
     - 'PROVISIONAL (2026-11-16): criterion 8''s package test drives package_gating''s own _state and words with the windows the
       build derives, rather than a whole recorded package.'
     - REQ-DASH-272 criterion 21 amended in this change, as approved (its two nested quotes written once each).
+    - 'A RE-CHECK''S OWN CAUSE NEVER CLOSES IT (post-build-review #400): the decision that caused a re-check, and its caused_by
+      family up and down the chain, is never read as a move out of the slot; a move closes the red only strictly after it opened,
+      the earliest such move of every one recorded (#403).'
+    - 'ONE OPEN BLOCKER PER SUPPLY (#402): the newest qualifying run''s; an older one closes where the newer one opens.'
+    - 'The blocker record carries the supply''s own receipt (receivedAt) and each failed try''s end (tries.failedEndedAt), for
+      the page (#401, #405).'
+    - 'PROVISIONAL (2026-11-16): could_not_check() is read once per caller (package_gating and the filing queue, each per collection)
+      - one indexed read of the asset''s attempts each - rather than cached per build (#407).'
+    - 'PROVISIONAL (2026-11-16): settlement''s REFILE is covered by the same derivation as a person''s REFILE (one decision action);
+      #400''s test drives placing.place and a REFILE through decision_log, not a settlement scenario.'
+    - 'FOR KEITH (recorded, behaviour unchanged, #408): in the terminal an arrival still running its first try already reads COULD_NOT_CHECK
+      (F7).'
     linked_tests:
     - tests/test_could_not_check.py::TestAnArrivalWhoseOnlyTryCrashed
     - tests/test_could_not_check.py::TestADecisionRecheckThatCrashed
@@ -51792,6 +51811,11 @@ requirements:
       failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
+      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
+      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
+      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
+      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51983,6 +52007,9 @@ requirements:
       in.'
     - 'PROVISIONAL (2026-11-16): the note is shown only once the completing try had ended by the date on show; before that the
       row shows no tries note.'
+    - 'NO NOTE UNLESS THE TRY BEFORE FAILED (post-build-review #404), as the terminal says it.'
+    - 'Criterion 6 is held at the build, where verdicts are made (TestAFailedTryNeverRaisesAStatus, #408), replacing a vacuous
+      JS assertion.'
     linked_tests:
     - tests-js/run-times.test.js
     implemented_by:
@@ -52000,6 +52027,11 @@ requirements:
       failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
+      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
+      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
+      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
+      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     unmet_criteria:
     - criterion: Criterion 8, in part - the real-browser test on a built dashboard holding a retried run that opening the details
         does not touch location.
@@ -52059,6 +52091,13 @@ requirements:
       keeps its cycle row, which reads the grey No data while its blocker is open.'
     - 'PROVISIONAL (2026-11-16): the try count in ''could not be checked on <n> tries'' is the count recorded, not clipped to
       the date on show.'
+    - 'JUDGED BY THE SUPPLY''S OWN RECEIPT (post-build-review #401): blockerWithoutARunOfItsOwn compares a could-not-check blocker''s
+      receivedAt, not when its red opened, so a crashed re-check of an older supply does not blank a newer one. Its banner has
+      its own words (blockedBannerLead): the pass retries it, a person can reject it.'
+    - 'PROVISIONAL (2026-11-16): the try count is as at the date on show (#405); before the newest try ended, the page says how
+      many earlier tries did not finish.'
+    - 'FOR KEITH (recorded, #401): should a crashed re-check of an old period turn a later period red? 417 c4 says ''red for the
+      period once''.'
     linked_tests:
     - tests-js/run-times.test.js
     implemented_by:
@@ -52077,6 +52116,11 @@ requirements:
       failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
+      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
+      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
+      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
+      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     unmet_criteria:
     - criterion: Criterion 10, in part - the real-browser test on a built dashboard holding a run whose only try crashed.
       why: 'As REQ-DASH-413''s: the e2e module needs the deployment database rebuilt at schema 51.'
@@ -52157,6 +52201,11 @@ requirements:
     - 'PROVISIONAL (2026-11-16): the wizard''s panel reads the run time back (one read-only query), since report_recorded is called
       after the run step has finished.'
     - REQ-TEST-150 criterion 7 amended in this change, as approved.
+    - 'One full stop before the next step whatever the tool''s message ends with (post-build-review #406). duration-cases.json
+      gains 59.5s, 599.5s, 3540s and 3570s (#408).'
+    - 'FOR KEITH (recorded, behaviour unchanged, #408 F6): NEXT_STEP is printed for readers-only, gate and trial runs too, where
+      it is not true, and inside recheck''s Outcome text; criterion 2 is worded unconditionally. The run step says ''crashed in
+      <tool>'' where the page and the queue say ''failed in <tool>''.'
     linked_tests:
     - tests/test_run_summary_line.py::TestEachSummaryLine
     - tests/test_run_summary_line.py::TestARetriedRunsLine
@@ -52186,6 +52235,11 @@ requirements:
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     - 'npm test: tests-js/duration-cases.test.js, the browser half of duration-cases.json, in the full JS run named above.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
+      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
+      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
+      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
+      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     open_questions: []
     signed_off:
       by: Keith

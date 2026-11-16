@@ -15560,3 +15560,96 @@ twice. It deliberately did not re-find the `TypeError`.
        two-rule Fail test added.
      - **Ran** (#381-#385): see REQ-GEN-392's evidence - 29 affected modules,
        629 passed, 2 skipped; ruff clean.
+
+400. **[done, 2026-11-16]** **[QA checks & contract]** **[Dashboard UI]** **A re-check owed by a re-file or a placement that then crashed was never red.**
+     Post-build critic on wip/timing 78edbad9 (F1, HIGH; REQ-PIPE-417
+     criteria 2 and 3). `dataset_blockers._could_not_check` read the decision
+     that CAUSED the re-check - a REFILE - as a move out of the slot at or
+     after the red opened, so the blocker resolved the instant it opened.
+     - **Fix** (defect, failing test first): the causing decision and its
+       caused_by family (`_decision_family`, up and down the chain) are never a
+       closing move, and a move closes the red only strictly after it opened.
+       `tests/test_place_held_supply.py::TestARecheckOwedByAMoveThatCrashedIsRed`
+       (through the real `placing.place`, and a person's REFILE through
+       `decision_log.apply_decision` and `filing.refile` - settlement's REFILE
+       records the same action, PROVISIONAL (2026-11-16): not driven through a
+       settlement scenario) - both failed against 78edbad9, pass now.
+
+401. **[done, 2026-11-16]** **[Dashboard UI]** **A crashed re-check of an OLDER supply blanked the newer supply on show.**
+     Critic F2 (MED-HIGH, render layer). `blockerWithoutARunOfItsOwn` compared
+     the blocker's `openedAt` - for a re-check, its decision's instant - with
+     the newest checked receipt, so a re-check of an older supply blanked every
+     check of the newer one.
+     - **Fix** (defect, failing test first): the blocker record carries the
+       supply's own receipt (`receivedAt`), and a could-not-check blocker is
+       judged by it. Its banner has wording of its own - the pass retries it,
+       a person can reject it - with no 'Received <openedAt>' and no 'until a
+       person resolves it' (`blockedBannerLead`). `tests-js/run-times-critic.test.js`
+       (#401's four) and `test_could_not_check.py::TestCriticFindings::test_401_...`
+       failed against 78edbad9, pass now.
+     - **For Keith** (recorded, behaviour as built): should a crashed re-check
+       of an old period turn a LATER period red at all? 417 c4 says "red for
+       the period once"; today the dataset reads red ('Waiting for a person'
+       banner, the later supply's checks left showing) while it is open.
+
+402. **[done, 2026-11-16]** **[QA checks & contract]** **One supply could have two open 'Could not be checked' blockers.**
+     Critic F3. An arrival that crashed and then a decision re-check of the
+     same supply that crashed each kept its own open blocker.
+     - **Fix** (defect, failing test first): per (dataset, supply) only the
+       NEWEST qualifying run's blocker stays open (criterion 1, "newest own
+       run"); an older one closes where the newer one opens.
+       `test_402_one_supply_has_one_open_blocker_its_newest_runs`.
+
+403. **[done, 2026-11-16]** **[QA checks & contract]** **Only the earliest move about a supply was ever considered.**
+     Critic F4. `_decision_instants` kept the first SUPERSEDE/REFILE by
+     setdefault, so a move before the red opened hid every later one.
+     - **Fix** (defect, failing test first): every move is kept, and the
+       earliest strictly after the red opened (and outside #400's family)
+       closes it. `test_403_a_move_before_it_opened_does_not_hide_a_later_one`.
+
+404. **[done, 2026-11-16]** **[Dashboard UI]** **The page said 'another try' when no try had failed.**
+     Critic F5. A run completed, reopened and completed again (C, C) read
+     'Checked on the second try - the first was checked after ...'.
+     - **Fix** (defect, failing test first): no note unless the try before
+       the completing one failed - the terminal's own guard.
+       `tests-js/run-times-critic.test.js` #404.
+
+405. **[done, 2026-11-16]** **[Dashboard UI]** **'Could not be checked on N tries' counted tries after the date on show.**
+     Critic F8 (415 c6). The blocker's `tries` now carries `failedEndedAt`, and
+     the page counts only failed tries ended by the date; before the newest
+     try ended it says how many earlier tries did not finish (PROVISIONAL
+     (2026-11-16): the wording). Failing test first, both halves.
+
+406. **[done, 2026-11-16]** **[QA checks & contract]** **'... run this again.. Its supply ...'.**
+     A tool's message ending in a full stop got a second one before the next
+     step in QaRunFailure's text. Fixed (one full stop);
+     `test_tables_read.py::...::test_a_message_ending_in_a_full_stop_gets_one`,
+     failing first.
+
+407. **[done, 2026-11-16]** **[Pipeline & publishing]** **Unread per-dataset `notChecked` and dead `RunAttempts.failed_tries`.**
+     Critic F9 (polish). Both removed - nothing read them; a not-checked run
+     is in `runTimes` with `not_checked`. `could_not_check()` stays one read
+     per caller (package_gating per collection, the filing queue per
+     collection): each is one indexed read of the asset's attempts, recorded
+     in REQ-PIPE-417's decisions rather than cached.
+
+408. **[done, 2026-11-16]** **[Testing & dev tooling]** **Coverage the critic asked for (F10 and the formatter's edges).**
+     Not defects - each passed before and after. 414 c6's vacuous
+     `rollupStatuses` assertion replaced by
+     `test_attempts_in_the_build.py::TestAFailedTryNeverRaisesAStatus` (a
+     second-try supply carries the first-try supply's verdicts, a Fail
+     included); a JS test of an arrival nobody could check after a passing
+     supply (it blanks, no earlier verdict current); the cycle row's grey No
+     data; the Python unfinished-try wording; and 59.5s, 599.5s, 3540s and
+     3570s in duration-cases.json.
+     - **Judgements for Keith, recorded, behaviour unchanged:**
+       F6 - `run_summary.NEXT_STEP` ("Its supply shows as Could not be
+       checked...") is printed for readers-only, gate-application and trial
+       runs too, where it is not true, and lands inside recheck's Outcome
+       text; REQ-TEST-416 c2 is worded unconditionally.
+       F7 - in the terminal an arrival still running its first try already
+       reads COULD_NOT_CHECK (411 c4's "whether or not that attempt has ended").
+       Words differ by surface: 'failed in <tool>' on the page and in the
+       queue, 'crashed in <tool>' in the run step's summary line.
+       #401's question above.
+     - **Ran**: see REQ-PIPE-417's evidence.

@@ -206,6 +206,54 @@ class TestWhatClosesIt:
         assert _at(b.resolved_at) == moved
 
 
+class TestCriticFindings:
+    """post-build-review #402 to #405, each written first."""
+
+    def test_402_one_supply_has_one_open_blocker_its_newest_runs(self, conn):
+        s = Supply(conn)
+        s.tries("X")
+        decided = s.received + timedelta(days=3)
+        decision = s.decide(decision_log.RECHECK, decided)
+        s.tries("Y", run_id=f"{TABLE}__recheck_{s.key}", scope="full",
+                caused_by_decision=decision)
+        older, newer = sorted(s.blockers(), key=lambda b: b.opened_at)
+        assert [b.is_open for b in (older, newer)] == [False, True]
+        assert _at(older.resolved_at) == _at(newer.opened_at) == decided
+
+    def test_403_a_move_before_it_opened_does_not_hide_a_later_one(self, conn):
+        s = Supply(conn)
+        s.decide(decision_log.SUPERSEDE, s.received - timedelta(days=1))
+        s.tries("X")
+        later = s.received + timedelta(days=2)
+        s.decide(decision_log.SUPERSEDE, later)
+        (b,) = s.blockers()
+        assert b.resolved_at is not None and _at(b.resolved_at) == later
+
+    def test_405_each_failed_try_says_when_it_ended(self, conn):
+        s = Supply(conn)
+        s.tries("X", "Y")
+        (b,) = s.blockers()
+        ended = [a["ended_at"] for a in qa_store.attempts_of(conn, s.run_id)]
+        assert [_at(x) for x in b.tries["failedEndedAt"]] == ended
+
+    def test_a_reason_for_a_try_still_running_says_it_began(self, conn):
+        """dataset_blockers.tried_words' unfinished wording."""
+        words = dataset_blockers.tried_words(
+            {"outcome": None, "beganAt": "2030-01-02T09:00:00+08:00", "endedAt": None,
+             "failed": 1})
+        assert words.startswith("a check began ") and words.endswith("has not finished")
+
+    def test_401_the_record_carries_the_supplys_own_receipt(self, conn):
+        s = Supply(conn)
+        s.tries("C")
+        decision = s.decide(decision_log.RECHECK, s.received + timedelta(days=3))
+        s.tries("Y", run_id=f"{TABLE}__recheck_{s.key}", scope="full",
+                caused_by_decision=decision)
+        (b,) = [b for b in s.blockers() if b.is_open]
+        assert _at(b.as_record()["receivedAt"]) == s.received
+        assert _at(b.opened_at) != s.received
+
+
 class TestARejectedArrivalNobodyCouldCheck:
     """Criterion 10 (TV2): processed - not retried, holding nothing back."""
 

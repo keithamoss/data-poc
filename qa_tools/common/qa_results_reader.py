@@ -400,11 +400,6 @@ class RunAttempts:
         return self.attempts[-1] if self.attempts else None
 
     @property
-    def failed_tries(self) -> int:
-        """How many tries ended other than COMPLETED - found dead included."""
-        return sum(1 for a in self.attempts if a["outcome"] != qa_store.COMPLETED)
-
-    @property
     def not_checked(self) -> bool:
         """THE ONE STATEMENT OF A NOT-CHECKED RUN (REQ-PIPE-411 criterion 4): a
         run of a supply, not a trial's, in no gate application, that is its

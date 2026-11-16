@@ -7831,8 +7831,12 @@ function blockerOpenInPlaceOn(datasetId, inPlaceOnDateStr, source){
 // nothing was ever checked, any open blocker does.
 function blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr, source){
   const latest = ds.lastArrival && ds.lastArrival.arrivedAt;
+  // A SUPPLY THAT COULD NOT BE CHECKED is judged by its OWN RECEIPT, never
+  // when its red opened (post-build-review #401): a re-check of an older
+  // supply opens at its decision, and must not blank a newer supply.
+  const receivedOf = b=> b.kind === "could-not-check" && b.receivedAt ? b.receivedAt : b.openedAt;
   const open = blockersOpenInPlaceOn(ds.id, inPlaceOnDateStr, source)
-    .filter(b=> !latest || (b.kind !== "held" && String(b.openedAt) > String(latest)))
+    .filter(b=> !latest || (b.kind !== "held" && String(receivedOf(b)) > String(latest)))
     .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
   if(!open.length) return null;
   const same = open.filter(b=> b.kind === open[0].kind);
@@ -7864,6 +7868,13 @@ function blockerSays(b){
   return b.scheduleEnded
     ? "add the next delivery dates; it files itself on the next processing pass"
     : (BLOCKER_SAYS[b.kind] || "it cannot be read");
+}
+// THE BANNER'S BOLD LEAD (post-build-review #401): a supply that could not
+// be checked says the pass retries it - never 'until a person resolves it'.
+function blockedBannerLead(b){
+  if(b.kind === "could-not-check")
+    return `${escHtml(blockerLabel(b))} — our check of this dataset's own supply did not finish; the next processing pass retries it, and a person can reject the supply if it keeps failing.`;
+  return `${escHtml(blockerLabel(b))} — this dataset's own supply is not checked ${blockerUntil(b)}.`;
 }
 function blockerUntil(b){
   if(b.kind === "agreement-refused") return "until the agreement is restored or the change is declared as a correction";
@@ -9352,6 +9363,10 @@ function triesNote(r, on){
   const newest = tries[tries.length - 1];
   if(!newest || newest.unfinished || newest.outcome !== "COMPLETED" || newest.number !== a.count) return "";
   const before = tries[tries.length - 2];
+  // ONLY WHERE THE TRY BEFORE IT FAILED, as the terminal says it
+  // (post-build-review #404): a run reopened after it completed needed no
+  // 'another try'.
+  if(!before || (!before.unfinished && before.outcome === "COMPLETED")) return "";
   const said = !before ? "another try"
     : before.unfinished || before.run_time_ms == null
     ? `the ${tryOrdinal(before.number)} did not finish`
@@ -9456,7 +9471,13 @@ function couldNotCheckWords(b, on){
   const how = ended
     ? `its newest try ${tryEndedWords({outcome: t.outcome, tool: t.tool})} on ${fmtInstant(t.endedAt)}`
     : `a check began ${fmtInstant(t.beganAt)} and has not finished`;
-  const many = ended && t.failed > 1 ? ` It could not be checked on ${t.failed} tries.` : "";
+  // HOW MANY HAD FAILED BY THE DATE ON SHOW (post-build-review #405; 415
+  // criterion 6), from each failed try's own end.
+  const failed = t.failedEndedAt ? t.failedEndedAt.filter(x=> endedBy(x, on)).length : t.failed;
+  // Before the newest try ended, the ones that had already failed are said
+  // as earlier tries (PROVISIONAL, 2026-11-16).
+  const many = ended ? (failed > 1 ? ` It could not be checked on ${failed} tries.` : "")
+    : failed ? ` ${failed} earlier ${pluralize(failed, "try", "tries")} did not finish.` : "";
   return `Could not be checked - ${how}.${many} Nothing is yet known about this supply's data. `
     + `The next processing pass retries it; a person can reject the supply if it keeps failing.`;
 }
@@ -10426,10 +10447,10 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // supply's figures shown as this period's.
   const blockedBanner = ds.blocked ? `
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
-        <b>${escHtml(blockerLabel(ds.blocked))} — this dataset's own supply is not checked ${blockerUntil(ds.blocked)}.</b>
+        <b>${blockedBannerLead(ds.blocked)}</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           <span data-recorded-text>${blockerReasonOn(ds.blocked, CURRENT_IN_PLACE_ON) || withCode(ds.blocked.reason)}</span><br><br>
-          ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
+          ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.kind === "could-not-check" ? `The supply arrived ${fmtInstant(ds.blocked.receivedAt || ds.blocked.openedAt)}` : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
           period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}
         </div>${affectsReaders(ds)}

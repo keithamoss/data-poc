@@ -91,6 +91,10 @@ class Blocker:
     #: "endedAt", "failed"} for the newest try that did not complete, and
     #: how many tries failed. Never an error's message (TA Q5).
     tries: dict | None = None
+    #: The blocked supply's own receipt instant, where it differs from when
+    #: the blocker opened - a re-check's red opens at its decision
+    #: (post-build-review #401): what the page compares a newer supply against.
+    received_at: str | None = None
     #: A contested pair's own staged tables, in file-name order (REQ-PIPE-279,
     #: PROVISIONAL 2026-10-23): what a reader's contested read names, so the
     #: page keys a cross-table row on the pair rather than on a time.
@@ -128,7 +132,8 @@ class Blocker:
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
                 "settleAt": self.settle_at if self.kind == CONTESTED else None,
                 "tables": list(self.tables),
-                "tries": self.tries}
+                "tries": self.tries,
+                "receivedAt": self.received_at}
 
 
 def _settle_at(dataset_id: str, conn=None) -> str:
@@ -466,16 +471,40 @@ def tried_words(tries: dict) -> str:
     return said
 
 
-def _decision_instants(db, actions) -> dict[tuple[str, str], str]:
-    """(dataset, arrival key) -> the earliest effective_at of any of
-    `actions` about that supply."""
-    out: dict[tuple[str, str], str] = {}
-    for dataset_id, supply, effective_at in db.execute(
-            "SELECT dataset_id, supply, effective_at FROM qa.decision "
+def _decision_instants(db, actions) -> dict[tuple[str, str], list[tuple[int, str]]]:
+    """(dataset, arrival key) -> EVERY (decision id, effective_at) of any of
+    `actions` about that supply, in order - not only the earliest
+    (post-build-review #403): a move before the blocker opened says nothing
+    about whether it closed."""
+    out: dict[tuple[str, str], list[tuple[int, str]]] = {}
+    for decision_id, dataset_id, supply, effective_at in db.execute(
+            "SELECT id, dataset_id, supply, effective_at FROM qa.decision "
             f"WHERE action IN ({', '.join('?' for _ in actions)}) ORDER BY effective_at, id",
             list(actions)).fetchall():
-        out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
+        out.setdefault((dataset_id, _arrival_of(supply)), []).append(
+            (decision_id, _iso(effective_at)))
     return out
+
+
+def _decision_family(links: dict[int, int | None], decision_id: int | None) -> set[int]:
+    """`decision_id`, every decision it was caused by, and every decision
+    caused by any of those (post-build-review #400): a re-check owed by a
+    re-file or a placement must not read that same re-file, or a rule's
+    record that follows from it, as a move that closes its own red."""
+    if decision_id is None:
+        return set()
+    family, at = set(), decision_id
+    while at is not None and at not in family:
+        family.add(at)
+        at = links.get(at)
+    grew = True
+    while grew:
+        grew = False
+        for child, parent in links.items():
+            if parent in family and child not in family:
+                family.add(child)
+                grew = True
+    return family
 
 
 def _could_not_check(db) -> list[Blocker]:
@@ -503,8 +532,10 @@ def _could_not_check(db) -> list[Blocker]:
     runs = qa_results_reader.attempts_by_run(db)
     rejected = _rejections(db)
     moved = _decision_instants(db, (decision_log.SUPERSEDE, decision_log.REFILE))
-    effective = {i: _iso(at) for i, at in db.execute(
-        "SELECT id, effective_at FROM qa.decision").fetchall()}
+    effective, links = {}, {}
+    for i, at, parent in db.execute(
+            "SELECT id, effective_at, caused_by_decision FROM qa.decision").fetchall():
+        effective[i], links[i] = _iso(at), parent
     reloaded = {i: at for i, at in db.execute(
         "SELECT id, recorded_at FROM qa.load_outcome").fetchall()}
     completions: dict[tuple[str, str], list[tuple[int, str]]] = {}
@@ -550,16 +581,25 @@ def _could_not_check(db) -> list[Blocker]:
                       if seq > first_seq and at is not None]
         rejection = rejected.get((ra.dataset_id, arrival))
         resolved = closing
-        for at in (rejection["at"] if rejection else None,
-                   moved.get((ra.dataset_id, arrival)), *later_done):
-            if at is not None and datetime.fromisoformat(at) >= datetime.fromisoformat(opened):
+        start = datetime.fromisoformat(opened)
+        for at in (rejection["at"] if rejection else None, *later_done):
+            if at is not None and datetime.fromisoformat(at) >= start:
                 resolved = _earlier(resolved, at)
-        unfinished = [a for a in failed if a["outcome"] is not None and a["ended_at"]]
+        # A MOVE OUT OF ITS SLOT closes it only STRICTLY AFTER it opened, and
+        # never the decision that caused this run or any of its family
+        # (post-build-review #400, #403).
+        own = _decision_family(links, ra.caused_by_decision)
+        for decision_id, at in moved.get((ra.dataset_id, arrival), ()):
+            if decision_id not in own and at is not None and datetime.fromisoformat(at) > start:
+                resolved = _earlier(resolved, at)
+                break
         last = failed[-1]
         tries = {"runId": ra.run_key, "outcome": last["outcome"], "tool": last["tool"],
                  "errorType": last["error_type"], "beganAt": _iso(last["began_at"]),
                  "endedAt": _iso(last["ended_at"]), "failed": len(failed),
-                 "ended": len(unfinished)}
+                 # WHEN EACH FAILED TRY ENDED, so the page counts only those
+                 # ended by the date on show (post-build-review #405, 415 c6).
+                 "failedEndedAt": [_iso(a["ended_at"]) for a in failed]}
         out.append(Blocker(
             kind=COULD_NOT_CHECK, dataset_id=ra.dataset_id, supply=ra.supply_id,
             opened_at=opened, resolved_at=resolved,
@@ -568,7 +608,21 @@ def _could_not_check(db) -> list[Blocker]:
                     f"can reject the supply if it keeps failing."),
             delivery=ra.delivery,
             rejected=(rejection if rejection and resolved == rejection["at"] else None),
-            tries=tries))
+            tries=tries, received_at=_iso(ra.received_instant)))
+    # ONE OPEN BLOCKER PER SUPPLY, ITS NEWEST OWN RUN'S (post-build-review
+    # #402; criterion 1's "newest own run"): an older qualifying run's red
+    # closes where the newer one's opens.
+    from dataclasses import replace
+
+    by_supply: dict[tuple[str, str], list[int]] = {}
+    for i, b in enumerate(out):
+        by_supply.setdefault((b.dataset_id, b.supply), []).append(i)
+    for indexes in by_supply.values():
+        for older, newer in zip(indexes, indexes[1:]):
+            b, n = out[older], out[newer]
+            out[older] = replace(b, resolved_at=_earlier(b.resolved_at, n.opened_at),
+                                 rejected=b.rejected if _earlier(b.resolved_at, n.opened_at)
+                                 == b.resolved_at else None)
     return out
 
 
