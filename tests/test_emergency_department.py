@@ -2,9 +2,9 @@
 scenarios planted on it (REQ-GEN-236), driven through the shared driver into a
 scratch directory - never the repository's own data/.
 
-READS ONLY ITS OWN REPORTS: the scenario_placements.json it reads is the one
-`generator.output.redirect()` writes under that scratch directory, never the
-real data/ one a bootstrap leaves (tests/test_publish.py's fast-half guard)."""
+READS ONLY ITS OWN REPORTS: the scenario_placements.json it reads is the
+suite's shared history's (REQ-TEST-402), never the real data/ one a bootstrap
+leaves (tests/test_publish.py's fast-half guard)."""
 from __future__ import annotations
 
 import csv
@@ -42,19 +42,22 @@ def _tree(root) -> dict[str, str]:
 
 
 @pytest.fixture(scope="module")
-def generated(tmp_path_factory):
-    root = tmp_path_factory.mktemp("ed")
-    manifest = _generate(root)
-    return root, manifest
+def generated(quarterly_history):
+    """(root, ED's bookkeeping) of the suite's shared quarterly history
+    (REQ-TEST-402) - generated once per run, read-only."""
+    return quarterly_history.root, quarterly_history.book()["ed-presentations"]
 
 
 class TestTheProvider:
-    def test_two_generations_with_the_same_seed_are_byte_identical(self, generated,
-                                                                    tmp_path):
-        """Criterion 8: deliveries and receipts, file for file."""
-        root, _manifest = generated
-        _generate(tmp_path)
-        assert _tree(tmp_path) == _tree(root)
+    def test_two_generations_with_the_same_seed_are_byte_identical(self, tmp_path):
+        """Criterion 8: deliveries and receipts, file for file. ITS SUBJECT IS
+        GENERATION ITSELF, so it generates twice (REQ-TEST-402 criterion 7) -
+        Emergency Department alone each time, since alongside Child Protection,
+        as in the shared history, its delivery names are chosen around Child
+        Protection's."""
+        first = _generate(tmp_path / "a")
+        assert _generate(tmp_path / "b") == first
+        assert _tree(tmp_path / "b") == _tree(tmp_path / "a")
 
     def test_each_supply_is_one_file_with_the_contracts_eight_columns(self, generated):
         """Criterion 1."""
