@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**69 of 69 scenarios marked for injection have data behind them today.** 69 scenarios are registered in all.
+**69 of 70 scenarios marked for injection have data behind them today.** 70 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -1054,6 +1054,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Supplies | `geo_cp_clients__202411011830000800` |
 | Period | 2024-Q4 |
 | Set "in the warehouse on" to | 2024-11-01 |
+
+### TS-113 - A Client Register geocode whose placed mix drifts
+
+**What it demonstrates.** The drift check on `match_level` reads Warn: the share of records placed at each match level has moved from the quarter before. Every other check of the file passes.
+
+**What it would look like if the rule were wrong.** The drift check reads Pass on a file whose placed mix visibly moved. Or the drift is read against the wrong reference: anything other than 2026-Q2's file, which the replay has promoted by then.
+
+*Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved from suburb placement to postcode placement to land the drift check's PSI in its warn band. The size is derived from the check's own band, as REQ-GEN-392 derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL (2026-11-16).)*
+
+**not injected - nothing to look at yet**
 
 
 <!-- scenario-map-data
@@ -2573,6 +2583,20 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "inPlaceOn": "2024-11-01",
     "subject": "supply-history-row"
    }
+  },
+  {
+   "id": "TS-113",
+   "mode": "INJECT",
+   "title": "A Client Register geocode whose placed mix drifts",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "The drift check on `match_level` reads Warn: the share of records placed at each match level has moved from the quarter before. Every other check of the file passes.",
+   "breaksAs": "The drift check reads Pass on a file whose placed mix visibly moved. Or the drift is read against the wrong reference: anything other than 2026-Q2's file, which the replay has promoted by then.",
+   "config": "Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved from suburb placement to postcode placement to land the drift check's PSI in its warn band. The size is derived from the check's own band, as REQ-GEN-392 derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL (2026-11-16).)",
+   "requirements": [
+    "REQ-GEN-392",
+    "REQ-GEN-298"
+   ],
+   "coordinates": null
   }
  ]
 }

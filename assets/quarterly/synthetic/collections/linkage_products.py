@@ -133,12 +133,15 @@ GEO_ROW_FAULTS = {
     "orphan_record": "one record's rows, in every year, naming a record the quarter's source "
                      "does not hold",
     "empty_file": "the file holds no rows at all",
+    "placed_mix_shift": "whole records moved from suburb to postcode placement in every year "
+                        "until the drift check's PSI against the file's reference reaches the "
+                        "middle of its warn band",
 }
 #: The verdict each fault is built to; the share faults' is the share's own,
 #: banded by the check (planned_verdict).
 GEO_FAULT_VERDICT = {"missing_year": "red", "duplicate_year": "red", "unexpected_year": "red",
                      "left_out_amber": "amber", "left_out_red": "red",
-                     "orphan_record": "red", "empty_file": "red"}
+                     "orphan_record": "red", "empty_file": "red", "placed_mix_shift": "amber"}
 #: THE CHECK EACH FAULT IS AIMED AT (criterion 7), by the end of its check id
 #: - "{source}" the source dataset's id - so a named scenario's trial refuses
 #: when any other check of its file moves.
@@ -150,7 +153,8 @@ GEO_FAULT_AIMS = {"missing_year": "census_year.missing_set_members_dbt",
                   "left_out_amber": "{source}.coverage_soda",
                   "left_out_red": "{source}.coverage_soda",
                   "orphan_record": "{source}.referential_soda",
-                  "empty_file": "{source}.coverage_soda"}
+                  "empty_file": "{source}.coverage_soda",
+                  "placed_mix_shift": "match_level.drift_psi_evidently"}
 #: THE PRESETS (criterion 2): an ordinary amber raises the share into the
 #: amber band; an ordinary red takes one of these, the missing year only
 #: where two or more years are in force.
@@ -404,6 +408,101 @@ def drift_verdict(dataset_id: str, rows, reference_rows) -> str:
     return {"fail": "red", "warn": "amber"}.get(status, "green")
 
 
+def drift_band(dataset_id: str, catalogue) -> tuple[str, tuple[float, float] | None]:
+    """The geocoding dataset's drift check id and its warn band, (lo, hi), as
+    check_bands reads it from the check's own file (TS-113; the band
+    REQ-GEN-392's Warn rule aims at the middle of) - None for the band where
+    the check has none. Refused where the dataset declares no drift check,
+    or more than one."""
+    aim = GEO_FAULT_AIMS["placed_mix_shift"]
+    rules = [r for r in catalogue.rules() if r.dataset_id == dataset_id
+             and any(c.check_id.endswith("." + aim) for c in r.checks)]
+    if len(rules) != 1 or _drift_entry(dataset_id) is None:
+        raise CannotGenerate(f"{dataset_id} declares {len(rules)} drift checks in force - one is "
+                             f"needed to plan a drift on purpose; nothing was written")
+    check_id = next(c.check_id for c in rules[0].checks if c.check_id.endswith("." + aim))
+    bands = rules[0].amber(0)
+    return check_id, (bands[0] if bands else None)
+
+
+def _shift_placed_mix(dataset_id: str, rows, key, order, reference_rows, rng, where: str,
+                      catalogue):
+    """`placed_mix_shift` (TS-113): the rows with whole records moved from the
+    finest placement (suburb) to the next (postcode) in every year, as many
+    as first bring the drift check's PSI against `reference_rows` to the
+    middle of its warn band - computed by the check's own PSI, exclusions
+    and thresholds (drift.psi_of_counts over value_counts, as drift_verdict
+    reads them). Refused, never shifted or relaxed, where no count lands the
+    file in the band, naming the scenario, the check and the band."""
+    from asset_model import drift
+    from generator import synthetic_inputs
+
+    placing = synthetic_inputs.placings()[dataset_id]
+    level = placing.placed_column
+    check_id, band = drift_band(dataset_id, catalogue)
+    entry = _drift_entry(dataset_id)
+
+    def refuse(why: str) -> CannotGenerate:
+        text = "none" if band is None else f"PSI above {band[0]:g} and not above {band[1]:g}"
+        return CannotGenerate(f"{where}: {why} - {check_id}, warn band {text}; nothing was "
+                              f"written")
+
+    if band is None:
+        raise refuse("the drift check has no warn band to aim at")
+    if reference_rows is None or not len(reference_rows):
+        raise refuse(f"{dataset_id}'s file has no reference for the drift check to read")
+    if len(placing.place_by) < 2:
+        raise refuse(f"{dataset_id} is placed at one level only, so its placed mix cannot move")
+    frm, to = placing.place_by[0][1], placing.place_by[1][1]
+    mid = (band[0] + band[1]) / 2
+    at_frm = (rows[level] == frm).groupby(key).all() if len(rows) else {}
+    movable = [k for k in order if bool(at_frm[k])]
+    drawn = [movable[int(i)] for i in rng.permutation(len(movable))]
+    per_record = key.value_counts()
+    moved = [0]
+    for k in drawn:
+        moved.append(moved[-1] + int(per_record[k]))
+    column = entry["column"]
+    reference = value_counts(reference_rows, column, dataset_id)
+    current = value_counts(rows, column, dataset_id)
+    excluded = {str(v) for v in entry.get("exclude_values") or ()}
+
+    def counts_at(n: int) -> list[list]:
+        return [[v, c - moved[n] if v == frm else c + moved[n] if v == to else c]
+                for v, c in current]
+
+    def psi_at(n: int) -> float:
+        psi, _status = drift.psi_of_counts(counts_at(n), reference, entry)
+        return -1.0 if psi is None else psi
+
+    # PSI ALONG THE MOVE IS CONVEX, lowest near where the postcode share among
+    # placed rows meets the reference's; from there it only rises, so the
+    # first count reaching the middle is found by halving.
+    def share(counts) -> float:
+        placed = sum(c for v, c in counts if v not in excluded)
+        return (sum(c for v, c in counts if v == to) / placed) if placed else 0.0
+
+    ref_share = share(reference)
+    lo_n = next((n for n in range(1, len(moved)) if share(counts_at(n)) >= ref_share),
+                len(moved) - 1)
+    hi_n = len(moved) - 1
+    if hi_n < 1 or psi_at(hi_n) < mid:
+        raise refuse(f"moving all {hi_n} of {dataset_id}'s {frm}-placed records to {to} does "
+                     f"not reach the middle of the band ({mid:g})")
+    while lo_n < hi_n:
+        n = (lo_n + hi_n) // 2
+        if psi_at(n) >= mid:
+            hi_n = n
+        else:
+            lo_n = n + 1
+    rows = rows.copy()
+    rows.loc[key.isin(set(drawn[:hi_n])), level] = to
+    if drift_verdict(dataset_id, rows, reference_rows) != "amber":
+        raise refuse(f"no count of {dataset_id}'s records moved from {frm} to {to} lands its "
+                     f"PSI in the warn band ({hi_n} records give {psi_at(hi_n):.4f})")
+    return rows
+
+
 def parse_geo_fault(fault: str, where: str, dataset_id: str) -> str:
     """A geocoding row fault's name, refused naming the scenario where the
     name is unknown or it names a dataset other than the one it is applied
@@ -437,14 +536,16 @@ def _keys(rows, ids: list[str]):
 
 
 def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, years,
-                     rng, where: str, catalogue, seed: int):
+                     rng, where: str, catalogue, seed: int, reference_rows=None):
     """One geocoding file's rows with its named faults applied (REQ-GEN-298
     criteria 1, 4 and 6), and the verdict the file is built to: the share's
     own band (planned_verdict) and each fault's. Pure: the same inputs and
     draw give the same rows. Refused - never shifted or relaxed - where a
     fault cannot be placed. `seed` is the declared seed `rng` was made from,
     handed on to generator/dirty.py, which seeds its own draw (REQ-GEN-246
-    criterion 2: no seed outside the provider's declared schedule)."""
+    criterion 2: no seed outside the provider's declared schedule).
+    `reference_rows` is the file the drift check will read this one against,
+    which only `placed_mix_shift` reads (TS-113)."""
     import pandas as pd
 
     from generator import dirty, synthetic_inputs
@@ -588,6 +689,12 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
                                      f"supply holding rows (REQ-QAC-340 criterion 4); nothing "
                                      f"was written")
             rows = rows.iloc[0:0]
+            built.append(GEO_FAULT_VERDICT[name])
+        elif name == "placed_mix_shift":
+            # WHOLE RECORDS, every year, codes kept (TS-113): a postcode
+            # placement still carries its areas, so only the drift check moves.
+            rows = _shift_placed_mix(dataset_id, rows, key, order, reference_rows, rng, where,
+                                     catalogue)
             built.append(GEO_FAULT_VERDICT[name])
     rows = rows.reset_index(drop=True)
     return rows, worst(planned_verdict(dataset_id, rows, catalogue), *built)
@@ -1152,8 +1259,8 @@ class LinkageProducts(Provider):
                 if sev is not None:
                     severity[(job.slot_id, d)] = sev
 
-        state, resupply, meta, applied = {}, {}, {}, {}
-        for job in jobs:
+        state, resupply, meta, applied, shifted = {}, {}, {}, {}, {}
+        for idx, job in enumerate(jobs):
             if base[job.slot_id] is None:
                 state[job.slot_id] = None
                 continue
@@ -1179,11 +1286,19 @@ class LinkageProducts(Provider):
                     faults, where = (), ""
                 if faults:
                     applied[(job.slot_id, d)] = tuple(faults)
+                    reference = None
+                    if any(f.partition("@")[0] == "placed_mix_shift" for f in faults):
+                        # THE FILE THE DRIFT CHECK WILL READ IT AGAINST (TS-113),
+                        # resolved as the drift pass below resolves it.
+                        reference = _replay_reference(table, src, jobs[:idx], state, resupply,
+                                                      at, sources)
+                        shifted[(job.slot_id, d)] = where
                     rows, verdict = apply_geo_faults(
                         d, rows, faults, source_rows=_before(sources[src], src, job.period.name,
                                                              at)[-1].rows,
                         id_columns=hierarchy.dataset(d).linked[0][2], years=years, rng=rng,
-                        where=where, catalogue=catalogue, seed=job.seed + GEO_FAULT_SPAN)
+                        where=where, catalogue=catalogue, seed=job.seed + GEO_FAULT_SPAN,
+                        reference_rows=reference)
                 out[table] = (d, rows, verdict)
                 # TRIED AT GENERATION (criterion 13): every amber or red, every
                 # named scenario's file and each file criterion 8 names.
@@ -1258,6 +1373,14 @@ class LinkageProducts(Provider):
                         m.setdefault("references", {})[d] = (
                             asset_time.isoformat(ref[2]) if ref is not None else None)
                     earlier.append((job.slot_id, job.period.name, at, files[t][2], rows))
+        # A DRIFT PLANTED ON PURPOSE IS CONFIRMED AGAINST THE REFERENCE THE
+        # REPLAY RESOLVES (TS-113): Warn, as built, or refused.
+        for (slot, d), where in shifted.items():
+            if bands.get((slot, d, 1)) != "amber":
+                raise CannotGenerate(
+                    f"{where}: {d}'s drift against the reference the replay resolves plans "
+                    f"{bands.get((slot, d, 1))}, not the warn band it was built to - "
+                    f"{drift_band(d, catalogue)[0]}; nothing was written")
         plan.jobs.extend(jobs)
         plan.state["geocoding"] = state
         plan.state["geo_resupply"] = resupply
@@ -1381,6 +1504,26 @@ class LinkageProducts(Provider):
 #: quarter a linked dataset's scripted mark-not-supplied puts out of scope,
 #: riding the correction that emptied it - never a quarter of its own.
 NAMED_NOT_SUPPLIED = "TS-95"
+
+
+def _replay_reference(table: str, src: str, earlier_jobs, state, resupply, at, sources):
+    """The rows of the file the drift check reads a geocoding file received
+    at `at` against, as the plan's drift pass resolves it (REQ-QAC-108): the
+    dataset's last earlier arrival, resupplies included, not planned red and
+    whose source the warehouse holds at `at` - or None. Read from the
+    verdicts planned so far, before drift is added to them; the drift pass
+    confirms the band against its own resolution (TS-113)."""
+    earlier = []
+    for job in earlier_jobs:
+        if state.get(job.slot_id) is None or table not in state[job.slot_id][1]:
+            continue
+        arrivals = [state[job.slot_id]] + (
+            [resupply[job.slot_id]] if table in resupply.get(job.slot_id, (0, {}))[1] else [])
+        for _at, files in arrivals:
+            earlier.append((job.period.name, files[table][2], files[table][1]))
+    return next((rows for period, verdict, rows in reversed(earlier)
+                 if verdict != "red" and in_warehouse(src, period, at, sources[src]) is not None),
+                None)
 
 
 def marked_quarters(periods) -> list[tuple[str, str]]:
