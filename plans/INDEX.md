@@ -1187,7 +1187,7 @@ one when this line suggests it matters.
 - **#403** `done` 2026-11-16 - Only the earliest move about a supply was ever considered. Critic F4.
 - **#404** `done` 2026-11-16 - The page said 'another try' when no try had failed. Critic F5.
 - **#405** `done` 2026-11-16 - 'Could not be checked on N tries' counted tries after the date on show. Critic F8 (415 c6).
-- **#406** `done` 2026-11-16 - '...
+- **#406** `done` 2026-11-16 - A run's failure text ended with a double full stop ("run this again..
 - **#407** `done` 2026-11-16 - Unread per-dataset notChecked and dead RunAttempts.failed_tries. Critic F9 (polish).
 - **#408** `done` 2026-11-16 - Coverage the critic asked for (F10 and the formatter's edges). Not defects - each passed before and after.
 - **#409** `todo` 2026-11-16 - For Keith: what the pin and the memo do not hold. Recorded from the critic, no behaviour changed: - F6: a pin holds...

@@ -15620,7 +15620,7 @@ twice. It deliberately did not re-find the `TypeError`.
      try ended it says how many earlier tries did not finish (PROVISIONAL
      (2026-11-16): the wording). Failing test first, both halves.
 
-406. **[done, 2026-11-16]** **[QA checks & contract]** **'... run this again.. Its supply ...'.**
+406. **[done, 2026-11-16]** **[QA checks & contract]** **A run's failure text ended with a double full stop ("run this again.. Its supply").**
      A tool's message ending in a full stop got a second one before the next
      step in QaRunFailure's text. Fixed (one full stop);
      `test_tables_read.py::...::test_a_message_ending_in_a_full_stop_gets_one`,
