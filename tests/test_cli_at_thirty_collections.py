@@ -248,6 +248,9 @@ class TestTheMenusAtThirty:
             session.close()
 
     def test_the_generate_menu_groups_and_filters_too(self, thirty):
+        """ITS SUBJECT IS THE GENERATE MENU, which generates the chosen test
+        collection - a thirty-collection test asset's, not a shared history's
+        (REQ-TEST-402 criterion 7)."""
         session = self._session(thirty)
         try:
             for _ in range(4):

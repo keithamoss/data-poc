@@ -35,7 +35,6 @@ from unittest.mock import MagicMock
 import pytest
 
 import equiv_support
-from generator import driver
 
 RUN_ID = "run_001"
 COMPARED = ("qa.filing", "qa.decision", "qa.check_result")

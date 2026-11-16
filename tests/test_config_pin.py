@@ -364,7 +364,8 @@ _AUDITED_GENERATION = textwrap.dedent("""
 @pytest.mark.asset("daily")
 class TestAPinnedGenerationOpensNoConfigurationFile:
     """Criterion 15's audit-hook test: a pinned generation of a test asset
-    opens no file of the snapshot set from a mothman frame."""
+    opens no file of the snapshot set from a mothman frame. ITS SUBJECT IS
+    GENERATION ITSELF, so it generates (REQ-TEST-402 criterion 7)."""
 
     def test_no_snapshot_file_is_opened(self):
         done = subprocess.run([sys.executable, "-c", _AUDITED_GENERATION,
@@ -381,7 +382,8 @@ class TestAPinnedGenerationOpensNoConfigurationFile:
 class TestAGenerationReadsItsConfigurationOnce:
     """REQ-GEN-398 criterion 5: a configuration file edited while a generation
     runs leaves that generation's output unchanged, and the next generation
-    reads the edit."""
+    reads the edit. ITS SUBJECT IS GENERATION ITSELF, so it generates
+    (REQ-TEST-402 criterion 7)."""
 
     def test_an_edit_mid_generation_waits_for_the_next(self, tmp_path):
         from generator import collections as providers
