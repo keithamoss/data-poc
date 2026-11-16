@@ -29,12 +29,23 @@ def test_every_collected_test_has_exactly_one_group(request):
 
 def test_a_module_outside_the_browser_tests_is_one_group(request):
     """So it runs whole on one worker, exactly as --dist loadfile kept it."""
-    others = [i for i in request.session.items if i.path.name not in conftest.SPREAD_BY_CLASS]
+    others = [i for i in request.session.items
+              if i.path.name not in conftest.SPREAD_BY_CLASS
+              and i.path.name not in conftest.SHARE_THE_DEPLOYMENT]
     assert others, "no items outside the browser tests - this test proves nothing"
     wrong = [(i.nodeid, _groups(i)) for i in others if _groups(i) != [_file(i)]]
     assert wrong == [], wrong[:5]
     mine = [i for i in others if i.path.name == "test_distribution_groups.py"]
     assert len({g for i in mine for g in _groups(i)}) == 1
+
+
+def test_the_deployment_writers_and_counters_share_one_group(request):
+    """Post-build-review #323: the deployment-half modules that write and the
+    ones that count run on one worker, so one cannot count rows the other is
+    writing. They are the one exception to a group per file."""
+    shared = [i for i in request.session.items if i.path.name in conftest.SHARE_THE_DEPLOYMENT]
+    groups = {g for i in shared for g in _groups(i)}
+    assert groups <= {"deployment-writers-and-counters"}, groups
 
 
 def test_under_loadgroup_the_scheduler_sees_the_group(request):

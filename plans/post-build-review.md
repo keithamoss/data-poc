@@ -16155,3 +16155,18 @@ twice. It deliberately did not re-find the `TypeError`.
      instant. NOT added: refuse_unsafe's "resolves outside" branch, which no
      path built as data_dir()/<name> can reach once the symlink branches have
      run - recorded rather than tested.
+
+440. **[done, 2026-11-16]** **[Testing & dev tooling]** **The one-group-per-file test never learned #323's shared deployment group.**
+     The full gate on 2a0dbdfa failed
+     `test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group`
+     (36 items, all in test_target_agreement.py and test_recheck_trial.py). It
+     was carried as "order-dependent" in earlier gates and in the rolling-anchor
+     critic's report. It is not: #323 deliberately put those two modules in one
+     xdist group, `deployment-writers-and-counters` (tests/conftest.py
+     `SHARE_THE_DEPLOYMENT`), and this test still demanded a group per file. It
+     failed whenever either module was in the same session, and passed alone.
+     - **Fix** (a test that encoded a superseded rule, so no product change):
+       the one-group-per-file test leaves out `SHARE_THE_DEPLOYMENT`, and a new
+       test asserts those modules carry only the shared group.
+     - **Ran** (test_distribution_groups.py with the two modules, `-n 2`):
+       before, 1 failed and 61 passed; after, 63 passed.
