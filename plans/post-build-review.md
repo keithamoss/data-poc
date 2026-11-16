@@ -15896,3 +15896,20 @@ twice. It deliberately did not re-find the `TypeError`.
        **Ran** (the same `-k`, `-n 2`, this tree): before the fix, 2 failed
        (TS-76 and TS-77a `standing-in`, -5 to 18px) and 15 passed; after it,
        17 passed.
+
+421. **[done, 2026-11-16]** **[Testing & dev tooling]** **The centred-landing test still demanded a whole subject after Keith's pill-first rule (#420).**
+     The full gate on 833ae73e failed
+     `test_dashboard_e2e.py::TestEveryScenarioSubjectLandsCentred::test_every_subject_lands_centred`
+     for TS-54, TS-76 and TS-77a: each subject's bottom was at 804.75 in an
+     800px window. That is #420's option (a) working as decided. When a head
+     pill and its own substitution drill-down cannot both fit, the pill lands
+     at the top and the drill-down's foot goes below the fold. #420's builder
+     ran only TestTheAsAtScenarioChips and TestEveryScenarioJumpLands, so this
+     class kept the old rule.
+     - **Fix** (a test that encoded a superseded rule, so no product change):
+       the test now accepts a landing that is pill-first. The scenario's
+       subject must be `substitution-drill-down`, the pill's top must be 0 to
+       2px, the subject's top must be in view, and the pill and subject
+       together must be taller than the window. Every other case keeps
+       today's checks. Run on this tree, the three scenario-landing classes
+       gave 18 passed.

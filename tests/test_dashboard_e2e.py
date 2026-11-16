@@ -6374,16 +6374,29 @@ class TestEveryScenarioSubjectLandsCentred:
             _scenario_chip(clean_page, built_dashboard_html, sid)
             if clean_page.locator("[data-scenario-not-found]").count():
                 continue
-            got = clean_page.evaluate("""() => {
+            got = clean_page.evaluate("""(sid) => {
                 const el = document.querySelector('#view .scenario-subject');
                 const r = el.getBoundingClientRect();
                 const max = document.documentElement.scrollHeight - innerHeight;
                 const head = document.querySelector('#view .view-head');
+                const pill = document.querySelector('[data-testid="standing-in"]');
                 return {top: r.top, mid: r.top + r.height / 2, h: r.height, bottom: r.bottom,
                         headTop: head ? head.getBoundingClientRect().top : null,
+                        drillDown: SCENARIO_MAP.find(e => e.id === sid)?.coordinates?.subject
+                            === "substitution-drill-down",
+                        pillTop: pill ? pill.getBoundingClientRect().top : null,
                         y: scrollY, atEnd: scrollY >= max - 1, vh: innerHeight};
-            }""")
-            if got["h"] > got["vh"]:
+            }""", sid)
+            # PILL FIRST (#420, Keith 2026-11-16, option a): when a head pill
+            # and its own substitution drill-down cannot both fit, the pill
+            # lands at the window's top and the drill-down's foot may fall
+            # below the fold - so the subject is not whole, by decision.
+            pill_first = (got["drillDown"] and got["pillTop"] is not None
+                          and 0 <= got["pillTop"] <= 2 and got["top"] >= 0
+                          and got["bottom"] - got["pillTop"] > got["vh"])
+            if pill_first:
+                ok = True
+            elif got["h"] > got["vh"]:
                 ok = abs(got["top"]) <= 2
             else:
                 centred = abs(got["mid"] - got["vh"] / 2) <= 2
