@@ -119,6 +119,67 @@ decisions:
     supply: 0
     after_hours: 24
     reason: "The supplier's resent placements for this quarter - checked, and replacing the stand-in."
+  # TS-55 (REQ-GEN-206 criterion 4): 2023-Q1's delivery left cp_placements out;
+  # the quarter stands on 2022-Q4 from two days after it was due, and nothing
+  # removes or replaces it - so at the end of the history 2023-Q1's _manifest
+  # lists promoted, inherited and substituted tables together.
+  - scenario: TS-55
+    name: TS-55 substitute
+    operation: substitute
+    dataset: cp-placements
+    scope: period
+    stands_on: -1
+    after_hours: 48
+    reason: "The supplier's delivery left placements out and will not resend them; the previous quarter's placements stand in for this quarter."
+  # TS-112 (REQ-GEN-206 criteria 19 and 21): 2017-Q2's two Client Registers -
+  # cp_clients.csv at 08:30 and a re-export at 08:40 - settled by a person at
+  # 11:00 the day after, both rejected. It takes effect with the gate's lagged
+  # refusal of the pair, at 05:53 on 8 February - one act, one instant
+  # (post-build-review #284 (B)), as TS-80's did - so the same person promotes
+  # the three readers held only for want of a Client Register at 11:00 on 9
+  # February, the asset day after the settlement's, and
+  # the quarter's Client Register is marked not supplied the day after its
+  # slot closes (as TS-96's: a quarterly slot closes 1872 hours after due).
+  - scenario: TS-112a
+    name: TS-112 settle
+    operation: choose-file
+    dataset: cp-clients
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, reject]
+    reason: "The two Client Register extracts disagree and the supplier cannot say which is right; neither is accepted, and the quarter will not be resupplied."
+  - scenario: TS-112a
+    name: TS-112 promote notifications
+    operation: promote
+    dataset: cp-notifications
+    supply: 0
+    at: "11:00"
+    day_offset: 8
+    reason: "Notifications passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
+  - scenario: TS-112a
+    name: TS-112 promote investigations
+    operation: promote
+    dataset: cp-investigations
+    supply: 0
+    at: "11:00"
+    day_offset: 8
+    reason: "Investigations passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
+  - scenario: TS-112a
+    name: TS-112 promote placements
+    operation: promote
+    dataset: cp-placements
+    supply: 0
+    at: "11:00"
+    day_offset: 8
+    reason: "Placements passed their own checks; the Client Register they are checked against was rejected and is not being replaced this quarter."
+  - scenario: TS-112a
+    name: TS-112 not supplied
+    operation: mark-not-supplied
+    dataset: cp-clients
+    scope: period
+    after_hours: 1896
+    reason: "Both Client Register extracts for this quarter were rejected and the supplier will not resend; accepted as not supplied."
   # GROWN RED CHAINS, SETTLED (REQ-GEN-207; Keith, 2026-10-16: "Script
   # decisions", "Promote the resend", "One entry per chain", "Grown years
   # only"). None is left since REQ-GEN-238 dropped 2013 and 2014: the grown

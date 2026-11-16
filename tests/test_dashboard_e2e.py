@@ -6565,6 +6565,47 @@ class TestThePeriodComposition:
             if row["kind"] not in ("notsupplied", "notowed"):
                 assert dataset in held, (period, dataset, row)
 
+    def test_ts55s_period_holds_all_three_kinds_and_agrees_both_ways(
+            self, clean_page, built_dashboard_html, deployment_history):
+        """REQ-DASH-209 criterion 10's half that waited on TS-55 (REQ-GEN-206
+        criterion 4): one period - TS-55's 2023-Q1 at the history's end -
+        holding a promoted, an inherited and a substituted table at once, its
+        rows compared with its _manifest both ways."""
+        from qa_tools.common import period_schema, scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get("TS-55")
+        assert placement is not None and placement.in_place_on, "TS-55 is not placed"
+        schema = period_schema.period_schema(placement.period)
+        with supply_db.connect(read_only=True, label="test-composition") as conn:
+            manifest = conn.execute(
+                f'SELECT dataset_id, kind, decided_by FROM "{schema}"._manifest '
+                "WHERE dataset_id LIKE 'cp-%'").fetchall()
+        kinds = {k for _d, k, _b in manifest}
+        assert {"promoted", "inherited", "substituted"} <= kinds, (placement.period, manifest)
+        self._open(clean_page, built_dashboard_html, placement.period, on=placement.in_place_on)
+        page = self._rows(clean_page)
+        held = {d: (k, b) for d, k, b in manifest}
+        for dataset, (kind, by) in held.items():
+            assert page[dataset]["kind"] == kind, (dataset, page[dataset], kind)
+            said = "Decided by" if by == "person" else "Applied automatically by the schedule"
+            assert said in page[dataset]["text"], (dataset, page[dataset]["text"])
+        for dataset, row in page.items():
+            if row["kind"] not in ("notsupplied", "notowed"):
+                assert dataset in held, (dataset, row)
+
+    def test_ts55s_chip_opens_its_period_composition(self, clean_page, built_dashboard_html):
+        """REQ-DASH-209 criterion 7's last half (REQ-GEN-206 criterion 4)."""
+        _scenario_chip(clean_page, built_dashboard_html, "TS-55")
+        assert clean_page.locator("[data-scenario-not-found]").count() == 0
+        got = clean_page.evaluate("() => [STATE.tier, STATE.period]")
+        assert got == ["period", "2023-Q1"], got
+        table = clean_page.locator('#view [data-testid="period-composition"]')
+        assert table.count() == 1
+        kinds = set(clean_page.evaluate(
+            """() => [...document.querySelectorAll(
+                 '#view [data-testid="period-composition"] tbody tr')].map(tr => tr.dataset.kind)"""))
+        assert {"promoted", "inherited", "substituted"} <= kinds, kinds
+
     def test_an_earlier_date_agrees_with_the_decision_log_then(
             self, clean_page, built_dashboard_html, deployment_history):
         from asset_model import asset_time

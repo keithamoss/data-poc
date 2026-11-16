@@ -3825,6 +3825,80 @@ Notifications, Investigations, Carer Register and Case Workers are promoted
 corrected Placements is promoted, superseding the first.
 **Breaks as**: a reader of Placements held back with it.
 
+**TS-112a `[INJECT]` A Child Protection pair with both files rejected -
+while it is contested.** PLANTED by REQ-GEN-206 criteria 18 to 21 (Keith,
+2026-10-14, F8, against the recommendation of fixture tests only; Keith,
+2026-11-15, Q3 = a) in 2017-Q2, the one grown quarter no scenario of any
+collection claimed. It was drafted as TS-81, which REQ-GEN-273 took on
+2026-10-25. Two lettered siblings share the one placement (REQ-GEN-201):
+this one's link opens on the pair's arrival day.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14
+days; settings in force: warn setting promote, replacement setting never.
+2017-Q2's delivery (the 1 February 2017 round) carries the usual six files
+and two Client Registers - cp_clients.csv at 08:30 and a re-export,
+cp_clients_v2.csv, at 08:40 whose rows differ - both before due, the other
+files carrying no fault drawn for the quarter. A scripted person settles the
+pair at 11:00 the next day with both files rejected ("TS-112 settle"),
+which takes effect with the gate's lagged refusal of the pair at 5:53am on 8
+February (TS-112b); promotes the three readers at 11:00 on 9 February, the
+asset day after that ("TS-112 promote notifications", "... investigations",
+"... placements"), and marks the
+quarter's Client Register not supplied the day after its slot closes
+("TS-112 not supplied"). The re-evaluation the settlement owes its readers
+runs in the replay at the settlement's instant (REQ-PIPE-211 criterion 1),
+through the bootstrap's player.*
+**Expect** (the first bootstrapped build, 2026-11-16): on 1 February 2017 cp-clients reads
+"Two files for one table — this dataset's own supply is not checked until a
+person resolves it.", naming cp_clients.csv (received 8:30am) and
+cp_clients_v2.csv (8:40am), and its banner ends "Affects Notifications,
+Investigations and Placements."; its cross-table rows - Investigations (two
+checks), Notifications and Placements → Client Register - read Fail. Each
+reader's cross-table checks reading cp_clients are not evaluated and red,
+recorded with the reason contested (REQ-PIPE-270 criterion 4), the row worded
+"Not evaluated" and "no Client Register in the warehouse for 2017-Q2"; and each
+reader's page carries REQ-DASH-204's line - Notifications "No promoted Client
+Register for 2017-Q2. One of this supply's checks needs it, so it could not
+run. That is not a fault in this supply's own data.", Investigations the same
+with "2 of this supply's checks need it, so they could not run", Placements as
+Notifications - under the verdict line "Nothing needs deciding on this
+supply" (when the checks run again is said once, on that verdict line, so the
+line leaves out criterion 2's last sentence, as TS-80's does). Carer Register and Case Workers are promoted by the rule.
+**Breaks as**: either file taken as the quarter's supply, or a reader's
+cross-table checks evaluated against one.
+
+**TS-112b `[INJECT]` A Child Protection pair with both files rejected -
+once settled.** TS-112a's placement; this link opens on the settlement's
+asset day, after the re-evaluation.
+*Config: as TS-112a.*
+**Expect** (the first bootstrapped build, 2026-11-16): the settlement takes effect with the
+gate's lagged refusal of the pair, at 5:53am Wednesday, 8 February 2017 - one
+act, one instant (post-build-review #284 (B)), as TS-80's does - and the
+re-evaluation it owes the three readers runs at that instant, in the replay.
+On 8 February cp-clients' row reads "Settled · Two files for one table —
+settled by Robin Hale, 5:53am Wednesday, 8 February 2017", cp_clients.csv and
+cp_clients_v2.csv each "— rejected", and the page says "The 2017-Q2 file was
+turned down and nothing has replaced it — Notifications, Investigations and
+Placements are waiting on it." Each reader's checks reading cp_clients are red,
+recorded with the reason rejected (REQ-PIPE-211 criteria 3 and 4), none with
+contested; the page words the row as before, "no Client Register in the
+warehouse for 2017-Q2". Each reader's verdict line carries REQ-DASH-204 criterion 16's no-queue-item
+form with its "was rejected" clause - not that criterion's turned-down
+sentence, which the page gives only where the rejected table was a
+package-mate held back with the supply (post-build-review #448, for Keith):
+"Awaiting a decision — ... One of this supply's checks could not run
+because the supply of Client Register for 2017-Q2 was rejected. A person can
+decide on this supply." (Investigations "2 of this supply's checks"). The
+person promotes the three at 11:00am Thursday, 9 February 2017, and marks
+cp-clients' 2017-Q2 not supplied at 9:00am Friday, 21 April 2017, so from then
+it reads "Not supplied (accepted) — 2017-Q2: 2 files arrived and were rejected
+by Robin Hale ...". The quarter's linkage release (received 1 May 2017) is
+held for a while by its ED Presentations checks, not for want of a Client
+Register, and promoted by the rule on 11 May; its Client Register Geocodes are
+promoted by the rule - so nothing of the quarter waits on a later page.
+**Breaks as**: the readers still contested after the settlement, or
+evaluated against a rejected file; or anything of the quarter left waiting
+on a later page.
+
 **TS-43 `[INJECT]` A warning supply held under hold.**
 PLANTED 2026-10-11 (parked 2026-10-05 for want of a warning supply): built
 to warn on facility nulls from the checks' own bands (REQ-GEN-184), after
@@ -3874,69 +3948,195 @@ supply-history row says so (REQ-PIPE-123, REQ-DASH-127).
 **TS-47 `[INJECT]` A daily file arriving after the next day's window
 opened.**
 *Config: daily, due 14:00, 4-hour claim window - the next day's window opens
-at 10:00. Settings in force where it lands (2026-09-07): warn setting hold,
-replacement setting never.*
+at 10:00. Settings in force where it lands (2026-09-07): warn setting hold
+(the 2026-08-30 version), replacement setting never. The day after is
+TS-47's own, generated passing (REQ-GEN-206 criterion 11; post-build-review
+#175, option 1), and no other period's arrival lands on either day.*
 The day's supply never comes on the day; it arrives at 11:00 the next
 morning.
 **Expect**: it fills the NEXT day, the period open when it arrived; its own
 day closes with no supply, overdue, and a scripted person marks it not
 supplied, so it reads "not supplied (accepted)" (REQ-PIPE-131, REQ-PIPE-132,
-REQ-DASH-133, REQ-GEN-137 criterion 3).
-**Breaks as**: filed backward to its own day.
+REQ-DASH-133, REQ-GEN-137 criterion 3). The late file is HELD under hold
+because 8 September lies in the hold era - a true consequence of the era,
+not of the scenario - while 8 September's own 14:00 supply, built passing,
+is promoted; so on that day only the supplies TS-43, TS-47 and TS-78
+account for wait under hold. Observed on the first
+bootstrapped build of 2026-11-16: the late file, received 11:00am Tuesday, 8
+September, fills 8 September and is withheld under hold at 2:08pm; 8
+September's own supply arrives at 2:30pm, built passing, supersedes it and is
+promoted by the rule at 3:47pm; 7 September is marked not supplied at 1:00pm
+on 8 September. Across the whole history the supplies withheld under hold are
+exactly TS-78a's two, TS-43's and TS-47's late file.
+**Breaks as**: filed backward to its own day; or 8 September's own supply
+waiting under hold beside the late file.
 
 **TS-48 `[INJECT]` A correction arriving before its partner is promoted.**
-NOT IN THE DATA YET. A single-table correction that starts failing on a
-cross-table check and is promoted when its partner's promotion re-checks it
-(REQ-PIPE-121) needs the Child Protection generator to place a partner's
-promotion between two arrivals of one quarter, which its delivery shapes do
-not yet express.
+DEMONSTRATED BY TS-75 (REQ-GEN-206 criterion 8; Keith, 2026-10-14, F13):
+cp-clients' 2024-Q2 Client Register is refused on its own data, its three
+readers are held back beside it ('promotion-withheld', REQ-PIPE-266), and
+when the corrected Client Register arrives the gate promotes it and the
+three readers together, in one gate application (REQ-PIPE-267,
+REQ-PIPE-121) - the readers rescued by their partner's promotion rather than
+by a separate knock-on.
+*Config: TS-75a's placement; its link opens the day after the corrected
+cp_clients' promotion.*
+**Expect** (the first bootstrapped build, 2026-11-16): cp-clients' 2024-Q2 Client Register is
+refused, and Notifications, Investigations and Placements are
+'promotion-withheld' beside it at the same instant (10:42am Monday, 12
+February 2024); the person rejects it on 22 February; the corrected Client
+Register received 10:00am Thursday, 29 February 2024 and the three readers
+are promoted in ONE gate application at 4:01pm Monday, 11 March 2024. On 12
+March cp-clients reads "The results below are the supply in place in the
+warehouse, received 10:00am Thursday, 29 February 2024", and its cross-table
+rows Investigations, Notifications and Placements → Client Register each read
+Pass ("Investigations received Thursday, 1 February 2024").
+**Breaks as**: the readers left waiting after the corrected Client Register
+is promoted, or promoted one by one rather than with it.
 
 **TS-49 `[INJECT]` A correction still failing after its partner's
-promotion.** NOT IN THE DATA YET, for TS-48's reason. Would produce the
-decision log's still-failing record (REQ-PIPE-121 criterion 12).
+promotion.** NOT TO BE PLANTED (Keith, 2026-10-11, confirmed 2026-10-14,
+REQ-GEN-136 criterion 5 as amended): it would produce the decision log's
+still-failing record (REQ-PIPE-121 criterion 12), and planting it needs
+named red cross-table targets and referential closure across six tables.
 
-**TS-50 `[INJECT]` A reader re-checked against the newer version.** NOT IN
-THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a
-cross-table reader).
+**TS-50 `[INJECT]` A reader re-checked against the newer version.**
+DEMONSTRATED BY TS-81's placement (REQ-GEN-206 criterion 6; Keith,
+2026-11-15, Q2 = a): Child Protection's 2017-Q3 Client Register v2 (received
+15 May 2017), clean, replaces its promoted v1 under Child Protection's green
+replacement era (2017-04-17 to 2017-10-18, REQ-PIPE-123), and every
+cross-table check reading cp_clients in that quarter is read against v2 by
+v2's own first run (REQ-PIPE-279) and counted once v2 is the period's supply
+(REQ-PIPE-269). Its supersession half - a newer file superseding a contested
+pair and its promotion re-evaluating the readers (REQ-PIPE-118) - is also
+demonstrated by REQ-GEN-203's TS-42.
+*Config: TS-81's placement; replacement setting green (Child Protection's
+collection-level version, 2017-04-17 to 2017-10-18), warn setting promote.
+Its link opens a week after v2's arrival.*
+**Expect** (the first bootstrapped build, 2026-11-16): v2's own arrival run reads the three
+readers' cross-table checks against v2; its gate promotes v2 replacing v1 at
+4:20am Thursday, 18 May 2017 (replacement setting green, beside Notifications
+v2's refusal), with no knock-on re-check of the readers. On 22 May 2017
+cp-clients reads "The results below are the supply in place in the
+warehouse, received 10:00am Monday, 15 May 2017", its cross-table rows
+Investigations, Notifications and Placements → Client Register each read Pass
+("Notifications received Monday, 1 May 2017"), and v1's supply-history row
+reads "Superseded by the supply received Monday, 15 May 2017 by the rule under
+the replacement setting 'when passing', 4:20am Thursday, 18 May 2017".
+**Breaks as**: a reader's cross-table row read against v1 after v2 replaced
+it, or the replacement waiting for a person.
 
-**TS-51 `[INJECT]` A promoted supply turned to Fail by a later sibling.** NOT IN
-THE DATA YET. Needs a Child Protection file shape that breaks a promoted
-sibling's referential check (REQ-DASH-126).
+**TS-51 `[INJECT]` A promoted supply turned to Fail by a later sibling.**
+NOT TO BE PLANTED (Keith, 2026-10-11, confirmed 2026-10-14, REQ-GEN-136
+criterion 9 as amended): it needs a Child Protection file shape that breaks a
+promoted sibling's referential check (REQ-DASH-126) - named red cross-table
+targets and referential closure across six tables.
 
 **TS-52 `[INJECT]` Case Workers arriving in a period it does not deliver
-in.** NOT INJECTED: the ordinary history already produces it - Case Workers
-files arrive in every delivery and are held in the quarters it does not
-take part in (TS-33a, REQ-PIPE-131). An injection would record a placement
-for what is already there; it waits on the Child Protection injection
-supporting a placement with no extra arrival.
+in.** PLANTED by REQ-GEN-206 criterion 1 as a placement written after
+generation, beside TS-79's: nothing is generated for it. Case Workers files
+arrive in every delivery of the original fifteen quarters and are held in
+the quarters cp-case-workers does not take part in (TS-33a, REQ-PIPE-131);
+the placement names the newest such supply, outside every scenario's
+delivery and every declared correction's claim, chosen from configuration
+and the generated deliveries alone - and generation refuses, naming TS-52,
+where the history holds none.
+*Config: quarterly; cp-case-workers takes part only in the quarters its
+participation names (February and August rounds), so a cp_case_workers.csv
+in a May or November delivery arrives while no period it delivers in is
+open. Settings in force: warn setting promote, replacement setting never.
+Its link opens the day after the supply's receipt, on its verdict line.*
+**Expect** (the first bootstrapped build, 2026-11-16): the newest such supply is the 2026-Q3
+delivery's, received 9:00am Wednesday, 27 May 2026 (cp_case_workers__202605270100000000) -
+the same held supply TS-79a's page shows in its as-at panel.
+On 28 May 2026 cp-case-workers' verdict line reads "Awaiting a decision — the
+results below are the newest supply, received 9:00am Wednesday, 27 May 2026,
+which is not in place in the warehouse yet. The supply in place in the
+warehouse is the one received 9:00am Sunday, 1 February 2026, and is passing.",
+beside the pill "Inherited from 2026-Q2", and the page says "Held (9
+supplies) — no open period to file it to; waiting for a person." - the
+standing Case Workers holds, each counted as needing a person (NFR 2).
+**Breaks as**: filed into the inherited quarter or the one before it, or
+taken as the quarter's supply.
 
-**TS-53 `[INJECT]` Keith's worked un-supersede case.** NOT IN THE DATA -
-FOR KEITH. A good file superseded by a bad later one, the bad one rejected
-and the good one un-superseded, re-checked and promoted by the gate
-(REQ-PIPE-120). Under the rules as built a good file is superseded only
-while WAITING, and a passing one waits only behind a filled slot or a hold -
-in either case the gate does not promote it after the un-supersede without
-a further decision. What should the planted shape be?
+**TS-53 `[INJECT]` Keith's worked un-supersede case.** PLANTED by
+REQ-GEN-206 criterion 5 on Birth Registrations (Keith, 2026-10-14, F12 and
+Q11): a good resend waiting behind a filled slot is superseded by a bad
+later one; a scripted person rejects the bad one, then un-supersedes the
+good one, in that order (REQ-PIPE-120 refuses an un-supersede beside a
+waiting version); it is re-checked, left waiting by the gate, and promoted
+by the person (REQ-GEN-137 criterion 2 as amended). Each file is built to a
+target (REQ-GEN-184) after one passing lead-in day and before a passing day
+(REQ-GEN-185).
+*Config: daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window;
+2026-07-24 - settings in force there: replacement setting never, warn
+setting promote. The day's own supply at 14:00, built passing; a good
+resend at 16:00, built passing; a bad one at 18:00, built failing on
+facility nulls. The next morning a scripted person rejects the 18:00 one at
+09:00 ("TS-53 reject"), un-supersedes the 16:00 one at 10:00 ("TS-53
+restore") and promotes it at 20:00 ("TS-53 promote").*
+**Expect** (the first bootstrapped build, 2026-11-16): 24 July's
+own supply is promoted by the rule at 3:59pm; the 16:00 resend is refused -
+"this supply's slot is already filled by a promoted supply" - and waits; the
+18:00 resend supersedes it at 6:00pm ("a newer version of this table for
+2026-07-24 arrived") and is refused on its Fail. On 25 July the person
+rejects the 18:00 one at 9:00am and un-supersedes the 16:00 one at 10:00am; it
+is re-checked at once, refused again by the gate on the filled slot, and
+promoted by the person at 8:00pm, displacing the 14:00 supply (recorded
+superseded by it). On 25 July the page's as-at panel reads "On Saturday, 25
+July 2026 the newest file was not the newest promotion", naming
+birth-registrations@202607241600000800 as promoted into Friday, 24 July 2026,
+and "a supply promoted later into Friday, 24 July 2026 was what downstream
+read most recently".
+**Breaks as**: the un-supersede refused or played before the rejection; the
+good resend promoted by the gate over the filled slot; or still superseded
+at the end of the day.
 
 **TS-54 `[INJECT]` A period substituted onto an earlier promoted supply.**
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14,
-Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1
-substituted by a scripted person onto 2024-Q4, whose cp-placements supply
+Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q2
+substituted by a scripted person onto 2025-Q1, whose cp-placements supply
 was promoted passing - with its own link while the substitution stands.
-CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the
-ordinary Warn drawn for 2026-Q3 to 2024-Q4 and this entry then said
-"promoted warning", but that Warn dirties only cp_carers and cp_clients, so
-cp-placements' 2024-Q4 supply is still passing and promoted. Whether it should
-be a Warn is with Keith. The script's
-`stands_on` field (REQ-GEN-200) answered the old blocker.
+PERIOD NAMES CORRECTED 2026-11-16 (REQ-GEN-206 criterion 3): since
+REQ-GEN-325 Child Protection's files go into the next period, so the
+February 2025 round fills 2025-Q2 and the substitution stands on 2025-Q1;
+this entry said 2025-Q1 and 2024-Q4. CORRECTED 2026-10-16 (post-build-review
+#207 D1): REQ-GEN-207 moved the ordinary Warn drawn for 2026-Q3 and this
+entry then said "promoted warning", but that Warn dirties only cp_carers and
+cp_clients, so cp-placements' 2025-Q1 supply is still passing and promoted.
+Whether it should be a Warn is with Keith. The script's `stands_on` field
+(REQ-GEN-200) answered the old blocker.
 
-**TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
-THE DATA YET: needs TS-54's substitution beside an inheritance in one
-period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
+**TS-55 `[INJECT]` A period whose _manifest lists all three kinds.**
+PLANTED by REQ-GEN-206 criterion 4 (Keith, 2026-11-15, Q1 = b): Child
+Protection's 2023-Q1, a quarter cp-case-workers does not deliver in, so it
+inherits 2022-Q4's; the quarter's delivery leaves out cp_placements - which
+no other collection reads - and a scripted person substitutes cp-placements'
+2023-Q1 onto 2022-Q4 (REQ-GEN-200), never removed or replaced, so at the end
+of the history 2023-Q1's _manifest lists promoted, inherited and substituted
+tables together (REQ-PIPE-130). Its link opens the period's composition
+view (REQ-DASH-209) on the history's last day.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; settings in
+force: warn setting promote, replacement setting never. 2023-Q1's delivery
+(the 1 November 2022 round) arrives on time without cp_placements.csv and
+clean otherwise; a scripted person substitutes the quarter's cp-placements
+onto 2022-Q4 at 09:00 on 3 November 2022 ("TS-55 substitute").*
+**Expect** (the first bootstrapped build, 2026-11-16): on the history's last day, 25
+September 2026, the chip opens "Child Protection · 2023-Q1", "6 datasets: 1
+substituted, 1 inherited, 4 promoted": Placements "Substituted from 2022-Q4",
+decided 9:00am Thursday, 3 November 2022, "Decided by Robin Hale"; Case
+Workers "Inherited from 2022-Q4", "Applied automatically by the schedule";
+Carer Register, Client Register, Investigations and Notifications
+"Promoted", 4:56am Wednesday, 2 November 2022, each Pass when promoted. The
+period's _manifest lists the same six kinds (cp-placements substituted by a
+person, cp-case-workers inherited, the other four promoted by the rule).
+**Breaks as**: the view missing a kind, or a row disagreeing with the
+period's _manifest.
 
 **TS-56 `[INJECT]` A supply whose columns arrive in another order.**
-2026-Q3, the newest quarter since 2026-10-15 (Keith, REQ-GEN-207 criterion
-3: its old 2024-Q4 is the quarter TS-76 stands on).
+The newest quarter since 2026-10-15 - 2026-Q4 on the history generated
+2026-11-16 (Keith, REQ-GEN-207 criterion 3: it left its old 2024-Q4 because
+TS-76 then stood on that quarter; TS-76 stands on 2025-Q1 today).
 *Config: quarterly, Feb/May/Aug/Nov.*
 `cp_carers` arrives with its first two columns swapped, header and rows
 alike - the same data, laid out differently by an upstream export.
@@ -4173,23 +4373,28 @@ now promoted. From 29 February the corrected supply fills the quarter and
 cp-clients ends healthy. **Breaks as**: the panel naming the corrected
 supply, or still "nobody had decided".
 
-**TS-76 `[INJECT]` A substitution later removed.** cp-placements, 2025-Q1:
-the delivery leaves cp_placements out; a person substitutes the quarter
-onto 2024-Q4 at 09:00 on 3 February, and at 09:00 on 20 April - once the
+**TS-76 `[INJECT]` A substitution later removed.** cp-placements, 2025-Q2
+(the February 2025 round; PERIOD NAMES CORRECTED 2026-11-16, REQ-GEN-206
+criterion 3 - since REQ-GEN-325 Child Protection's files go into the next
+period, and this entry said 2025-Q1 and 2024-Q4): the delivery leaves
+cp_placements out; a person substitutes the quarter onto 2025-Q1 at 09:00
+on 3 February, and at 09:00 on 20 April - once the
 next quarter's window has opened - removes the substitution and marks the
 quarter not supplied, in that order, at one instant. *Config: quarterly,
 as TS-75a.* **Expect** (REQ-DASH-198), on 17 February: the pill "Substituted
-from 2024-Q4" beside the dataset's title, and in its drill-down, below the
+from 2025-Q1" beside the dataset's title, and in its drill-down, below the
 results' heading, "Since removed, as from Sunday, 20 April 2025". The
 quarter closes "not supplied (accepted)". **What cp-clients and cp-carers
-read for 2025-Q1** (H1): clients promoted WARNING on arrival and stays at Warn
-before, during and after the substitution - the Warn is the ordinary one
-drawn for this quarter, which the delivery keeps (REQ-GEN-199's PROVISIONAL
-choice); carers waited until 9 February, then promoted PASSING and stays
-at Pass. Neither is a Fail after the substitution ends: the cross-table checks
-reading cp_placements are filed under cp-placements, so in a quarter with no
-placements supply nothing runs them for clients or carers (the architect's
-H1 expected a Fail; post-build-review #174). **Breaks as**: no pill on 17
+read for 2025-Q2** (H1; REQ-GEN-199 criterion 9 as amended by REQ-GEN-206),
+as recorded from the first bootstrapped build of 2026-11-16: clients promoted
+WARNING and carers PASSING together at 6:55pm Monday, 10 February 2025 - the
+Warn is the ordinary one drawn for this quarter, which the delivery keeps
+(REQ-GEN-199's PROVISIONAL choice) - and both stay so before, during and after
+the substitution. Neither is a Fail after the substitution ends (the
+architect's H1 expected one; post-build-review #174). Cp-clients' cross-table rows from Placements read "No data"
+for 2025-Q2: the quarter has no Placements supply of its own, and once it is
+marked not supplied the checks reading cp_placements are out of the period's
+scope (REQ-PIPE-270, REQ-PIPE-332). **Breaks as**: no pill on 17
 February; or "Since replaced".
 
 **TS-77a `[INJECT]` A substitution later replaced - while it stood.**
@@ -4258,7 +4463,8 @@ participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill
 "Inherited from 2026-Q1" beside the dataset's title. The same page also shows
 an as-at panel and an "Awaiting a decision" verdict line about a May supply
 that is "not filed to any period": ordinary deliveries carry cp_case_workers
-in months it does not take part in, and each is held (TS-52's shape) - the
+in months it does not take part in, and each is held (TS-52's shape; that
+May supply, cp_case_workers__202605270100000000, is TS-52's own) - the
 pill, not the panel, is what this scenario points at. **Breaks as**: no pill;
 or a stale date after ANCHOR_DATE moves.
 
@@ -4415,8 +4621,10 @@ over 4 percent of distinct keys are large groups.*
 **Breaks as**: Warn, or every key counted as a group.
 
 **TS-99 `[INJECT]` A blank expected identifier.** PLANTED by REQ-GEN-335
-(o).
-*Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.*
+(o). MOVED 2026-11-16 from 2022-Q4 to 2024-Q3 (REQ-GEN-206 criterion 24;
+Keith, 2026-11-15, Q1 = b), its shape, configuration and fault unchanged, so
+that 2022-Q4 holds no scenario for TS-55 to stand on.
+*Config: as TS-86; 2024-Q3's release, one DOC_CLIENTS row's id_1 blank.*
 **Expect**: Expected identifiers present reads Fail; the Client Register's
 referential check also fails on that row, which matches no client.
 **Breaks as**: the blank read as a value.
@@ -4558,6 +4766,10 @@ refused 2025-Q4, so drift read Fail across the gap.)*
 the 2024-Q4 Client Register, promoted passing on the round before, reads with
 the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the
 cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
+Since REQ-GEN-206 (2026-11-16) the quarter's ordinary linkage release is drawn
+amber too, on Emergency Department coverage - a Warn of linkage-keys about ED
+Presentations, not of the Client Register (post-build-review #449); this
+Expect is about the Client Register alone.
 **Breaks as**: the Client Register demoted, or tagged before the promotion.
 
 **TS-113 `[INJECT]` A Client Register geocode whose placed mix drifts.**

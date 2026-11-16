@@ -577,8 +577,38 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # from empty; each geocoding release lands hours before its 19:00 due
         # time. The 504 already pinned were compared one by one first: every
         # one of them the same verdict, none missing, none new.
-        assert counts == {"on_time": 345, "early": 194, "late": 52, "unfiled": 13}
-        assert sum(counts.values()) == 604
+        # 342 / 198 / 54 / 13 over 607 FOR REQ-GEN-206 (2026-11-16, both assets
+        # bootstrapped from empty), each of the 28 run ids out and 31 in
+        # accounted for by hand (post-build-review #447). No arrival present in
+        # both captures under the same run id changed its verdict or instant.
+        # FROM THIS BRANCH - Birth Registrations: out the ordinary supplies of
+        # 23, 24 and 25 July (early, on time, on time), now TS-53's lead-in, its
+        # own day and its following day - in 23 July 14:30 and 25 July 14:30 (on
+        # time) and TS-53's three files on 24 July, 14:00 on time, 16:00 (its
+        # re-check run, __r1) and 18:00 late; out 30 July 03:32 (early), the
+        # resend of the ordinary red TS-53's claims moved from 22 July to 14
+        # July (#441), in that red's resends of 15, 16 and 20 July (on time);
+        # out 8 September's ordinary supply (on time), in TS-47's green day at
+        # 14:30 (on time). Child Protection: out the 2017-Q2 and 2022-11-01
+        # routine deliveries, eleven on time (six, then five - no Case Workers in
+        # November); in TS-112's six at 08:30, early, and TS-55's four at 09:00,
+        # on time (no cp_placements). linkage-keys: TS-99 moved from 2022-Q4 to
+        # 2024-Q3, so 2022-11-01's release moves 17:30 -> 17:48 (now the drawn
+        # amber's) and 2024-08-01's 17:07 -> 17:30 (TS-99's), early all four.
+        # NOT FROM THIS BRANCH, already in the real databases built before it -
+        # the 2026-11-03 capture had gone stale. Geocoding, nine out and nine
+        # in: TS-107 left 2014-Q1 for 2021-Q2 and TS-111 left 2026-Q1 for
+        # 2024-Q4 (650d26f1, 2026-11-14, #322), and TS-113 took 2026-Q3
+        # (3c88932b, 2026-11-16), each quarter's one geocoding delivery moving
+        # to or off its scenario's 18:30 (geo-ed 2014-02 18:30 -> 18:40; both
+        # 2021-05 18:26 -> 18:30; geo-cp 2026-02 18:30 -> 18:29; both 2024-11
+        # 18:44 -> 18:30; both 2026-08 18:53 -> 18:30), early all eighteen; and
+        # with TS-113 geo-ed's ordinary red's resupply moved from 14 August
+        # 2017 to 9 August 2018 (late, both). Birth Registrations' 13 July
+        # resend moved 02:11 -> 02:13 (early, both) - not dated to a commit; see
+        # post-build-review #454.
+        assert counts == {"on_time": 342, "early": 198, "late": 54, "unfiled": 13}
+        assert sum(counts.values()) == 607
 
 
 @pytest.mark.asset("daily")

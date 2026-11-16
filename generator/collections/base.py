@@ -233,6 +233,28 @@ class Provider:
         return scenario_injection.carries_file(shape, files, f"{table}.csv")
 
 
+    def contests_table(self, plan: Plan, job: Job, n: int, delivery_obj, table: str) -> bool:
+        """Whether arrival `n` of `job` carries TWO files for `table` - a pair a
+        scenario plants (REQ-GEN-196, REQ-GEN-203) - so no rule promotes it and
+        a reader of the table must wait for its settlement (generated_supplies;
+        REQ-GEN-206 criterion 22). GENERIC: read from the injection's own
+        declaration, never from a provider's delivery class.
+
+        AS THE PIPELINE CONTESTS IT, NOT BY THE FILE NAMES: Arrival.contested
+        counts any dataset that two files of one arrival claim by its
+        arrival_pattern, so a one-table collection's next-day pair ({D} with
+        {D+1}) and its _TEST pairs are contests too, each settled by a
+        person's choose-file (post-build-review #452)."""
+        injected = plan.injected_by_period.get(job.period.name)
+        if injected is None or not 0 < n <= len(injected[0].arrivals):
+            return False
+        files = injected[0].arrivals[n - 1].files
+        tables = [f.table for f in files]
+        if len(files) > 1 and all(t is None for t in tables):
+            return True  # a one-table collection's pair is its one table's
+        return tables.count(table) > 1
+
+
 class GenerationOrderRefused(ValueError):
     """A provider whose declared dependency is absent or generates after it
     (REQ-GEN-334 criterion 6) - refused before anything is written."""
@@ -256,6 +278,11 @@ class GeneratedSupply:
     #: the supply was planned but never arrives (REQ-GEN-298, found building
     #: the geocoding trial: TS-104's 2016-Q2 Client Register).
     carried: bool = True
+    #: WHETHER THE ARRIVAL BROUGHT TWO FILES FOR THE TABLE (Provider.
+    #: contests_table): a contested pair is promoted by no rule - only a
+    #: person's settlement makes one of its files the supply, or neither
+    #: (REQ-GEN-206 criterion 22, TS-112).
+    contested: bool = False
 
 
 def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedSupply]:
@@ -284,7 +311,9 @@ def generated_supplies(provider: "Provider", dataset_id: str) -> list[GeneratedS
                 out.append(GeneratedSupply(job.period.name, received, rows,
                                            entry.get("dirty_severity"),
                                            provider.carries_table(plan, job, n, delivery_obj,
-                                                                  table)))
+                                                                  table),
+                                           provider.contests_table(plan, job, n, delivery_obj,
+                                                                   table)))
     from asset_model import asset_time
 
     return sorted(out, key=lambda s: asset_time.parse_instant(s.received_at, "a receipt"))

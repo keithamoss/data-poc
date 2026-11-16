@@ -157,7 +157,9 @@ class TestAStoodOnPeriodIsClaimed:
         resolved, _ = cp_provider._plan_injections(periods)
         stood = {inj.scenario_id: si.stood_on(inj, periods) for inj, _p in resolved
                  if inj.stands_on is not None}
-        assert stood == {"TS-76": periods[-8].name, "TS-77a": periods[-15].name}
+        # TS-55 stands on 2022-Q4 (REQ-GEN-206 criterion 4).
+        assert stood == {"TS-76": periods[-8].name, "TS-77a": periods[-15].name,
+                         "TS-55": periods[-17].name}
 
 
 class TestADayMeantToBeEmptyMustBeEmpty:

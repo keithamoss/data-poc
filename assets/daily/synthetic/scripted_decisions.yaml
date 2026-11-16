@@ -123,6 +123,33 @@ decisions:
     after_hours: 20
     reason: "Second-parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
 
+  # TS-53, Keith's worked un-supersede case (REQ-GEN-206 criterion 5; REQ-GEN-137
+  # criterion 2 as amended): the bad 18:00 resend is rejected first, then the
+  # good 16:00 one it superseded is un-superseded - REQ-PIPE-120 refuses an
+  # un-supersede beside a waiting version - and, once the gate has left it
+  # waiting behind the filled slot, promoted by the person that evening.
+  - scenario: TS-53
+    name: TS-53 reject
+    operation: reject
+    dataset: birth-registrations
+    supply: 2
+    after_hours: 15
+    reason: "The 18:00 resend fails its checks - facility details are missing on most registrations; it is not the day's supply."
+  - scenario: TS-53
+    name: TS-53 restore
+    operation: un-supersede
+    dataset: birth-registrations
+    supply: 1
+    after_hours: 18
+    reason: "The 16:00 resend was set aside only because the faulty 18:00 one arrived after it; it is the supplier's correct resend."
+  - scenario: TS-53
+    name: TS-53 promote
+    operation: promote
+    dataset: birth-registrations
+    supply: 1
+    after_hours: 28
+    reason: "The supplier's corrected resend for this day, checked again and passing; it replaces the supply promoted at 14:00."
+
 # SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) - see the header.
 corrections:
   # TS-62: merged and left for the asset manager - pending to the end.
