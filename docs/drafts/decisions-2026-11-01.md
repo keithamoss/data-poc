@@ -800,3 +800,12 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
   until match_level's PSI sits mid-warn, sized from the check's own band; every
   other check passes; REQ-GEN-298's recorded drift finding amended as
   history)? Keith: "Approve as drafted".
+- TS-113 could not go in 2019-Q4: TS-42a holds that quarter, and REQ-GEN-298
+  criterion 7 allows one geocoding scenario per quarter. The draft missed this.
+  Asked which free quarter to use (2017-Q2, 2023-Q3, 2023-Q4, 2024-Q3,
+  2025-Q2, 2026-Q1, 2026-Q3). Keith: "2026-Q3". Its reference is green and no
+  later file is measured against it. It plans 16 records shifted, PSI 0.178,
+  mid-warn.
+- Asked whether to accept moving the reference test's 2019-Q4 half to TS-103's
+  2022-Q1 ED file against TS-101b's 2021-Q4 file (the same rule on a file tried
+  by design). Keith: "Accept".
