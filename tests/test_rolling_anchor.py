@@ -653,3 +653,43 @@ class TestNoAnchorFileInASandbox:
         assert not (data / "deliveries").exists()
         code, out, err = sandbox("pipeline", "bootstrap", "--anchor", "2099-01-01")
         assert "is after today" in " ".join((out + err).replace("│", " ").split()), (out, err)
+
+
+class TestValidateConfigRunsOnAFreshCheckout:
+    """post-build-review #433: validate-config.yml's daily leg runs gates that
+    read the daily asset's offset dates, on a runner with no data/ and so no
+    anchor file. Its asset-reading steps are run here with exactly the job's
+    environment and an empty data folder."""
+
+    def _job_env(self, asset):
+        from pathlib import Path
+
+        import yaml
+
+        root = Path(__file__).resolve().parent.parent
+        doc = yaml.safe_load((root / ".github" / "workflows" / "validate-config.yml").read_text())
+        job = doc["jobs"]["validate"]
+        env = {}
+        for name, value in (job.get("env") or {}).items():
+            value = str(value).replace("${{ matrix.asset }}", asset)
+            if "${{" not in value:
+                env[name] = value
+        steps = [s["run"] for s in job["steps"] if "mothman schedule validate" in s.get("run", "")]
+        assert steps, "the job runs `mothman schedule validate`"
+        return root, env
+
+    def test_its_daily_leg_reads_the_offset_dates_with_no_anchor_file(self, tmp_path):
+        import os
+        import subprocess
+        import sys
+
+        root, job_env = self._job_env("daily")
+        assert job_env.get("MOTHMAN_ASSET") == "daily"
+        env = {k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}
+        env.update(job_env)
+        done = subprocess.run([sys.executable, "-c", _NO_ANCHOR_DRIVER, str(tmp_path / "daily"),
+                               "schedule", "validate"], cwd=root, env=env, capture_output=True,
+                              text=True, timeout=300)
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert "schedule validation OK" in done.stdout
+        assert not (tmp_path / "daily").exists(), "a gate writes nothing"
