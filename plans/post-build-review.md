@@ -16520,6 +16520,12 @@ twice. It deliberately did not re-find the `TypeError`.
      per agreement by REQ-PIPE-400) - and either reading state another test
      left would give this shape. Left for a proper look; the worker's test
      order from a failing run is what would pin it.
+     - **Failed again, a43cdc05's gate (2026-11-16)**, the same test in the
+       same chunk 00 under `-n auto`, the only failure of 8450. The chunk's
+       twenty modules and its log are kept session-locally
+       (scratchpad/i459/list_00, log_00.txt). The chunk's per-worker order
+       was not recorded (`-rfE` only); a run with `-v` would name the
+       failing worker's preceding tests.
 
 460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
      Found building REQ-TEST-402, by its own writer guard rather than by
