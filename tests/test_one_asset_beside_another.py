@@ -209,7 +209,8 @@ def test_each_command_leaves_the_other_assets_folders_byte_for_byte(
     for args, typed in ((generate, None),
                         (("pipeline", "cache-key"), None),
                         (("pipeline", "checkpoint", "list"), None),
-                        (("env", "reset-synthetic"), f"delete all QA history for {asset}\n")):
+                        (("env", "reset-synthetic"),
+                         f"delete all QA history and generated files for {asset}\n")):
         _mothman(repo, env, *args, input=typed)
         unchanged(" ".join(args))
 

@@ -117,6 +117,24 @@ releases:
     changes:
       - category: New
         items:
+          - headline: A demo up to today
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              `mothman pipeline bootstrap --roll-anchor` regenerates the demo
+              up to today on the asset's clock, and `--anchor <date>` gives you
+              the same history back. Tests and CI still use 25 September 2026.
+          - headline: The reset clears the files too
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              `mothman env reset-synthetic` now deletes the generated delivery
+              files with the history, so a regeneration leaves one history,
+              and it stops if a folder you filed by hand is still there.
+          - headline: Generated up to when
+            components: ["Dashboard UI"]
+            description: >
+              On a synthetic asset the footer and the date picker say the date
+              the supplies were generated up to, and `mothman env current`
+              says it too.
           - headline: How long each check took
             components: ["QA checks & contract", "Dashboard UI"]
             description: >

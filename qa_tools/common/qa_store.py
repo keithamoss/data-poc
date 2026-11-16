@@ -202,7 +202,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 51
+SCHEMA_VERSION = 52
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -225,6 +225,17 @@ CREATE SCHEMA IF NOT EXISTS "{SCHEMA}";
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".schema_version (
     only_row boolean PRIMARY KEY DEFAULT true CHECK (only_row),
     version  integer NOT NULL
+);
+
+-- THE ANCHOR THE HISTORY WAS GENERATED AT (REQ-GEN-404 criterion 4, v52):
+-- one row per history, written by the bootstrap that replays it, so the
+-- dashboard build and `mothman` read 'what date was this generated to' as a
+-- recorded fact, beside run_by and run_timestamp, without the generator's
+-- bookkeeping. A real asset's history has none.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".history_anchor (
+    only_row     boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    anchor       date NOT NULL,
+    recorded_at  timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (
@@ -1930,6 +1941,30 @@ def ensure_schema(conn: supply_db.SupplyConnection) -> None:
             [SCHEMA_VERSION])
     finally:
         conn.execute("SELECT pg_advisory_unlock(?)", [_DDL_LOCK])
+
+
+def record_history_anchor(conn: supply_db.SupplyConnection, anchor) -> None:
+    """Record the anchor the history in this database was generated at, once
+    per history (REQ-GEN-404 criterion 4). A second, different anchor is
+    refused: a database holds one history (REQ-GEN-408)."""
+    ensure_schema(conn)
+    conn.execute(f'INSERT INTO "{SCHEMA}".history_anchor (anchor) VALUES (?) '
+                 "ON CONFLICT (only_row) DO NOTHING", [anchor])
+    found = history_anchor(conn)
+    if found != anchor:
+        raise ValueError(f"this database's history is recorded as generated up to {found}, "
+                         f"and a bootstrap at {anchor} cannot add to it - one database holds "
+                         f"one history. `mothman env reset-synthetic` replaces it")
+
+
+def history_anchor(conn: supply_db.SupplyConnection):
+    """The anchor recorded for this database's history, or None - none is
+    recorded, or the qa schema predates it (REQ-GEN-404 criterion 4)."""
+    if not conn.execute(
+            f"SELECT to_regclass('{SCHEMA}.history_anchor')").fetchall()[0][0]:
+        return None
+    rows = conn.execute(f'SELECT anchor FROM "{SCHEMA}".history_anchor').fetchall()
+    return rows[0][0] if rows else None
 
 
 def _recorded_version(conn: supply_db.SupplyConnection) -> int | None:

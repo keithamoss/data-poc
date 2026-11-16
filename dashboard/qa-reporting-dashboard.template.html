@@ -1119,6 +1119,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 
   <footer>
     Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every dataset on this page is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against generated synthetic supplies, including cross-table foreign-key and business-rule checks where a collection has more than one table.
+    <span id="footer-generated-up-to" hidden></span>
     <br><br>
     <em>Internal project codename: Mothman.</em>
   </footer>
@@ -1201,6 +1202,9 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
          seven weeks earlier, and two datasets on two calendars are
          showing two different periods of the same chosen date. Naming
          both is what makes the chosen date mean something. -->
+    <!-- WHAT THE SYNTHETIC SUPPLIES RUN UP TO (REQ-DASH-407 criterion 2, SR8):
+         one quiet line under the picker, only on a synthetic asset. -->
+    <div id="in-place-on-generated-up-to" style="margin-top:8px; font-size:12.5px; color:var(--ink-muted);" hidden></div>
     <div id="in-place-on-periods" style="margin-top:14px; font-size:12.5px; color:var(--ink-muted);"></div>
     <div style="margin-top:14px;">
       <button class="link-btn" id="in-place-on-reset-btn" type="button">Reset to default (<span id="in-place-on-default-label"></span>)</button>
@@ -13440,6 +13444,37 @@ function renderBuildStamp(){
 }
 renderBuildStamp();
 
+// THE DATE A SYNTHETIC ASSET'S SUPPLIES WERE GENERATED UP TO (REQ-DASH-407;
+// R3: say the date, never warn). From BUILD_PROVENANCE, which the build read
+// from the anchor recorded in the qa schema. Two quiet lines - the footer,
+// which snapshots and printouts carry, and one under the as-of picker - and
+// neither on a real asset. The as-of default and the picker's range are NOT
+// touched by it (criterion 6). A plain date on the asset's clock (fmtDay),
+// and the same words whether it is today or months ago.
+function generatedUpToLines(provenance){
+  if(!provenance || !provenance.synthetic) return null;
+  const up = provenance.generated_up_to;
+  if(!up){
+    const none = "The date this synthetic data was generated up to was not recorded.";
+    return {footer: none, panel: none};
+  }
+  const day = fmtDay(up);
+  return {
+    footer: `The synthetic supplies on this page were generated up to and including ${day}; a period after that date has no supply.`,
+    panel: `Synthetic supplies run up to and including ${day}`,
+  };
+}
+function renderGeneratedUpTo(){
+  const lines = generatedUpToLines(typeof BUILD_PROVENANCE === "undefined" ? null : BUILD_PROVENANCE);
+  for(const [id, key] of [["footer-generated-up-to", "footer"], ["in-place-on-generated-up-to", "panel"]]){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    el.textContent = lines ? lines[key] : "";
+    el.hidden = !lines;
+  }
+}
+renderGeneratedUpTo();
+
 // Initial load: STATE already resolved from location.hash (or the {tier:
 // "exec"} default) up where it's declared. replaceState (not pushState)
 // so this first view IS the base history entry rather than a duplicate of
@@ -13461,6 +13496,17 @@ const SCENARIO_ON_LOAD = (()=>{
   const id = SCENARIO_MAP[index].id;
   // Written back lowercase in one spelling (criterion 5, post-build-review #202 F9).
   withScenarioParam(INITIAL_URL, id);
+  // THE SCENARIO'S CURRENT DATE WINS (REQ-GEN-406 criterion 9, SR9): a link
+  // saved before the anchor rolled carries the date the scenario stood on
+  // then. Shown at the scenario's date now, the address corrected by the
+  // replaceState below, rather than silently marking nothing.
+  const target = scenarioTarget(SCENARIO_MAP[index]);
+  if(target && target.inPlaceOn && target.inPlaceOn !== CURRENT_IN_PLACE_ON){
+    setInPlaceOnQuietly(target.inPlaceOn);
+    if(target.inPlaceOn === DEFAULT_IN_PLACE_ON) INITIAL_URL.searchParams.delete(IN_PLACE_ON_PARAM);
+    else INITIAL_URL.searchParams.set(IN_PLACE_ON_PARAM, target.inPlaceOn);
+    INITIAL_URL.searchParams.delete(PREVIOUS_DATE_PARAM);
+  }
   if(!(STATE.scenarioJump && STATE.scenarioJump.id === id)){
     STATE = {...STATE, scenarioJump: {id, from: DEFAULT_IN_PLACE_ON, to: CURRENT_IN_PLACE_ON}};
   }

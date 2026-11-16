@@ -443,6 +443,10 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
                                    collection_id="child-protection", before=3, name="ckpt")
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
         monkeypatch.setattr(checkpoints, "find", lambda name: cp)
+        from asset_model import history_anchor
+
+        monkeypatch.setattr(checkpoints, "recorded_anchor",
+                            lambda c: history_anchor.FIXED_TEST_ANCHOR)
         monkeypatch.setattr(replay_inputs, "first_affected",
                             lambda recorded: types.SimpleNamespace(arrival=5, reason="changed"))
         seen = []

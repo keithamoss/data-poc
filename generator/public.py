@@ -102,14 +102,43 @@ def this_assets_scenarios() -> set[str]:
 
 
 def anchor_statement():
-    """(the date the generated history runs up to, how it was chosen) - what a
-    bootstrap's closing line says (REQ-GEN-399 criterion 4): 'fixed' for the
-    committed test anchor, 'override' for GENERATOR_ANCHOR_DATE. A rolled
-    anchor is REQ-GEN-404's and not built."""
-    import os
-
+    """(the date the generated history runs up to, 'fixed' or 'rolled') - the
+    anchor installed for this run, as a bootstrap's closing line says it
+    (REQ-GEN-399 criterion 4)."""
+    from asset_model import history_anchor
     from generator import anchor_date
 
     up_to = anchor_date.get_anchor_date()
-    how = "override" if os.environ.get("GENERATOR_ANCHOR_DATE") else "fixed"
-    return up_to.isoformat(), how
+    return up_to.isoformat(), history_anchor.kind(up_to)
+
+
+# THE ANCHOR, AS THE BOOTSTRAP SEES IT (REQ-GEN-404, REQ-GEN-405) - through
+# this one module, as everything else of the generator's.
+from generator.anchor_date import (  # noqa: E402,F401 - re-exported for the bootstrap
+    FIXED_TEST_ANCHOR, AnchorRefused, refuse_the_retired_variable, validate as validate_anchor,
+    zone_name)
+
+
+def recorded_anchor():
+    """The anchor the generator's bookkeeping records for the history on disk
+    (REQ-GEN-404 criterion 3), or None."""
+    from generator import driver
+
+    return driver.recorded_anchor()
+
+
+def written_delivery_names(bookkeeping) -> set[str]:
+    """Every delivery folder the generator's bookkeeping at `bookkeeping` says
+    it wrote - what a reset may delete and regenerate (REQ-GEN-408 criterion
+    4). Empty where there is no bookkeeping."""
+    import json
+    from pathlib import Path
+
+    from generator import driver
+
+    path = Path(bookkeeping)
+    if not path.exists():
+        return set()
+    book = json.loads(path.read_text(encoding="utf-8"))
+    return {e["delivery"] for k in driver.dataset_keys(book) for e in book[k]
+            if isinstance(e, dict) and e.get("delivery")}

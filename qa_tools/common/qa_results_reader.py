@@ -668,6 +668,18 @@ def replaced_runs(run_ids: list[str], conn=None) -> list[str]:
     return [r for r in run_ids if r in replaced]
 
 
+def read_history_anchor(conn=None):
+    """The anchor recorded for this database's synthetic history (REQ-GEN-404
+    criterion 4) - what the dashboard says its supplies were generated up to
+    (REQ-DASH-407 criterion 4) - or None where none is recorded."""
+    c, close = _conn(conn)
+    try:
+        return qa_store.history_anchor(c)
+    finally:
+        if close:
+            c.close()
+
+
 def read_dataset_stats(agency: str, collection: str, run_id: str,
                        conn=None) -> dict | None:
     """The precomputed value-counts/arrival/check-aggregate/manifest-entry

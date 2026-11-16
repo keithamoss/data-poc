@@ -270,25 +270,29 @@ def try_targets(collection_id: str) -> int:
     return of(collection_id).try_targets(collection_id=collection_id)
 
 
-def generate_collection(collection_id: str, *, trial: bool) -> None:
+def generate_collection(collection_id: str, *, trial: bool, anchor: str | None = None) -> None:
     """One collection's synthetic history, its target trial, then the scenario
     map - bootstrap/generation.py's, with its refusals said as this terminal
     says a refusal."""
     import time
 
-    from asset_model import config_pin
+    from asset_model import config_pin, config_yaml
     from bootstrap import generation
+    from generator import public as generator_public
 
     started = time.monotonic()
     try:
-        generation.generate_collection(
+        generation.generate_on_its_own(
             collection_id, trial=trial, try_targets=try_targets,
-            say=lambda m: console.print(m, style="yellow"))
+            say=lambda m: console.print(m, style="yellow"), anchor=anchor)
+    except generator_public.AnchorRefused as exc:
+        # BEFORE ANYTHING IS WRITTEN (REQ-GEN-404 criteria 7 to 9).
+        raise click.ClickException(str(exc)) from None
     except generation.NoGenerator as exc:
         raise click.ClickException(str(exc)) from None
     except generation.TargetTrialUnavailable as exc:
         raise TargetTrialUnavailable(str(exc)) from None
-    except config_pin.PinRefused as exc:
+    except (config_pin.PinRefused, config_yaml.OffsetRefused) as exc:
         # A REFUSAL, NOT A TRACEBACK (post-build-review #397): the asset is
         # not synthetic, so there is nothing to generate.
         raise click.ClickException(str(exc)) from None
@@ -331,9 +335,24 @@ def cache_key_command() -> None:
               help="Do not try each injected target against the real tools after "
                    "generating. Every targeted supply is still compared with what it was "
                    "built to once the replay finishes.")
+@click.option("--anchor", "anchor", default=None, metavar="YYYY-MM-DD",
+              help="Generate the history up to this date rather than the fixed test anchor "
+                   "(2026-09-25) - to rebuild a demo history given its date back. From "
+                   "2026-09-25 to today on the asset's clock. An empty database only.")
+@click.option("--roll-anchor", "roll_anchor", is_flag=True,
+              help="Generate the demo history up to today on the asset's own clock (or the "
+                   "day before, if a receipt is still planned for later today). An empty "
+                   "database only; the deployment-half tests refuse a rolled history.")
 def bootstrap_command(collection: str, force: bool, sequential: bool,
-                      checkpoint_before: int | None, skip_target_trial: bool) -> None:
+                      checkpoint_before: int | None, skip_target_trial: bool,
+                      anchor: str | None = None, roll_anchor: bool = False) -> None:
     """Take an empty environment to one with data and QA results in it.
+
+    \b
+    Examples:
+      mothman pipeline bootstrap                      the fixed test anchor, 2026-09-25
+      mothman pipeline bootstrap --roll-anchor        a demo up to today
+      mothman pipeline bootstrap --anchor 2026-11-13  a history up to that date
 
     Run this after cloning, on a fresh dev container, or whenever a
     database has been dropped. It is IDEMPOTENT: if this environment
@@ -346,9 +365,14 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     """
     from bootstrap import bootstrap as boot
 
+    if anchor is not None and roll_anchor:
+        # A USAGE ERROR NAMING BOTH (REQ-GEN-404 criterion 5).
+        raise click.UsageError("--anchor and --roll-anchor were both given - give one: "
+                               "--anchor names the date, --roll-anchor rolls to today.")
     result = boot.bootstrap(collection=collection, force=force, sequential=sequential,
                             on_step=_step, checkpoint_before=checkpoint_before,
-                            skip_target_trial=skip_target_trial, try_targets=try_targets)
+                            skip_target_trial=skip_target_trial, try_targets=try_targets,
+                            anchor=anchor, roll_anchor=roll_anchor)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:

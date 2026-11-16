@@ -429,6 +429,25 @@ def place_page_assets(page_path) -> None:
         shutil.copytree(os.path.join(source, name), os.path.join(dest, name), dirs_exist_ok=True)
 
 
+def generated_up_to_provenance() -> dict:
+    """BUILD_PROVENANCE's synthetic fields (REQ-DASH-407 criterion 4): whether
+    the asset declares itself synthetic, and the date its supplies were
+    generated up to, read from the anchor RECORDED IN THE QA SCHEMA - never
+    from the delivery tree or the generator's bookkeeping (the build rule) -
+    or None where none is recorded (criterion 5: never a guessed date)."""
+    from asset_model import asset_time
+
+    if not asset_time.declared_synthetic():
+        return {"synthetic": False, "generated_up_to": None}
+    from qa_tools.common import qa_results_reader
+
+    try:
+        found = qa_results_reader.read_history_anchor()
+    except Exception:  # noqa: BLE001 - an unreadable record is 'not recorded'
+        found = None
+    return {"synthetic": True, "generated_up_to": found.isoformat() if found else None}
+
+
 def embed() -> None:
     page_path, open_tickets_json, ticket_resolutions_json = output_paths()
     with open(TEMPLATE_HTML) as f:
@@ -545,6 +564,7 @@ def embed() -> None:
         # changes per deployment.
         provenance["environment"] = {"id": env.id, "label": env.label,
                                      "publishes": bool(env.publishes)}
+    provenance.update(generated_up_to_provenance())
     html = _replace_const(html, "BUILD_PROVENANCE",
                            json.dumps(provenance, separators=(",", ":")))
     print(f"Re-embedded BUILD_PROVENANCE = {provenance['environment'] or 'unset'}, "

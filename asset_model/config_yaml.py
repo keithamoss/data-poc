@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import threading
 from collections import OrderedDict
 
@@ -64,9 +65,150 @@ _cache: "OrderedDict[str, object]" = OrderedDict()
 _lock = threading.Lock()
 
 
+# ---- OFFSET DATES (REQ-GEN-406 criterion 3; SA Q1, SETTLED by Keith 2026-11-14) ----
+#
+# A SYNTHETIC asset's configuration may write a date that frames its generated
+# history as an offset from the history's anchor: `!anchor -99` is the date 99
+# days before it, and `!anchor "calendar daily version {+0}"` writes one into a
+# string. Resolved HERE, at the one parse every reader goes through, to the plain
+# 'YYYY-MM-DD' string the file would otherwise hold - so the pipeline, the
+# dashboard build and the CLI read a resolved date and none of them computes
+# the anchor; the anchor comes from asset_model/history_anchor.py's resolver
+# (the installed one, else the anchor file, else - under test and CI only - the
+# fixed test anchor). REFUSED on an asset that does not declare `synthetic:
+# true`, naming the file and the line (criterion 3): a real deployment's
+# agreement is only ever the dates it wrote.
+#
+# A DOCUMENT USING THE TAG IS CACHED PER ANCHOR: its parse is keyed on the
+# anchor as well as the text, so one process generating at two anchors never
+# answers one anchor's dates for the other.
+
+ANCHOR_TAG = "!anchor"
+
+_OFFSET = re.compile(r"\{([+-]?\d+)\}")
+
+
+class OffsetRefused(ValueError):
+    """An offset date written in the configuration of an asset that is not
+    synthetic."""
+
+
+_parsing = threading.local()
+
+
+def _anchor_offset(loader, node):
+    from datetime import timedelta
+
+    from asset_model import history_anchor
+
+    where = f"{getattr(_parsing, 'name', None) or 'a configuration file'}, line {node.start_mark.line + 1}"
+    if not getattr(_parsing, "checking", False):
+        if not _asset_is_synthetic():
+            raise OffsetRefused(
+                f"{where} writes a date as an offset from the history's anchor "
+                f"({ANCHOR_TAG}), and this asset does not declare `synthetic: true` - a real "
+                f"asset's configuration writes its dates")
+    anchor = history_anchor.for_offsets()
+    value = str(loader.construct_scalar(node)).strip()
+    try:
+        return (anchor + timedelta(days=int(value))).isoformat()
+    except ValueError:
+        pass
+    if not _OFFSET.search(value):
+        raise ValueError(f"{where}: {ANCHOR_TAG} takes a number of days, e.g. -7, or a "
+                         f"string naming one in braces, e.g. \"version {{+0}}\" - not {value!r}")
+    return _OFFSET.sub(lambda m: (anchor + timedelta(days=int(m.group(1)))).isoformat(), value)
+
+
+#: Whether the selected asset is synthetic, by its data-asset.yaml's text.
+_SYNTHETIC: "OrderedDict[str, bool]" = OrderedDict()
+
+
+def _asset_is_synthetic() -> bool:
+    """asset_time.declared_synthetic(), remembered by data-asset.yaml's text -
+    so the answer is part of an offset-using document's cache key and the
+    refusal holds on every load (post-build-review #435). The declaration is
+    read with `checking` set: data-asset.yaml may itself write offsets, which
+    resolve unchecked there, since the check is what is being answered."""
+    from asset_model import asset_time
+
+    text = read(asset_time.data_asset_yaml())
+    found = _SYNTHETIC.get(text)
+    if found is None:
+        before = getattr(_parsing, "checking", False)
+        _parsing.checking = True
+        try:
+            found = asset_time.declared_synthetic()
+        finally:
+            _parsing.checking = before
+        with _lock:
+            _SYNTHETIC[text] = found
+            while len(_SYNTHETIC) > MAX_DOCUMENTS:
+                _SYNTHETIC.popitem(last=False)
+    return found
+
+
+class _Loader(LOADER):
+    """The safe loader, with the one tag a synthetic asset may write."""
+
+
+_Loader.add_constructor(ANCHOR_TAG, _anchor_offset)
+# ON PyYAML'S OWN SAFE LOADERS TOO (PROVISIONAL (2026-11-16)): a reader that
+# parses a configuration file itself - a test copying an asset folder, a tool's
+# own safe_load - resolves the tag the same way rather than failing on it. The
+# one tag is all that is added, so nothing else safe_load accepts changes.
+for _safe in {yaml.SafeLoader, getattr(yaml, "CSafeLoader", yaml.SafeLoader)}:
+    _safe.add_constructor(ANCHOR_TAG, _anchor_offset)
+
+#: Whether a text uses the tag, remembered by the text itself (a pinned run
+#: hands the same string objects a million times, whose hash is cached).
+_USES_ANCHOR: "OrderedDict[str, bool]" = OrderedDict()
+
+
+def uses_anchor(text) -> bool:
+    if not isinstance(text, str):
+        return False
+    found = _USES_ANCHOR.get(text)
+    if found is None:
+        found = ANCHOR_TAG in text
+        with _lock:
+            _USES_ANCHOR[text] = found
+            while len(_USES_ANCHOR) > MAX_DOCUMENTS:
+                _USES_ANCHOR.popitem(last=False)
+    return found
+
+
+def anchored_key(text):
+    """`text` itself, or - where it uses the tag - `text` with the anchor it
+    resolves against, so a cached document or a built value is per anchor."""
+    if not uses_anchor(text):
+        return text
+    from asset_model import history_anchor
+
+    if getattr(_parsing, "checking", False):
+        # The synthetic check's own read: never remembered (parse()).
+        return f"checking\0{text}"
+    if not _asset_is_synthetic():
+        # Refused when parsed, so nothing is ever kept under this key - and an
+        # offset document kept while the asset was synthetic is not answered.
+        return f"real\0{text}"
+    return f"{history_anchor.for_offsets().isoformat()}\0{text}"
+
+
 def _parse_raw(text: str):
     """One real parse - separate so a test can count them."""
-    return yaml.load(text, Loader=LOADER)  # noqa: S506 - a SafeLoader, C or Python
+    return yaml.load(text, Loader=_Loader)  # noqa: S506 - a SafeLoader, C or Python
+
+
+def _parse_named(text: str, name: str | None):
+    """_parse_raw, with the file's name where an offset date's refusal can say
+    it."""
+    before = getattr(_parsing, "name", None)
+    _parsing.name = name
+    try:
+        return _parse_raw(text)
+    finally:
+        _parsing.name = before
 
 
 def parse(source, *, name: str | None = None, remember: bool = True):
@@ -88,13 +230,15 @@ def parse(source, *, name: str | None = None, remember: bool = True):
     text = source if isinstance(source, str) else source.read()
     if isinstance(text, bytes):
         text = text.decode("utf-8")
+    # PER ANCHOR WHERE THE TEXT WRITES AN OFFSET DATE (REQ-GEN-406).
+    key = anchored_key(text)
     if remember:
         with _lock:
-            if text in _cache:
-                _cache.move_to_end(text)
-                return copy.deepcopy(_cache[text])
+            if key in _cache:
+                _cache.move_to_end(key)
+                return copy.deepcopy(_cache[key])
     try:
-        parsed = _parse_raw(text)
+        parsed = _parse_named(text, name)
     except yaml.MarkedYAMLError as exc:
         if name:
             # A C-loader mark's name is read-only, so each is replaced by the
@@ -107,9 +251,16 @@ def parse(source, *, name: str | None = None, remember: bool = True):
         raise
     if not remember:
         return parsed
+    if getattr(_parsing, "checking", False) and uses_anchor(text):
+        # RESOLVED UNCHECKED, SO NEVER REMEMBERED (post-build-review #435): this
+        # parse is the synthetic check's own read of data-asset.yaml, whose
+        # offset dates resolve without asking - the check is what is being
+        # answered. Remembered, the next load of the file would be answered
+        # from it and an asset that is not synthetic would be refused once.
+        return parsed
     with _lock:
-        _cache[text] = parsed
-        _cache.move_to_end(text)
+        _cache[key] = parsed
+        _cache.move_to_end(key)
         while len(_cache) > MAX_DOCUMENTS:
             _cache.popitem(last=False)
     return copy.deepcopy(parsed)
@@ -270,6 +421,9 @@ class Built:
         self._lock = threading.Lock()
 
     def get(self, key, text, build):
+        # A VALUE BUILT FROM A FILE WRITING OFFSET DATES IS PER ANCHOR
+        # (REQ-GEN-406): the text is keyed with the anchor it resolves against.
+        text = anchored_key(text)
         newest = self._newest.get(key)
         if newest is not None and newest[0] == text:
             return newest[1]

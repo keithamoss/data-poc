@@ -384,6 +384,17 @@ def copy_for_resume(cp: Checkpoint, dsn: str | None = None) -> str:
     return _with_dbname(dsn or supply_db.supply_db_dsn(), name)
 
 
+def recorded_anchor(cp: Checkpoint, dsn: str | None = None):
+    """The anchor recorded for the history `cp` copied (REQ-GEN-404 criterion
+    6) - qa.history_anchor in the checkpoint's own database, which the
+    bootstrap wrote before its first run - or None."""
+    from qa_tools.common import qa_store
+
+    with supply_db.connect(dsn=_with_dbname(dsn or supply_db.supply_db_dsn(), cp.name),
+                           read_only=True, label="mothman:checkpoints") as conn:
+        return qa_store.history_anchor(conn)
+
+
 def snapped(arrivals: list, before: int) -> int:
     """`before`, moved back to where its group begins - a delivery's files
     are staged together and a zip's are filed together (arrival_lifecycle.

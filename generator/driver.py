@@ -57,6 +57,56 @@ def bookkeeping_path():
     return assets.data_path(delivery.BOOKKEEPING_FILE)
 
 
+def anchor_path():
+    """The one-line anchor file beside the delivery tree (REQ-GEN-404 criterion
+    3) - redirected with the other three (generator/output.py)."""
+    from asset_model import history_anchor
+
+    return assets.data_path(history_anchor.FILE)
+
+
+#: The bookkeeping's key for the anchor the history was generated at
+#: (REQ-GEN-404 criterion 3) - not a dataset id, so every reader iterating the
+#: datasets' entries skips it (`dataset_keys`).
+ANCHOR_KEY = "_anchor"
+
+
+def dataset_keys(book: dict) -> list[str]:
+    """The bookkeeping's dataset keys - everything but its anchor."""
+    return [k for k in book if k != ANCHOR_KEY]
+
+
+def recorded_anchor():
+    """The anchor the bookkeeping records for the history on disk, or None -
+    the generator's own reader (a resume, REQ-GEN-404 criterion 6)."""
+    from datetime import date
+
+    path = bookkeeping_path()
+    if not path.exists():
+        return None
+    with open(path) as f:
+        found = json.load(f).get(ANCHOR_KEY)
+    return date.fromisoformat(found) if found else None
+
+
+def record_anchor(anchor) -> None:
+    """The anchor this generation used, from one value, in the generator's two
+    records (REQ-GEN-404 criterion 3): its bookkeeping and the anchor file. The
+    bootstrap writes the third, the qa schema's."""
+    from asset_model import history_anchor
+
+    path = bookkeeping_path()
+    book = {}
+    if path.exists():
+        with open(path) as f:
+            book = json.load(f)
+    book[ANCHOR_KEY] = anchor.isoformat()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(book, f, indent=2)
+    history_anchor.write(anchor, anchor_path())
+
+
 def write_bookkeeping(key: str, manifest: list[dict]) -> None:
     """The generator's own record, OUTSIDE every delivery (REQ-GEN-043
     criterion 6), under the provider's bookkeeping key.
@@ -135,7 +185,8 @@ def no_instant_shared_with_another_collection(key, manifest: list[dict]) -> None
         book = json.load(f)
     own = {key} if isinstance(key, str) else set(key)
     theirs: dict = {}
-    for other, entries in book.items():
+    for other in dataset_keys(book):
+        entries = book[other]
         if other in own:
             continue
         for e in entries:
@@ -169,10 +220,13 @@ def generate(collection_id: str) -> list[dict]:
 
 
 def _generate(collection_id: str) -> list[dict]:
-    from generator import collections, delivery_names, scenario_injection
+    from generator import anchor_date, collections, delivery_names, scenario_injection
     from generator.resupply import MAX_ATTEMPTS
     from asset_model import arrivals
 
+    # THE ANCHOR, ONE VALUE (REQ-GEN-404 criteria 1 and 3): the one installed
+    # for this generation, recorded at the end from this same value.
+    anchor = anchor_date.get_anchor_date()
     provider = collections.provider(collection_id)
     # 1. BEFORE THE FIRST WRITE. A scenario naming a dataset no provider
     # makes would otherwise be skipped without a word (criterion 8).
@@ -284,6 +338,7 @@ def _generate(collection_id: str) -> list[dict]:
             table = _h.dataset(d).table
             write_bookkeeping(d, [e for e in by_stream[st.name]
                                   if table in (e.get("row_counts") or {})])
+    record_anchor(anchor)
     if plan.resolved:
         placed = [placement for _, placement in plan.resolved]
         recognised = arrivals.arrivals_for(collection_id, provider.run_prefix,

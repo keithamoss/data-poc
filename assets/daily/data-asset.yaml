@@ -162,25 +162,25 @@ amber_setting:
     # TWO DAYS EARLIER FOR TS-78 (REQ-GEN-199; Keith, 2026-10-13): a version
     # ADDED beside the frozen 2026-09-01 one, never an edit of it. The
     # 2026-09-01 version below still says hold, so the era runs unbroken.
-    - effective_from: "2026-08-30"
+    - effective_from: !anchor -26
       value: hold
       changelog:
         - date: "2026-10-13"
           author: Keith (REQ-GEN-199)
           change: "synthetic era starts two days earlier - amber waits for a person from 30 August, so TS-78's two held supplies fall inside it."
-    - effective_from: "2026-09-01"
+    - effective_from: !anchor -24
       value: hold
       changelog:
         - date: "2026-09-01"
           author: not recorded - converted from a plain-string entry by REQ-PIPE-112
           change: "synthetic era - amber waits for a person (TS-43, parked; the era's own amber supplies show it)."
-    - effective_from: "2026-09-10"
+    - effective_from: !anchor -15
       value: promote-and-acknowledge
       changelog:
         - date: "2026-09-10"
           author: not recorded - converted from a plain-string entry by REQ-PIPE-112
           change: "synthetic era - amber promotes and asks for an acknowledgement (TS-44 and TS-45, parked; the era's own amber supplies show it)."
-    - effective_from: "2026-09-18"
+    - effective_from: !anchor -7
       value: promote
       changelog:
         - date: "2026-09-18"
@@ -213,13 +213,13 @@ replacement_setting:
           change: "a filled slot waits for a person - unchanged from before the setting existed (REQ-PIPE-075 criterion 4)."
     # SYNTHETIC ERA (REQ-GEN-136 criteria 7, 14 and 15): a green resend replaces
     # the promoted supply for four days, then never again.
-    - effective_from: "2026-09-18"
+    - effective_from: !anchor -7
       value: green
       changelog:
         - date: "2026-09-18"
           author: not recorded - converted from a plain-string entry by REQ-PIPE-112
           change: "synthetic era - a green resupply replaces the promoted supply (TS-46, parked; the era's own resends show it)."
-    - effective_from: "2026-09-22"
+    - effective_from: !anchor -3
       value: never
       changelog:
         - date: "2026-09-22"

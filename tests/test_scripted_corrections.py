@@ -247,6 +247,10 @@ class TestAResumeConfirmsAsABootstrapDoes:
                                  readable=True, arrivals=[SimpleNamespace(run_id="r")]))
         monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
         monkeypatch.setattr(checkpoints, "find", lambda name: cp)
+        from asset_model import history_anchor
+
+        monkeypatch.setattr(checkpoints, "recorded_anchor",
+                            lambda c: history_anchor.FIXED_TEST_ANCHOR)
         monkeypatch.setattr(checkpoints, "copy_for_resume",
                             lambda c: "postgresql://u:p@localhost:5432/resumed")
         monkeypatch.setattr(replay_inputs, "first_affected",

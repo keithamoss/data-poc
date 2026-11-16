@@ -6156,23 +6156,6 @@ could never have computed it), and it belongs with batch 5's check work.
      148/177/387, hierarchy.py 112/143/293 -> 107/97/239; all four
      947/1097/2314 -> 923/948/2131. Groups B, C and D and the
      duplicate-table sighting are untouched, waiting on the scoper.
-138. **[todo, 2026-11-03]** **[Data generation]** **A rolling anchor date
-     for the synthetic data.** Keith, 2026-11-03, answering morning report 12
-     question 4: the demo data is generated up to a fixed ANCHOR_DATE
-     (2026-09-25, REQ-GEN-042), so once the real date passes a quarterly round
-     the "current" period has no supply and the dashboard goes quiet - which
-     is what broke three browser tests overnight. He chose "make it rolling"
-     over a one-off bump. To scope before building: everything is seeded, so
-     a regenerated history is byte-identical today, and REQ-TEST-239's
-     equivalence compare and the bootstrap cache key both rely on that; a
-     rolling anchor needs either the anchor recorded as an input (so the same
-     anchor reproduces the same bytes) or a rounding rule (e.g. the start of
-     the current week) so it moves rarely. Also: what a test should use as
-     "today", and how CI's cache behaves when the anchor rolls.
-     **SCOPED AND SIGNED 2026-11-14 (Keith, "Sign all 15")** as speed-anchor
-     v2 (REQ-GEN-404 to REQ-GEN-408, REQ-DASH-407; docs/drafts/speed-anchor-v2.yaml, answers in
-     docs/drafts/decisions-2026-11-01.md). Not built; this entry's prose comes
-     out when they are.
 
 139. **[todo, 2026-11-03]** **[Testing & dev tooling]** **Pytest's session
      temp folders filled the sandbox disk.** Found 2026-11-03 when the browser

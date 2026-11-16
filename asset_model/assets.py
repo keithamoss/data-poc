@@ -299,27 +299,31 @@ def handoff() -> tuple:
     pinned instant is MOTHMAN_PINNED_NOW, which a spawned process inherits with
     the environment, and a replay clock is installed by each stream process
     around its own replay, since a clock anchored on this process's monotonic
-    time means nothing in another. The rolling anchor (REQ-GEN-404) is not
-    built, so nothing of it is handed yet."""
-    from asset_model import arrivals, config_pin
+    time means nothing in another. THE INSTALLED ANCHOR IS HANDED TOO
+    (REQ-GEN-404 criterion 10, REQ-PIPE-397 criterion 12), so a provider
+    called in a started process generates for the run's anchor."""
+    from asset_model import arrivals, config_pin, history_anchor
 
     return (selected().name, _describe(_layout), config_pin.installed(),
-            arrivals.installed_tree())
+            arrivals.installed_tree(), history_anchor.installed())
 
 
-def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None) -> Asset:
+def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None,
+          anchor=None) -> Asset:
     """A started process's first act: take the layout and the asset it was
     handed (`handoff()`), select the asset - refused as `select` refuses - pin
     the configuration snapshot it was handed, verified against its digest
     (REQ-PIPE-397 criterion 12), and hold the delivery-tree snapshot it was
-    handed (REQ-PIPE-430) - or neither, if it was handed neither."""
+    handed (REQ-PIPE-430) - or neither, if it was handed neither - and install
+    the history's anchor it was handed (REQ-GEN-404 criterion 10)."""
     global _layout
     _layout = _rebuild(layout)
     asset = select(name)
-    from asset_model import arrivals, config_pin
+    from asset_model import arrivals, config_pin, history_anchor
 
     config_pin.adopt(snapshot)
     arrivals.adopt_tree(tree)
+    history_anchor.adopt(anchor)
     return asset
 
 

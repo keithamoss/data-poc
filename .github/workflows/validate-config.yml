@@ -93,6 +93,12 @@ jobs:
       # falls back to HEAD~1.
       MOTHMAN_DIFF_BASE: ${{ github.event.before }}
       MOTHMAN_ASSET: ${{ matrix.asset }}
+      # A RUNNER IS `ci` (assets/environments.yaml), and saying so is what lets
+      # the daily leg read its offset dates (REQ-GEN-406): a fresh checkout has
+      # no data/ and so no anchor file, and only test and ci resolve offsets
+      # against the fixed test anchor without one (REQ-GEN-404 criterion 12;
+      # post-build-review #433).
+      MOTHMAN_ENVIRONMENT: ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4

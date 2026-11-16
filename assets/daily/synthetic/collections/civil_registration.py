@@ -200,8 +200,8 @@ def run_plan() -> list[tuple[int, str | None]]:
     """RUN_PLAN, drawn on first use (criterion 7)."""
     return _build_run_plan(N_DELIVERIES, _RUN_PLAN_SEED)
 
-# Rolling window ending on the anchor date ("today" by default, pinnable
-# via GENERATOR_ANCHOR_DATE - see anchor_date.py) rather than a fixed
+# Rolling window ending on the anchor date (the one the generation was given,
+# REQ-GEN-404 - see anchor_date.py) rather than a fixed
 # calendar date - the fixed 2026-09-01 this used to be drifted further
 # from real "now" every day, which is exactly why the Soda [recent] filter
 # and the dbt/contract freshness checks on date_of_birth always resolved

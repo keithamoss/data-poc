@@ -1238,11 +1238,15 @@ def _registered():
     which is what lets the command modules build their options with nothing
     of any asset read (REQ-PIPE-363 criterion 2)."""
     from asset_model import collections as declared_collections
-    from asset_model import assets
+    from asset_model import assets, history_anchor
 
     if assets.selected_or_none() is None:
         return []
-    return declared_collections.all_collections()
+    # WHICH COLLECTIONS EXIST IS STRUCTURE (post-build-review #432): help, a
+    # picker and an option's validation read it before any command has settled
+    # an anchor, so it is read with no framing date needed.
+    with history_anchor.structure_only():
+        return declared_collections.all_collections()
 
 
 def many_collections() -> bool:

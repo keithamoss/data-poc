@@ -264,14 +264,14 @@ def _add_quarters(d: date, n: int) -> date:
     return date(year, month, 1)
 
 
-# Rolling window ending on the anchor date ("today" by default, pinnable
-# via GENERATOR_ANCHOR_DATE - see anchor_date.py), same fix and rationale
-# as civil_registration.py's own START_DATE - un-stales the fixture generally
-# (plans/qa-pipeline.md #3's follow-up covers both). No wall-clock-
-# relative check depends on CP's dates today, unlike BDM's, but there's
-# no reason to leave CP's snapshots drifting stale either.
-_anchor = get_anchor_date()
-START_DATE = _add_quarters(_quarter_start(_anchor), -(N_QUARTERS - 1))
+# THE ANCHOR IS READ AT CALL TIME (REQ-GEN-404 criterion 2): this used to be a
+# module-level `_anchor = get_anchor_date()` and START_DATE, read once at
+# import, so a provider imported before a generation installed its anchor
+# generated for the wrong date. A function now, as every other provider's.
+def start_date() -> date:
+    """The first quarter of the 15-quarter run plan's window, ending on the
+    anchor's quarter."""
+    return _add_quarters(_quarter_start(get_anchor_date()), -(N_QUARTERS - 1))
 
 
 def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str | None, seed: int) -> pd.DataFrame:

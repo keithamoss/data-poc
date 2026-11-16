@@ -91,6 +91,9 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
     # 6): a key no provider makes is refused by name, where it used to be
     # read as Child Protection's. The collections that trial their targets
     # first, as before, then the rest in the order they were written.
+    from generator import driver
+
+    book = {k: book[k] for k in driver.dataset_keys(book)}
     owners = {}
     for key in book:
         try:

@@ -310,7 +310,16 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
     name = collection_cli.label(coll)
     me = lambda: collection_cli.of(coll.id)  # noqa: E731 - resolved when the command runs
 
-    def generate(yes: bool, skip_target_trial: bool = False) -> None:
+    def generate(yes: bool, skip_target_trial: bool = False, anchor: str | None = None) -> None:
+        from asset_model import history_anchor
+
+        # STARTS WITHOUT AN ANCHOR FILE (post-build-review #432): what comes
+        # before the generation reads configuration for its structure only, and
+        # the generation installs the anchor it uses.
+        with history_anchor.structure_only():
+            _generate(yes, skip_target_trial, anchor)
+
+    def _generate(yes: bool, skip_target_trial: bool, anchor: str | None) -> None:
         from cli import common
 
         refuse_a_broken_adapter(coll)
@@ -320,10 +329,18 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                 "Continue?", yes=yes, default=True):
             console.print("Not regenerated.", style="yellow")
             return
-        cli_.generate_synthetic_data(trial=with_target_trial and not skip_target_trial)
+        cli_.generate_synthetic_data(trial=with_target_trial and not skip_target_trial,
+                                     anchor=anchor)
         console.print(f"Generated -> {cli_.generated_output_dir()}", style="green")
 
     generate = click.option("--yes", is_flag=True, help="Skip the overwrite confirmation.")(generate)
+    # REQ-GEN-404 criterion 5: the anchor, default the fixed test anchor.
+    generate = click.option(
+        "--anchor", default=None, metavar="YYYY-MM-DD",
+        help="Generate up to this date rather than the fixed test anchor (2026-09-25). "
+             "Refused unless it matches the anchor of the asset's current history - "
+             "`mothman env reset-synthetic` then `mothman pipeline bootstrap --anchor` "
+             "replaces a history.")(generate)
     if with_target_trial:
         # OFFERED ONLY WHERE THE PROVIDER DECLARES A TRIAL (criterion 4).
         generate = click.option(

@@ -687,11 +687,14 @@ held from the original equivalent-only build.
   `extract_timestamp` instead). **Fixed** (2026-09-14, see `plans/qa-
   pipeline.md` #3): the fixture's dates used to be pinned to a fixed
   calendar range, so this scope resolved to 0 rows on every run once real
-  time had drifted away from it — `generator/anchor_date.py` now anchors
-  every generated run's dates to a rolling window ending "today" (real
-  wall-clock by default, pinnable via `GENERATOR_ANCHOR_DATE` for
-  reproducible verification runs), so this check has real data to filter
-  and genuinely passes or fails depending on it.
+  time had drifted away from it — every generated run's dates now end on
+  the history's ANCHOR (`generator/anchor_date.py`, REQ-GEN-404): the fixed
+  test anchor, 2026-09-25, unless a demo regeneration asks for another with
+  `mothman pipeline bootstrap --roll-anchor` (today on the asset's clock) or
+  `--anchor YYYY-MM-DD` (that date, byte for byte the same history again).
+  The date used is recorded with the history. Regenerating the demo is a
+  deliberate `mothman env reset-synthetic` then `mothman pipeline bootstrap
+  --roll-anchor`, so this check has recent data to filter.
 - **The newer freshness / relative-date check shares that same real-
   wall-clock property, deliberately.** Unlike the `[recent]` filter above,
   this one (contract + Soda + dbt, `date_of_birth`) is genuinely useful
