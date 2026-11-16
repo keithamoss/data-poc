@@ -108,9 +108,10 @@ class TestAStreamsPlayerSpansItsCollections:
 
 
 @pytest.fixture(scope="module")
-def corpus(tmp_path_factory):
+def corpus(tmp_path_factory, daily_history):
     root = tmp_path_factory.mktemp("plays_scripted_corpus")
-    entries = support.corpus(root, "civil-registration", "birth-registrations", 2)
+    entries = support.corpus(root, "civil-registration", "birth-registrations", 2,
+                             daily_history)
     return root, support.scripted("birth-registrations", entries[0]["period"])
 
 

@@ -225,6 +225,13 @@ releases:
               once, and the replay reads that. If the tree changes while it
               runs - a hand filing, or a generation in another terminal - the
               bootstrap fails and says how to start again.
+          - headline: Test data generated once
+            components: ["Testing & dev tooling"]
+            description: >
+              Tests that read a generated history now share one per asset,
+              built once a run and kept between runs until the generator
+              changes. A test that tries to write into it fails, naming the
+              file.
   - date: "2026-11-15"
     summary: >
       New checks keep the code's boundaries, the two assets' dbt packages and

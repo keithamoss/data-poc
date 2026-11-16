@@ -235,8 +235,15 @@ class TestARefusalChangesNothing:
     dropped."""
 
     @pytest.fixture
-    def no_generating(self, monkeypatch):
+    def no_generating(self, monkeypatch, quarterly_history):
+        """Nothing regenerated: the CLI's generation refuses, and the arrival
+        numbering a checkpoint is checked against is read from the suite's
+        shared history rather than regenerated per test (REQ-TEST-402) - the
+        subject here is the refusal, not the regeneration."""
+        import shared_history
         from cli.collection_cli import of as _cli_of
+
+        shared_history.answer_regenerations(quarterly_history, monkeypatch)
 
         def refuse(**_):
             raise AssertionError("the synthetic data was regenerated before the refusal")

@@ -3,16 +3,10 @@ fast, seeded, and this repo's convention throughout has been to verify by
 actually running things rather than mocking) and checks the resulting
 manifest has the shape everything downstream depends on.
 
-The real generation itself (driver.generate("civil-registration") - writes BDM's full real
-120-delivery/176-run manifest + every real CSV to a real directory) happens
-ONCE per test session (`manifest` fixture below, module-scoped - deliberately
-NOT a plain module-level call, since pytest needs a real fixture to share
-one real generation run across every test function in this file rather
-than each one triggering its own ~9s regeneration of identical,
-deterministic output - a real, measured ~43s/test-session win found
-2026-09-18 while investigating why the local suite felt slow, not a
-theoretical one). Every test below reads that one shared, real result -
-none of them mutate it, so sharing is safe.
+The real generation itself is the suite's SHARED daily history since
+REQ-TEST-402 (tests/shared_history.py): generated once per run - or restored
+from its cache - at the fixed test anchor, and read-only. Every test below
+reads it except the two whose subject is generation itself, which say so.
 
 Isolated from the real production data/raw/ since 2026-09-18 (Keith's own
 explicit call: "fix the issue where tests and production share an output
@@ -39,26 +33,14 @@ from generator import driver
 
 
 @pytest.fixture(scope="module")
-def raw_dir(tmp_path_factory):
-    """Points every one of generate_runs' outputs at a real tmp dir for
-    the duration of this module's tests, instead of the repo's own
-    data/raw/ (and, since REQ-GEN-043, data/deliveries/, data/receipts/
-    and data/generator_bookkeeping.json - see tests/generator_isolation.py
-    and the regression test at the bottom of this file) - running
-    this test file used to mutate the SAME directory ./run_pipeline.sh
-    and qa_tools.tools.orchestrate read from/write to for real, purely
-    as a side effect of testing (harmless in outcome, since generation
-    is fully deterministic, but a real coupling between test execution
-    and production state that shouldn't exist). Each output is a plain
-    module global driver.generate("civil-registration") reads at call time (not captured
-    into a default arg), so reassigning them here works - module-scoped,
-    not the standard function-scoped `monkeypatch` fixture, which can't
-    be depended on from a module-scoped fixture (a real ScopeMismatch),
-    hence the manual save/restore instead."""
-    root = tmp_path_factory.mktemp("bdm_gen")
-    restore = generator_isolation.redirect(root)
-    yield Path(driver.deliveries_dir())
-    restore()
+def raw_dir(daily_history):
+    """The generator's own call-time paths pointed at the suite's SHARED,
+    read-only daily history for this module (REQ-TEST-402) - generated once
+    per run at the fixed test anchor, never in this module, and never the
+    repo's own data/. Module-scoped, hence the context manager rather than
+    the function-scoped `monkeypatch`."""
+    with daily_history.as_generator_output():
+        yield Path(driver.deliveries_dir())
 
 
 @pytest.fixture(scope="module")
@@ -69,23 +51,14 @@ def deliveries_dir(raw_dir):
 
 
 @pytest.fixture(scope="module")
-def real_data_before(raw_dir):
-    """The supply-shaped files under the REAL data/ before this module
-    generates anything, so the generator's writes outside its redirected
-    root can be seen afterwards."""
-    return generator_isolation.supply_files_under_data()
-
-
-@pytest.fixture(scope="module")
-def manifest(raw_dir, real_data_before):
+def manifest(daily_history):
     """This generator's own BOOKKEEPING, which is the only place it is
     written now (REQ-GEN-043) - data/{raw,cp_raw}/manifest.json held a
     second copy of exactly this list and is retired. Still called
     `manifest` because every test below reads it as "the list of what
-    was generated", which is what it is."""
-    driver.generate("civil-registration")
-    with open(driver.bookkeeping_path()) as f:
-        return json.load(f)[generate_runs.DATASET_ID]
+    was generated", which is what it is. Read from the shared history
+    (REQ-TEST-402)."""
+    return daily_history.book()[generate_runs.DATASET_ID]
 
 
 
@@ -243,23 +216,25 @@ def test_deliveries_in_one_slot_advance_in_time(manifest):
             f"{slot_id}: deliveries disagree about which period they are for"
 
 
-def test_the_generator_writes_a_delivery_and_nothing_beside_it(manifest, raw_dir, real_data_before):
+def test_the_generator_writes_a_delivery_and_nothing_beside_it(manifest, raw_dir):
     """REQ-PIPE-102 criterion 2, by what generation leaves behind. The
     generator used to write each run as a flat CSV (data/raw/ or
     data/cp_raw/) AS WELL AS a real delivery. Its output root now holds
     the delivery tree, its receipts and the bookkeeping - and the
     scenario placements, which scenario_injection writes at the end of a
-    run - and the real data/ tree gains no supply file at all."""
+    run. That the real data/ tree gains no file at all is asserted by the
+    two generations below, which are this module's tests whose subject is
+    generation itself; this one reads the shared history, whose root also
+    holds the cache's own two files (tests/shared_history.py)."""
+    import shared_history
+
     root = raw_dir.parent
-    written = {p.name for p in root.iterdir()}
+    written = {p.name for p in root.iterdir()} - shared_history._CACHE_FILES
     assert {"deliveries", "receipts", "generator_bookkeeping.json"} <= written, \
         f"the generator did not write a delivery, its receipts and its bookkeeping: {sorted(written)}"
     assert list((root / "deliveries").iterdir()), "no delivery was generated at all"
     beside = written - generator_isolation.GENERATOR_OUTPUTS
     assert not beside, f"the generator wrote something beside the delivery: {sorted(beside)}"
-    elsewhere = generator_isolation.supply_files_under_data() - real_data_before
-    assert not elsewhere, \
-        f"the generator wrote a supply file into the real data/ tree: {sorted(map(str, elsewhere))}"
 
 
 def test_no_run_id_carries_a_date(manifest):
@@ -268,6 +243,20 @@ def test_no_run_id_carries_a_date(manifest):
     for e in manifest:
         assert not re.search(r"\d{4}-\d{2}-\d{2}", e["run_id"]), \
             f"{e['run_id']} still carries a date"
+
+
+def _real_data_files() -> tuple[Path, Path]:
+    """The selected asset's REAL scenario placements and anchor file under the
+    checkout's data/<asset>/ - read from the asset itself, never from the
+    generator's call-time getters, which a module fixture may have redirected
+    (post-build-review #468)."""
+    from asset_model import assets, history_anchor
+    from qa_tools.common import scenario_map
+
+    real = (assets.data_path(scenario_map.PLACEMENTS_FILE), assets.data_path(history_anchor.FILE))
+    for path in real:
+        assert generator_isolation.DATA_DIR.resolve() in path.resolve().parents, path
+    return real
 
 
 def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
@@ -286,6 +275,9 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     back identical and nothing ever noticed - but a run interrupted
     mid-write leaves the real tree half-deleted, and identical bytes
     are not the same thing as not having written them.
+
+    ITS SUBJECT IS GENERATION ITSELF, so it generates a history of its own
+    rather than reading the shared one (REQ-TEST-402 criterion 7).
 
     Fingerprints the real tree, generates into tmp with every output
     redirected, and requires the real one to be untouched - including
@@ -331,13 +323,25 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # truncated.
     from generator import scenario_injection
 
-    placements_before = (scenario_injection.placements_path().read_bytes()
-                          if scenario_injection.placements_path().exists() else None)
+    # THE REAL PATHS, FROM THE ASSET'S OWN DATA FOLDER (post-build-review
+    # #461, #468) - never through placements_path()/anchor_path(), which in a
+    # whole-module run the module's raw_dir fixture has already pointed at
+    # the shared history, so "the real file" would be the shared one.
+    real_placements, real_anchor = _real_data_files()
+    placements_before = (real_placements.read_bytes() if real_placements.exists() else None)
+
+    # THE ANCHOR FILE TOO (REQ-GEN-404 criterion 3, post-build-review #460): a
+    # generation writes data/<asset>/history_anchor beside the tree, and this
+    # test's redirects once missed it - so run alone it rewrote the checkout's
+    # real anchor file, a rolled demo's included.
+    anchor_before = ((real_anchor.stat().st_mtime_ns, real_anchor.read_bytes())
+                     if real_anchor.exists() else None)
 
     monkeypatch.setattr(driver, "deliveries_dir", fixed(tmp_path / "deliveries"))
     monkeypatch.setattr(driver, "receipts_dir", fixed(tmp_path / "receipts"))
     monkeypatch.setattr(driver, "bookkeeping_path", fixed(tmp_path / "bookkeeping.json"))
     monkeypatch.setattr(scenario_injection, "placements_path", fixed(tmp_path / "scenario_placements.json"))
+    monkeypatch.setattr(driver, "anchor_path", fixed(tmp_path / "history_anchor"))
 
     driver.generate("civil-registration")
 
@@ -348,10 +352,12 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.bookkeeping_path().read_bytes()
             if delivery.bookkeeping_path().exists() else None) == book_before
-    assert (scenario_injection.placements_path().read_bytes()
-            if scenario_injection.placements_path().exists() else None) \
+    assert (real_placements.read_bytes() if real_placements.exists() else None) \
         == placements_before, (
             "the real scenario_placements.json was written to by a test run")
+    assert ((real_anchor.stat().st_mtime_ns, real_anchor.read_bytes())
+            if real_anchor.exists() else None) == anchor_before, \
+        "the real history_anchor file was written to by a test run"
 
 
 def test_a_redirected_generation_writes_nothing_under_the_real_data_tree(tmp_path):
@@ -361,7 +367,10 @@ def test_a_redirected_generation_writes_nothing_under_the_real_data_tree(tmp_pat
     the placements with the other three outputs, and this passed when first
     run - but nothing asserted it of EVERY file under the real data/, only
     of the four outputs by name. A fifth output added later would write the
-    real tree with every named check still green; this one would not."""
+    real tree with every named check still green; this one would not.
+
+    ITS SUBJECT IS GENERATION ITSELF, so it generates a history of its own
+    rather than reading the shared one (REQ-TEST-402 criterion 7)."""
     from generator.output import redirect
 
     def snapshot():

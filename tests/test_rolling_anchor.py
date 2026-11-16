@@ -1,6 +1,11 @@
 """The rolling anchor at the bootstrap, the generate command, the reset and
 `mothman env current` (REQ-GEN-404, REQ-GEN-405, REQ-GEN-408, REQ-DASH-407;
-signed by Keith 2026-11-14 as speed-anchor v2)."""
+signed by Keith 2026-11-14 as speed-anchor v2).
+
+ITS SUBJECT IS GENERATION ITSELF, so the tests here that generate a history
+generate their own rather than reading the suite's shared one (REQ-TEST-402
+criterion 7) - a generation at a given anchor, and a
+dry build, are what these tests are about."""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone

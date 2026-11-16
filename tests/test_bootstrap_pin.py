@@ -165,32 +165,15 @@ class TestTheReplayReadsThePinnedConfiguration:
 # ---- a real replay with the calendar edited part-way (criterion 7) ------------
 
 @pytest.fixture(scope="module")
-def three_arrivals(tmp_path_factory) -> Path:
-    """Birth Registrations' first three arrivals, generated for real into a
-    tree of the module's own and cut down to them."""
-    import contextlib
-    import io
-    import shutil
-    import warnings
-
-    from generator import driver, output
-
-    whole = tmp_path_factory.mktemp("whole")
-    undo = output.redirect(whole)
-    try:
-        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            driver.generate("civil-registration")
-            first = arrivals.recognise_arrivals("civil-registration", "", whole / "deliveries",
-                                                whole / "receipts")[:3]
-    finally:
-        undo()
-    cut = tmp_path_factory.mktemp("cut")
-    for name in {a.delivery_name for a in first}:
-        shutil.copytree(whole / "deliveries" / name, cut / "deliveries" / name)
-        shutil.copytree(whole / "receipts" / name, cut / "receipts" / name)
-    shutil.rmtree(whole)
-    return cut
+def three_arrivals(tmp_path_factory, daily_history) -> Path:
+    """Birth Registrations' first three arrivals, cut from the suite's shared
+    history (REQ-TEST-402) into a tree of the module's own."""
+    first = arrivals.recognise_arrivals("civil-registration", "", daily_history.deliveries,
+                                        daily_history.receipts)[:3]
+    assert len(first) == 3
+    cut = daily_history.copy_to(tmp_path_factory.mktemp("cut") / "history",
+                                only={a.delivery_name for a in first})
+    return cut.root
 
 
 def _replayed(tree: Path, monkeypatch, *, edit=None, edit_before=False) -> dict:

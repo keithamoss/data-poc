@@ -35,30 +35,19 @@ from unittest.mock import MagicMock
 import pytest
 
 import equiv_support
-from generator import driver
 
 RUN_ID = "run_001"
 COMPARED = ("qa.filing", "qa.decision", "qa.check_result")
 
 
 @pytest.fixture(scope="module")
-def corpus(tmp_path_factory):
-    """The real Birth Registrations generator's output, cut to its first
-    delivery."""
-    import generator_isolation
-
-    root = tmp_path_factory.mktemp("kept_routes")
-    undo = generator_isolation.redirect(root)
-    try:
-        driver.generate("civil-registration")
-    finally:
-        undo()
-    book = json.loads((root / "generator_bookkeeping.json").read_text())
-    [first] = [e["delivery"] for e in book["birth-registrations"] if e["run_id"] == RUN_ID]
-    for tree in ("deliveries", "receipts"):
-        for d in (root / tree).iterdir():
-            if d.name != first:
-                shutil.rmtree(d)
+def corpus(tmp_path_factory, daily_history):
+    """The real Birth Registrations history, cut to its first delivery - a
+    copy of just that one, from the suite's shared history (REQ-TEST-402)."""
+    [first] = [e["delivery"] for e in daily_history.book()["birth-registrations"]
+               if e["run_id"] == RUN_ID]
+    root = daily_history.copy_to(tmp_path_factory.mktemp("kept_routes") / "history",
+                                 only={first}).root
     return root, first
 
 

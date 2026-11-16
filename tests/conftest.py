@@ -804,6 +804,45 @@ def _no_test_files_a_real_delivery():
         delivery.remove_deliveries = real_remove
 
 
+# EACH ASSET'S SYNTHETIC HISTORY, GENERATED ONCE AND SHARED (REQ-TEST-402):
+# built once per run across every worker, or restored from .test-history/ by
+# its inputs' key, at the fixed test anchor - see tests/shared_history.py. A
+# test that only READS a generated history requests its asset's fixture; one
+# that must change it takes `history.copy_to(tmp_path)`.
+@pytest.fixture(scope="session", autouse=True)
+def _no_test_writes_a_shared_history(_no_test_files_a_real_delivery):
+    """Every writer of a history refuses the shared one, naming the file
+    (REQ-TEST-402 criterion 5). Installed after, and so removed before, the
+    real-tree guard above, which wraps two of the same writers."""
+    import shared_history
+
+    restore = shared_history.guard_writers()
+    try:
+        yield
+    finally:
+        restore()
+
+
+def _shared_history(asset: str):
+    import shared_history
+
+    yield from shared_history.session(asset, fail=pytest.fail)
+
+
+@pytest.fixture(scope="session")
+def daily_history(_no_test_writes_a_shared_history):
+    """The daily asset's generated history (REQ-TEST-402 criterion 2) - a
+    shared_history.History, read-only."""
+    yield from _shared_history("daily")
+
+
+@pytest.fixture(scope="session")
+def quarterly_history(_no_test_writes_a_shared_history):
+    """The quarterly asset's generated history (REQ-TEST-402 criterion 2) - a
+    shared_history.History, read-only."""
+    yield from _shared_history("quarterly")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _committed_history_is_off_limits(tmp_path_factory):
     """No test writes into this repo's committed history trees.

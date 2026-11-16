@@ -107,6 +107,8 @@ class TestTheClaimIsChecked:
 
 
 def test_the_driver_refuses_before_it_writes(monkeypatch, tmp_path):
+    """ITS SUBJECT IS GENERATION ITSELF - a generation refused before its first
+    write - so it calls the driver (REQ-TEST-402 criterion 7)."""
     from generator import driver
 
     def refuse(*_a, **_k):

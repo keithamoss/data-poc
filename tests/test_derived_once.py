@@ -78,6 +78,8 @@ class TestEachIsWorkedOutOncePerArgumentSet:
     """Criterion 1, in one pinned generation of a test asset."""
 
     def test_a_pinned_generation_works_each_out_once(self, counted, tmp_path):
+        """ITS SUBJECT IS GENERATION ITSELF - what one pinned generation works
+        out - so it generates (REQ-TEST-402 criterion 7)."""
         from generator import driver, output
 
         undo = output.redirect(tmp_path / "out")

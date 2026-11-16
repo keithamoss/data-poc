@@ -74,3 +74,8 @@ _site/
 
 # REQ-TEST-117: the CI bootstrap cache lives in GitHub's cache, never here.
 ci-cache/
+
+# REQ-TEST-402: each asset's synthetic history, generated once for the test
+# suite and cached here by its inputs' key (tests/shared_history.py). Never
+# under data/, which everything that recognises arrivals reads.
+.test-history/

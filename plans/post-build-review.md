@@ -16413,3 +16413,173 @@ twice. It deliberately did not re-find the `TypeError`.
      resend's rows is not reproducible from the seed alone - which CLAUDE.md's
      "everything is seeded" relies on. Not investigated further here; worth a
      proper look before the next golden capture.
+
+460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
+     Found building REQ-TEST-402, by its own writer guard rather than by
+     looking. `test_generating_never_touches_the_real_delivery_tree` (in
+     tests/test_generate_runs.py and tests/test_generate_cp_runs.py) redirects
+     the generator's deliveries, receipts, bookkeeping and placements by hand,
+     but not `driver.anchor_path()` - the anchor file REQ-GEN-404 criterion 3
+     added beside the tree. Run as part of its whole module it was harmless:
+     the module's own redirect fixture was still in force, so the anchor went
+     to the module's scratch folder. Run alone (`-k`), or once the module
+     stopped generating a history of its own, the generation wrote
+     data/<asset>/history_anchor in the checkout - a rolled demo's anchor
+     overwritten with the fixed one, which the test then reported green.
+     - **Seen**: with REQ-TEST-402's shared history in place the guard refused
+       the write into the shared tree, naming the file; run alone on this
+       worktree, both tests rewrote data/daily/ and data/quarterly/history_anchor
+       (mtimes 10:00:34 and 10:01:20 UTC, same date in the file, so no harm here).
+     - **Fixed, test-first** (a defect in the test, minor, one obvious answer):
+       both tests now fingerprint the real anchor file before and after, which
+       failed on both (`the real history_anchor file was written to by a test
+       run`), and then redirect `anchor_path` too, after which both pass.
+     - **Flagged for Keith anyway**, because a rolled demo checkout is exactly
+       where it would have bitten: any test that redirects the generator's
+       outputs one by one rather than through `generator.output.redirect()`
+       misses the next output added. Only these two do it on purpose; both
+       now cover all five.
+
+461. **[done, 2026-11-16]** **[Testing & dev tooling]** **The Birth Registrations isolation test compared its placements file against itself.**
+     Same test as #460, tests/test_generate_runs.py only. It captured
+     `scenario_injection.placements_path()` before monkeypatching it, then
+     asked `placements_path()` again AFTER - so "after" read the test's own
+     tmp file, not the real one. It passed only because the module fixture
+     had redirected "before" to a generation byte-identical to the test's own.
+     The Child Protection twin already captured the real path once (#225).
+     - **Fixed** the same way as the twin: the real path is captured before
+       the redirect and compared after. Without the module-wide redirect (its
+       history now comes from the shared fixture) the old comparison failed
+       outright, which is how it was found.
+     - **CORRECTED by #468**: "the real path" above was not the real path. In
+       a whole-module run the module's `raw_dir` fixture is still in force when
+       this test starts, and it redirects `placements_path()` and
+       `anchor_path()` to the SHARED history - so both tests captured
+       `.test-history/` paths, and a generation writing the checkout's real
+       data/<asset>/ anchor or placements went unnoticed. Both now take the two
+       paths from the asset's own data folder; see #468.
+
+462. **[done, 2026-11-16]** **[Testing & dev tooling]** **A measurement run and a builder's own test runs shared one MOTHMAN_TEST_DB_TAG.**
+     Process finding, building REQ-TEST-402. The first "before" profile of the
+     no-deployment half (a 30-minute detached run) used tag `t402`, and so did
+     this build's own module runs started beside it: each session drops its
+     worker databases `WITH (FORCE)` when it starts, so they killed each
+     other's. That run ended 14 failed and 10 errors, every one a database
+     symptom (`qa already exists`, missing worker databases), and is kept only
+     as the pilot that found which tests generate. The before and after
+     figures in REQ-TEST-402's evidence come from a second pair run back to
+     back with no test run of this build's beside them.
+     - **Lesson, already CLAUDE.md's rule, applied one level down**: a
+       detached measurement run is a session of its own and needs its own tag,
+       even inside one builder.
+
+463. **[investigate, 2026-11-16]** **[Data generation]** **[Pipeline & publishing]** **A checkpoint regenerates the whole asset just to number its arrivals.**
+     SIGHTING, not a defect and not changed. `bootstrap.checkpoints.arrivals_of`
+     regenerates every collection of the asset into a temporary folder to
+     check an arrival number before anything is touched - about a minute on
+     the quarterly asset (Linkage Products alone ~30-45s on this sandbox),
+     every time `mothman pipeline bootstrap --checkpoint-before N` is asked,
+     including when it is then refused. In the pilot profile five
+     refusal tests spent 304s in it; REQ-TEST-402 now answers those tests
+     from the shared history (shared_history.answer_regenerations), but a
+     person asking for a checkpoint still waits the minute. Whether to cache
+     or narrow it is Keith's call; it would be a requirement of its own.
+
+464. **[done, 2026-11-16]** **[Testing & dev tooling]** **REQ-TEST-402's register claimed more than its evidence and dropped its follow-on work.**
+     Post-build critic, verified against requirements.yaml. Criterion 10 asks
+     for the slowest modules and classes of the FULL suite's after profile;
+     the evidence names them for the no-deployment half only, yet only
+     criteria 1 and 9 were in `unmet_criteria`. And the build deleted
+     plans/running-thoughts.md #136, whose remaining scope was "the test-time
+     audit itself", while the 30-minute target is not met - so the follow-on
+     work lived only as prose inside an evidence line.
+     - **Fixed** (register honesty, minor): criterion 10 added to
+       `unmet_criteria` beside 1 and 9, with the same honest owner - the
+       deployment half needs a profile allowed to use the deployment
+       databases, which waits on Keith - and `blocked_by: unowned`. The
+       follow-on is an `open_questions` entry on REQ-TEST-402 (the validator
+       accepts open questions on a built requirement; twenty others carry
+       them) naming the candidates: the six gate_support-driven modules
+       (about a third of the after run), test_door_flag_parity,
+       test_one_asset_beside_another, and the deployment half's browser
+       module. **For Keith to scope** - each changes which tests exist.
+
+465. **[done, 2026-11-16]** **[Testing & dev tooling]** **The shared-history cache key did not cover the build script.**
+     Post-build critic, verified. `shared_history.key()` was exactly
+     `replay_inputs.cache_key(asset, anchor=FIXED)`, whose digest covers the
+     generator and the asset's configuration but nothing under tests/ - and
+     the build script (`_BUILD`), the environment it runs in and an entry's
+     layout all live in tests/shared_history.py. Changing any of them restored
+     the history the OLD build made, contradicting the requirement's COST NFR.
+     - **Fixed, test-first** (a defect, low): `TestTheKey::
+       test_a_change_to_the_build_script_itself_misses` loads two copies of
+       the module, one with `_BUILD` edited, and requires different keys. RED
+       before the fix (`assert 'bootstrap-v6-daily-343ba6dc...' != 'bootstrap-
+       v6-daily-343ba6dc...'`), green after: the key is now the bootstrap key
+       plus `-build-<16 hex of sha256(tests/shared_history.py)>`. The existing
+       test that pinned key() to equal cache_key() now pins it as a prefix.
+       Rejected: adding tests/ to replay_inputs.INPUTS, which would move CI's
+       bootstrap cache on every test edit. Recorded in REQ-TEST-402's
+       `decisions:`. First run after it rebuilt both histories and pruned the
+       old two, as designed.
+
+466. **[done, 2026-11-16]** **[Testing & dev tooling]** **Pruning locked an old entry without the inode re-check acquire() uses.**
+     Post-build critic, verified. `_prune` opened and flocked the old lock
+     file directly, so a second pruner unlinking it between the open and the
+     lock left the first holding a lock on a file no longer at that path.
+     - **Fixed** (polish): `_prune` now goes through `_open_locked(..., LOCK_EX
+       | LOCK_NB)`, which re-checks the inode, and catches the
+       BlockingIOError it raises for a held lock. No test of its own - the
+       race needs two pruners interleaved at one syscall; the two existing
+       pruning tests pass on the changed path.
+
+467. **[done, 2026-11-16]** **[Testing & dev tooling]** **A worker waited forever for another's build, and a failing build was retried by every worker in turn.**
+     Post-build critic, verified. The `.build` lock was taken with a blocking
+     flock and no timeout, and after a failed build each waiting worker found
+     no entry and built again - four workers, four failed generations of
+     about a minute each, before the run said anything useful.
+     - **Fixed, test-first** (polish, with a test as the critic asked): two
+       tests in `TestAWaitingWorkerDoesNotWaitForever`, real processes as the
+       rest of the locking tests. RED before: the bounded-wait test's worker was
+       still waiting after 60s; three workers with a failing stand-in build
+       made 3 builds, not 1. Green after: the wait is bounded by
+       `BUILD_WAIT_SECONDS` (30 minutes; the test sets 2s) and fails naming
+       the `.build` file; a failure writes `<key>.failed` with the xdist run id
+       (`PYTEST_XDIST_TESTRUNUID`) and its message, and the run's other workers
+       fail at once quoting it. A third test proves a marker from an EARLIER
+       run is cleared and the build retried.
+
+468. **[done, 2026-11-16]** **[Testing & dev tooling]** **The generator isolation tests' "real" anchor and placements paths were the shared history's.**
+     Post-build critic, verified, and it corrects #461's write-up. In a
+     whole-module run `test_generating_never_touches_the_real_delivery_tree`
+     (both generator modules) starts with the module's `raw_dir` redirect
+     already in force, so `scenario_injection.placements_path()` and
+     `driver.anchor_path()` answered `.test-history/` paths, never
+     data/<asset>/'s. The CP module had also lost its check that no supply
+     file lands anywhere under the real data/, when REQ-TEST-402 moved the
+     module's generation onto the shared history.
+     - **Fixed, with a red check**: both tests now take the two paths from
+       the asset (`assets.data_path(...)`, asserted to be under the real
+       data/). Mutation check, each module run with
+       `-k "nothing_beside_it or never_touches"` so the redirect is active,
+       the anchor redirect changed to write the REAL data/<asset>/history_anchor:
+       the 6a400500 version PASSED (2 passed - the bug), the fixed version
+       FAILED (`the real history_anchor file was written to by a test run`),
+       for daily and quarterly alike. The real anchor files were restored from
+       a copy after each.
+     - **Restored** in test_generate_cp_runs: the `supply_files_under_data()`
+       before/after check (now inside the generation test, the one place it
+       generates), and a Child Protection twin of
+       `test_a_redirected_generation_writes_nothing_under_the_real_data_tree`
+       (about 4s).
+
+469. **[done, 2026-11-16]** **[Testing & dev tooling]** **Pruning deleted a cache folder that named no asset.**
+     Post-build critic, verified. `_prune` treated a folder in .test-history/
+     with no ASSET file as this asset's and removed it.
+     - **Fixed, test-first** (polish): `test_a_folder_that_names_no_asset_is_left_alone`
+       was RED (the stranger folder's file gone) and is green - only a folder
+       whose ASSET file names this asset is pruned.
+     - **Noted, not changed**: each checkout (each worktree) builds its own
+       ~76MB `.test-history/`, and nothing but a manual delete removes it.
+       A `mothman` command to clear it would be a new feature, so none was
+       built; worth knowing when disk is tight, since worktrees multiply it.
