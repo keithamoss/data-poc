@@ -1,5 +1,8 @@
 # TS-113: a geocoding file that drifts on purpose (draft for Keith, 2026-11-16)
 
+**Approved by Keith 2026-11-16, with the quarter changed to 2026-Q3 (built there;
+reads Warn at PSI 0.1779). Where this draft says 2019-Q4 below, read 2026-Q3.**
+
 **Why.** REQ-GEN-392 made Child Protection's red Client Registers cleaner: a
 single-tier Fail now plants 5 rows. The 2019 geocoding files then held fewer
 postcode placements, and the only three drift Warns in the geocoding history
