@@ -53,6 +53,12 @@
 # participation below, applied to the calendar's date - so a per-dataset deadline
 # stays per-dataset instead of being flattened into one per period.
 
+# OFFSETS FROM THE ANCHOR (REQ-GEN-406 criterion 4; SA Q1, Keith 2026-11-14):
+# the dates that frame the generated history are written `!anchor -99` - 99
+# days before the anchor the history was generated at - so a rolled demo
+# keeps them in step. At the fixed test anchor, 2026-09-25, each resolves to
+# the date it held before (-99 is 2026-06-18). Changelog dates stay absolute:
+# they say when an edit was made, not what it frames.
 calendars:
 
   - name: daily
@@ -75,7 +81,7 @@ calendars:
       # Birth Registrations' earliest stretch is due the evening before, so
       # TS-3c, TS-3d and TS-10 sit in the configuration that makes their
       # outcomes right. Added at the old end, as every growth before it was.
-      - effective_from: "2026-06-18"
+      - effective_from: !anchor -99
         changelog:
           - date: "2026-10-16"
             author: REQ-GEN-044
@@ -84,7 +90,7 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-      - effective_from: "2026-06-30"
+      - effective_from: !anchor -87
         changelog:
           - date: "2026-10-13"
             author: REQ-GEN-196
@@ -93,7 +99,7 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-      - effective_from: "2026-07-05"
+      - effective_from: !anchor -82
         changelog:
           - date: "2026-10-13"
             author: REQ-GEN-196
@@ -102,7 +108,7 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-      - effective_from: "2026-08-14"
+      - effective_from: !anchor -42
         changelog:
           - date: "2026-10-11"
             author: REQ-GEN-185
@@ -111,7 +117,7 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-      - effective_from: "2026-08-24"
+      - effective_from: !anchor -32
         changelog:
           - date: "2026-08-24"
             author: not recorded - converted from a plain-string entry by REQ-PIPE-110
@@ -126,7 +132,7 @@ calendars:
       # TS-62 (REQ-GEN-205): a fictional new version on the history's last
       # day, widening the claim window to six hours - declared as a
       # correction below and left awaiting the asset manager's confirmation.
-      - effective_from: "2026-09-25"
+      - effective_from: !anchor +0
         changelog:
           - date: "2026-10-19"
             author: REQ-GEN-205
@@ -139,7 +145,7 @@ calendars:
           rule: daily
     corrections:
       - change_reference: REQ-GEN-205-WINDOW
-        date: "2026-09-24"
+        date: !anchor -1
         author: Claude (for Keith)
         approver: fpycnkgvmt@privaterelay.appleid.com
         reason: >-
@@ -148,7 +154,7 @@ calendars:
           Registrations' claim window widens from four hours to six from
           2026-09-25.
         changes:
-          - item: calendar daily version 2026-09-25
+          - item: !anchor "calendar daily version {+0}"
             old: null
             new: {claim_window: 6h, cadence: {rule: daily}}
 
@@ -161,7 +167,7 @@ collections:
     # collection, never a dataset, from the collection's first round.
     files_go_to_period:
       versions:
-        - effective_from: "2026-06-18"
+        - effective_from: !anchor -99
           value: 0
           changelog:
             - date: "2026-10-30"
@@ -189,7 +195,7 @@ datasets:
         # FIVE MORE (post-build-review #172) - see the daily calendar above.
         # THE EVENING-BEFORE ERA (REQ-GEN-044, Keith, 2026-10-15): twelve
         # earlier days in which the supply for day D is due at 22:00 on D-1.
-        - effective_from: "2026-06-18"
+        - effective_from: !anchor -99
           expected_time: "22:00"
           days_before: 1
           grace: 1h
@@ -201,7 +207,7 @@ datasets:
                 22:00 the evening before its day - the evening-before era the
                 scenarios TS-3c, TS-3d and TS-10 need. From 2026-06-30 it is
                 due at 14:00 on the day, as before.
-        - effective_from: "2026-06-30"
+        - effective_from: !anchor -87
           expected_time: "14:00"
           # Restated since the evening-before version above states 1: every
           # version reads as complete on its own. 0 is the default, so no
@@ -215,7 +221,7 @@ datasets:
                 Birth Registrations owes a supply from 2026-06-30, five days
                 earlier - the synthetic history is 85 days now. The same due
                 time and grace as the versions after it.
-        - effective_from: "2026-07-05"
+        - effective_from: !anchor -82
           expected_time: "14:00"
           days_before: 0
           grace: 1h
@@ -228,7 +234,7 @@ datasets:
                 as the versions after it.
         # TEN EARLIER DAYS, AS AN EARLIER VERSION (REQ-GEN-185) - see the daily
         # calendar above for why not by moving the 2026-08-24 one.
-        - effective_from: "2026-08-14"
+        - effective_from: !anchor -42
           expected_time: "14:00"
           days_before: 0
           grace: 1h
@@ -239,7 +245,7 @@ datasets:
                 Birth Registrations owes a supply from 2026-08-14, ten days earlier -
                 the synthetic history is 40 days now. The same due time and grace
                 as the version after it.
-        - effective_from: "2026-08-24"
+        - effective_from: !anchor -32
           expected_time: "14:00"
           days_before: 0
           grace: 1h

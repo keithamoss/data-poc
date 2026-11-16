@@ -407,6 +407,103 @@ class TestTheDeploymentHalfRefusesAnotherAnchor:
         assert said is None
 
 
+@pytest.mark.asset("daily")
+class TestTheDailyHistoryMovesWithTheAnchor:
+    """REQ-GEN-406 criteria 1, 2 and 4: the daily asset's framing dates are
+    offsets from the anchor, so at a later anchor its plan owes no slot before
+    its first generated supply and places every scenario it places at the
+    fixed one - and at the fixed anchor the files read exactly as before."""
+
+    def _plan(self, anchor):
+        import contextlib
+        import io
+
+        from asset_model import hierarchy, schedule
+        from generator import collections
+
+        with history_anchor.anchored(anchor):
+            provider = collections.provider("civil-registration")
+            with contextlib.redirect_stdout(io.StringIO()):
+                plan = provider.plan()
+            generated = {j.period.name for j in plan.jobs}
+            owed = [p.name for d in hierarchy.datasets_in_collection("civil-registration")
+                    for p in schedule.periods_for_dataset(d.dataset_id, until=anchor)]
+        first = min(p for p in owed if p in generated)
+        return ([p for p in owed if p < first],
+                sorted(pl.scenario_id for _, pl in plan.resolved), len(plan.jobs))
+
+    def test_a_later_anchor_owes_nothing_earlier_and_places_every_scenario(self):
+        early_fixed, placed_fixed, jobs_fixed = self._plan(FIXED)
+        early_later, placed_later, jobs_later = self._plan(LATER)
+        assert early_fixed == [] and early_later == []
+        assert placed_later == placed_fixed and placed_fixed
+        assert jobs_later == jobs_fixed
+
+    def test_two_generations_at_one_anchor_write_identical_trees(self, tmp_path):
+        """REQ-GEN-404 criteria 5 and 14 (R2): a later anchor given back gives
+        the same bytes, and records itself in both of the generator's records."""
+        import contextlib
+        import hashlib
+        import io
+        import json
+
+        from generator.public import generated_into
+
+        def digest(root):
+            h = hashlib.sha256()
+            for p in sorted(root.rglob("*")):
+                if p.is_file():
+                    h.update(str(p.relative_to(root)).encode())
+                    h.update(p.read_bytes())
+            return h.hexdigest()
+
+        found = []
+        for name in ("one", "two"):
+            with history_anchor.anchored(LATER), contextlib.redirect_stdout(io.StringIO()):
+                with generated_into(tmp_path / name) as root:
+                    pass
+            found.append(digest(root))
+            assert (root / history_anchor.FILE).read_text() == "2026-11-13\n"
+            assert json.loads((root / "generator_bookkeeping.json").read_text())["_anchor"] \
+                == "2026-11-13"
+        assert found[0] == found[1]
+
+    def test_the_offsets_resolve_to_todays_dates_at_the_fixed_anchor(self):
+        from asset_model import assets, config_yaml
+
+        folder = assets.selected().folder
+        calendar = config_yaml.load(folder / "calendar.yaml")
+        daily = next(c for c in calendar["calendars"] if c["name"] == "daily")
+        froms = [v["effective_from"] for v in daily["versions"]]
+        assert "2026-06-18" in froms and froms[-1] == "2026-09-25"
+        correction = daily["corrections"][0]
+        assert correction["date"] == "2026-09-24"
+        assert correction["changes"][0]["item"] == "calendar daily version 2026-09-25"
+        with history_anchor.anchored(LATER):
+            later = config_yaml.load(folder / "calendar.yaml")
+        assert next(c for c in later["calendars"]
+                    if c["name"] == "daily")["versions"][-1]["effective_from"] == "2026-11-13"
+
+    def test_the_freeze_gate_reads_an_unchanged_offset_as_unchanged(self):
+        """REQ-GEN-406 criterion 7: both versions the gate compares are
+        resolved against one anchor, at any anchor."""
+        from asset_model import assets, config_yaml
+        from qa_tools.common import agreement_freeze
+
+        folder = assets.selected().folder
+        cal_text = (folder / "calendar.yaml").read_text()
+        asset_doc = config_yaml.load(folder / "data-asset.yaml")
+        edited = cal_text.replace("effective_from: !anchor -32", "effective_from: !anchor -33", 1)
+        assert edited != cal_text
+        for anchor in (FIXED, LATER):
+            with history_anchor.anchored(anchor):
+                before = agreement_freeze.flatten(config_yaml.parse(cal_text), asset_doc)
+                same = agreement_freeze.flatten(config_yaml.parse(cal_text), asset_doc)
+                moved = agreement_freeze.flatten(config_yaml.parse(edited), asset_doc)
+            assert same == before
+            assert moved != before
+
+
 class TestPastTheLastAuthoredRound:
     """REQ-GEN-406 criterion 6: the quarterly calendar's last authored round is
     2027-11-01 (assets/quarterly/calendar.yaml)."""

@@ -66,6 +66,16 @@ describe("a chip is a real link (criterion 10)", () => {
   });
 });
 
+describe("a link saved before the anchor rolled (REQ-GEN-406 criterion 9, SR9)", () => {
+  it("lands on the scenario's current date and corrects the address", () => {
+    const w = load("http://localhost/?scenario=ts-75a&in-place-on=2025-01-02#/exec");
+    expect(w.eval("CURRENT_IN_PLACE_ON")).toBe("2025-03-10");
+    expect(w.location.search).toContain("in-place-on=2025-03-10");
+    expect(w.location.search).not.toContain("2025-01-02");
+    expect(page.errors).toEqual([]);
+  });
+});
+
 describe("a stale parameter (criterion 9)", () => {
   it("opens at the top, says so in one line, shows no bar and removes the parameter", () => {
     const w = load("http://localhost/?scenario=TS-999#/exec");

@@ -5972,12 +5972,8 @@ requirements:
       - THE SYSTEM SHALL issue run identifiers deterministically from
         configuration and seed, so that regenerating overwrites the
         existing history in place.
-      - THE SYSTEM SHALL derive the generated schedule from a fixed,
-        committed anchor date rather than from the day it is run.
-      - WHEN the generator is re-run on a different calendar day with
-        unchanged configuration, THE SYSTEM SHALL produce an identical
-        history, and SHALL NOT add a second copy of it alongside the
-        first.
+      - THE SYSTEM SHALL derive the generated schedule from one anchor date, given to the generation and recorded with the history, rather than from the day it is run.
+      - WHEN the generator is re-run with the same anchor and unchanged configuration, THE SYSTEM SHALL produce an identical history, and SHALL NOT add a second copy of it alongside the first.
       - THE SYSTEM SHALL use the same vocabulary in every generator
         module, and SHALL NOT leave one module using the old sense of a
         word another module has changed.
@@ -50860,6 +50856,7 @@ requirements:
     - tests/test_config_pin.py::TestAPinnedGenerationOpensNoConfigurationFile
     - tests/test_validate_imports.py
     evidence:
+    - '2026-11-16 (Perth), worktree anc, criterion 12''s last part: the installed anchor is the fifth element of assets.handoff() and assets.adopt() installs it; tests/test_anchor_date.py::test_a_spawned_process_reads_the_installed_anchor passed, and failed with the anchor left out of handoff().'
     - '2026-11-16 (Perth), tree f28a924c (branch wip/speed-b): the fast half, `pytest -m "not needs_deployment" -n 2 tests/` with data/ and reports/ moved aside - 7596 passed, 5 failed, 1 error, 0 skipped,
       1656s. The six are not this requirement''s: post-build-review #391''s own status line (fixed after; tests/test_plans_md.py and test_plans_index.py then 31 passed) and the five in post-build-review #392,
       each failing identically at 12f06b34 or passing alone at this tree. tests/test_config_pin.py, test_derived_once.py, test_tree_snapshot.py and test_bootstrap_pin.py are among the passes.'
@@ -50870,13 +50867,6 @@ requirements:
     - '2026-11-16: a from-empty bootstrap of the daily asset into a scratch database (created, marked, dropped after) on tree 756df379 (before the tests and the content-keyed from_doc were added): ''Took generation
       49s, Birth Registrations 288s, in total 337s.'', within budget at 338s, ''Configuration pinned: 1d1285b84abb'', 16 staged tables, no tree change and no pin difference. Not REQ-PIPE-403''s measurement,
       which is taken separately.'
-    unmet_criteria:
-    - criterion: Criterion 12, in part - 'the installed anchor (REQ-GEN-404)' handed to every process a pinned run spawns.
-      why: REQ-GEN-404 (the rolling anchor) is not built, so there is no installed anchor to hand; the snapshot, the asset and its layout are handed, and the clock travels in the environment (PROVISIONAL, decisions).
-      owner: REQ-GEN-404
-      blocked_by:
-        requirements:
-        - REQ-GEN-404
   - id: REQ-GEN-398
     title: A generation - `mothman <collection> generate-synthetic-data` and a bootstrap's generation step, its target trials included - runs with its asset's configuration pinned
     date_written: '2026-11-14'
@@ -51004,19 +50994,12 @@ requirements:
     - tests/test_bootstrap_pin.py::TestWhatABootstrapSaysAtTheEnd
     - tests/test_bootstrap.py
     evidence:
+    - '2026-11-16 (Perth), worktree anc, criterion 4''s rolled wording: tests/test_rolling_anchor.py::TestTheClosingLine passed - ''(rolled to today on Perth''s clock; `--anchor 2026-11-13` reproduces it)''.'
     - '2026-11-16 (Perth), tree f28a924c: the fast half as REQ-PIPE-397''s evidence records it. tests/test_bootstrap_pin.py::TestARealReplayFilesAsThePinnedCalendarSays replays Birth Registrations'' first three
       arrivals through the real pipeline three times: the calendar edited as the second arrival begins leaves every filing and verdict equal to the unedited run, and the next bootstrap''s verdicts differ; with
       the pin''s read check removed it fails (''an edit made mid-replay reached the replay''s records'').'
     - '2026-11-16: the daily from-empty bootstrap''s closing lines, in order: ''Took generation 49s, Birth Registrations 288s, in total 337s.'', the budget line, ''Configuration pinned: 1d1285b84abb'', ''Populated:
       16 staged table(s) in this environment, generated up to 2026-09-25 (the fixed test anchor).'''
-    unmet_criteria:
-    - criterion: Criterion 4, in part - the rolled closing wording '(rolled to today on <zone>'s clock; `--anchor <date>` reproduces it)'.
-      why: 'Only the fixed test anchor exists: rolling the anchor and --anchor are REQ-GEN-404 and REQ-GEN-405, not built. The fixed-anchor wording and every other part of the criterion are built.'
-      owner: REQ-GEN-405
-      blocked_by:
-        requirements:
-        - REQ-GEN-404
-        - REQ-GEN-405
   - id: REQ-PIPE-400
     title: The values derived from an agreement - each dataset's slots and periods, a calendar's periods, a dataset's standing on a date - are worked out once per immutable Agreement and zone-versions value actually used, pinned or not, so a staged calendar or time-zone correction is never answered from another's result
     date_written: '2026-11-14'
@@ -51210,7 +51193,7 @@ requirements:
     date_written: '2026-11-14'
     story: As whoever regenerates the demo, I want the date a history was generated up to to be an input I can see and give back, rather than a constant edited by hand, so that a rolling anchor stays reproducible and a resume regenerates the same history it is comparing against.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #138 (2026-11-03, morning report 12 Q4: ''make it rolling'') and R2 of ''Rolling anchor date scoping'', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - THE SYSTEM SHALL take a generation's anchor from one function, generator.anchor_date.get_anchor_date (generator/anchor_date.py line 49), given the anchor by its caller - REQ-GEN-405 decides which date - and SHALL hold no other default anywhere in the generator or a provider.
@@ -51244,16 +51227,52 @@ requirements:
     - 'REFUSE A BARE GENERATE ON A MISMATCH (SR3, SETTLED by Keith 2026-11-14, NOT THE RECOMMENDATION): after a rolled bootstrap, a plain generate-synthetic-data would rewrite the tree at the fixed anchor underneath a rolled database; it refuses naming reset then bootstrap. REJECTED defaulting to the recorded anchor (the recommendation), and always the fixed anchor.'
     - 'NOTHING EARLIER THAN THE FIXED ANCHOR (SR6, SETTLED by Keith 2026-11-14): REQ-GEN-406 promises a full, placeable history only from 2026-09-25 to today. REJECTED allowing it and refusing only if a scenario cannot place.'
     - 'THE VARIABLE REFUSES RATHER THAN GOES QUIET (CLI finding 6): a developer''s leftover GENERATOR_ANCHOR_DATE in .env would otherwise stop working without a word.'
+    - 'THE ANCHOR LIVES IN asset_model/, THE GENERATOR NAMES IT (PROVISIONAL (2026-11-16)): asset_model/history_anchor.py holds FIXED_TEST_ANCHOR, the installed anchor and the anchor file, because assets.handoff() must hand it and the offset resolver must read it, and neither may import the generator (REQ-TEST-384''s imports gate). generator/anchor_date.py''s FIXED_TEST_ANCHOR is the same object, so REQ-GEN-405 criterion 1''s ''a constant in the generator'' names one value, not two.'
+    - 'NOTHING INSTALLED MEANS THE FIXED ANCHOR (PROVISIONAL (2026-11-16)): get_anchor_date() with no anchor installed - a test calling a provider directly - answers the fixed test anchor, REQ-GEN-405''s choice, rather than raising; it is the only default anywhere in the generator or a provider (criterion 1).'
+    - 'THE ANCHOR FILE IS data/<asset>/history_anchor, ONE LINE, AND THE BOOKKEEPING KEY IS _anchor (PROVISIONAL (2026-11-16)): every reader iterating the bookkeeping''s datasets goes through driver.dataset_keys, which leaves it out; generator/output.py''s redirect moves the file with the other three.'
+    - 'qa.history_anchor, ONE ROW (PROVISIONAL (2026-11-16)): schema version 52, an only_row table with the anchor and when it was recorded, written by the bootstrap before its first run so a checkpoint copied mid-replay carries it. A second, different anchor in one database is refused. The bump means every database at version 51 is refused and rebuilt, which REQ-GEN-405 criterion 8 requires anyway.'
+    - 'A CHECKPOINT AND A ROLL ARE NOT TAKEN TOGETHER (PROVISIONAL (2026-11-16)): `--checkpoint-before` with `--roll-anchor` is refused, because the checkpoint''s arrival numbers are checked before the roll''s date is known; `--anchor <date>` with a checkpoint works.'
+    - 'AN ANCHOR GIVEN WITH --anchor SAYS SO ON THE CLOSING LINE (PROVISIONAL (2026-11-16)): ''(given with `--anchor <date>`)'', since REQ-GEN-399 criterion 4 words only the fixed and the rolled cases.'
+    - 'INSTALLED BEFORE THE FIRST CONFIGURATION READ (found building REQ-GEN-406): the bootstrap and the generate command install the anchor asked for, or the fixed one, before anything reads the configuration, so an asset writing offset dates can be read where no anchor file exists yet.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    linked_tests:
+    - 'tests/test_anchor_date.py'
+    - 'tests/test_rolling_anchor.py::TestWhichAnchorABootstrapUses'
+    - 'tests/test_rolling_anchor.py::TestAPopulatedDatabase'
+    - 'tests/test_rolling_anchor.py::TestTheGenerateCommand'
+    - 'tests/test_rolling_anchor.py::TestTheCacheKey'
+    - 'tests/test_rolling_anchor.py::TestTheResume'
+    - 'tests/test_rolling_anchor.py::TestTheDailyHistoryMovesWithTheAnchor'
+    implemented_by:
+    - 'asset_model/history_anchor.py::anchored'
+    - 'asset_model/history_anchor.py::for_offsets'
+    - 'asset_model/assets.py::handoff'
+    - 'asset_model/assets.py::adopt'
+    - 'generator/anchor_date.py::get_anchor_date'
+    - 'generator/anchor_date.py::validate'
+    - 'generator/driver.py::record_anchor'
+    - 'assets/quarterly/synthetic/collections/child_protection.py::start_date'
+    - 'bootstrap/anchoring.py::requested'
+    - 'bootstrap/generation.py::generate_on_its_own'
+    - 'bootstrap/bootstrap.py::bootstrap'
+    - 'bootstrap/bootstrap.py::_resume'
+    - 'bootstrap/checkpoints.py::recorded_anchor'
+    - 'bootstrap/replay_inputs.py::cache_key'
+    - 'qa_tools/common/qa_store.py::record_history_anchor'
+    - 'cli/pipeline.py::bootstrap_command'
+    evidence:
+    - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    - '2026-11-16: Birth Registrations generated twice at 2026-09-25 wrote identical trees (sha256 prefix b004667bd47e), the same bytes before and after its calendar became offsets; at 2026-10-15 654dc4b3f8bc and at 2026-11-13 ffe62e48cf30, each tree''s history_anchor naming its date.'
+    - 'README.md''s anchor paragraph and every help text name --anchor; GENERATOR_ANCHOR_DATE appears only in the refusal that names it.'
   - id: REQ-GEN-405
     title: A bootstrap rolls the demo's anchor only when asked with --roll-anchor, to the latest day on the asset's own clock whose planned receipts have all passed; otherwise - and always for the test suite and CI - it generates at the fixed test anchor 2026-09-25, and a test reading a deployment's history refuses one generated at any other anchor
     date_written: '2026-11-14'
     story: As Keith, I want the demo to show supplies up to today when I regenerate it, while the tests and CI keep testing one fixed date, so that the dashboard I put in front of people is never quiet for want of a supply and the pins and the CI cache never move with the calendar.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #138 (2026-11-03) and R1, R2 and R3 of ''Rolling anchor date scoping'', SETTLED 2026-11-14, with the architect''s note (docs/drafts/separation-v5-reviews.md line 357); drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - THE SYSTEM SHALL name one fixed test anchor, 2026-09-25 (today's ANCHOR_DATE, generator/anchor_date.py line 46), as a constant in the generator.
@@ -51288,16 +51307,43 @@ requirements:
     - 'ONE CHECKOUT HOLDS ONE HISTORY - v1''s ''two databases'' NOTE WAS WRONG (SR2, SETTLED by Keith 2026-11-14; architect and CLI finding 3): the delivery and receipt trees are per asset per checkout (assets.deliveries_dir and receipts_dir, assets.py lines 467-472, under ROOT/data/<asset>, line 187) and have nothing to do with MOTHMAN_SUPPLY_DSN, so a second database at the fixed anchor would regenerate the one shared tree and leave the demo database out of step with its files. The refusal offers only reset then bootstrap. The real side-by-side route is a second worktree with its own data/, its own database and its own from-empty bootstrap; a docstring on the deployment-half check names it, with the catch that tests/conftest.py''s deployment_dsn_for (lines 783-807) prefers supply_<asset> whenever it exists, so the gate-ready history must be the supply_<asset> database (or on another server) and the demo use another name. REJECTED per-database delivery trees.'
     - 'NO RECORDED ANCHOR IS REFUSED TOO (delivery-scoper, from the architect''s point; Keith may change it): every local deployment bootstrapped before REQ-GEN-404 lands records none, so the first local full gate after it forces one rebuild per asset. #134 v6 already plans one reset and bootstrap per asset after its last step, so building this after v6 makes that one rebuild, not an extra one.'
     - 'THE STEP-BACK IS SAID BEFORE THE LONG PART (CLI finding 7): a person can stop a two-hour run whose date is not what they meant.'
+    - 'THE DRY BUILD IS A GENERATION INTO A THROWAWAY FOLDER (PROVISIONAL (2026-11-16)): each candidate day generates every collection under a temporary directory, never data/, and reads the latest received_at its receipt files record - per file, so a pair''s later file counts. A roll looks back at most seven days, then refuses naming the fallback.'
+    - 'THE DEPLOYMENT CHECK RUNS TRYLAST (PROVISIONAL (2026-11-16)): a plugin registered in tests/conftest.py''s pytest_configure checks after `-m` has deselected, so the fast half, which reads no deployment, is never stopped by the local database. It reads qa.history_anchor with one read-only SELECT and raises one pytest.UsageError naming each asset''s database, the anchor found, the count of tests and the rebuild.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    linked_tests:
+    - 'tests/test_rolling_anchor.py::TestWhichAnchorABootstrapUses'
+    - 'tests/test_rolling_anchor.py::TestTheRoll'
+    - 'tests/test_rolling_anchor.py::TestAPopulatedDatabase'
+    - 'tests/test_rolling_anchor.py::TestTheCacheKey'
+    - 'tests/test_rolling_anchor.py::TestTheDeploymentHalfRefusesAnotherAnchor'
+    - 'tests/test_rolling_anchor.py::TestTheResetDeletesTheGeneratedFiles'
+    - 'tests/test_anchor_date.py'
+    implemented_by:
+    - 'bootstrap/anchoring.py::roll'
+    - 'bootstrap/anchoring.py::chosen_without_roll'
+    - 'bootstrap/anchoring.py::latest_receipt'
+    - 'bootstrap/bootstrap.py::bootstrap'
+    - 'cli/pipeline.py::bootstrap_command'
+    - 'cli/env.py::reset_synthetic_command'
+    - 'tests/conftest.py::_refuse_a_deployment_at_another_anchor'
+    evidence:
+    - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    - 'Every local deployment bootstrapped before this records no anchor, so the deployment half stops on it until `mothman env reset-synthetic` then `mothman pipeline bootstrap` per asset (decision ''NO RECORDED ANCHOR IS REFUSED TOO''); the fast half is unaffected.'
+    unmet_criteria:
+    - criterion: 'Criterion 10 - every test whose result depends on today takes its date from the fixed test anchor.'
+      why: 'Not audited in this build: the tests touched here pin their clock or take the fixed anchor, but no sweep of the suite for wall-clock ''today'' was made.'
+      owner: 'REQ-GEN-405, a follow-up audit'
+      blocked_by:
+        unowned: true
   - id: REQ-GEN-406
     title: When the anchor rolls, the dates a synthetic asset's configuration uses to frame its generated history move with it, so that no slot is owed before the history starts and no scenario falls outside the era it was built for
     date_written: '2026-11-14'
     story: As Keith, I want a rolled demo to look like the fixed one - every slot owed has a supply, every scenario still shows what it was built to show - so that rolling the date does not quietly turn into a supplier who stopped delivering or a scenario that refuses to generate.
     moscow: must
-    status: not_started
+    status: built
     source: 'delivery-scoper, found 2026-11-14 by probing the real generator with the anchor moved (plans/running-thoughts.md #138''s ''to scope before building''); put to Keith as SA Q1 and SETTLED by him 2026-11-14 (option (a)). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - WHEN a synthetic asset's history is generated at any anchor from the fixed test anchor to today, THE SYSTEM SHALL leave no slot owed before the dataset's first generated supply that is not owed at the fixed test anchor.
@@ -51327,16 +51373,50 @@ requirements:
     - 'THE SCENARIO''S CURRENT DATE WINS (SR9, SETTLED by Keith 2026-11-14): REJECTED the link''s date plus a note, and no change.'
     - 'WHERE THE RESOLVER GETS THE ANCHOR (SR1, SETTLED by Keith 2026-11-14): the one-line file beside the delivery tree, inside asset_model''s charter; v1''s ''against the anchor recorded for the history'' named only places asset_model cannot read (architect B6).'
     - 'THE PAGE NEVER SHOWS AN OFFSET (dashboard finding 5): offsets are an authoring form for a synthetic asset''s configuration; a reader sees dates.'
+    - 'ONE TAG, RESOLVED AT THE ONE PARSE (PROVISIONAL (2026-11-16)): `!anchor -99` is the date 99 days before the anchor and `!anchor "version {+0}"` writes one into a string, resolved by asset_model/config_yaml.py''s loader to the plain ''YYYY-MM-DD'' text the file would otherwise hold, so no reader changed. A document using the tag is cached, and a Built value keyed, with the anchor as well as the text.'
+    - 'WHICH DAILY DATES MOVED (PROVISIONAL (2026-11-16)): every effective_from from 2026-06-18 to 2026-09-25 in the daily calendar and data-asset.yaml (calendar versions, files_go_to_period, participation, amber and replacement eras), the TS-62 correction''s date and the item naming its version. 1970, 2013 and 2023 versions and every changelog date stay absolute: a changelog date says when an edit was made.'
+    - 'check-yaml CHECKS SYNTAX ONLY (PROVISIONAL (2026-11-16)): the pre-commit hook runs with --unsafe, because safe_load refuses to construct the tag.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    linked_tests:
+    - 'tests/test_rolling_anchor.py::TestTheDailyHistoryMovesWithTheAnchor'
+    - 'tests/test_rolling_anchor.py::TestPastTheLastAuthoredRound'
+    - 'tests/test_rolling_anchor.py::TestOffsetDates'
+    - 'tests-js/scenario-jump.test.js'
+    implemented_by:
+    - 'asset_model/config_yaml.py::_anchor_offset'
+    - 'asset_model/config_yaml.py::anchored_key'
+    - 'asset_model/history_anchor.py::for_offsets'
+    - 'bootstrap/anchoring.py::refuse_past_the_last_round'
+    evidence:
+    - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    - '2026-11-16: at the fixed anchor the daily calendar.yaml and data-asset.yaml parse equal to their text at HEAD; generating Birth Registrations at 2026-11-13 succeeded, where before the offsets it raised CannotPlace for TS-78a (outside the hold era). Plans at 2026-09-25 and 2026-11-13: Birth Registrations 100 jobs, 20 placements, nothing owed before its first supply at either.'
+    - '2026-11-16, quarterly plans at 2026-09-25, 2026-11-13 and 2027-01-20: Emergency Department 54/55/55 jobs and Linkage Products 108/110/110, nothing owed before their first supply; placements 16, 11 and 26 at all three; Child Protection keeps 47 jobs and owes one slot before its first supply at the later anchors (criterion 5, unmet).'
+    - 'tests-js/scenario-jump.test.js and generated-up-to.test.js: 4 failed against the HEAD template, all pass after.'
+    unmet_criteria:
+    - criterion: 'Criterion 5 - Child Protection generates from its configured start to the anchor.'
+      why: 'Its periods are a fixed count of drawn run plans (fifteen original quarters plus the grown ones, REQ-GEN-207 and REQ-GEN-238); generating from its start means drawing severities for each quarter rolled and keeping the fixed-anchor history byte-stable, which is generator work of its own. Measured: at 2026-11-13 it owes one slot before its first supply.'
+      owner: 'REQ-GEN-406'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 1 for the quarterly asset, and criterion 10''s quarterly plan test.'
+      why: 'Child Protection''s window slides (criterion 5); the daily asset meets criterion 1 and is tested.'
+      owner: 'REQ-GEN-406'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 8 - every configuration date on the built page shown by fmtDay(), no text naming an offset.'
+      why: 'No offset reaches the page by construction - the build reads resolved strings - but the built page was not checked date by date for fmtDay().'
+      owner: 'REQ-GEN-406'
+      blocked_by:
+        unowned: true
   - id: REQ-DASH-407
     title: The dashboard says, in its footer and in the as-of panel, that a synthetic asset's supplies were generated up to and including a date, and `mothman` says the same, from the anchor recorded with its history
     date_written: '2026-11-14'
     story: As someone shown the demo dashboard, I want to see the date its synthetic data was generated up to, so that a quiet current period reads as an old demo rather than a supplier who stopped delivering.
     moscow: should
-    status: not_started
+    status: built
     source: Keith, R3 of 'Rolling anchor date scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect's, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith's SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.
     acceptance_criteria:
     - 'WHERE the asset declares `synthetic: true`, THE SYSTEM SHALL show in the footer, as its own sentence immediately after the synthetic wording (REQ-PIPE-385 criterion 12) and before the codename line, in the footer''s existing type and with no new class: ''The synthetic supplies on this page were generated up to and including <date>; a period after that date has no supply.'', <date> formatted by fmtDay() as a plain date on the asset''s clock, never an instant; the text SHALL be identical whether the date is today or months ago (dashboard finding 2).'
@@ -51364,16 +51444,29 @@ requirements:
     - 'THE PICKER STAYS AS IT IS (dashboard finding 3): capping it at the anchor would raise the range notice on every load of an aged demo - the warning R3 rejected.'
     - 'env current READS THE FILE, NOT THE DATABASE (delivery-scoper, from CLI finding 8 and SR1): env current opens no database today and is the ''what am I about to act on'' check; the anchor file answers without one, so it cannot hang.'
     - 'FOR delivery-dashboard-ux-critic (dashboard review): check the default view of a non-rolled demo and of a same-day rolled one (SA Q5 often anchors a rolled demo on yesterday), confirm the sentence explains the empty periods with no banner, confirm the picker''s maximum is still today, and cold-load an old scenario link after a roll.'
+    - 'BUILD_PROVENANCE CARRIES synthetic AND generated_up_to (PROVISIONAL (2026-11-16)): whether the asset declares itself synthetic travels with the date, since no other embed said so; the build reads the anchor through qa_results_reader.read_history_anchor, and an unreadable record is ''not recorded''.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    linked_tests:
+    - 'tests-js/generated-up-to.test.js'
+    - 'tests/test_rolling_anchor.py::TestEnvCurrentSaysTheAnchor'
+    - 'tests/test_rolling_anchor.py::TestTheClosingLine'
+    implemented_by:
+    - 'dashboard/embed_dashboard_data.py::generated_up_to_provenance'
+    - 'qa_tools/common/qa_results_reader.py::read_history_anchor'
+    - 'cli/env.py::anchor_line'
+    - 'bootstrap/bootstrap.py::closing_line'
+    evidence:
+    - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    - 'tests-js/generated-up-to.test.js: 4 passed; 3 of them fail against the HEAD template, which has no such lines.'
   - id: REQ-GEN-408
     title: A demo regeneration replaces the whole history - the reset deleting, with the database, the asset's generated delivery and receipt trees, the generator's bookkeeping, the scenario placements and the anchor file, under a typed phrase naming the files - and refuses while any delivery folder the generator did not write exists
     date_written: '2026-11-14'
     story: As Keith, I want regenerating the demo on a new date to leave exactly one history behind, so that a rolled anchor never brings back the doubled history that pinning the anchor was introduced to stop.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, R4 of 'Rolling anchor date scoping', SETTLED 2026-11-14; drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect's, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith's SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.
     acceptance_criteria:
     - WHEN `mothman env reset-synthetic` is confirmed on a synthetic asset, THE SYSTEM SHALL delete, with the database schemas it drops today, that asset's generated delivery tree, its receipt tree, the generator's bookkeeping, the scenario placements file (data_path(scenario_map.PLACEMENTS_FILE), generator/scenario_injection.py lines 56-57) and the anchor file (REQ-GEN-404 criterion 3) (architect, non-blocking).
@@ -51398,10 +51491,32 @@ requirements:
     - 'THE PHRASE NAMES THE FILES TOO (SR4, SETTLED by Keith 2026-11-14): REJECTED keeping the phrase and relying on the listing above it.'
     - 'REFUSE WHILE A HAND-FILED FOLDER EXISTS (SR5, SETTLED by Keith 2026-11-14, NOT THE RECOMMENDATION): a folder the generator did not write cannot be regenerated, so the reset stops until a person has moved or deleted it. REJECTED deleting them listed apart (the recommendation), and keeping them. ''Not written by the generator'' is decided by the bookkeeping, the one record of what it wrote.'
     - 'THE LAST MOMENT TO READ THE ANCHOR (CLI finding 1): REQ-GEN-404''s reproducibility is ''give that date back'', so the reset says the date it is about to delete.'
+    - 'THE SUITE''S RESET DELETES A FOLDER OF THE TEST''S OWN (PROVISIONAL (2026-11-16)): tests/conftest.py''s autouse _reset_deletes_no_real_files points the reset''s data folder under the session''s base temp, so no test can delete the main checkout''s data/<asset>.'
+    - 'THE DATABASE IS NOT DROPPED WHILE ITS FILES CANNOT FOLLOW: reset() runs the symlink and hand-filed refusals after the phrase check and before any schema is dropped, as the command runs them before asking for the phrase.'
     open_questions: []
     signed_off:
       by: Keith
       date: '2026-11-14'
+    linked_tests:
+    - 'tests/test_rolling_anchor.py::TestTheResetDeletesTheGeneratedFiles'
+    - 'tests/test_reset_synthetic.py'
+    implemented_by:
+    - 'bootstrap/synthetic_reset.py::confirmation_phrase'
+    - 'bootstrap/synthetic_reset.py::generated_paths'
+    - 'bootstrap/synthetic_reset.py::refuse_unsafe'
+    - 'bootstrap/synthetic_reset.py::refuse_hand_filed'
+    - 'bootstrap/synthetic_reset.py::delete_generated'
+    - 'cli/env.py::reset_synthetic_command'
+    - 'generator/public.py::written_delivery_names'
+    - 'tests/conftest.py::_reset_deletes_no_real_files'
+    evidence:
+    - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    unmet_criteria:
+    - criterion: 'Criterion 8''s guard test - regenerate at one anchor, reset, regenerate at a later anchor, bootstrap, and find exactly one history.'
+      why: 'Not built: it needs a from-empty bootstrap of a test asset on a scratch database, and that run was not made in this build. The refusal, phrase and symlink tests are built.'
+      owner: 'REQ-GEN-408'
+      blocked_by:
+        unowned: true
   - id: REQ-PIPE-430
     title: A bootstrap snapshots the delivery tree it is about to replay - its own installation, after generation and never during it - and answers every recognition from that snapshot, and a tree that changes mid-replay fails the bootstrap
     date_written: '2026-11-14'

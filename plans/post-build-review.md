@@ -15880,3 +15880,48 @@ twice. It deliberately did not re-find the `TypeError`.
        notices - but TS-76's Expect places it "below the results' heading".
      - **Ran** (`-k "TestTheAsAtScenarioChips or TestEveryScenarioJumpLands"
        -n 2`, this tree): 2 failed (TS-76 and TS-77a `standing-in`), 15 passed.
+
+430. **[done, 2026-11-16]** **[Testing & dev tooling]** **The real-tree guard knew only one asset's tree.**
+     Found building the rolling anchor (REQ-GEN-404 to 408): in two runs of
+     about twenty modules at `-n 2`, tests/test_generator_providers.py's
+     TestNoTestClearsTheRealDeliveryTree failed with "DID NOT RAISE" - the
+     guard let a clear of the real tree through. Both tests pass alone, and the
+     ordering that broke them was not reproduced in four smaller runs, so the
+     cause below is a reading of the code rather than a proof.
+     - **What the code shows**: `_no_test_files_a_real_delivery` captured the
+       real deliveries and receipts folders of whichever asset was selected
+       when the session fixture was first set up, then compared against those
+       two paths only. A clear aimed at another asset's real tree was not
+       guarded at all.
+     - **Fixed (minor, test tooling)**: the guard now refuses every asset's
+       `data/<asset>/deliveries` and `receipts`. The two tests pass with it in
+       the runs since; whether they now pass in the ordering that failed is
+       for the next fast half to show.
+
+431. **[todo, 2026-11-16]** **[Data generation]** **[Pipeline & publishing]** **For Keith: with offset dates in the daily configuration, a sandbox with no anchor file cannot read the daily asset.**
+     REQ-GEN-404 criterion 12 (SR1) says offset dates resolve against the
+     anchor file beside the delivery tree, fall back to the fixed test anchor
+     only under `test` and `ci`, and refuse elsewhere. Built as signed. Its
+     consequence, which the draft did not spell out:
+     - **Every daily command in a `sandbox` checkout with no
+       `data/daily/history_anchor` refuses** - `mothman check`'s daily gates
+       (16 failed in this worktree until the file was written by hand), the
+       dashboard build and every pipeline command. That includes the main
+       checkout today, whose tree was generated before the file existed, and
+       every fresh builder worktree.
+     - `mothman pipeline bootstrap` and `generate-synthetic-data` are not
+       blocked: they install their anchor before reading anything.
+       `mothman env current` says there is no anchor file rather than failing.
+     - **The main checkout needs `MOTHMAN_ASSET=daily mothman env
+       reset-synthetic` then a bootstrap anyway** (qa schema 52, and the
+       deployment half refusing a history with no recorded anchor,
+       REQ-GEN-405 criterion 8), which writes the file. The quarterly asset has
+       no offset dates, so only its deployment half is affected.
+     - **The question**: keep criterion 12 as signed (a builder worktree copies
+       or writes `data/<asset>/history_anchor`), or let a checkout with no
+       delivery tree at all fall back to the fixed anchor in any environment,
+       refusing only where a tree exists without its anchor file.
+     - **And the qa schema is version 52** (qa.history_anchor), so until each
+       asset is rebuilt every command reading `supply_<asset>` - here, `mothman
+       check`'s `patterns` gate - is refused as an older schema, before any
+       DDL runs. Not reset from this session (the builder's terms).

@@ -13472,6 +13472,17 @@ const SCENARIO_ON_LOAD = (()=>{
   const id = SCENARIO_MAP[index].id;
   // Written back lowercase in one spelling (criterion 5, post-build-review #202 F9).
   withScenarioParam(INITIAL_URL, id);
+  // THE SCENARIO'S CURRENT DATE WINS (REQ-GEN-406 criterion 9, SR9): a link
+  // saved before the anchor rolled carries the date the scenario stood on
+  // then. Shown at the scenario's date now, the address corrected by the
+  // replaceState below, rather than silently marking nothing.
+  const target = scenarioTarget(SCENARIO_MAP[index]);
+  if(target && target.inPlaceOn && target.inPlaceOn !== CURRENT_IN_PLACE_ON){
+    setInPlaceOnQuietly(target.inPlaceOn);
+    if(target.inPlaceOn === DEFAULT_IN_PLACE_ON) INITIAL_URL.searchParams.delete(IN_PLACE_ON_PARAM);
+    else INITIAL_URL.searchParams.set(IN_PLACE_ON_PARAM, target.inPlaceOn);
+    INITIAL_URL.searchParams.delete(PREVIOUS_DATE_PARAM);
+  }
   if(!(STATE.scenarioJump && STATE.scenarioJump.id === id)){
     STATE = {...STATE, scenarioJump: {id, from: DEFAULT_IN_PLACE_ON, to: CURRENT_IN_PLACE_ON}};
   }

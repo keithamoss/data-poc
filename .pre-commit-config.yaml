@@ -18,6 +18,11 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-yaml
+        # SYNTAX ONLY (REQ-GEN-406, 2026-11-16): a synthetic asset may write a
+        # date as `!anchor -7`, a tag safe_load refuses to construct; --unsafe
+        # parses without constructing, which still catches the quoting slip
+        # this hook was added for. asset_model/config_yaml.py resolves the tag.
+        args: [--unsafe]
   # check-yaml above only proves a file PARSES. It uses yaml.safe_load,
   # which accepts a duplicate mapping key silently and keeps the last
   # one - so a second `decisions:` block on one requirement discarded
