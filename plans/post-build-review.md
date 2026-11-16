@@ -16170,3 +16170,67 @@ twice. It deliberately did not re-find the `TypeError`.
        test asserts those modules carry only the shared group.
      - **Ran** (test_distribution_groups.py with the two modules, `-n 2`):
        before, 1 failed and 61 passed; after, 63 passed.
+
+460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
+     Found building REQ-TEST-402, by its own writer guard rather than by
+     looking. `test_generating_never_touches_the_real_delivery_tree` (in
+     tests/test_generate_runs.py and tests/test_generate_cp_runs.py) redirects
+     the generator's deliveries, receipts, bookkeeping and placements by hand,
+     but not `driver.anchor_path()` - the anchor file REQ-GEN-404 criterion 3
+     added beside the tree. Run as part of its whole module it was harmless:
+     the module's own redirect fixture was still in force, so the anchor went
+     to the module's scratch folder. Run alone (`-k`), or once the module
+     stopped generating a history of its own, the generation wrote
+     data/<asset>/history_anchor in the checkout - a rolled demo's anchor
+     overwritten with the fixed one, which the test then reported green.
+     - **Seen**: with REQ-TEST-402's shared history in place the guard refused
+       the write into the shared tree, naming the file; run alone on this
+       worktree, both tests rewrote data/daily/ and data/quarterly/history_anchor
+       (mtimes 10:00:34 and 10:01:20 UTC, same date in the file, so no harm here).
+     - **Fixed, test-first** (a defect in the test, minor, one obvious answer):
+       both tests now fingerprint the real anchor file before and after, which
+       failed on both (`the real history_anchor file was written to by a test
+       run`), and then redirect `anchor_path` too, after which both pass.
+     - **Flagged for Keith anyway**, because a rolled demo checkout is exactly
+       where it would have bitten: any test that redirects the generator's
+       outputs one by one rather than through `generator.output.redirect()`
+       misses the next output added. Only these two do it on purpose; both
+       now cover all five.
+
+461. **[done, 2026-11-16]** **[Testing & dev tooling]** **The Birth Registrations isolation test compared its placements file against itself.**
+     Same test as #460, tests/test_generate_runs.py only. It captured
+     `scenario_injection.placements_path()` before monkeypatching it, then
+     asked `placements_path()` again AFTER - so "after" read the test's own
+     tmp file, not the real one. It passed only because the module fixture
+     had redirected "before" to a generation byte-identical to the test's own.
+     The Child Protection twin already captured the real path once (#225).
+     - **Fixed** the same way as the twin: the real path is captured before
+       the redirect and compared after. Without the module-wide redirect (its
+       history now comes from the shared fixture) the old comparison failed
+       outright, which is how it was found.
+
+462. **[done, 2026-11-16]** **[Testing & dev tooling]** **A measurement run and a builder's own test runs shared one MOTHMAN_TEST_DB_TAG.**
+     Process finding, building REQ-TEST-402. The first "before" profile of the
+     no-deployment half (a 30-minute detached run) used tag `t402`, and so did
+     this build's own module runs started beside it: each session drops its
+     worker databases `WITH (FORCE)` when it starts, so they killed each
+     other's. That run ended 14 failed and 10 errors, every one a database
+     symptom (`qa already exists`, missing worker databases), and is kept only
+     as the pilot that found which tests generate. The before and after
+     figures in REQ-TEST-402's evidence come from a second pair run back to
+     back with no test run of this build's beside them.
+     - **Lesson, already CLAUDE.md's rule, applied one level down**: a
+       detached measurement run is a session of its own and needs its own tag,
+       even inside one builder.
+
+463. **[investigate, 2026-11-16]** **[Data generation]** **[Pipeline & publishing]** **A checkpoint regenerates the whole asset just to number its arrivals.**
+     SIGHTING, not a defect and not changed. `bootstrap.checkpoints.arrivals_of`
+     regenerates every collection of the asset into a temporary folder to
+     check an arrival number before anything is touched - about a minute on
+     the quarterly asset (Linkage Products alone ~30-45s on this sandbox),
+     every time `mothman pipeline bootstrap --checkpoint-before N` is asked,
+     including when it is then refused. In the pilot profile five
+     refusal tests spent 304s in it; REQ-TEST-402 now answers those tests
+     from the shared history (shared_history.answer_regenerations), but a
+     person asking for a checkpoint still waits the minute. Whether to cache
+     or narrow it is Keith's call; it would be a requirement of its own.
