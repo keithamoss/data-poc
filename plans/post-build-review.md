@@ -8564,7 +8564,7 @@ twice. It deliberately did not re-find the `TypeError`.
       and the gate after it judges the supply's whole status. Decisions on
       REQ-PIPE-075 and REQ-PIPE-121.
 
-174. **[todo, 2026-10-13]** **[Data generation]** **[Dashboard UI]**
+174. **[done, 2026-11-16]** **[Data generation]** **[Dashboard UI]**
     **REQ-GEN-199's first bootstrapped build: six of its quoted texts open
     below the fold, and TS-76's after-state is not the red the architect
     predicted.** Found by the build itself, overnight #4, against the real
@@ -8591,8 +8591,12 @@ twice. It deliberately did not re-find the `TypeError`.
       needs Keith (SIGNIFICANT: it changes a signed claim).
     - **Keith to decide**: the page fix for the fold, and criterion 9's
       wording.
+    - **Closed 2026-11-16**: the fold by REQ-DASH-208's scenario jump, and
+      criterion 9's wording by REQ-GEN-206 criterion 15 (Keith, 2026-10-14,
+      close-out Q15) - TS-76's entry records clients Warn and carers Pass as
+      the from-empty bootstrap of that day showed them.
 
-175. **[todo, 2026-10-13]** **[Data generation]** **Two supplies that are
+175. **[done, 2026-11-16]** **[Data generation]** **Two supplies that are
     neither TS-43's nor TS-78's wait under hold on 8 September 2026.** Found
     by REQ-GEN-199 criterion 16's guard on its first run, overnight #4.
     - **What**: TS-47's late file (the 7 September extract arriving at 11:00
@@ -8612,6 +8616,13 @@ twice. It deliberately did not re-find the `TypeError`.
       (3) build every ordinary day inside a hold era green. Recommended (1):
       TS-47's late file being held is a true consequence of the era, and its
       register entry can say so.
+    - **Closed 2026-11-16 by REQ-GEN-206 criteria 11, 12 and 16** (Keith,
+      2026-10-14 and 2026-11-15, option 1): TS-47 `green_follow`, its late
+      file named in REQ-GEN-199 criterion 17 as amended, and the strict
+      expected failure removed. On that day's from-empty daily bootstrap the
+      supplies withheld under hold were exactly TS-78a's two, TS-43's and
+      TS-47's late file; 8 September's own supply, built passing, superseded
+      the late file and was promoted by the rule.
 
 176. **[done, 2026-10-14]** **[Data generation]** **[Dashboard UI]** **The
     delivery-critic on REQ-GEN-199 as built (274e7a6)** - overnight #4. Every
@@ -16170,3 +16181,84 @@ twice. It deliberately did not re-find the `TypeError`.
        test asserts those modules carry only the shared group.
      - **Ran** (test_distribution_groups.py with the two modules, `-n 2`):
        before, 1 failed and 61 passed; after, 63 passed.
+
+441. **[done, 2026-11-16]** **[Data generation]** **REQ-GEN-206 NFR 3's free Birth
+     Registrations days had no room for TS-53.** Found building it, by
+     `tests/test_generate_runs.py::TestNoResendIsPushedFarFromItsDay`. The NFR
+     says 2026-06-29 to 2026-07-26 are free; they are free of claims, but every
+     claim there moves the ordinary reds (they must sit three days before the
+     first claim, `_reds_clear_of_scenarios`), and the last red's resends were
+     then pushed past TS-68's quiet days - to 30 July from 13, 15 and 17 July
+     at anchors 22, 23 and 24 July with two lead-in days. On 30 July and 4
+     August (TS-68's and TS-69's following days standing as lead-in, lead_in
+     0) the target trial refused it: "it has no lead-in to be measured
+     against". **Placed (PROVISIONAL)** on 24 July with one lead-in day, which
+     moves no red past the clearance; the test passed and the trial agreed.
+     Not a defect of the product - a sizing claim in the requirement that did
+     not hold; recorded in REQ-GEN-206's decisions.
+
+442. **[done, 2026-11-16]** **[Data generation]** **The Linkage Products plan
+     read a contested Client Register pair as promoted at its receipt.** Found
+     reading `in_warehouse` for criterion 22. A pair (`PairDelivery`) reached
+     the row interface as one ordinary clean supply, so the plan promoted it
+     at receipt. Harmless until now - TS-42's and TS-80's pairs settle weeks
+     before their quarters' releases and geocodes, and the plan's answer for
+     those reads is the same either way (the test
+     `test_a_settlement_naming_a_supply_promotes_the_pair` pins TS-80's) -
+     but for TS-112 it would have planned the quarter against a Client
+     Register never promoted, which criterion 22 forbids. **Built as the
+     criterion** (feature work, not a defect fix): `contested` on
+     GeneratedSupply, a settlement promoting only where it makes a file the
+     supply, and a refusal naming the scenario. The ordinary geocoding draw
+     moved with it: 2017-Q2's source is not in the warehouse, so no drawn
+     fault lands there.
+
+443. **[done, 2026-11-16]** **[Testing & dev tooling]** **A REQ-GEN-335 test's
+     premise stopped holding once two more quarters gave up their drawn
+     ambers.** `test_linkage_scenarios.py::
+     test_the_child_protection_sides_move_no_ordinary_severity` planned with
+     and without TS-93a and TS-100a and required every other quarter's
+     severity identical. TS-112's 2017-Q2 and TS-55's 2023-Q1 were both drawn
+     amber and must be clean (criterion 18 for TS-112, PROVISIONAL for
+     TS-55), so their ambers move - and without the two sides, the next clean
+     quarter for one of them is 2019-Q1. The sides' own quarters are still
+     DRAWN clean, which is what the criterion said. The test now asserts that
+     against the drawn plan, and that the only differences are ambers moving,
+     the same number generated. A test encoding a premise the history no
+     longer has, so no product change.
+
+444. **[done, 2026-11-16]** **[Data generation]** **TS-112's settlement takes
+     effect a week after its scripted time, so its promotions had to wait.**
+     Expected, not a defect: a person's act takes one instant, the latest
+     already recorded about its supplies (post-build-review #284 (B)), and the
+     gate's refusal of the pair is lagged across the 14-day claim window to
+     5:53am 8 February 2017. Scripted promotions at 11:00 on 3 February would
+     have landed before the settlement took effect. Worked out from
+     scenarios/promotion_lag.py before the bootstrap (the package's last
+     arrival seeds it - the same computation gives TS-80's observed 7:35am 8
+     November 2020), so the readers' promotions are scripted for 9 February
+     and TS-112b's link is 8 February; the bootstrap confirmed both.
+
+445. **[todo, 2026-11-16]** **[Dashboard UI]** **For Keith: a reader's
+     cross-table row reads 'no Client Register in the warehouse' whether the
+     Client Register is contested or rejected.** Seen on TS-112's readers on 1
+     and 8 February 2017: the record carries the reason contested, then
+     rejected (`qa.check_result` extra `unrunnable_code`), and the verdict line
+     and REQ-DASH-204's notice say "rejected" after the settlement, but the row
+     itself reads "Not evaluated" with the same words both times. This is
+     REQ-PIPE-202 criterion 4's last clause, already recorded unmet there, and
+     REQ-GEN-206 criterion 20's Expect quotes the page as it is rather than
+     the reason codes. Whether the row should name the reason is a page
+     change for its own requirement - not changed here.
+
+446. **[done, 2026-11-16]** **[Testing & dev tooling]** **The container's
+     environment carried stale MOTHMAN_ASSET and MOTHMAN_SUPPLY_DSN.** As the
+     brief warned: `data-asset-1` and a database named `supply`. One early
+     generation's target trial reached that database and was refused by the
+     identity check before writing anything. Every later command unset both,
+     and every bootstrap ran against a second PostgreSQL cluster on port 5433
+     whose `supply_<asset>` databases were this build's own - so the
+     needs-deployment tests, which prefer `supply_<asset>` by name on the
+     server, read this build's history rather than the real one. Process
+     only; recorded so the next builder sets the cluster up the same way.
+

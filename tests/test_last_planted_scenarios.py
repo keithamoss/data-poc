@@ -140,7 +140,7 @@ class TestTS47AndTS53:
         ts53 = _injection("TS-53")
         periods = _periods("birth-registrations")
         placement = si.resolve(ts53, periods)
-        assert placement.period == "2026-08-04"
+        assert placement.period == "2026-07-24"
         for name in si.claimed_periods(ts53, periods):
             from datetime import date
 

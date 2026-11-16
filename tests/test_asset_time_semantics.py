@@ -577,8 +577,16 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # from empty; each geocoding release lands hours before its 19:00 due
         # time. The 504 already pinned were compared one by one first: every
         # one of them the same verdict, none missing, none new.
-        assert counts == {"on_time": 345, "early": 194, "late": 52, "unfiled": 13}
-        assert sum(counts.values()) == 604
+        # 342 / 198 / 54 / 13 over 607 FOR REQ-GEN-206 (2026-11-16, both assets
+        # bootstrapped from empty): the arrivals of the quarters it plants or
+        # moves - Child Protection's 2017-Q2 (TS-112) and 2023-Q1 (TS-55, no
+        # cp_placements), linkage-keys' 2022-Q4 and 2024-Q3 (TS-99), Birth
+        # Registrations' 24 July (TS-53's three) and 8 September (TS-47's
+        # green day) - plus the ordinary geocoding and Birth Registrations
+        # supplies whose drawn severity moved with them. Every arrival in both
+        # captures under the same run id kept its verdict and its instant.
+        assert counts == {"on_time": 342, "early": 198, "late": 54, "unfiled": 13}
+        assert sum(counts.values()) == 607
 
 
 @pytest.mark.asset("daily")

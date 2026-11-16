@@ -308,11 +308,11 @@ for injection and has not been placed yet.
 
 ### TS-47 - A daily file arriving after the next day's window opened
 
-**What it demonstrates.** It fills the NEXT day, the period open when it arrived; its own day closes with no supply, overdue, and a scripted person marks it not supplied, so it reads "not supplied (accepted)" (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133, REQ-GEN-137 criterion 3).
+**What it demonstrates.** It fills the NEXT day, the period open when it arrived; its own day closes with no supply, overdue, and a scripted person marks it not supplied, so it reads "not supplied (accepted)" (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133, REQ-GEN-137 criterion 3). The late file is HELD under hold because 8 September lies in the hold era - a true consequence of the era, not of the scenario - while 8 September's own 14:00 supply, built passing, is promoted; so on that day only the supplies TS-43, TS-47 and TS-78 account for wait under hold. Observed on the first bootstrapped build of 2026-11-16: the late file, received 11:00am Tuesday, 8 September, fills 8 September and is withheld under hold at 2:08pm; 8 September's own supply arrives at 2:30pm, built passing, supersedes it and is promoted by the rule at 3:47pm; 7 September is marked not supplied at 1:00pm on 8 September. Across the whole history the supplies withheld under hold are exactly TS-78a's two, TS-43's and TS-47's late file.
 
-**What it would look like if the rule were wrong.** Filed backward to its own day.
+**What it would look like if the rule were wrong.** Filed backward to its own day; or 8 September's own supply waiting under hold beside the late file.
 
-*Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): warn setting hold, replacement setting never.*
+*Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): warn setting hold (the 2026-08-30 version), replacement setting never. The day after is TS-47's own, generated passing (REQ-GEN-206 criterion 11; post-build-review #175, option 1), and no other period's arrival lands on either day.*
 
 | Where to look | |
 |---|---|
@@ -323,17 +323,21 @@ for injection and has not been placed yet.
 
 ### TS-53 - Keith's worked un-supersede case
 
-NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?
+PLANTED by REQ-GEN-206 criterion 5 on Birth Registrations (Keith, 2026-10-14, F12 and Q11): a good resend waiting behind a filled slot is superseded by a bad later one; a scripted person rejects the bad one, then un-supersedes the good one, in that order (REQ-PIPE-120 refuses an un-supersede beside a waiting version); it is re-checked, left waiting by the gate, and promoted by the person (REQ-GEN-137 criterion 2 as amended). Each file is built to a target (REQ-GEN-184) after one passing lead-in day and before a passing day (REQ-GEN-185). *Config: daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; 2026-07-24 - settings in force there: replacement setting never, warn setting promote. The day's own supply at 14:00, built passing; a good resend at 16:00, built passing; a bad one at 18:00, built failing on facility nulls. The next morning a scripted person rejects the 18:00 one at 09:00 ("TS-53 reject"), un-supersedes the 16:00 one at 10:00 ("TS-53 restore") and promotes it at 20:00 ("TS-53 promote").* **Expect** (the first bootstrapped build, 2026-11-16): 24 July's own supply is promoted by the rule at 3:59pm; the 16:00 resend is refused - "this supply's slot is already filled by a promoted supply" - and waits; the 18:00 resend supersedes it at 6:00pm ("a newer version of this table for 2026-07-24 arrived") and is refused on its Fail. On 25 July the person rejects the 18:00 one at 9:00am and un-supersedes the 16:00 one at 10:00am; it is re-checked at once, refused again by the gate on the filled slot, and promoted by the person at 8:00pm, displacing the 14:00 supply (recorded superseded by it). On 25 July the page's as-at panel reads "On Saturday, 25 July 2026 the newest file was not the newest promotion", naming birth-registrations@202607241600000800 as promoted into Friday, 24 July 2026, and "a supply promoted later into Friday, 24 July 2026 was what downstream read most recently". **Breaks as**: the un-supersede refused or played before the rejection; the good resend promoted by the gate over the filled slot; or still superseded at the end of the day.
+
+**What it would look like if the rule were wrong.** The un-supersede refused or played before the rejection; the good resend promoted by the gate over the filled slot; or still superseded at the end of the day.
+
+*Config: daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; 2026-07-24 - settings in force there: replacement setting never, warn setting promote. The day's own supply at 14:00, built passing; a good resend at 16:00, built passing; a bad one at 18:00, built failing on facility nulls. The next morning a scripted person rejects the 18:00 one at 09:00 ("TS-53 reject"), un-supersedes the 16:00 one at 10:00 ("TS-53 restore") and promotes it at 20:00 ("TS-53 promote").*
 
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202607231400000800`, `birth_registrations__202607231600000800`, `birth_registrations__202607231800000800` |
-| Period | 2026-07-23 |
-| Set "in the warehouse on" to | 2026-07-24 |
-| Built to | Pass, the 2026-07-23 14:00 arrival |
-| Built to | Pass, the 2026-07-23 16:00 arrival |
-| Built to | Fail on place_of_birth_facility.completeness (661 of 1,820), the 2026-07-23 18:00 arrival |
+| Supplies | `birth_registrations__202607241400000800`, `birth_registrations__202607241600000800`, `birth_registrations__202607241800000800` |
+| Period | 2026-07-24 |
+| Set "in the warehouse on" to | 2026-07-25 |
+| Built to | Pass, the 2026-07-24 14:00 arrival |
+| Built to | Pass, the 2026-07-24 16:00 arrival |
+| Built to | Fail on place_of_birth_facility.completeness (661 of 2,052), the 2026-07-24 18:00 arrival |
 
 ## Calendar corrections
 
@@ -760,10 +764,11 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
    "mode": "INJECT",
    "title": "A daily file arriving after the next day's window opened",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "It fills the NEXT day, the period open when it arrived; its own day closes with no supply, overdue, and a scripted person marks it not supplied, so it reads \"not supplied (accepted)\" (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133, REQ-GEN-137 criterion 3).",
-   "breaksAs": "Filed backward to its own day.",
-   "config": "Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): warn setting hold, replacement setting never.",
+   "demonstrates": "It fills the NEXT day, the period open when it arrived; its own day closes with no supply, overdue, and a scripted person marks it not supplied, so it reads \"not supplied (accepted)\" (REQ-PIPE-131, REQ-PIPE-132, REQ-DASH-133, REQ-GEN-137 criterion 3). The late file is HELD under hold because 8 September lies in the hold era - a true consequence of the era, not of the scenario - while 8 September's own 14:00 supply, built passing, is promoted; so on that day only the supplies TS-43, TS-47 and TS-78 account for wait under hold. Observed on the first bootstrapped build of 2026-11-16: the late file, received 11:00am Tuesday, 8 September, fills 8 September and is withheld under hold at 2:08pm; 8 September's own supply arrives at 2:30pm, built passing, supersedes it and is promoted by the rule at 3:47pm; 7 September is marked not supplied at 1:00pm on 8 September. Across the whole history the supplies withheld under hold are exactly TS-78a's two, TS-43's and TS-47's late file.",
+   "breaksAs": "Filed backward to its own day; or 8 September's own supply waiting under hold beside the late file.",
+   "config": "Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): warn setting hold (the 2026-08-30 version), replacement setting never. The day after is TS-47's own, generated passing (REQ-GEN-206 criterion 11; post-build-review #175, option 1), and no other period's arrival lands on either day.",
    "requirements": [
+    "REQ-GEN-206",
     "REQ-PIPE-131",
     "REQ-PIPE-132",
     "REQ-DASH-133",
@@ -784,38 +789,56 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
    "mode": "INJECT",
    "title": "Keith's worked un-supersede case",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?",
-   "breaksAs": null,
-   "config": null,
+   "demonstrates": "PLANTED by REQ-GEN-206 criterion 5 on Birth Registrations (Keith, 2026-10-14, F12 and Q11): a good resend waiting behind a filled slot is superseded by a bad later one; a scripted person rejects the bad one, then un-supersedes the good one, in that order (REQ-PIPE-120 refuses an un-supersede beside a waiting version); it is re-checked, left waiting by the gate, and promoted by the person (REQ-GEN-137 criterion 2 as amended). Each file is built to a target (REQ-GEN-184) after one passing lead-in day and before a passing day (REQ-GEN-185). *Config: daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; 2026-07-24 - settings in force there: replacement setting never, warn setting promote. The day's own supply at 14:00, built passing; a good resend at 16:00, built passing; a bad one at 18:00, built failing on facility nulls. The next morning a scripted person rejects the 18:00 one at 09:00 (\"TS-53 reject\"), un-supersedes the 16:00 one at 10:00 (\"TS-53 restore\") and promotes it at 20:00 (\"TS-53 promote\").* **Expect** (the first bootstrapped build, 2026-11-16): 24 July's own supply is promoted by the rule at 3:59pm; the 16:00 resend is refused - \"this supply's slot is already filled by a promoted supply\" - and waits; the 18:00 resend supersedes it at 6:00pm (\"a newer version of this table for 2026-07-24 arrived\") and is refused on its Fail. On 25 July the person rejects the 18:00 one at 9:00am and un-supersedes the 16:00 one at 10:00am; it is re-checked at once, refused again by the gate on the filled slot, and promoted by the person at 8:00pm, displacing the 14:00 supply (recorded superseded by it). On 25 July the page's as-at panel reads \"On Saturday, 25 July 2026 the newest file was not the newest promotion\", naming birth-registrations@202607241600000800 as promoted into Friday, 24 July 2026, and \"a supply promoted later into Friday, 24 July 2026 was what downstream read most recently\". **Breaks as**: the un-supersede refused or played before the rejection; the good resend promoted by the gate over the filled slot; or still superseded at the end of the day.",
+   "breaksAs": "The un-supersede refused or played before the rejection; the good resend promoted by the gate over the filled slot; or still superseded at the end of the day.",
+   "config": "Config: daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; 2026-07-24 - settings in force there: replacement setting never, warn setting promote. The day's own supply at 14:00, built passing; a good resend at 16:00, built passing; a bad one at 18:00, built failing on facility nulls. The next morning a scripted person rejects the 18:00 one at 09:00 (\"TS-53 reject\"), un-supersedes the 16:00 one at 10:00 (\"TS-53 restore\") and promotes it at 20:00 (\"TS-53 promote\").",
    "requirements": [
-    "REQ-PIPE-120"
+    "REQ-GEN-206",
+    "REQ-PIPE-120",
+    "REQ-GEN-137",
+    "REQ-GEN-184",
+    "REQ-GEN-185"
    ],
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202607231400000800",
-     "birth_registrations__202607231600000800",
-     "birth_registrations__202607231800000800"
+     "birth_registrations__202607241400000800",
+     "birth_registrations__202607241600000800",
+     "birth_registrations__202607241800000800"
     ],
-    "period": "2026-07-23",
-    "inPlaceOn": "2026-07-24",
+    "period": "2026-07-24",
+    "inPlaceOn": "2026-07-25",
     "targets": [
      {
-      "date": "2026-07-23",
+      "date": "2026-07-24",
       "at": "14:00",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2052
+       }
+      ]
      },
      {
-      "date": "2026-07-23",
+      "date": "2026-07-24",
       "at": "16:00",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2052
+       }
+      ]
      },
      {
-      "date": "2026-07-23",
+      "date": "2026-07-24",
       "at": "18:00",
       "built_to": "red",
       "rules": [
@@ -823,11 +846,17 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
       ],
       "moved": [
        {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2052
+       },
+       {
         "rule": "place_of_birth_facility.completeness",
         "to": "red",
         "nulls": 661,
-        "of_rows": 1820,
-        "was": 55
+        "of_rows": 2052,
+        "was": 54
        }
       ]
      }

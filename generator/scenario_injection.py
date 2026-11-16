@@ -1354,15 +1354,18 @@ def held_case_workers_placement(recognised, injected_deliveries) -> Placement:
     the delivery names any injection placed. REFUSED naming TS-52 where the
     history holds no such supply, never one held for another reason."""
     from asset_model import agreement, asset_time, declared_corrections, slots
-    from generator import correction_claims
+    from generator import collections, correction_claims
 
+    # THE DELIVERY'S QUARTER, by the dataset its collection's slots follow - the
+    # provider's own, asked rather than named (the collections gate).
+    every_quarter = collections.for_dataset(INHERITING_DATASET).dataset_id
     corrections = []
     docs = declared_corrections.working()
     for pending in declared_corrections.pending_corrections(*docs):
         _p, _before, after = correction_claims._docs_either_side(pending.reference, docs)
         quarters = correction_claims.claimed(
-            pending.reference, {"cp-clients": generated_periods("cp-clients")},
-            docs=docs).get("cp-clients", [])
+            pending.reference, {every_quarter: generated_periods(every_quarter)},
+            docs=docs).get(every_quarter, [])
         corrections.append((pending.reference, agreement.from_doc(after[0]), set(quarters)))
 
     candidates = []
@@ -1374,7 +1377,7 @@ def held_case_workers_placement(recognised, injected_deliveries) -> Placement:
         at = arrival.received_at
         if slots.period_claimed_at(INHERITING_DATASET, at) is not None:
             continue  # a period it delivers in was open: filed, not held
-        quarter = slots.period_claimed_at("cp-clients", at)
+        quarter = slots.period_claimed_at(every_quarter, at)
         if any(quarter in claimed or slots.period_claimed_at(INHERITING_DATASET, at,
                                                               agreement=after) is not None
                for _ref, after, claimed in corrections):
@@ -1842,15 +1845,14 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-53",
         dataset_id="birth-registrations",
-        # 4 AUGUST, A TUESDAY, so both resends land on a weekday: the day after
-        # TS-69's green following day, which stands as its lead-in (lead_in=0,
-        # PROVISIONAL), with 5 August, free, its own following day. Anywhere in
-        # the free stretch before TS-68 its claims moved the ordinary reds, and
-        # a red's resends were pushed past the quiet days to 30 July; on 30
-        # July itself the last red's resend went to 4 August, thirteen days
-        # late (tests/test_generate_runs.py, TestNoResendIsPushedFarFromItsDay).
-        anchor=-53,
-        lead_in=0,
+        # 24 JULY, A FRIDAY, so both resends land on a weekday, with one passing
+        # lead-in day (23 July) and its passing following day (25 July) - the
+        # free stretch's end before TS-68. Two lead-in days moved the ordinary
+        # reds so a red's resend was pushed past TS-68's quiet days to 30 July
+        # (tests/test_generate_runs.py, TestNoResendIsPushedFarFromItsDay), and
+        # with none the target trial has nothing to measure it against.
+        anchor=-64,
+        lead_in=1,
         quiet=(0, 1),
         config="daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; the "
                "replacement setting is never. The day's own supply arrives on time and is "
