@@ -315,7 +315,13 @@ def test_two_plans_build_the_same_rows(plan):
 def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
     """Criterion 6 and the byte-identical-neighbours NFR: TS-93a and TS-100a
     sit on quarters drawn clean, so every other quarter's severity is as it
-    was without them, and each is one delivery with cp_clients alone red."""
+    was without them, and each is one delivery with cp_clients alone red.
+
+    ONE EXCEPTION, NAMED EXACTLY (REQ-GEN-206; post-build-review #443 and
+    #449): TS-112 and TS-55 took 2017-Q2's and 2023-Q1's drawn ambers, which
+    land on the next clean quarters - 2018-Q4 and 2019-Q2 with the sides in
+    place. Without the sides, 2019-Q1 (TS-93a's) is clean and one of them
+    lands there instead of on 2019-Q2. Nothing else moves."""
     from generator import collections
 
     from collection_modules import provider_module
@@ -328,10 +334,10 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
                         tuple(i for i in si.INJECTIONS if i.scenario_id not in sides))
     without = cp.plan()
     ours = {p.period for _i, p in with_them.resolved if p.scenario_id in sides}
-    assert len(ours) == 2
+    assert ours == {"2019-Q1", "2019-Q3"}
     drawn = cp_module._drawn_by_period(cp.generated_periods())
     moved = []
-    for a, b in zip(with_them.jobs, without.jobs):
+    for a, b in zip(with_them.jobs, without.jobs, strict=True):
         assert a.period.name == b.period.name
         if a.period.name in ours:
             assert drawn.get(a.period.name) is None, f"{a.period.name} was not drawn clean"
@@ -339,12 +345,7 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
             assert len(deliveries) == 1 and deliveries[0].severity == "red"
         if a.severity != b.severity:
             moved.append((a.period.name, a.severity, b.severity))
-    # ONLY AN AMBER ANOTHER SCENARIO MOVED OFF ITS OWN QUARTER MAY LAND
-    # DIFFERENTLY (REQ-GEN-206: TS-112's and TS-55's quarters were drawn amber,
-    # and without the two sides the next clean quarter for one is 2019-Q1) -
-    # the same number generated, the sides' own quarters drawn clean.
-    assert all({x, y} <= {None, "amber"} for _n, x, y in moved), moved
-    assert sum(x == "amber" for _n, x, _y in moved) == sum(y == "amber" for _n, _x, y in moved)
+    assert sorted(moved) == [("2019-Q1", None, "amber"), ("2019-Q2", "amber", None)], moved
 
 
 class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:

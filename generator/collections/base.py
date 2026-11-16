@@ -238,7 +238,13 @@ class Provider:
         scenario plants (REQ-GEN-196, REQ-GEN-203) - so no rule promotes it and
         a reader of the table must wait for its settlement (generated_supplies;
         REQ-GEN-206 criterion 22). GENERIC: read from the injection's own
-        declaration, never from a provider's delivery class."""
+        declaration, never from a provider's delivery class.
+
+        AS THE PIPELINE CONTESTS IT, NOT BY THE FILE NAMES: Arrival.contested
+        counts any dataset that two files of one arrival claim by its
+        arrival_pattern, so a one-table collection's next-day pair ({D} with
+        {D+1}) and its _TEST pairs are contests too, each settled by a
+        person's choose-file (post-build-review #452)."""
         injected = plan.injected_by_period.get(job.period.name)
         if injected is None or not 0 < n <= len(injected[0].arrivals):
             return False

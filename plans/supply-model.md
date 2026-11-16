@@ -3839,8 +3839,10 @@ and two Client Registers - cp_clients.csv at 08:30 and a re-export,
 cp_clients_v2.csv, at 08:40 whose rows differ - both before due, the other
 files carrying no fault drawn for the quarter. A scripted person settles the
 pair at 11:00 the next day with both files rejected ("TS-112 settle"),
-promotes the three readers at 11:00 the day after ("TS-112 promote
-notifications", "... investigations", "... placements"), and marks the
+which takes effect with the gate's lagged refusal of the pair at 5:53am on 8
+February (TS-112b); promotes the three readers at 11:00 on 9 February, the
+asset day after that ("TS-112 promote notifications", "... investigations",
+"... placements"), and marks the
 quarter's Client Register not supplied the day after its slot closes
 ("TS-112 not supplied"). The re-evaluation the settlement owes its readers
 runs in the replay at the settlement's instant (REQ-PIPE-211 criterion 1),
@@ -3859,7 +3861,8 @@ Register for 2017-Q2. One of this supply's checks needs it, so it could not
 run. That is not a fault in this supply's own data.", Investigations the same
 with "2 of this supply's checks need it, so they could not run", Placements as
 Notifications - under the verdict line "Nothing needs deciding on this
-supply". Carer Register and Case Workers are promoted by the rule.
+supply" (when the checks run again is said once, on that verdict line, so the
+line leaves out criterion 2's last sentence, as TS-80's does). Carer Register and Case Workers are promoted by the rule.
 **Breaks as**: either file taken as the quarter's supply, or a reader's
 cross-table checks evaluated against one.
 
@@ -3878,8 +3881,11 @@ turned down and nothing has replaced it — Notifications, Investigations and
 Placements are waiting on it." Each reader's checks reading cp_clients are red,
 recorded with the reason rejected (REQ-PIPE-211 criteria 3 and 4), none with
 contested; the page words the row as before, "no Client Register in the
-warehouse for 2017-Q2". Each reader's verdict line carries the turned-down
-form: "Awaiting a decision — ... One of this supply's checks could not run
+warehouse for 2017-Q2". Each reader's verdict line carries REQ-DASH-204 criterion 16's no-queue-item
+form with its "was rejected" clause - not that criterion's turned-down
+sentence, which the page gives only where the rejected table was a
+package-mate held back with the supply (post-build-review #448, for Keith):
+"Awaiting a decision — ... One of this supply's checks could not run
 because the supply of Client Register for 2017-Q2 was rejected. A person can
 decide on this supply." (Investigations "2 of this supply's checks"). The
 person promotes the three at 11:00am Thursday, 9 February 2017, and marks
@@ -4041,7 +4047,8 @@ in a May or November delivery arrives while no period it delivers in is
 open. Settings in force: warn setting promote, replacement setting never.
 Its link opens the day after the supply's receipt, on its verdict line.*
 **Expect** (the first bootstrapped build, 2026-11-16): the newest such supply is the 2026-Q3
-delivery's, received 9:00am Wednesday, 27 May 2026 (cp_case_workers__202605270100000000).
+delivery's, received 9:00am Wednesday, 27 May 2026 (cp_case_workers__202605270100000000) -
+the same held supply TS-79a's page shows in its as-at panel.
 On 28 May 2026 cp-case-workers' verdict line reads "Awaiting a decision — the
 results below are the newest supply, received 9:00am Wednesday, 27 May 2026,
 which is not in place in the warehouse yet. The supply in place in the
@@ -4127,8 +4134,9 @@ person, cp-case-workers inherited, the other four promoted by the rule).
 period's _manifest.
 
 **TS-56 `[INJECT]` A supply whose columns arrive in another order.**
-2026-Q3, the newest quarter since 2026-10-15 (Keith, REQ-GEN-207 criterion
-3: its old 2024-Q4 is the quarter TS-76 stands on).
+The newest quarter since 2026-10-15 - 2026-Q4 on the history generated
+2026-11-16 (Keith, REQ-GEN-207 criterion 3: it left its old 2024-Q4 because
+TS-76 then stood on that quarter; TS-76 stands on 2025-Q1 today).
 *Config: quarterly, Feb/May/Aug/Nov.*
 `cp_carers` arrives with its first two columns swapped, header and rows
 alike - the same data, laid out differently by an upstream export.
@@ -4455,7 +4463,8 @@ participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill
 "Inherited from 2026-Q1" beside the dataset's title. The same page also shows
 an as-at panel and an "Awaiting a decision" verdict line about a May supply
 that is "not filed to any period": ordinary deliveries carry cp_case_workers
-in months it does not take part in, and each is held (TS-52's shape) - the
+in months it does not take part in, and each is held (TS-52's shape; that
+May supply, cp_case_workers__202605270100000000, is TS-52's own) - the
 pill, not the panel, is what this scenario points at. **Breaks as**: no pill;
 or a stale date after ANCHOR_DATE moves.
 
@@ -4757,6 +4766,10 @@ refused 2025-Q4, so drift read Fail across the gap.)*
 the 2024-Q4 Client Register, promoted passing on the round before, reads with
 the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the
 cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
+Since REQ-GEN-206 (2026-11-16) the quarter's ordinary linkage release is drawn
+amber too, on Emergency Department coverage - a Warn of linkage-keys about ED
+Presentations, not of the Client Register (post-build-review #449); this
+Expect is about the Client Register alone.
 **Breaks as**: the Client Register demoted, or tagged before the promotion.
 
 **TS-113 `[INJECT]` A Client Register geocode whose placed mix drifts.**

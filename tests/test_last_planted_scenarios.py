@@ -12,7 +12,7 @@ test in tests/test_as_at_scenarios.py.
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -79,6 +79,50 @@ class TestTS52IsChosenFromTheDeliveries:
     def test_never_one_an_injection_places(self):
         recognised = [_cw("2025-05-27", "may25"), _cw("2026-05-27", "may26")]
         placement = si.held_case_workers_placement(recognised, {"may26"})
+        assert placement.arrivals[0]["delivery"] == "may25"
+
+    @staticmethod
+    def _one_correction(monkeypatch, quarters=(), opens=None):
+        """One declared correction, claiming `quarters` of the delivery's
+        quarter dataset and, where `opens` is a day, opening a cp-case-workers
+        slot over a receipt on that day under its agreement after."""
+        from asset_model import agreement, declared_corrections, slots
+        from generator import correction_claims
+
+        after = object()
+        pending = type("Pending", (), {"reference": "TEST-CORRECTION"})()
+        monkeypatch.setattr(declared_corrections, "pending_corrections", lambda *_d: [pending])
+        monkeypatch.setattr(correction_claims, "_docs_either_side",
+                            lambda *_a, **_k: (None, None, [{}]))
+        monkeypatch.setattr(correction_claims, "claimed",
+                            lambda *_a, **_k: {"cp-clients": list(quarters)})
+        monkeypatch.setattr(agreement, "from_doc", lambda _doc: after)
+        real = slots.period_claimed_at
+
+        def claimed_at(dataset_id, at, agreement=None):
+            if agreement is after:
+                return ("2026-Q2" if opens and dataset_id == si.INHERITING_DATASET
+                        and asset_time.local_date(at).isoformat() == opens else None)
+            return real(dataset_id, at, agreement=agreement)
+
+        monkeypatch.setattr(slots, "period_claimed_at", claimed_at)
+
+    def test_never_one_in_a_quarter_a_declared_correction_claims(self, monkeypatch):
+        # Criterion 1 (post-build-review #451): a correction that moves, holds
+        # or places a supply of the newest held one's quarter skips it.
+        from asset_model import slots
+
+        may26 = slots.period_claimed_at("cp-clients", _at("2026-05-27"))
+        assert may26, "the 27 May 2026 delivery has a quarter"
+        self._one_correction(monkeypatch, quarters=(may26,))
+        recognised = [_cw("2025-05-27", "may25"), _cw("2026-05-27", "may26")]
+        placement = si.held_case_workers_placement(recognised, set())
+        assert placement.arrivals[0]["delivery"] == "may25"
+
+    def test_never_one_a_declared_corrections_calendar_opens_a_slot_over(self, monkeypatch):
+        self._one_correction(monkeypatch, opens="2026-05-27")
+        recognised = [_cw("2025-05-27", "may25"), _cw("2026-05-27", "may26")]
+        placement = si.held_case_workers_placement(recognised, set())
         assert placement.arrivals[0]["delivery"] == "may25"
 
     def test_refused_naming_it_where_none_is_held(self):
@@ -154,8 +198,7 @@ class TestTS47AndTS53:
         assert [(s.operation, s.supply_index) for s in mine] == [
             ("reject", 2), ("un-supersede", 1), ("promote", 1)]
         placement = si.resolve(_injection("TS-53"), _periods("birth-registrations"))
-        received = [asset_time.wall_clock(__import__("datetime").date.fromisoformat(a["date"]),
-                                          a["at"]) for a in placement.arrivals]
+        received = [asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"]) for a in placement.arrivals]
         when = [received[s.supply_index] + timedelta(hours=s.after_hours) for s in mine]
         assert when == sorted(when) and len(set(when)) == 3
         assert when[0] > received[2]
@@ -216,6 +259,42 @@ class TestTheQuarterlyPlacements:
         assert "TS-48" in _injection("TS-75a").also_demonstrates
         assert "TS-50" in _injection("TS-81").also_demonstrates
         assert si.link_problems([_injection("TS-75a"), _injection("TS-81")]) == []
+
+
+@pytest.mark.asset("quarterly")
+def test_only_the_ambers_its_quarters_displaced_move(monkeypatch):
+    """Where the drawn ambers went (post-build-review #443 and #449): without
+    TS-112 and TS-55, and with TS-99 back on 2022-Q4 (anchor -16), every
+    ordinary severity of Child Protection and Linkage Products is as it was
+    before REQ-GEN-206 - so these, and only these, are what it moved.
+
+    Child Protection: 2017-Q2's and 2023-Q1's drawn ambers land on 2018-Q4
+    and 2019-Q2, TS-91's and TS-92's linkage quarters (whose linkage rows do
+    not change). Linkage Products, all from TS-99's move: 2022-Q4 gains an
+    ordinary amber and 2023-Q2 loses one; 2024-Q3's drawn amber gives way to
+    TS-99 and lands on 2024-Q4, TS-111's quarter."""
+    from generator import collections
+
+    def severities(cid):
+        plan = collections.provider(cid).plan()
+        return {(j.period.name, j.stream): j.severity for j in plan.jobs}
+
+    cp_now, lp_now = severities("child-protection"), severities("linkage-products")
+    before = tuple(dataclasses.replace(i, anchor=-16) if i.scenario_id == "TS-99" else i
+                   for i in si.INJECTIONS
+                   if i.scenario_id not in {"TS-112a", "TS-112b", "TS-55"})
+    monkeypatch.setattr(si, "INJECTIONS", before)
+    cp_then, lp_then = severities("child-protection"), severities("linkage-products")
+    assert cp_now.keys() == cp_then.keys() and lp_now.keys() == lp_then.keys()
+
+    def moved(now, then):
+        return sorted((p, then[(p, s)], now[(p, s)]) for p, s in now
+                      if now[(p, s)] != then[(p, s)])
+
+    assert moved(cp_now, cp_then) == [("2017-Q2", "amber", None), ("2018-Q4", None, "amber"),
+                                      ("2019-Q2", None, "amber"), ("2023-Q1", "amber", None)]
+    assert moved(lp_now, lp_then) == [("2022-Q4", None, "amber"), ("2023-Q2", "amber", None),
+                                      ("2024-Q3", "amber", None), ("2024-Q4", None, "amber")]
 
 
 @pytest.mark.asset("quarterly")
@@ -285,3 +364,33 @@ def test_a_one_table_pair_contests_its_table_and_a_six_table_one_only_its_own():
                              (six, "cp_clients", True), (six, "cp_notifications", False)):
         plan = Plan(jobs=[], resolved=[], injected_by_period={"Q": (inj, None)})
         assert P().contests_table(plan, Job("s", 0, None, period), 1, None, table) is want
+
+
+@pytest.mark.asset("daily")
+def test_every_birth_registrations_pair_is_contested_as_the_pipeline_contests_it():
+    """Post-build-review #452: a next-day pair ({D} with {D+1}) or a _TEST pair
+    is a contest too. The pipeline contests every dataset that several files
+    of one arrival claim by its arrival_pattern (Arrival.contested), and every
+    file of these pairs is Birth Registrations' - so nothing promotes the day
+    until a person's choose-file settles it (scripted_decisions.yaml), and
+    Provider.contests_table must agree rather than read the file names."""
+    from datetime import date
+
+    from asset_model import arrival_patterns
+    from generator.collections.base import Job, Plan, Provider
+
+    class P(Provider):
+        collection_id = "civil-registration"
+
+    pairs = [i for i in si.INJECTIONS if i.dataset_id == "birth-registrations"
+             and any(a.files for a in i.arrivals)]
+    assert {i.scenario_id for i in pairs} >= {"TS-69", "TS-71", "TS-74"}, pairs
+    period = type("Period", (), {"name": "D"})()
+    for inj in pairs:
+        n = next(k for k, a in enumerate(inj.arrivals, start=1) if a.files)
+        names = [f.filename(date(2026, 7, 1)) for f in inj.arrivals[n - 1].files]
+        claimed = {arrival_patterns.dataset_for_filename(name) for name in names}
+        assert claimed == {"birth-registrations"}, (inj.scenario_id, names)
+        plan = Plan(jobs=[], resolved=[], injected_by_period={"D": (inj, None)})
+        assert P().contests_table(plan, Job("s", 0, None, period), n, None,
+                                  "birth_registrations") is True, inj.scenario_id

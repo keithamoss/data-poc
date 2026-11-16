@@ -16209,9 +16209,12 @@ twice. It deliberately did not re-find the `TypeError`.
      Register never promoted, which criterion 22 forbids. **Built as the
      criterion** (feature work, not a defect fix): `contested` on
      GeneratedSupply, a settlement promoting only where it makes a file the
-     supply, and a refusal naming the scenario. The ordinary geocoding draw
-     moved with it: 2017-Q2's source is not in the warehouse, so no drawn
-     fault lands there.
+     supply, and a refusal naming the scenario. CORRECTED (#447, the critic's
+     finding): this entry said the ordinary geocoding draw moved with it. It
+     did not - the geocoding stream's plan is identical at 6129d66c and at
+     this build, every job's severity, receipt, faults, resupply and planned
+     verdict; the geocoding run ids that changed in the golden were already in
+     the real databases before this branch.
 
 443. **[done, 2026-11-16]** **[Testing & dev tooling]** **A REQ-GEN-335 test's
      premise stopped holding once two more quarters gave up their drawn
@@ -16225,7 +16228,10 @@ twice. It deliberately did not re-find the `TypeError`.
      DRAWN clean, which is what the criterion said. The test now asserts that
      against the drawn plan, and that the only differences are ambers moving,
      the same number generated. A test encoding a premise the history no
-     longer has, so no product change.
+     longer has, so no product change. SUPERSEDED BY #449: that loosening
+     accepted any amber reshuffle; the test now names the one move exactly
+     (2019-Q1 and 2019-Q2), and where every displaced amber landed is pinned
+     by a test of its own.
 
 444. **[done, 2026-11-16]** **[Data generation]** **TS-112's settlement takes
      effect a week after its scripted time, so its promotions had to wait.**
@@ -16262,3 +16268,148 @@ twice. It deliberately did not re-find the `TypeError`.
      server, read this build's history rather than the real one. Process
      only; recorded so the next builder sets the cluster up the same way.
 
+447. **[done, 2026-11-16]** **[Testing & dev tooling]** **The arrival golden's
+     re-capture absorbed earlier drift and said it had not.** The post-build
+     critic on 4f85789e. The comment and the evidence said every shared run id
+     kept its verdict and instant - true - but 28 run ids went out and 31 came
+     in, and not all of them were this build's. Verified against the real
+     `supply_daily` and `supply_quarterly` (read only), built before this
+     branch: they already hold the new geocoding ids and Birth Registrations'
+     `__20260713021303987266`, and none of this branch's scenario arrivals.
+     Accounted for by hand, as earlier entries in that comment are: from this
+     branch 18 out and 21 in (TS-53's 23 to 25 July and the ordinary red its
+     claims moved from 22 to 14 July, #441; TS-47's green 8 September;
+     TS-112's 2017-Q2 delivery, early at 08:30; TS-55's 2022-11-01 delivery
+     without cp_placements; TS-99's move, which swaps two linkage-keys
+     release times). Pre-existing, 10 out and 10 in: the 2026-11-03 capture
+     (c5d01de5) was never re-taken when 650d26f1 (2026-11-14, #322) moved
+     TS-107 to 2021-Q2 and TS-111 to 2024-Q4, nor when 3c88932b (2026-11-16)
+     placed TS-113 in 2026-Q3 - each quarter's one geocoding delivery moving to
+     or off its scenario's 18:30, and with TS-113 geo-ed's ordinary red's
+     resupply moving from 14 August 2017 to 9 August 2018 (bisected by
+     planning at 479b06b8 and 3c88932b). Plus Birth Registrations' 13 July
+     resend, see #454. The counts are unchanged; the comment
+     (tests/test_asset_time_semantics.py) and REQ-GEN-206's evidence now say
+     which is which, and #442's "the ordinary geocoding draw moved with it" is
+     corrected there: the geocoding plan is identical before and after.
+
+448. **[todo, 2026-11-16]** **[Data generation]** **[Dashboard UI]** **For
+     Keith: TS-112b's verdict line is REQ-DASH-204 criterion 16's no-queue-item
+     form, not its turned-down form, as REQ-GEN-206 criterion 20 says.** The
+     critic on 4f85789e, verified in the code. The page gives "The <dataset>
+     file received with it was turned down; this supply now needs its own
+     decision." only when the line's form is `turned-down`, which
+     pipeline/cross_table_notices.py sets only from `_package_form` - the
+     rejected table was a package-mate the gate held back WITH the reader
+     (its promotion-withheld entry names it). TS-112's readers were never held
+     with the pair: their cross-table records read contested, then rejected,
+     so the line is form `general`, cause `turned-down`, and with no item in
+     the queue (`_NO_ITEM_CODES` holds REJECTED) the verdict line takes the
+     no-queue-item branch with REQ-DASH-337's "was rejected" clause - exactly
+     what TS-112b's Expect quotes. Criterion 16 has both a "that other supply
+     has been rejected" clause and a "no item of its own in the queue" clause,
+     and a pair rejected whole in the reader's own delivery satisfies both;
+     which wins is not written down. **Not changed**: criterion 20 moved into
+     REQ-GEN-206's unmet_criteria (unowned), and TS-112b's register entry now
+     names the form it quotes. **Keith to decide**: (a) amend criterion 20's
+     "b" to the no-queue-item form with the rejected clause - the page as
+     built; or (b) the turned-down sentence should apply to a rejected table
+     received in the reader's own delivery, a page change for REQ-DASH-204.
+     Also checked: TS-112a's quoted line does stop at "That is not a fault in
+     this supply's own data." - not a truncation, the page leaves out
+     criterion 2's last sentence when the verdict line already says when the
+     checks run again (`said`, UX critic on 7093c20, S4, PROVISIONAL); the
+     Expect now says so, as TS-80's does.
+
+449. **[done, 2026-11-16]** **[Testing & dev tooling]** **REQ-GEN-335's
+     byte-identical-neighbours test was loosened to accept any amber
+     reshuffle.** The critic on 4f85789e; #443's change. Restored: the test now
+     requires the sides' quarters to be exactly 2019-Q1 and 2019-Q3 and the
+     with-and-without difference to be exactly one amber, on 2019-Q2 with the
+     sides and on 2019-Q1 without them - TS-93a's quarter, clean and free
+     without it - and nothing else. A new test plans without TS-112 and TS-55
+     and with TS-99 back on 2022-Q4 and requires exactly REQ-GEN-206's moves:
+     Child Protection's drawn ambers of 2017-Q2 and 2023-Q1 on 2018-Q4 and
+     2019-Q2; linkage-keys 2022-Q4 gaining an Emergency Department coverage
+     amber, 2023-Q2 losing one, 2024-Q3's Client Register amber giving way to
+     TS-99 and 2024-Q4 gaining an ED coverage amber. Each verified by planning
+     at 6129d66c and at this build before writing it. Two notes recorded: the
+     moved Child Protection ambers sit in TS-91's and TS-92's quarters, whose
+     linkage rows are byte-identical before and after (hashed); and 2024-Q4 is
+     TS-111's quarter, whose Expect is about the Client Register only - a line
+     added to its register entry saying the linkage release's Warn there is
+     about ED Presentations. Where the ambers landed is in REQ-GEN-206's
+     decisions. **Ran**: both tests pass on this tree (see the commit).
+
+450. **[todo, 2026-11-16]** **[Data generation]** **For Keith: TS-112's
+     settlement is "on the asset day after its arrival" only as scripted.**
+     The critic on 4f85789e. Criterion 19 says settled on the asset day after
+     the arrival; the choose-file is scripted for 11:00 on 2 February 2017 and
+     is recorded at 5:53am 8 February, because a person's act takes one
+     instant, the latest already recorded about its supplies (#284 (B)), and
+     the gate's refusal of the pair is lagged across the claim window (#444).
+     TS-80's settlement behaves the same way and its Expect says so. **Not
+     changed**: criterion 19 moved into REQ-GEN-206's unmet_criteria
+     (unowned). **Keith to decide**: accept the week and amend criterion 19 to
+     "scripted for the asset day after its arrival", or ask for a settlement
+     that lands on 2 February - which needs the lag rule or the arrival moved.
+
+451. **[done, 2026-11-16]** **[Testing & dev tooling]** **TS-52's chooser never
+     had a test for the supply a declared correction claims.** The critic on
+     4f85789e: the branch in `held_case_workers_placement` skipping a candidate
+     a correction moves, holds or places was never exercised. Two tests added
+     (tests/test_last_planted_scenarios.py), one per half of the condition: a
+     correction claiming the newest held supply's quarter, and one whose
+     agreement opens a cp-case-workers slot over its receipt; each must choose
+     the older supply. **Ran**: with the branch's `continue` replaced by
+     `pass`, both failed (2 failed, 4 passed); restored, 6 passed.
+
+452. **[done, 2026-11-16]** **[Data generation]** **Not a defect: a Birth
+     Registrations next-day or _TEST pair IS contested.** The critic on
+     4f85789e called `Provider.contests_table` a latent defect for counting
+     every two-file arrival of a one-table collection as contested. Checked
+     against the pipeline before writing a failing test: `Arrival.contested`
+     counts any dataset two files of one arrival claim by its arrival_pattern,
+     and Birth Registrations' pattern (`birth_registrations_[^/]+\.csv`)
+     claims both files of every pair TS-68 to TS-74 plants - {D} with {D+1}
+     and the _TEST pairs included. assets/daily/synthetic/scripted_decisions.yaml
+     settles each by a person's choose-file for exactly that reason ("so the
+     arrival day reads contested"). Counting them contested is the pipeline's
+     answer, so no fix: a test now pins the agreement for every Birth
+     Registrations pair, and the docstring says why.
+
+453. **[done, 2026-11-16]** **[Data generation]** **Polish from the critic on
+     4f85789e.** REQ-GEN-206's evidence said "TS-53's seven decisions" and
+     listed eight - now eight. TS-112's config (scenario_injection.py and its
+     register entry) said the readers are promoted "at 11:00 the day after"
+     the settlement; the script's day_offset 8 is 9 February, the asset day
+     after the settlement takes effect on 8 February - both now say so.
+     TS-56's entry said "2026-Q3, the newest quarter ... its old 2024-Q4 is the
+     quarter TS-76 stands on"; today TS-56 is on 2026-Q4 and TS-76 stands on
+     2025-Q1 - reworded. TS-52 and TS-79a now name each other: TS-79a's
+     "May supply" is TS-52's cp_case_workers__202605270100000000. The test's
+     `__import__("datetime")` is a plain import. **For Keith, not changed**
+     (signed text): REQ-GEN-207 still says TS-76 stands on 2024-Q4 in
+     criterion text (requirements.yaml lines ~34266 and ~34275, "TS-76 stands
+     on 2024-Q4, TS-77a on 2023-Q1"; "TS-56 moves to 2026-Q3 and the amber
+     drawn there goes to 2024-Q4"), its evidence (~34348) and two decisions
+     (~34418, ~34427) - each true when written. Noticed, not changed: TS-79a's
+     entry says "(2026-Q2 today)" and quotes "Inherited from 2026-Q1", while
+     the placement this build recorded is 2026-Q3; its Expect wants
+     re-observing on a page.
+
+454. **[investigate, 2026-11-16]** **[Data generation]** **Birth Registrations'
+     13 July 2026 resend lands at 02:11 on some plans and 02:13 on others.**
+     Found accounting for #447. The 2026-11-03 golden pinned
+     `birth_registrations__20260713021103987266` (the 7 July red's fourth
+     delivery); the real `supply_daily` and this build's bootstrap both hold
+     `...021303...`, two minutes later, and both still hold the 9 July red's
+     resend at 02:11 on 10 July. Bisecting it by planning the provider alone
+     did not date it: the same commit (479b06b8, and 6129d66c) gave 02:11 for
+     both resends on one run and 02:13 for both on later runs, with the same
+     anchor and no file changed, while the bootstraps recorded one of each.
+     The receipt is the payload's earliest extract_timestamp outside the
+     disordered rows (`_received_at`), so something feeding the dirtied
+     resend's rows is not reproducible from the seed alone - which CLAUDE.md's
+     "everything is seeded" relies on. Not investigated further here; worth a
+     proper look before the next golden capture.

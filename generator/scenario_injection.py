@@ -2422,8 +2422,10 @@ INJECTIONS: tuple[Injection, ...] = (
     # grown quarter no scenario of any collection claims. The delivery carries
     # the usual files and two Client Registers, each its own receipt, both
     # before due, clean apart from the pair; a person settles it as neither the
-    # day after, promotes the three readers the day after that, and marks the
-    # quarter's Client Register not supplied once its slot has closed.
+    # day after (in effect at 05:53 on 8 February, with the gate's lagged
+    # refusal), promotes the three readers on 9 February, the asset day after
+    # that, and marks the quarter's Client Register not supplied once its slot
+    # has closed.
     Injection(
         scenario_id="TS-112a",
         dataset_id="cp-clients",
@@ -2433,8 +2435,9 @@ INJECTIONS: tuple[Injection, ...] = (
                "cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose "
                "rows differ - both before due. A person settles the pair at 11:00 the next "
                "day with both files rejected, which takes effect with the gate's refusal of the "
-               "pair; promotes the three readers at 11:00 the day after that, and marks the quarter's Client Register not supplied the day after its "
-               "slot closes.",
+               "pair at 05:53 on 8 February; promotes the three readers at 11:00 on 9 February, "
+               "the asset day after that, and marks the quarter's Client Register not "
+               "supplied the day after its slot closes.",
         arrivals=(
             ExtraArrival(0, "08:30", note="the quarter's delivery, its Client Register sent "
                                           "twice", files=(
