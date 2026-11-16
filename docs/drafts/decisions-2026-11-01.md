@@ -809,3 +809,16 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - Asked whether to accept moving the reference test's 2019-Q4 half to TS-103's
   2022-Q1 ED file against TS-101b's 2021-Q4 file (the same rule on a file tried
   by design). Keith: "Accept".
+
+## #420 and what next (Keith, 2026-11-16 ~12:30 Perth)
+
+- #420: since the regeneration, TS-76's and TS-77a's head pill and drill-down
+  need about 805px in an 800px window, because a real "1 thing waiting for a
+  person" queue sits between them. Keith chose (a): when the two cannot both
+  fit and the subject is the pill's own drill-down, land with the pill at the
+  top and let the subject's bottom few pixels go. Both quoted texts stay on
+  screen. He rejected (b), narrowing REQ-GEN-199 c36-37, and (c), moving the
+  drill-down above the notices.
+- Next: Keith chose (a), the rolling-anchor batch (REQ-GEN-404 to 408,
+  REQ-DASH-407, REQ-TEST-402), over REQ-GEN-206, the timing browser tests, or
+  stopping for the day.
