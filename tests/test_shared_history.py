@@ -76,8 +76,36 @@ class TestTheKey:
     fixed test anchor."""
 
     def test_it_is_the_bootstrap_cache_key_at_the_fixed_anchor(self):
-        assert shared_history.key("daily") == replay_inputs.cache_key("daily", anchor=FIXED)
+        assert shared_history.key("daily").startswith(
+            replay_inputs.cache_key("daily", anchor=FIXED) + "-")
         assert shared_history.key("daily").startswith(replay_inputs.KEY_PREFIX + "daily-")
+
+    def test_a_change_to_the_build_script_itself_misses(self, tmp_path, monkeypatch):
+        """post-build-review #465: the build (_BUILD, its environment, the
+        entry layout) lives in tests/shared_history.py, which replay_inputs'
+        digest does not cover - so a change there restored the history the
+        OLD build made. Two copies of the module, one with the build script
+        edited, must key differently; two identical copies must not."""
+        import importlib.util
+
+        source = Path(shared_history.__file__).read_text()
+        edited = source.replace("warnings.simplefilter(\"ignore\")",
+                                "warnings.simplefilter(\"ignore\")  # edited")
+        assert edited != source, "precondition: the build script was edited"
+
+        def key_of(text, name):
+            path = tmp_path / name / "tests" / "shared_history.py"
+            path.parent.mkdir(parents=True)
+            path.write_text(text)
+            spec = importlib.util.spec_from_file_location(f"sh_{name}", path)
+            module = importlib.util.module_from_spec(spec)
+            monkeypatch.setitem(sys.modules, spec.name, module)  # a dataclass needs it
+            spec.loader.exec_module(module)
+            return module.key("daily")
+
+        same = key_of(source, "same")
+        assert key_of(source, "again") == same
+        assert key_of(edited, "edited") != same
 
     def test_another_installed_anchor_does_not_move_it(self):
         before = shared_history.key("daily")
@@ -175,12 +203,17 @@ _WORKER = textwrap.dedent("""
     from pathlib import Path
     import shared_history as sh
     cache, key, builds, hold = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3]), float(sys.argv[4])
+    mode, wait = sys.argv[5], sys.argv[6]
     sh.CACHE_DIR = cache
     sh.key = lambda asset: key
+    if wait:
+        sh.BUILD_WAIT_SECONDS = float(wait)
     def build(asset, dest):
         with open(builds, "a") as f:
             f.write(f"{{os.getpid()}}\\n")
         time.sleep(1.0)
+        if mode == "fail":
+            raise RuntimeError(f"stand-in build failed in {{os.getpid()}}")
         (dest / "deliveries" / "d1").mkdir(parents=True)
         (dest / "deliveries" / "d1" / "f.csv").write_text("x\\n")
     sh._build = build
@@ -190,12 +223,13 @@ _WORKER = textwrap.dedent("""
 """)
 
 
-def _worker(tmp_path, cache, key, *, hold=0.0):
+def _worker(tmp_path, cache, key, *, hold=0.0, mode="ok", wait="", run="run-1"):
     code = _WORKER.format(tests=str(TESTS), root=str(shared_history.ROOT))
     return subprocess.Popen(
-        [sys.executable, "-c", code, str(cache), key, str(tmp_path / "builds"), str(hold)],
+        [sys.executable, "-c", code, str(cache), key, str(tmp_path / "builds"), str(hold),
+         mode, str(wait)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=shared_history.ROOT,
-        env=dict(os.environ, MOTHMAN_ASSET="daily"))
+        env=dict(os.environ, MOTHMAN_ASSET="daily", PYTEST_XDIST_TESTRUNUID=run))
 
 
 def _builds(tmp_path) -> int:
@@ -225,6 +259,56 @@ class TestOnceAcrossEveryWorker:
         assert _builds(tmp_path) == 1
 
 
+class TestAWaitingWorkerDoesNotWaitForever:
+    """post-build-review #467: a worker waiting on another's build waits a
+    bounded time and says what it waited on; a build that failed is not
+    retried by every worker in turn - the rest of the run fails fast with
+    the first failure's message, and a LATER run tries again."""
+
+    def test_a_build_that_never_finishes_is_given_up_on_naming_it(self, tmp_path):
+        cache = tmp_path / "cache"
+        cache.mkdir()
+        # ANOTHER WORKER BUILDING: the build lock held exclusively, as acquire()
+        # holds it while it builds.
+        fd = os.open(cache / "k-one.build", os.O_RDWR | os.O_CREAT, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            p = _worker(tmp_path, cache, "k-one", wait=2)
+            try:
+                _, err = p.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.communicate()
+                pytest.fail("the waiting worker was still waiting after 60s")
+        finally:
+            os.close(fd)
+        assert p.returncode != 0
+        assert "waited" in err and "k-one.build" in err, err[-2000:]
+        assert _builds(tmp_path) == 0
+
+    def test_a_failed_build_is_not_retried_by_each_waiting_worker(self, tmp_path):
+        cache = tmp_path / "cache"
+        procs = [_worker(tmp_path, cache, "k-one", mode="fail") for _ in range(3)]
+        outs = [p.communicate(timeout=120) for p in procs]
+        assert all(p.returncode != 0 for p in procs)
+        assert _builds(tmp_path) == 1
+        builder = (tmp_path / "builds").read_text().split()[0]
+        for _, err in outs:
+            assert f"stand-in build failed in {builder}" in err, err[-2000:]
+        assert not (cache / "k-one").exists()
+
+    def test_a_later_run_tries_the_build_again(self, tmp_path):
+        cache = tmp_path / "cache"
+        p = _worker(tmp_path, cache, "k-one", mode="fail", run="run-1")
+        p.communicate(timeout=60)
+        assert p.returncode != 0
+        p = _worker(tmp_path, cache, "k-one", run="run-2")
+        _, err = p.communicate(timeout=60)
+        assert p.returncode == 0, err[-2000:]
+        assert _builds(tmp_path) == 2
+        assert sorted(q.name for q in cache.iterdir() if q.is_dir()) == ["k-one"]
+
+
 class TestAnOlderHistoryIsRemovedOnlyWhenNobodyHoldsIt:
     """Criterion 4."""
 
@@ -250,6 +334,19 @@ class TestAnOlderHistoryIsRemovedOnlyWhenNobodyHoldsIt:
             assert sorted(q.name for q in cache.iterdir() if q.is_dir()) == ["k-new", "k-old"]
         finally:
             os.close(fd)
+
+    def test_a_folder_that_names_no_asset_is_left_alone(self, tmp_path):
+        """post-build-review #469: pruning removes only what it can tell is
+        this asset's - a folder in the cache without an ASSET file (put there
+        by hand, or by something else) is not."""
+        cache = tmp_path / "cache"
+        stranger = cache / "k-stranger"
+        (stranger / "deliveries").mkdir(parents=True)
+        (stranger / "deliveries" / "keep.csv").write_text("x\n")
+        p = _worker(tmp_path, cache, "k-new")
+        _, err = p.communicate(timeout=60)
+        assert p.returncode == 0, err[-2000:]
+        assert (stranger / "deliveries" / "keep.csv").is_file()
 
 
 class TestTheBuildUsesTheFixedAnchor:

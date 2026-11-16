@@ -367,6 +367,20 @@ def test_dirty_only_picks_2_or_3_of_the_6_tables():
     assert saw_2 and saw_3, "expected both 2-table and 3-table draws across 200 seeds"
 
 
+def _real_data_files() -> tuple[Path, Path]:
+    """The selected asset's REAL scenario placements and anchor file under the
+    checkout's data/<asset>/ - read from the asset itself, never from the
+    generator's call-time getters, which a module fixture may have redirected
+    (post-build-review #468)."""
+    from asset_model import assets, history_anchor
+    from qa_tools.common import scenario_map
+
+    real = (assets.data_path(scenario_map.PLACEMENTS_FILE), assets.data_path(history_anchor.FILE))
+    for path in real:
+        assert generator_isolation.DATA_DIR.resolve() in path.resolve().parents, path
+    return real
+
+
 def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     """CP's counterpart to the same test in tests/test_generate_runs.py -
     see that one for the real bug this guards. Both generators write
@@ -399,7 +413,12 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # generation, and the redirects below once missed it.
     from generator import scenario_injection
 
-    real_placements = scenario_injection.placements_path()
+    # THE REAL PATHS, FROM THE ASSET'S OWN DATA FOLDER (post-build-review
+    # #468) - never through placements_path()/anchor_path(), which in a
+    # whole-module run the module's raw_dir fixture has already pointed at
+    # the shared history, so "the real file" would be the shared one.
+    real_placements, real_anchor = _real_data_files()
+    supply_before = generator_isolation.supply_files_under_data()
     placements_before = (real_placements.stat().st_mtime_ns, real_placements.read_bytes()) \
         if real_placements.exists() else None
     # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
@@ -415,7 +434,6 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # generation writes data/<asset>/history_anchor beside the tree, and this
     # test's redirects once missed it - so run alone it rewrote the checkout's
     # real anchor file, a rolled demo's included.
-    real_anchor = driver.anchor_path()
     anchor_before = ((real_anchor.stat().st_mtime_ns, real_anchor.read_bytes())
                      if real_anchor.exists() else None)
 
@@ -439,6 +457,46 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     assert ((real_anchor.stat().st_mtime_ns, real_anchor.read_bytes())
             if real_anchor.exists() else None) == anchor_before, \
         "the real history_anchor file was written to by a test run"
+    # AND NO SUPPLY FILE ANYWHERE ELSE UNDER THE REAL data/ (REQ-PIPE-102
+    # criterion 2) - the check the module's own test made before REQ-TEST-402
+    # moved it onto the shared history (post-build-review #468).
+    elsewhere = generator_isolation.supply_files_under_data() - supply_before
+    assert not elsewhere, \
+        f"the generator wrote a supply file into the real data/ tree: {sorted(map(str, elsewhere))}"
+
+
+def test_a_redirected_generation_writes_nothing_under_the_real_data_tree(tmp_path):
+    """Child Protection's twin of the same test in tests/test_generate_runs.py
+    (post-build-review #468): every file under the real data/, not only the
+    named outputs, is left alone by a generation redirected through
+    generator.output.redirect().
+
+    ITS SUBJECT IS GENERATION ITSELF, so it generates a history of its own
+    rather than reading the shared one (REQ-TEST-402 criterion 7)."""
+    from generator.output import redirect
+
+    def snapshot():
+        out = {}
+        for root, dirs, files in os.walk(generator_isolation.DATA_DIR, onerror=lambda _e: None):
+            dirs[:] = [d for d in dirs if d != "dbt_scratch"]
+            for f in files:
+                path = Path(root) / f
+                try:
+                    st = path.stat()
+                except FileNotFoundError:
+                    continue
+                out[str(path)] = (st.st_size, st.st_mtime_ns)
+        return out
+
+    before = snapshot()
+    undo = redirect(tmp_path)
+    try:
+        driver.generate("child-protection")
+    finally:
+        undo()
+    assert list((tmp_path / "deliveries").iterdir()), "precondition: something was generated"
+    assert (tmp_path / "scenario_placements.json").is_file()
+    assert snapshot() == before, "a redirected generation wrote under the real data/"
 
 
 # ---- Partial resupplies (REQ-GEN-040) --------------------------------

@@ -22,7 +22,13 @@ asset's providers and configuration, the shared code - with its KEY_PREFIX,
 so a change to any of them misses, and the fixed anchor (REQ-GEN-404
 criterion 11), so the key does not move with the calendar or with the
 checkout's own data/<asset>/history_anchor. The build itself installs the
-fixed anchor, whatever that file says (REQ-GEN-405 criterion 2).
+fixed anchor, whatever that file says (REQ-GEN-405 criterion 2). A digest of
+this file is folded in beside it, since the build script, its environment and
+an entry's layout live here (post-build-review #465).
+
+A WAITING WORKER WAITS A BOUNDED TIME (BUILD_WAIT_SECONDS), and a build that
+failed is recorded beside the entry so the run's other workers fail at once
+with its message rather than each rebuilding (post-build-review #467).
 
 WHERE (criterion 8): `.test-history/` at the repository root - gitignored,
 never under data/ (everything that recognises arrivals reads data/, the
@@ -49,6 +55,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -143,11 +150,18 @@ class History:
 
 def key(asset: str) -> str:
     """The cache key of `asset`'s shared history: replay_inputs' key for its
-    inputs at the fixed test anchor (criterion 3)."""
+    inputs at the fixed test anchor (criterion 3), and a digest of THIS FILE.
+
+    THIS FILE IS A BUILD INPUT TOO (post-build-review #465): the build script
+    (_BUILD), the environment it runs in and an entry's layout are all here,
+    and replay_inputs' digest covers none of tests/ - so without it a change
+    to how a history is built restored the one the old build made."""
     from asset_model import history_anchor
     from bootstrap import replay_inputs
 
-    return replay_inputs.cache_key(asset, anchor=history_anchor.FIXED_TEST_ANCHOR)
+    build = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+    return (replay_inputs.cache_key(asset, anchor=history_anchor.FIXED_TEST_ANCHOR)
+            + f"-build-{build}")
 
 
 def digest(root: Path) -> dict[str, str]:
@@ -201,14 +215,41 @@ def _lock_file(entry_key: str) -> Path:
     return CACHE_DIR / f"{entry_key}.lock"
 
 
-def _open_locked(path: Path, how: int) -> int:
+#: How long a worker waits for another to finish building a history before
+#: giving up, naming what it waited on (post-build-review #467). A cold build
+#: of the quarterly asset is about a minute on the 4-core sandbox; this is
+#: generous on purpose, a bound rather than an estimate.
+BUILD_WAIT_SECONDS = 30 * 60
+
+
+class SharedHistoryBuildFailed(RuntimeError):
+    """Building a shared history failed, in this process or in another
+    worker of the same run (post-build-review #467)."""
+
+
+def _open_locked(path: Path, how: int, *, wait: float | None = None) -> int:
     """`path` opened and flocked `how`, retried until the lock is on the file
     that is still at `path` - a pruner may unlink a lock file between the
-    open and the lock."""
+    open and the lock. With `wait`, the lock is waited for that many seconds
+    at most and TimeoutError names the file; with `how` carrying LOCK_NB,
+    BlockingIOError is raised at once, as flock raises it."""
+    deadline = None if wait is None else time.monotonic() + wait
     while True:
         fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
         try:
-            fcntl.flock(fd, how)
+            if deadline is None:
+                fcntl.flock(fd, how)
+            else:
+                while True:
+                    try:
+                        fcntl.flock(fd, how | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError(
+                                f"waited {wait:.0f}s for the lock on {path}, which another "
+                                f"process still holds") from None
+                        time.sleep(0.2)
         except BaseException:
             os.close(fd)
             raise
@@ -243,10 +284,17 @@ def acquire(asset: str) -> History:
     fd = _open_locked(_lock_file(entry_key), fcntl.LOCK_SH)
     try:
         if not entry.is_dir():
-            build = _open_locked(CACHE_DIR / f"{entry_key}.build", fcntl.LOCK_EX)
+            build_lock = CACHE_DIR / f"{entry_key}.build"
+            try:
+                build = _open_locked(build_lock, fcntl.LOCK_EX, wait=BUILD_WAIT_SECONDS)
+            except TimeoutError as waited:
+                raise SharedHistoryBuildFailed(
+                    f"gave up on the shared {asset} history: {waited}. Another worker is "
+                    f"building it or has hung doing so; if nothing is running, delete "
+                    f"{build_lock} and run again.") from None
             try:
                 if not entry.is_dir():
-                    _build_entry(asset, entry_key)
+                    _build_once_per_run(asset, entry_key)
                     _prune(asset, entry_key)
             finally:
                 os.close(build)
@@ -263,6 +311,38 @@ def acquire(asset: str) -> History:
     history = History(asset, entry, entry_key)
     _HELD[asset] = (fd, history)
     return history
+
+
+def _failed_file(entry_key: str) -> Path:
+    return CACHE_DIR / f"{entry_key}.failed"
+
+
+def _run_id() -> str | None:
+    """This test run's id, shared by every xdist worker of it - None outside
+    xdist, where no other worker of the run is waiting."""
+    return os.environ.get("PYTEST_XDIST_TESTRUNUID") or None
+
+
+def _build_once_per_run(asset: str, entry_key: str) -> None:
+    """Build the entry, called under its build lock - unless a worker of THIS
+    run already tried and failed, in which case fail at once with that
+    worker's message rather than spend another build finding the same thing
+    (post-build-review #467). A failure recorded by an EARLIER run is
+    cleared and the build tried again."""
+    failed = _failed_file(entry_key)
+    run = _run_id()
+    if failed.exists():
+        recorded = json.loads(failed.read_text())
+        if run is not None and recorded.get("run") == run:
+            raise SharedHistoryBuildFailed(
+                f"the shared {asset} history was not built - another worker of this run "
+                f"(pid {recorded.get('pid')}) already failed to build it:\n{recorded['error']}")
+        failed.unlink()
+    try:
+        _build_entry(asset, entry_key)
+    except Exception as error:
+        failed.write_text(json.dumps({"run": run, "pid": os.getpid(), "error": str(error)}))
+        raise
 
 
 def _build_entry(asset: str, entry_key: str) -> None:
@@ -285,22 +365,26 @@ def _prune(asset: str, keep: str) -> list[str]:
     for other in sorted(CACHE_DIR.iterdir()):
         if not other.is_dir() or other.name == keep or other.name.startswith("."):
             continue
+        # ONLY WHAT IS PROVABLY THIS ASSET'S (post-build-review #469): a folder
+        # with no ASSET file was not made by _build_entry, so it is left alone.
         try:
             owner = (other / ASSET_FILE).read_text().strip()
         except FileNotFoundError:
-            owner = None
-        if owner not in (asset, None):
+            continue
+        if owner != asset:
             continue
         lock = _lock_file(other.name)
-        fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o644)
+        # THE SAME INODE RE-CHECK AS acquire()'s (post-build-review #466): a
+        # second pruner may unlink the lock file between the open and the lock.
         try:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                continue
+            fd = _open_locked(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            continue
+        try:
             shutil.rmtree(other, ignore_errors=True)
             lock.unlink(missing_ok=True)
             (CACHE_DIR / f"{other.name}.build").unlink(missing_ok=True)
+            _failed_file(other.name).unlink(missing_ok=True)
             removed.append(other.name)
         finally:
             os.close(fd)

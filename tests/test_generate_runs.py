@@ -245,6 +245,20 @@ def test_no_run_id_carries_a_date(manifest):
             f"{e['run_id']} still carries a date"
 
 
+def _real_data_files() -> tuple[Path, Path]:
+    """The selected asset's REAL scenario placements and anchor file under the
+    checkout's data/<asset>/ - read from the asset itself, never from the
+    generator's call-time getters, which a module fixture may have redirected
+    (post-build-review #468)."""
+    from asset_model import assets, history_anchor
+    from qa_tools.common import scenario_map
+
+    real = (assets.data_path(scenario_map.PLACEMENTS_FILE), assets.data_path(history_anchor.FILE))
+    for path in real:
+        assert generator_isolation.DATA_DIR.resolve() in path.resolve().parents, path
+    return real
+
+
 def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     """Real bug, found 2026-09-23 by checking rather than assuming:
     redirecting one of generate_runs' outputs is not enough to isolate a
@@ -309,19 +323,17 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # truncated.
     from generator import scenario_injection
 
-    # THE REAL PATH, CAPTURED BEFORE THE REDIRECT (post-build-review #461): the
-    # comparison below once re-asked placements_path() after monkeypatching
-    # it, so it compared the test's own tmp file against whatever the path
-    # answered before - green only because the module's fixture had
-    # redirected both to identical generations.
-    real_placements = scenario_injection.placements_path()
+    # THE REAL PATHS, FROM THE ASSET'S OWN DATA FOLDER (post-build-review
+    # #461, #468) - never through placements_path()/anchor_path(), which in a
+    # whole-module run the module's raw_dir fixture has already pointed at
+    # the shared history, so "the real file" would be the shared one.
+    real_placements, real_anchor = _real_data_files()
     placements_before = (real_placements.read_bytes() if real_placements.exists() else None)
 
     # THE ANCHOR FILE TOO (REQ-GEN-404 criterion 3, post-build-review #460): a
     # generation writes data/<asset>/history_anchor beside the tree, and this
     # test's redirects once missed it - so run alone it rewrote the checkout's
     # real anchor file, a rolled demo's included.
-    real_anchor = driver.anchor_path()
     anchor_before = ((real_anchor.stat().st_mtime_ns, real_anchor.read_bytes())
                      if real_anchor.exists() else None)
 
