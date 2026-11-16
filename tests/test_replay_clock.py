@@ -51,22 +51,14 @@ class TestTheClock:
 
 
 @pytest.fixture(scope="module")
-def corpus(tmp_path_factory):
-    """The real Birth Registrations generator's first two deliveries."""
-    import generator_isolation
-
-    root = tmp_path_factory.mktemp("replay_clock")
-    undo = generator_isolation.redirect(root)
-    try:
-        driver.generate("civil-registration")
-    finally:
-        undo()
-    book = json.loads((root / "generator_bookkeeping.json").read_text())
+def corpus(tmp_path_factory, daily_history):
+    """The real Birth Registrations history's first two deliveries - a copy of
+    just those, from the suite's shared history (REQ-TEST-402)."""
+    book = daily_history.book()
     keep = {e["delivery"]: e for e in book["birth-registrations"] if e["run_id"] in FIRST_TWO}
-    for tree in ("deliveries", "receipts"):
-        for d in (root / tree).iterdir():
-            if d.name not in keep:
-                shutil.rmtree(d)
+    assert len(keep) == len(FIRST_TWO), keep
+    root = daily_history.copy_to(tmp_path_factory.mktemp("replay_clock") / "history",
+                                 only=keep).root
     latest = max(asset_time.parse_instant(e["received_at"], "bookkeeping") for e in keep.values())
     return root, latest
 

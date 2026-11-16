@@ -115,11 +115,29 @@ class History:
         finally:
             undo()
 
-    def copy_to(self, dest: Path) -> "History":
+    def copy_to(self, dest: Path, only=None) -> "History":
         """A copy of this history at `dest`, the test's own to change
-        (criterion 6) - never a regeneration."""
+        (criterion 6) - never a regeneration. `only`, a collection of delivery
+        names, copies just those deliveries and their receipts, with the
+        bookkeeping, placements and anchor file whole - for a test that reads
+        the first arrival or two."""
         dest = Path(dest)
-        shutil.copytree(self.root, dest, ignore=shutil.ignore_patterns(*_CACHE_FILES))
+        if only is None:
+            shutil.copytree(self.root, dest, ignore=shutil.ignore_patterns(*_CACHE_FILES))
+            return History(self.asset, dest, self.key)
+        only = set(only)
+        missing = only - {p.name for p in self.deliveries.iterdir()}
+        if missing:
+            raise KeyError(f"no such delivery in the shared {self.asset} history: {sorted(missing)}")
+        dest.mkdir(parents=True)
+        for path in self.root.iterdir():
+            if path.is_file() and path.name not in _CACHE_FILES:
+                shutil.copy2(path, dest / path.name)
+        for tree in ("deliveries", "receipts"):
+            (dest / tree).mkdir()
+            for name in sorted(only):
+                if (self.root / tree / name).exists():
+                    shutil.copytree(self.root / tree / name, dest / tree / name)
         return History(self.asset, dest, self.key)
 
 
