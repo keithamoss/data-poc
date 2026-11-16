@@ -185,9 +185,14 @@ def _replayed(tree: Path, monkeypatch, *, edit=None, edit_before=False) -> dict:
     from bootstrap import replay_clock
     from qa_tools.common import qa_store, supply_db
 
+    from qa_tools.common import build_output
+
     dbsupport.use_empty_supply_db(monkeypatch)
     with supply_db.connect(label="test") as conn:
         supply_db.ensure_schemas(conn)
+    # THE PIPELINE'S RESULTS FILE TO A BUILD OF ITS OWN (post-build-review
+    # #455): it rebuilt the real reports/daily/ results from these three runs.
+    monkeypatch.setenv(build_output.OUT_DIR_ENV, str(tree.parent / "build"))
     monkeypatch.setattr(delivery, "default_deliveries_dir", lambda: tree / "deliveries")
     monkeypatch.setattr(delivery, "default_receipts_dir", lambda: tree / "receipts")
     monkeypatch.setattr("bootstrap.generation.generate_collection", lambda cid, **_k: None)

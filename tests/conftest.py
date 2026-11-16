@@ -804,6 +804,49 @@ def _no_test_files_a_real_delivery():
         delivery.remove_deliveries = real_remove
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _no_test_writes_the_real_reports():
+    """No test writes a results or dashboard file into this checkout's real
+    reports/ (post-build-review #455).
+
+    Found 2026-11-16: tests/test_bootstrap_pin.py's real replay ran the real
+    pipeline, whose last step rebuilds the results file from history - into
+    reports/daily/, replacing the deployment's 119-run file with its own
+    three runs. Nothing failed: the deployment-half tests that read reports/
+    simply read a wrong file afterwards, and a dashboard built from it would
+    have shown three runs. Both writers - results_history.write_results_file
+    and build_dashboard_data.write - go through atomic_file.write_json, so
+    that is where this refuses. REFUSES rather than redirects, for the reason
+    _no_test_files_a_real_delivery gives: the test that reaches it can say
+    where its build goes (`build_output.OUT_DIR_ENV`, or its module's
+    reports_root), and a silent redirect would leave it asserting about a
+    directory it never named."""
+    import functools
+    from pathlib import Path
+
+    from qa_tools.common import atomic_file
+
+    real_reports = (_assets.ROOT / "reports").resolve()
+    real = atomic_file.write_json
+
+    @functools.wraps(real)
+    def guarded(path, *args, **kwargs):
+        target = Path(path).resolve()
+        if target == real_reports or real_reports in target.parents:
+            raise AssertionError(
+                f"a test tried to write {target} into this checkout's real reports/ - send its "
+                f"build elsewhere (monkeypatch.setenv(build_output.OUT_DIR_ENV, tmp_path), or "
+                f"the module's reports_root; see tests/conftest.py's "
+                f"_no_test_writes_the_real_reports)")
+        return real(path, *args, **kwargs)
+
+    atomic_file.write_json = guarded
+    try:
+        yield
+    finally:
+        atomic_file.write_json = real
+
+
 # EACH ASSET'S SYNTHETIC HISTORY, GENERATED ONCE AND SHARED (REQ-TEST-402):
 # built once per run across every worker, or restored from .test-history/ by
 # its inputs' key, at the fixed test anchor - see tests/shared_history.py. A

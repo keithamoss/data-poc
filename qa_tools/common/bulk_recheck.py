@@ -240,7 +240,8 @@ def newest_by_supply(conn, check) -> dict[tuple[str, str], str]:
     about - supply_status.results_about's rule for a non-file result, in SET
     form (NFR 3): a single-table result is about its run's own supply, a
     cross-table one about each supply it recorded READING of a table, and the
-    newest is the later-opened run's, then the later-recorded row. Held to
+    newest is the later-opened run's, then the later-recorded row - dropped
+    where a later run of the supply left the check out of scope. Held to
     results_about by tests/test_bulk_recheck.py::TestTheSetFormIsResultsAbout.
 
     ONE QUERY PER CHECK rather than results_about once per supply, which on a
@@ -274,7 +275,33 @@ def newest_by_supply(conn, check) -> dict[tuple[str, str], str]:
         rank = (run_seq if run_seq is not None else -1, row)
         if (where, sup) not in newest or rank > newest[(where, sup)][0]:
             newest[(where, sup)] = (rank, fp_)
-    return {key: fp_ for key, (_rank, fp_) in newest.items()}
+    left = _left_out_since(conn, check.check_id, {sup for _ds, sup in newest})
+    # A LATER RUN'S LEFT-OUT SUPERSEDES (supply_status._not_since_left_out,
+    # post-build-review #456): a result is no longer about its supply once a
+    # run of that supply at or after it left the check out of scope - and
+    # where the newest is gone, every older one is too.
+    return {key: fp_ for key, ((seq, _row), fp_) in newest.items()
+            if key[1] not in left or max(seq, 0) > left[key[1]]}
+
+
+def _left_out_since(conn, check_id: str, supplies: set[str]) -> dict[str, int]:
+    """{supply: the newest run_seq of a visible run of it that left `check_id`
+    out of its scope} - the left_out tool output's not_in_agreement, read as
+    supply_status._not_since_left_out reads it, for every supply at once."""
+    if not supplies:
+        return {}
+    s = qa_store.SCHEMA
+    left: dict[str, int] = {}
+    for sup, seq, raw in conn.execute(
+            f'SELECT r.supply_id, r.run_seq, t.raw_output FROM "{s}".run_visible r '
+            f'JOIN "{s}".tool_output t ON t.run_key = r.run_key '
+            "WHERE t.tool = 'left_out' AND r.supply_id = ANY(?) "
+            "AND strpos(t.raw_output::text, ?) > 0",
+            [sorted(supplies), check_id]).fetchall():
+        payload = raw.get("raw_output", raw) if isinstance(raw, dict) else {}
+        if check_id in ((payload or {}).get("not_in_agreement") or {}):
+            left[sup] = max(left.get(sup, seq), seq)
+    return left
 
 
 def _open_contests(conn) -> dict[tuple[str, str], tuple[str, ...]]:

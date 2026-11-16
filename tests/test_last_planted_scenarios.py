@@ -140,9 +140,12 @@ class TestTS52IsChosenFromTheDeliveries:
         extra placements carry TS-52 beside TS-79's."""
         import json
 
-        from generator import driver, output
+        from generator import driver
+        # REDIRECTED: the placements file read below is the one this test's
+        # own generation wrote under tmp_path, never the real tree's.
+        from generator.output import redirect
 
-        undo = output.redirect(tmp_path)
+        undo = redirect(tmp_path)
         try:
             driver.generate("child-protection")
         finally:

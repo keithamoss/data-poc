@@ -672,6 +672,49 @@ class TestTheSetFormIsResultsAbout:
         assert bulk.newest_by_supply(conn, checks[CHECK])[(DS, a)] == current()
         assert bulk.newest_by_supply(conn, cross)[(DS, b)] == STALE
 
+    def test_a_later_run_leaving_the_check_out_supersedes_it(self, conn):
+        """post-build-review #456: a LATER run of the supply that left the
+        check out of its scope (left_out's not_in_agreement - REQ-PIPE-332
+        criteria 7 and 9) means the earlier result is no longer about the
+        supply, in results_about. The set form named it all the same - the
+        shape TS-112's 2017-Q2 cp-notifications supply has on the deployment,
+        whose readers' relationship reds were re-evaluated out of scope once
+        both cp-clients files were rejected."""
+        checks = bulk.current_checks()
+        cross = next(c for c in checks.values() if c.reads_tables and c.tool == "soda")
+        kept, _ = filed(conn)
+        gone, _ = filed(conn)
+        key = f"pytest_bulk_x_{uuid.uuid4().hex[:8]}"
+        qa_store.record_run(conn, run_key=key, agency_id=AG, collection_id=COL,
+                            run_timestamp=WHEN, run_by=REAL_PERSON, environment="sandbox")
+        qa_store.set_run_purpose(conn, key, dataset_id=DS, supply_id=gone)
+        qa_store.record_results(
+            conn, key, [{"dataset_id": DS, "check_id": cross.check_id, "status": "fail"}],
+            tool="soda", agency_id=AG, collection_id=COL, scope=qa_store.CROSS_TABLE_SCOPE,
+            fingerprints={cross.check_id: STALE},
+            reads=[[qa_store.CheckRead("cp_carers", qa_store.READ, gone)]])
+        attempt_support.opened(conn, key)
+        qa_store.complete_run(conn, key)
+        # THE LATER RUN of `gone` - its single-table check and the cross-table
+        # one both left out, as not supplied by decision.
+        later = f"pytest_bulk_l_{uuid.uuid4().hex[:8]}"
+        qa_store.record_run(conn, run_key=later, agency_id=AG, collection_id=COL,
+                            run_timestamp=WHEN, run_by=REAL_PERSON, environment="sandbox")
+        qa_store.set_run_purpose(conn, later, dataset_id=DS, supply_id=gone)
+        why = {"code": "not_supplied_by_decision", "period": "2099-S6",
+               "reason": "not supplied for 2099-S6, by decision", "dataset": "cp-clients"}
+        qa_store.record_tool_output(conn, later, "left_out", {
+            "left_out": {}, "not_in_agreement": {CHECK: why, cross.check_id: why}})
+        attempt_support.opened(conn, later)
+        qa_store.complete_run(conn, later)
+        for check in (checks[CHECK], cross):
+            got = bulk.newest_by_supply(conn, check)
+            mine = {k: v for k, v in got.items() if k in {(DS, kept), (DS, gone)}}
+            assert mine == _newest_one_at_a_time(conn, check, {(DS, kept), (DS, gone)}), \
+                check.check_id
+            assert (DS, gone) not in got, check.check_id
+        assert bulk.newest_by_supply(conn, checks[CHECK])[(DS, kept)] == STALE
+
 
 @pytest.mark.needs_deployment
 class TestTheSetFormHoldsOnTheDeployment:

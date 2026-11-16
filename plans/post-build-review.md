@@ -16414,6 +16414,113 @@ twice. It deliberately did not re-find the `TypeError`.
      "everything is seeded" relies on. Not investigated further here; worth a
      proper look before the next golden capture.
 
+455. **[done, 2026-11-16]** **[Testing & dev tooling]** **A test's real replay rewrote the checkout's real Birth Registrations results file.**
+     Found accounting for the six golden failures on 244d7db0's gate (#457).
+     `reports/daily/results_rs_civil-registration.json` in the main checkout
+     held THREE runs (June 2026, generated 22:07 Perth during the gate) where
+     the deployment has 119. Running each module of that gate chunk alone
+     with the file's mtime watched named it:
+     `tests/test_bootstrap_pin.py::TestARealReplayFilesAsThePinnedCalendarSays`
+     replays three arrivals through the real bootstrap into an empty database
+     of its own, and the real pipeline's last step rebuilds the results file
+     from history (`orchestrate._end` -> `build_results_from_history`) - into
+     the real `reports/daily/`, since nothing redirected it. Nothing failed:
+     the deployment-half tests reading reports/ just read the wrong file
+     afterwards, and a dashboard built from it shows three runs. CLAUDE.md's
+     "the suite never writes the real reports/" was true of the e2e build
+     only. Not a significant defect in shipped code (a test's own redirect),
+     but worth knowing because the damage was silent.
+     - **Fixed, test-first**: a session guard,
+       `tests/conftest.py`'s `_no_test_writes_the_real_reports`, refuses any
+       `atomic_file.write_json` into the checkout's real reports/ (both
+       writers - the results file and the dashboard JSON - go through it),
+       refusing rather than redirecting for the reason
+       `_no_test_files_a_real_delivery` gives. RED: with the guard in,
+       test_bootstrap_pin.py went 1 failed / 14 passed, the failure naming
+       the real results file; the file's mtime unchanged. GREEN: the replay
+       sets `build_output.OUT_DIR_ENV` to a folder beside its cut tree - 15
+       passed, mtime unchanged. The 111 test modules that name a pipeline
+       run, a bootstrap, a results or dashboard build, an embed or
+       atomic_file (all but the e2e module, which builds into `--out-dir`)
+       were run under the guard to see whether it fires anywhere else: 2626
+       passed, and no file under reports/ changed.
+     - **Restored**: both assets' results and dashboard files rebuilt from
+       the real databases (`mothman dashboard rebuild-results` then
+       `build-data`, per asset) - reads only.
+
+456. **[done, 2026-11-16]** **[QA pipeline]** **The bulk re-check's set form still named a result a later run had left out of scope.**
+     244d7db0's gate: `TestTheSetFormHoldsOnTheDeployment` failed for
+     `cp-notifications@201702010830000800` (TS-112's 2017-Q2 supply, new with
+     REQ-GEN-206). `bulk_recheck.newest_by_supply` named a newest result for
+     its `cp_client_id.relationships_dbt` (check_result 4478 and 4614, both
+     fail, both READ the supply), while `supply_status.results_about(...).shown`
+     was empty for it. Which is right: results_about. Its run `__r2` (run_seq
+     142, after both cp-clients files were rejected) recorded the check in
+     left_out's `not_in_agreement`, code `not_supplied_by_decision`, and
+     `_shown` drops a result a LATER run of the supply left out of scope
+     (`_not_since_left_out`, REQ-PIPE-332 criteria 7 and 9 - criterion 9:
+     a red recorded before the not-supplied mark does not stand once the mark
+     puts the check out of scope). REQ-PIPE-177 NFR 3 holds the set form to
+     results_about's rule, and the set form had never learnt that part of it.
+     Effect: a bulk re-check of such a check would have covered a supply whose
+     result no longer counts or shows - one wasted re-check that records the
+     check left out again. No page reads the set form.
+     - **Fixed, test-first** (one obvious answer, so not held for Keith):
+       `test_a_later_run_leaving_the_check_out_supersedes_it` in
+       `TestTheSetFormIsResultsAbout`, on the test's own empty database - a
+       supply judged by a single-table and a cross-table READ result, then a
+       later run of it whose left_out output names both checks. RED: 1 failed
+       (the set form kept the supply the oracle dropped). GREEN after
+       `newest_by_supply` drops a key whose newest result's run_seq is not
+       after the newest left-out of that check by a run of that supply
+       (`_left_out_since`, one query for all supplies) - and with it the
+       deployment test passes too.
+     - **Noted, not changed**: REQ-PIPE-177's evidence describes the set form
+       without this rule; the register's text is Keith's to change.
+
+457. **[done, 2026-11-16]** **[Testing & dev tooling]** **Not a defect: the six golden failures read dashboard files from 3 November.**
+     244d7db0's gate failed six `tests/test_asset_time_semantics.py` golden
+     tests. They read `reports/<asset>/*_dashboard.json`, which were dated
+     **2026-11-03** 11:06-11:08 UTC - not today, so no builder or worktree of
+     today wrote them - while the reset and bootstrap rewrote only the
+     `results_*.json` files: a bootstrap rebuilds results, never the dashboard
+     JSON. Rebuilt with `mothman dashboard build-data` per asset (after
+     #455's restore), the module passed, 14 of 14. Worth knowing before
+     reading this shape as a regression: after a reset and bootstrap, run
+     `mothman dashboard build-data` (or `rebuild`) for each asset before the
+     deployment half.
+
+458. **[done, 2026-11-16]** **[Testing & dev tooling]** **The reports-marker guard accused a module that reads only its own placements.**
+     244d7db0's gate:
+     `tests/test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering::test_every_module_reading_reports_carries_the_marker`
+     named `tests/test_last_planted_scenarios.py` (REQ-GEN-206). Its only
+     match was `scenario_placements` in
+     `TestTS52IsChosenFromTheDeliveries::test_the_generated_history_holds_one`,
+     which reads the placements file its own generation wrote under tmp_path
+     through `output.redirect` - nothing of the real tree. A
+     `needs_deployment` mark would have pushed a fast test into the slow half
+     to quiet the guard, which the guard's own comment warns against. Fixed by
+     importing the redirect as `from generator.output import redirect`, the
+     form the guard already accepts as covered, with a comment saying what is
+     read. The guard and the module pass.
+
+459. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **TestOweNothingQuarter still fails beside other modules, and still passes alone.**
+     244d7db0's gate, chunk 00 (twenty modules, `-n auto`):
+     `tests/test_period_opening.py::TestOweNothingQuarter::test_readers_of_case_workers_promote_in_a_quarter_it_sits_out`
+     failed promoting Case Workers into its made-up Q2 - refused, "it is
+     inherited, standing on an earlier period because the schedule owes
+     nothing then" - so on that worker the Q2 opening judged Case Workers as
+     not participating in Q2, which the test patches only for Q4. Same
+     sighting as #392 (c). Not reproduced: with test_bulk_recheck.py before it
+     on one worker (77 passed), and with the eleven chunk-00 modules that
+     sort before it run serially on one worker (367 passed). Read, not
+     proved: `inheritance._does_not_participate` has two answers beyond the
+     patched `not_expected_periods` - a turned-off gap, and `delivery_months`
+     by `round_of` against the dataset's slots (`slots_for_dataset`, memoised
+     per agreement by REQ-PIPE-400) - and either reading state another test
+     left would give this shape. Left for a proper look; the worker's test
+     order from a failing run is what would pin it.
+
 460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
      Found building REQ-TEST-402, by its own writer guard rather than by
      looking. `test_generating_never_touches_the_real_delivery_tree` (in
