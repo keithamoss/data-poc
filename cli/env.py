@@ -145,6 +145,16 @@ def reset_synthetic_command() -> None:
     generator did not write, and until you type a phrase naming what goes.
     Follow it with `mothman pipeline bootstrap`.
     """
+    from asset_model import history_anchor
+
+    # IT IS THE REMEDY FOR A MISSING OR WRONG ANCHOR FILE, SO IT STARTS WITHOUT
+    # ONE, AND IT DELETES THE FILE PART-WAY THROUGH (post-build-review #432):
+    # it reads configuration for its structure only.
+    with history_anchor.structure_only():
+        _reset_synthetic()
+
+
+def _reset_synthetic() -> None:
     from qa_tools.common import supply_db
     from bootstrap import synthetic_reset
 

@@ -559,3 +559,97 @@ class TestOffsetDates:
 
 #: The data asset this module's tests act for (C11).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+# Runs the console script's own main() in a fresh process, as a sandbox does,
+# with the asset's data folder - where the anchor file lives - pointed at a
+# folder of the test's own: data/<asset> has no override, and the checkout's
+# own may hold a real anchor file (which is what hid post-build-review #432).
+_NO_ANCHOR_DRIVER = """
+import sys
+from pathlib import Path
+from asset_model import assets
+data = Path(sys.argv[1])
+assets.data_dir = lambda: data
+from bootstrap import synthetic_reset
+synthetic_reset.expected_data_dir = lambda: data
+sys.argv = ["mothman", *sys.argv[2:]]
+from cli.app import main
+main()
+"""
+
+
+@pytest.mark.asset("daily")
+class TestNoAnchorFileInASandbox:
+    """post-build-review #432: on the daily asset, whose configuration writes
+    offset dates, a sandbox with no anchor file could run no command at all -
+    a traceback at import - and the reset deleted the file, locking itself
+    out. The remedies start without one, and a command needing a date says so
+    in one line."""
+
+    @pytest.fixture
+    def sandbox(self, private_supply_dsn, tmp_path):
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        import psycopg
+
+        from qa_tools.common import db_identity
+
+        with psycopg.connect(private_supply_dsn, autocommit=True) as conn:
+            db_identity.mark(conn, db_identity.Identity("daily", "sandbox"))
+        data = tmp_path / "daily"
+        env = {k: v for k, v in os.environ.items() if k != "MOTHMAN_PG"}
+        env.update(MOTHMAN_ENVIRONMENT="sandbox", MOTHMAN_ASSET="daily",
+                   MOTHMAN_SUPPLY_DSN=private_supply_dsn)
+        root = Path(__file__).resolve().parent.parent
+
+        def run(*args, stdin=""):
+            done = subprocess.run([sys.executable, "-c", _NO_ANCHOR_DRIVER, str(data), *args],
+                                  cwd=root, env=env, input=stdin, capture_output=True,
+                                  text=True, timeout=300)
+            return done.returncode, done.stdout, done.stderr
+        run.data = data
+        return run
+
+    def test_every_remedy_starts_without_an_anchor_file(self, sandbox):
+        assert not (sandbox.data / history_anchor.FILE).exists()
+        for args, stdin, said in (
+                (("env", "list"), "", "there is no anchor file"),
+                (("env", "current"), "", "there is no anchor file"),
+                (("env", "reset-synthetic"), "no\n", "nothing was deleted"),
+                (("pipeline", "bootstrap", "--anchor", "2099-01-01"), "", "is after today"),
+                (("bdm", "generate-synthetic-data", "--yes", "--anchor", "2099-01-01"), "",
+                 "is after today")):
+            code, out, err = sandbox(*args, stdin=stdin)
+            both = " ".join((out + err).replace("│", " ").split())
+            assert "Traceback" not in both and "no anchor to resolve" not in both, (args, both)
+            assert said in both, (args, both)
+
+    def test_a_command_needing_a_framing_date_is_refused_in_one_line(self, sandbox):
+        code, out, err = sandbox("schedule", "show")
+        assert code == 2, (out, err)
+        assert "Traceback" not in err and len(err.strip().splitlines()) == 1, err
+        assert f"{sandbox.data / history_anchor.FILE} does not exist" in err
+        assert "`mothman pipeline bootstrap` writes it" in err
+
+    def test_the_reset_finishes_and_the_remedy_still_starts_after_it(self, sandbox):
+        import json
+
+        data = sandbox.data
+        (data / "deliveries" / "d1").mkdir(parents=True)
+        (data / "deliveries" / "d1" / "f.csv").write_text("x")
+        (data / "receipts" / "d1").mkdir(parents=True)
+        (data / "receipts" / "d1" / "f.csv.json").write_text("{}")
+        (data / "generator_bookkeeping.json").write_text(json.dumps(
+            {"bdm-births": [{"delivery": "d1"}], "_anchor": "2026-09-25"}))
+        history_anchor.write(FIXED, data / history_anchor.FILE)
+        code, out, err = sandbox("env", "reset-synthetic",
+                                 stdin=synthetic_reset.confirmation_phrase() + "\n")
+        assert code == 0 and "Traceback" not in err, (out, err)
+        assert not (data / history_anchor.FILE).exists()
+        assert not (data / "deliveries").exists()
+        code, out, err = sandbox("pipeline", "bootstrap", "--anchor", "2099-01-01")
+        assert "is after today" in " ".join((out + err).replace("│", " ").split()), (out, err)

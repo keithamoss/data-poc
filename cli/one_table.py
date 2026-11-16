@@ -311,6 +311,15 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
     me = lambda: collection_cli.of(coll.id)  # noqa: E731 - resolved when the command runs
 
     def generate(yes: bool, skip_target_trial: bool = False, anchor: str | None = None) -> None:
+        from asset_model import history_anchor
+
+        # STARTS WITHOUT AN ANCHOR FILE (post-build-review #432): what comes
+        # before the generation reads configuration for its structure only, and
+        # the generation installs the anchor it uses.
+        with history_anchor.structure_only():
+            _generate(yes, skip_target_trial, anchor)
+
+    def _generate(yes: bool, skip_target_trial: bool, anchor: str | None) -> None:
         from cli import common
 
         refuse_a_broken_adapter(coll)

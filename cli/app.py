@@ -40,20 +40,26 @@ def _config_refusal(exc) -> str:
             f"Fix it, then `mothman check` validates the rest.")
 
 
-try:
-    from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
-                   pipeline, plans, population, scenarios, schedule, supply)
-    from asset_model import collections as _registry
-    from asset_model import assets as _assets
+from asset_model import history_anchor as _history_anchor  # noqa: E402
 
-    # EVERY COLLECTION'S GROUP, FROM THE REGISTRY (REQ-TEST-245 criterion 1),
-    # built here inside the YAML guard: building them reads the hierarchy.
-    # THE SELECTED ASSET'S ONLY, AND NONE WITHOUT ONE (REQ-PIPE-363 criterion
-    # 2): with MOTHMAN_ASSET unset or naming no folder nothing of any asset is
-    # read, so `--help` and `mothman check` still run (criterion 5).
-    _ASSET = _assets.selected_or_none()
-    _COLLECTIONS = _registry.all_collections() if _ASSET is not None else []
-    _GROUPS = [collection_cli.make_group(c) for c in _COLLECTIONS]
+try:
+    # STRUCTURE ONLY (post-build-review #432): building the commands reads the
+    # hierarchy, which on a synthetic asset may write offset dates - and the
+    # commands that write the anchor file have to be able to start without one.
+    with _history_anchor.structure_only():
+        from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
+                       pipeline, plans, population, scenarios, schedule, supply)
+        from asset_model import collections as _registry
+        from asset_model import assets as _assets
+
+        # EVERY COLLECTION'S GROUP, FROM THE REGISTRY (REQ-TEST-245 criterion 1),
+        # built here inside the YAML guard: building them reads the hierarchy.
+        # THE SELECTED ASSET'S ONLY, AND NONE WITHOUT ONE (REQ-PIPE-363 criterion
+        # 2): with MOTHMAN_ASSET unset or naming no folder nothing of any asset is
+        # read, so `--help` and `mothman check` still run (criterion 5).
+        _ASSET = _assets.selected_or_none()
+        _COLLECTIONS = _registry.all_collections() if _ASSET is not None else []
+        _GROUPS = [collection_cli.make_group(c) for c in _COLLECTIONS]
 except yaml.YAMLError as _exc:
     # READ AT IMPORT TIME by several command modules, so this is the only
     # place that can catch it - before any command, `--help` included.
@@ -392,7 +398,15 @@ cli.add_panel(RichCommandPanel("Tools", commands=[n for n in sorted(cli.commands
 
 
 def main() -> None:
-    cli()
+    # NO ANCHOR TO RESOLVE AN OFFSET DATE AGAINST IS A REFUSAL, NOT A TRACEBACK
+    # (post-build-review #432): one line naming the remedy.
+    try:
+        cli()
+    except _history_anchor.AnchorUnknown as exc:
+        import sys
+
+        print(_history_anchor.refusal(exc), file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 if __name__ == "__main__":

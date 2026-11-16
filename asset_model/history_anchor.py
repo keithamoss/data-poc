@@ -149,6 +149,45 @@ def for_offsets() -> date:
         f"the history first - `mothman pipeline bootstrap` writes it")
 
 
+@contextmanager
+def structure_only():
+    """A block that reads configuration for its STRUCTURE - which collections
+    and commands exist, whether the asset is synthetic, what a reset deletes -
+    and never for a framing date (post-build-review #432). For the block's
+    span, offsets resolve against the anchor they resolve to at its start, or -
+    where none resolves - against the fixed test anchor as a placeholder, so
+    building the CLI and the remedies for a missing anchor file (`mothman env
+    reset-synthetic`, `mothman pipeline bootstrap`, `generate-synthetic-data`,
+    `mothman env current`) can start, and a reset that deletes the anchor file
+    part-way through can finish.
+
+    NOT the fallback REQ-GEN-404 criterion 12 leaves open for a checkout with
+    no delivery tree (post-build-review #431, with Keith): the placeholder is
+    released when the block ends, so a command that then reads a framing date
+    without an anchor is refused as before. Safe for the caches because a parse
+    is keyed on the anchor with the text - a value resolved against the
+    placeholder is only ever answered again for that same anchor, which it is
+    correct for."""
+    from asset_model import assets
+
+    if assets.selected_or_none() is None:
+        yield
+        return
+    try:
+        anchor = for_offsets()
+    except (AnchorUnknown, ValueError):
+        # ValueError: an anchor file that does not hold a date - said by the
+        # command that needs the date, never by building the CLI.
+        anchor = FIXED_TEST_ANCHOR
+    with anchored(anchor):
+        yield
+
+
+def refusal(exc: AnchorUnknown) -> str:
+    """The one-line refusal a command prints for AnchorUnknown."""
+    return f"{exc}."
+
+
 def kind(anchor: date) -> str:
     """'fixed' for the fixed test anchor, else 'rolled' - how the closing line,
     `mothman env current` and the cache key tell the two apart."""
