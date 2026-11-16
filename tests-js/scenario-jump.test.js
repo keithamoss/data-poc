@@ -304,3 +304,56 @@ describe("the head is brought back by whole pixels", () => {
     expect(page.window.headBackBy(4, 49)).toBe(0);
   });
 });
+
+// post-build-review #420 (Keith, 2026-11-16, option a): after the regenerated
+// history TS-76's 'Substituted from' pill and its drill-down needed ~805px in
+// an 800px window, and keeping the subject whole left the pill at -5.875px.
+// Where the two cannot both fit and the subject is that pill's own drill-down,
+// the pill lands at the top and the drill-down's foot may go below the fold;
+// every other subject stays whole.
+describe("a head pill and its own drill-down that cannot both fit (#420)", () => {
+  it("brings the pill wholly back when the subject is its drill-down", () => {
+    page = loadDashboard();
+    // Room below the subject 0, the pill 5.875px above the window.
+    expect(page.window.scenarioBackBy(-300, 0, -5.875)).toBe(6);
+  });
+
+  it("keeps the subject whole for any other subject", () => {
+    page = loadDashboard();
+    expect(page.window.scenarioBackBy(-300, 0, null)).toBe(0);
+    expect(page.window.scenarioBackBy(-300.5, 49, null)).toBe(49);
+  });
+
+  it("changes nothing when the pill fits beside the subject", () => {
+    page = loadDashboard();
+    expect(page.window.scenarioBackBy(-300, 49, -10)).toBe(49);
+  });
+
+  function landWith(subject){
+    const entry = {...ENTRY, coordinates: {...ENTRY.coordinates, subject}};
+    const w = load(undefined, [entry]);
+    const view = w.document.getElementById("view");
+    view.innerHTML = `<div class="view-head"><span data-testid="standing-in">Substituted</span></div>
+      <div data-testid="promotion-split">split</div>
+      <div data-testid="standing-in-detail">detail</div>`;
+    Object.defineProperty(w, "innerHeight", {value: 800, configurable: true});
+    const rect = (top, bottom)=> ()=> ({top, bottom, height: bottom - top});
+    view.querySelector(".view-head").getBoundingClientRect = rect(-20, 30);
+    view.querySelector('[data-testid="standing-in"]').getBoundingClientRect = rect(-5.875, 14);
+    view.querySelector('[data-testid="promotion-split"]').getBoundingClientRect = rect(524, 799);
+    view.querySelector('[data-testid="standing-in-detail"]').getBoundingClientRect = rect(524, 799);
+    const calls = [];
+    w.scrollBy = o=> calls.push(o.top);
+    onItsPage(w);
+    expect(w.landOnScenarioSubject(entry, "2025-03-10")).toBe(true);
+    return calls;
+  }
+
+  it("lands a drill-down with the pill inside the top of the window", () => {
+    expect(landWith("substitution-drill-down")).toEqual([-6]);
+  });
+
+  it("lands any other subject whole, the pill left where it falls", () => {
+    expect(landWith("as-at-panel")).toEqual([]);
+  });
+});

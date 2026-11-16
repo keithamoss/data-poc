@@ -12191,6 +12191,18 @@ function headBackBy(headTop, room){
   if(headTop >= 0) return 0;
   return Math.max(0, Math.min(Math.ceil(-headTop), room));
 }
+// THE HEAD PILL FIRST WHERE IT AND ITS OWN DRILL-DOWN CANNOT BOTH FIT
+// (post-build-review #420, Keith 2026-11-16, option a): pillTop is the head
+// pill's top when the subject is that pill's drill-down, else null. Where
+// bringing the head back by the room below the subject still leaves the pill
+// above the window, the pill comes wholly back and the drill-down's foot goes
+// below the fold - both quoted texts stay on screen. Any other subject stays
+// whole (#202 F7, #255).
+function scenarioBackBy(headTop, room, pillTop){
+  const back = headBackBy(headTop, room);
+  if(pillTop == null || pillTop + back >= 0) return back;
+  return Math.ceil(-pillTop);
+}
 // A SUPPLY'S ROW BY ITS OWN RUN ID OR ONE OF ITS RUNS (post-build-review #202
 // F1): a placement names the supply, and its row carries the run that is in
 // place - `<run id>__1__r1` - as settledBeforeIt treats them as one supply.
@@ -12298,6 +12310,9 @@ function landOnScenarioSubject(entry, on){
   // room left below the subject, never past the head's top, so the subject
   // stays whole and the head is shown as far as the window allows.
   const head = !tall && el.getBoundingClientRect && document.querySelector("#view .view-head");
+  const pill = head && entry.coordinates.subject === "substitution-drill-down"
+    && document.querySelector('#view [data-testid="standing-in"]');
+  let pillFirst = false;
   if(head){
     const headTop = head.getBoundingClientRect().top;
     // WHOLE PIXELS, AND ONE TO SPARE: a fractional height left the subject
@@ -12305,7 +12320,8 @@ function landOnScenarioSubject(entry, on){
     // fold rounds either way with the machine's fonts - TS-78a's landed 0.28px
     // past it on CI's (post-build-review #255).
     const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom) - 1;
-    const back = headBackBy(headTop, room);
+    const back = scenarioBackBy(headTop, room, pill ? pill.getBoundingClientRect().top : null);
+    pillFirst = back > Math.max(0, room);
     if(back > 0) window.scrollBy({top: -back, behavior: "instant"});
   }
   // AND IT STAYS INSIDE ONCE THE FONTS ARE IN (post-build-review #259): on a
@@ -12313,7 +12329,10 @@ function landOnScenarioSubject(entry, on){
   // reload, though the jump had left a pixel to spare - something laid out
   // after the jump pushed it down.
   if(!tall && document.fonts && document.fonts.ready){
-    document.fonts.ready.then(()=> requestAnimationFrame(()=> keepSubjectInsideFold(el, window.innerHeight)));
+    // A pill landed first (#420) is the edge kept instead: lifting the subject
+    // back inside the fold would push the pill above the window again.
+    document.fonts.ready.then(()=> requestAnimationFrame(()=> pillFirst
+      ? keepPillInsideTop(pill) : keepSubjectInsideFold(el, window.innerHeight)));
   }
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.
@@ -12330,6 +12349,11 @@ function keepSubjectInsideFold(el, height){
   // Down, which lifts the subject (post-build-review #259: a first version
   // scrolled up and pushed it a pixel further out).
   window.scrollBy({top: Math.ceil(r.bottom - (height - 1)), behavior: "instant"});
+}
+// Brings a head pill that has crossed the top edge back wholly inside (#420).
+function keepPillInsideTop(pill){
+  const top = pill.getBoundingClientRect().top;
+  if(top < 0) window.scrollBy({top: -Math.ceil(-top), behavior: "instant"});
 }
 // ONE LINE IN THE STALE-LINK NOTICE (criteria 7 and 9). An id is named only
 // once it has matched the panel's own (criterion 11).

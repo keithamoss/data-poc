@@ -15838,7 +15838,7 @@ twice. It deliberately did not re-find the `TypeError`.
        history holds drift, so the test can fail", `assert set()`).
      - **Ran**: see REQ-GEN-392's evidence.
 
-420. **[todo, 2026-11-16]** **[Dashboard UI]** **[Testing & dev tooling]** **After the regenerated history, TS-76's and TS-77a's pill lands 5.875px above the window.**
+420. **[done, 2026-11-16]** **[Dashboard UI]** **[Testing & dev tooling]** **After the regenerated history, TS-76's and TS-77a's pill lands 5.875px above the window.**
      Found by the full gate on 4ca444d7 (passed on 06a850d7): three
      real-browser tests, TS-76's and TS-77a's `standing-in` chip (y=-5.875) and
      `test_the_page_head_stays_in_view_when_it_fits_beside_the_subject`
@@ -15880,3 +15880,19 @@ twice. It deliberately did not re-find the `TypeError`.
        notices - but TS-76's Expect places it "below the results' heading".
      - **Ran** (`-k "TestTheAsAtScenarioChips or TestEveryScenarioJumpLands"
        -n 2`, this tree): 2 failed (TS-76 and TS-77a `standing-in`), 15 passed.
+     - **Keith chose (a), 2026-11-16 (docs/drafts/decisions-2026-11-01.md).**
+       **Fixed (test first)**: `landOnScenarioSubject` now asks
+       `scenarioBackBy(headTop, room, pillTop)` how far to bring the head back.
+       For a `substitution-drill-down` subject, where the room below the
+       subject still leaves the head's `standing-in` pill above the window, it
+       returns enough to bring the pill wholly inside the top, and the
+       drill-down's foot goes below the fold. After the fonts load, it keeps the
+       pill inside the top (`keepPillInsideTop`) rather than lifting the subject
+       back above the fold, which would undo the landing. Every other subject is
+       unchanged: whole, with as much of the head as fits. New tests in
+       tests-js/scenario-jump.test.js ("a head pill and its own drill-down that
+       cannot both fit"): four failed before the fix and pass after it; the
+       other-subject case passed both times. REQ-DASH-208 carries the decision.
+       **Ran** (the same `-k`, `-n 2`, this tree): before the fix, 2 failed
+       (TS-76 and TS-77a `standing-in`, -5 to 18px) and 15 passed; after it,
+       17 passed.
