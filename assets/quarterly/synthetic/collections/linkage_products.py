@@ -1117,6 +1117,7 @@ class LinkageProducts(Provider):
         # THE GEOCODING STREAM, AFTER EVERY LINKAGE JOB (criterion 1): its own
         # slots, seeds and numbering, so no linkage run or entry moves.
         self._plan_geocoding(plan)
+        _refuse_planned_against_a_rejected_pair(plan)
         return plan
 
     # ---- the geocoding stream (REQ-GEN-295) -------------------------------
@@ -1630,14 +1631,21 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
         received = asset_time.parse_instant(s.received_at, dataset_id)
         if received >= at:
             continue
-        promotes = s.severity is None or (
+        # A CONTESTED PAIR IS PROMOTED BY NO RULE (REQ-GEN-206 criterion 22):
+        # it waits for a person's settlement, played in below.
+        promotes = not s.contested and (s.severity is None or (
             s.severity == "amber"
-            and amber_setting.resolve(dataset_id, received).value != amber_setting.HOLD)
+            and amber_setting.resolve(dataset_id, received).value != amber_setting.HOLD))
         events.append((received, "promote" if promotes else "hold", s))
     claimed = set(_claimed_by(dataset_id).get(period, ()))
     for script in scripted_decisions.load():
+        # A SETTLEMENT PROMOTES ITS PAIR ONLY WHERE IT MAKES A FILE THE SUPPLY;
+        # one rejecting both files (TS-112) promotes nothing.
+        settles = (script.operation == scripted_decisions.CHOOSE_FILE
+                   and "supply" in (script.files or ()))
         if (script.dataset_id != dataset_id or script.scenario not in claimed
-                or script.operation not in scripted_decisions.CHAIN_OPERATIONS):
+                or (script.operation not in scripted_decisions.CHAIN_OPERATIONS
+                    and not settles)):
             continue
         if script.supply_index is None or not 0 <= script.supply_index < len(quarter):
             raise CannotGenerate(
@@ -1651,7 +1659,7 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
                                       + timedelta(days=script.day_offset), script.at)
                 if script.at else received + timedelta(hours=script.after_hours))
         if when < at:
-            events.append((when, script.operation, target))
+            events.append((when, "promote" if settles else script.operation, target))
     held = None
     for _when, what, supply in sorted(events, key=lambda e: e[0]):
         if what == "promote":
@@ -1659,6 +1667,57 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
         elif what == "reject" and held is supply:
             held = None
     return held
+
+
+def rejected_pairs() -> list[tuple[str, str, str]]:
+    """(scenario id, source dataset, period) for every scripted settlement
+    that rejects every file of a pair of a dataset this provider reads - the
+    quarters left with no supply of it (REQ-GEN-206 criterion 22, TS-112)."""
+    from qa_tools.common import scripted_decisions
+
+    read = {d for d, _c, _cols in linked()} | {src for _d, src, _cols in geocoded()}
+    out = []
+    for script in scripted_decisions.load():
+        if (script.operation != scripted_decisions.CHOOSE_FILE or script.dataset_id not in read
+                or not script.files or any(f != "reject" for f in script.files)):
+            continue
+        periods = [p for p, sids in _claimed_by(script.dataset_id).items()
+                   if script.scenario in sids]
+        out += [(script.scenario, script.dataset_id, p) for p in periods]
+    return out
+
+
+def _refuse_planned_against_a_rejected_pair(plan) -> None:
+    """REQ-GEN-206 criterion 22, before anything is written: where a person
+    rejects both files of a source's pair, no release or geocoding file of that
+    quarter may be planned against a supply of it promoted there - the bootstrap
+    would contradict the planned verdict. Refused naming the scenario."""
+    from asset_model import hierarchy
+
+    sources = plan.state["sources"]
+    reading: list[tuple[str, object, str]] = []
+    for job in plan.jobs:
+        if job.stream == GEO_STREAM:
+            found = (plan.state.get("geocoding") or {}).get(job.slot_id)
+            for at, files in ([found] if found else []) + (
+                    [plan.state["geo_resupply"][job.slot_id]]
+                    if job.slot_id in (plan.state.get("geo_resupply") or {}) else []):
+                for _t, (d, _rows, _v) in files.items():
+                    reading.append((job.period.name, at, hierarchy.dataset(d).linked[0][0]))
+        else:
+            for at, _faults, _sev in plan.state["arrivals"].get(job.slot_id, ()):
+                reading += [(job.period.name, at, d) for d, _c, _cols in linked()]
+    for sid, src, period in rejected_pairs():
+        for name, at, read in reading:
+            if name != period or read != src or src not in sources:
+                continue
+            held = in_warehouse(src, period, at, sources[src])
+            if held is not None:
+                raise CannotGenerate(
+                    f"{sid}: a person rejects both of {src}'s {period} files, and the "
+                    f"{period} plan reads {src} as promoted there at {at.isoformat()} (the "
+                    f"supply received {held.received_at}) - the bootstrap would contradict "
+                    f"the release's planned verdict; nothing was written")
 
 
 def _draw(n: int, rng) -> list:

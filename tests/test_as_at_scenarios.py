@@ -289,6 +289,8 @@ class TestTheLinksResolveBetweenTheirEvents:
         for sid in ("TS-75a", "TS-76", "TS-77a"):
             got.update(dict(si.resolve(_injection(sid), _cp_periods()).in_place_on))
         assert got == {"TS-75a": "2024-02-08", "TS-75b": "2024-02-25",
+                       # TS-48 rides TS-75a (REQ-GEN-206 criterion 8).
+                       "TS-48": "2024-03-12",
                        "TS-76": "2025-02-17", "TS-77a": "2023-05-17",
                        # TS-54 rides TS-76's placement and date (REQ-GEN-044).
                        "TS-54": "2025-02-17",
@@ -310,11 +312,14 @@ def test_a_targeted_amber_is_never_named_with_a_severity():
 
 @pytest.mark.asset("daily")  # TS-43 and TS-78 are Birth Registrations', the daily asset's
 class TestOnlyThePlantedAmbersWaitUnderHold:
-    """Criterion 16, on the bootstrapped history: every supply the rule held
-    under the hold amber setting is TS-43's or TS-78's - the guard that the
+    """Criterion 17 (as REQ-GEN-206 criterion 16 amends it), on the
+    bootstrapped history: every supply the rule held under the hold amber
+    setting is TS-43's, TS-78's or TS-47's late file - the guard that the
     back-dated 30 August version held nothing else. KEYED BY SUPPLY, and split
-    in two (the critic's T2): that the planted supplies ARE held passes today;
-    that NOTHING ELSE is held is the strict expected failure #175 records."""
+    in two (the critic's T2). Exact again with no allowance since REQ-GEN-206
+    criterion 12 (post-build-review #175, option 1): 8 September's own supply
+    is built green, and TS-47's late file is held because the day lies in the
+    hold era."""
 
     @staticmethod
     def _held_and_planted():
@@ -323,7 +328,7 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
 
         placements = scenario_map.read_placements()
         planted = set()
-        for sid, index in (("TS-43", 0), ("TS-78a", 0), ("TS-78a", 2)):
+        for sid, index in (("TS-43", 0), ("TS-78a", 0), ("TS-78a", 2), ("TS-47", 0)):
             run = placements[sid].supplies[index]
             planted.add(decision_player._supply_of("birth-registrations", run))
         with supply_db.connect(label="test-hold-guard") as conn:
@@ -334,13 +339,9 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
 
     def test_the_planted_ambers_are_held(self, deployment_history):
         held, planted = self._held_and_planted()
-        assert len(planted) == 3, planted
+        assert len(planted) == 4, planted
         assert planted <= held, f"not held under hold: {sorted(planted - held)}"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "post-build-review #175: on the first bootstrap two more supplies waited under "
-        "hold on 2026-09-08 - TS-47's late file and that day's own supply. Keith to "
-        "decide; the criterion is not loosened"))
     def test_nothing_else_is_held(self, deployment_history):
         held, planted = self._held_and_planted()
         assert held - planted == set(), sorted(held - planted)

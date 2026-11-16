@@ -1335,6 +1335,75 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     return out
 
 
+#: TS-52's scenario id (REQ-GEN-206 criterion 1).
+HELD_CASE_WORKERS = "TS-52"
+
+
+def held_case_workers_placement(recognised, injected_deliveries) -> Placement:
+    """TS-52, written AFTER generation as TS-79's are (REQ-GEN-206 criteria 1
+    and 2): the newest cp-case-workers supply received while no period it
+    delivers in was open - so the filing rule holds it, filed to no period -
+    chosen from configuration and the generated deliveries alone. Never one a
+    declared correction moves, holds or places (its receipt falls in a quarter
+    a correction claims, or a correction's calendar opens a slot over it), and
+    never one carried by a delivery an injection places. Nothing generated for
+    it: an ordinary delivery carries Case Workers in a quarter it does not take
+    part in. In place on the day after its receipt, at its verdict line.
+
+    `recognised` is the collection's recognised arrivals; `injected_deliveries`
+    the delivery names any injection placed. REFUSED naming TS-52 where the
+    history holds no such supply, never one held for another reason."""
+    from asset_model import agreement, asset_time, declared_corrections, slots
+    from generator import correction_claims
+
+    corrections = []
+    docs = declared_corrections.working()
+    for pending in declared_corrections.pending_corrections(*docs):
+        _p, _before, after = correction_claims._docs_either_side(pending.reference, docs)
+        quarters = correction_claims.claimed(
+            pending.reference, {"cp-clients": generated_periods("cp-clients")},
+            docs=docs).get("cp-clients", [])
+        corrections.append((pending.reference, agreement.from_doc(after[0]), set(quarters)))
+
+    candidates = []
+    for arrival in recognised:
+        if INHERITING_DATASET not in (arrival.files_by_dataset or {}):
+            continue
+        if arrival.delivery_name in injected_deliveries:
+            continue
+        at = arrival.received_at
+        if slots.period_claimed_at(INHERITING_DATASET, at) is not None:
+            continue  # a period it delivers in was open: filed, not held
+        quarter = slots.period_claimed_at("cp-clients", at)
+        if any(quarter in claimed or slots.period_claimed_at(INHERITING_DATASET, at,
+                                                              agreement=after) is not None
+               for _ref, after, claimed in corrections):
+            continue
+        candidates.append((at, arrival, quarter))
+    if not candidates:
+        raise CannotPlace(
+            f"{HELD_CASE_WORKERS}: the generated history holds no {INHERITING_DATASET} supply "
+            f"received while no period it delivers in was open, outside every injection's "
+            f"delivery and every declared correction's claim - so there is no held Case "
+            f"Workers file to link. It is not replaced by a supply held for another reason.")
+    at, arrival, quarter = max(candidates, key=lambda c: c[0])
+    day = asset_time.local_date(at)
+    hhmm = asset_time.localise(at).strftime("%H:%M")
+    return Placement(
+        scenario_id=HELD_CASE_WORKERS, dataset=INHERITING_DATASET, period=quarter or "",
+        period_date=day,
+        config=(f"quarterly; {INHERITING_DATASET} takes part only in the quarters "
+                f"{_assets.config_dir()}/calendar.yaml's participation names, and every "
+                f"delivery carries cp_case_workers.csv - so the {quarter} delivery's, received "
+                f"{hhmm} on {day.isoformat()} while no period it delivers in was open, is "
+                f"held, filed to no period. The newest such supply outside every scenario's "
+                f"delivery and every declared correction. Nothing generated for it."),
+        arrivals=({"date": day.isoformat(), "at": hhmm,
+                   "delivery": arrival.delivery_name, "run_id": arrival.run_id},),
+        in_place_on=((HELD_CASE_WORKERS, (day + timedelta(days=1)).isoformat()),),
+        subjects=((HELD_CASE_WORKERS, scenario_map.VERDICT_LINE),))
+
+
 def resolve_run_ids(placements: Sequence[Placement], recognised) -> None:
     """Fill in each injected arrival's REAL run id, from recognition.
 
@@ -1758,6 +1827,47 @@ INJECTIONS: tuple[Injection, ...] = (
         # with another arrival's receipt instant.
         arrivals=(ExtraArrival(1, "11:00", None,
                                "the late file, which fills the next day rather than its own"),),
+        # 8 SEPTEMBER'S OWN SUPPLY BUILT GREEN (REQ-GEN-206 criterion 11;
+        # post-build-review #175, option 1): the following day is TS-47's,
+        # claimed like its anchor, so only the late file - held because the
+        # day lies in the hold era - waits under hold there.
+        green_follow=True,
+    ),
+    # KEITH'S WORKED UN-SUPERSEDE CASE (REQ-GEN-206 criterion 5; REQ-GEN-137
+    # criterion 2 as amended): a good resend waiting behind a filled slot is
+    # superseded by a bad later one; a scripted person rejects the bad one,
+    # then un-supersedes the good one - in that order (REQ-PIPE-120) - which
+    # is re-checked, left waiting by the gate, and promoted by the person. On
+    # days no other scenario claims, under replacement setting never.
+    Injection(
+        scenario_id="TS-53",
+        dataset_id="birth-registrations",
+        # 4 AUGUST, A TUESDAY, so both resends land on a weekday: the day after
+        # TS-69's green following day, which stands as its lead-in (lead_in=0,
+        # PROVISIONAL), with 5 August, free, its own following day. Anywhere in
+        # the free stretch before TS-68 its claims moved the ordinary reds, and
+        # a red's resends were pushed past the quiet days to 30 July; on 30
+        # July itself the last red's resend went to 4 August, thirteen days
+        # late (tests/test_generate_runs.py, TestNoResendIsPushedFarFromItsDay).
+        anchor=-53,
+        lead_in=0,
+        quiet=(0, 1),
+        config="daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window; the "
+               "replacement setting is never. The day's own supply arrives on time and is "
+               "promoted; a good resend follows at 16:00 and waits behind the filled slot; "
+               "a bad one at 18:00 supersedes it. The next morning a person rejects the bad "
+               "one at 09:00, un-supersedes the good one at 10:00, and promotes it at 20:00.",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "the day's own supply, on time and promoted",
+                         target=Target("green")),
+            ExtraArrival(0, "16:00", None,
+                         "the good resend, waiting behind the filled slot",
+                         target=Target("green")),
+            ExtraArrival(0, "18:00", None,
+                         "the bad resend, which supersedes the good one while it waits",
+                         target=Target("red", ("place_of_birth_facility.completeness",))),
+        ),
+        links=(Link("TS-53", 0, "TS-53 promote", HISTORY_END),),
     ),
     Injection(
         scenario_id="TS-38",
@@ -2186,9 +2296,13 @@ INJECTIONS: tuple[Injection, ...] = (
                          "well before the next quarter's window",
                          file_shape="one_table_only"),
         ),
-        also_demonstrates=("TS-75b",),
+        # TS-48 (REQ-GEN-206 criterion 8; Keith, 2026-10-14): the three readers
+        # held beside the red cp_clients and promoted with the corrected one in
+        # one gate application.
+        also_demonstrates=("TS-75b", "TS-48"),
         links=(Link("TS-75a", 7, 0, "TS-75 reject", scenario_map.AS_AT_PANEL),
-               Link("TS-75b", 3, "TS-75 reject", 1, scenario_map.AS_AT_PANEL)),
+               Link("TS-75b", 3, "TS-75 reject", 1, scenario_map.AS_AT_PANEL),
+               Link("TS-48", 12, 1, HISTORY_END)),
     ),
     # A DATASET TURNED OFF FOR A WHILE (REQ-GEN-218; TS-63): Carer Register
     # is turned off after 31 December 2021 by correction REQ-GEN-218, dated
@@ -2277,6 +2391,63 @@ INJECTIONS: tuple[Injection, ...] = (
                     scenario_map.SUBSTITUTION_DRILL_DOWN),
                Link("TS-77b", 0, 0, "TS-77 promote", scenario_map.AS_AT_PANEL)),
         keeps_drawn_severity=True,
+    ),
+    # A PERIOD WHOSE _manifest LISTS ALL THREE KINDS (REQ-GEN-206 criterion 4;
+    # Keith, 2026-11-15, Q1 = b): 2023-Q1, a quarter cp-case-workers inherits
+    # in, its delivery leaving out cp_placements - which no other collection
+    # reads - and a person substituting that table's period onto 2022-Q4, never
+    # removed or replaced. Clean apart from the missing table (PROVISIONAL).
+    Injection(
+        scenario_id="TS-55",
+        dataset_id="cp-placements",
+        anchor=-16,
+        stands_on=-1,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st; cp-case-workers takes "
+               "part only in the quarters its participation names, so 2023-Q1 inherits "
+               "2022-Q4's. 2023-Q1's delivery arrives on time without cp_placements.csv; a "
+               "person substitutes the quarter's cp-placements onto 2022-Q4 two days later, "
+               "and the substitution stands to the end of the history.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "the quarter's delivery, on time - cp_placements.csv absent",
+                         file_shape="one_table_missing"),
+        ),
+        links=(Link("TS-55", LAST_DAY, "TS-55 substitute", HISTORY_END,
+                    scenario_map.PERIOD_COMPOSITION),),
+    ),
+    # A CHILD PROTECTION PAIR WITH BOTH FILES REJECTED (REQ-GEN-206 criteria 18
+    # to 21; Keith, 2026-10-14, F8, and 2026-11-15, Q3 = a): 2017-Q2, the one
+    # grown quarter no scenario of any collection claims. The delivery carries
+    # the usual files and two Client Registers, each its own receipt, both
+    # before due, clean apart from the pair; a person settles it as neither the
+    # day after, promotes the three readers the day after that, and marks the
+    # quarter's Client Register not supplied once its slot has closed.
+    Injection(
+        scenario_id="TS-112a",
+        dataset_id="cp-clients",
+        anchor=-39,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. "
+               "2017-Q2's delivery carries the usual files and two Client Registers - "
+               "cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose "
+               "rows differ - both before due. A person settles the pair at 11:00 the next "
+               "day with both files rejected, which takes effect with the gate's refusal of the "
+               "pair; promotes the three readers at 11:00 the day after that, and marks the quarter's Client Register not supplied the day after its "
+               "slot closes.",
+        arrivals=(
+            ExtraArrival(0, "08:30", note="the quarter's delivery, its Client Register sent "
+                                          "twice", files=(
+                PairFile("08:30", "cp_clients.csv", table="cp_clients",
+                         note="the quarter's Client Register"),
+                PairFile("08:40", "cp_clients_v2.csv", content="re_export", table="cp_clients",
+                         note="a re-export of it, its rows re-pulled - neither can be trusted"),
+            )),
+        ),
+        also_demonstrates=("TS-112b",),
+        links=(Link("TS-112a", 0, 0, "TS-112 settle"),
+               # THE SETTLEMENT'S ASSET DAY, 8 February: it takes effect with
+               # the gate's lagged refusal of the pair, as TS-80's does (the
+               # replay's seeded lag, scenarios/promotion_lag.py).
+               Link("TS-112b", 6, "TS-112 settle", "TS-112 promote notifications")),
     ),
     # A CONTESTED CLIENT REGISTER IN CHILD PROTECTION (REQ-GEN-203): two
     # cp_clients files in one delivery contest the table (REQ-PIPE-202), and its
@@ -2370,6 +2541,11 @@ INJECTIONS: tuple[Injection, ...] = (
         ),
         gate_outcomes=(GateOutcome("cp-clients", 1, "promoted"),
                        GateOutcome("cp-notifications", 1, "held back")),
+        # TS-50 (REQ-GEN-206 criterion 6; Keith, 2026-11-15, Q2 = a): the Client
+        # Register v2 replacing its promoted supply under the green replacement
+        # era, every reader's cross-table check read against v2 by v2's own run.
+        also_demonstrates=("TS-50",),
+        links=(Link("TS-50", 7, 1, "TS-81 reject"),),
     ),
     Injection(
         scenario_id="TS-82",
@@ -2626,7 +2802,9 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-99",
         dataset_id="linkage-keys",
-        anchor=-16,  # 2022-Q4
+        # 2024-Q3 SINCE REQ-GEN-206 criterion 24 (Keith, 2026-11-15, Q1 = b): it
+        # was 2022-Q4 (-16), which TS-55 now stands on.
+        anchor=-9,  # 2024-Q3
         config="quarterly, due 18:00 on the round with 8 hours' grace, files_go_to_period 0; the release is received at 17:30, after the quarter's Emergency Department supply is promoted. One DOC_CLIENTS row's id_1 is blank.",
         arrivals=(
             ExtraArrival(0, "17:30", None,

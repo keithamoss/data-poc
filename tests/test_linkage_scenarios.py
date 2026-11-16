@@ -318,7 +318,10 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
     was without them, and each is one delivery with cp_clients alone red."""
     from generator import collections
 
+    from collection_modules import provider_module
+
     cp = collections.provider("child-protection")
+    cp_module = provider_module("child-protection")
     with_them = cp.plan()
     sides = {"TS-93a", "TS-100a"}
     monkeypatch.setattr(si, "INJECTIONS",
@@ -326,14 +329,22 @@ def test_the_child_protection_sides_move_no_ordinary_severity(monkeypatch):
     without = cp.plan()
     ours = {p.period for _i, p in with_them.resolved if p.scenario_id in sides}
     assert len(ours) == 2
+    drawn = cp_module._drawn_by_period(cp.generated_periods())
+    moved = []
     for a, b in zip(with_them.jobs, without.jobs):
         assert a.period.name == b.period.name
         if a.period.name in ours:
-            assert b.severity is None, f"{a.period.name} was not drawn clean"
+            assert drawn.get(a.period.name) is None, f"{a.period.name} was not drawn clean"
             deliveries = cp.slot(with_them, a)
             assert len(deliveries) == 1 and deliveries[0].severity == "red"
-        else:
-            assert a.severity == b.severity, a.period.name
+        if a.severity != b.severity:
+            moved.append((a.period.name, a.severity, b.severity))
+    # ONLY AN AMBER ANOTHER SCENARIO MOVED OFF ITS OWN QUARTER MAY LAND
+    # DIFFERENTLY (REQ-GEN-206: TS-112's and TS-55's quarters were drawn amber,
+    # and without the two sides the next clean quarter for one is 2019-Q1) -
+    # the same number generated, the sides' own quarters drawn clean.
+    assert all({x, y} <= {None, "amber"} for _n, x, y in moved), moved
+    assert sum(x == "amber" for _n, x, _y in moved) == sum(y == "amber" for _n, _x, y in moved)
 
 
 class TestEachOrdinaryReleaseIsScheduledAfterThePromotionItReads:

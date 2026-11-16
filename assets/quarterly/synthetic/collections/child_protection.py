@@ -1140,9 +1140,18 @@ class ChildProtection(Provider):
     def extra_placements(self, plan: Plan) -> list:
         from generator import scenario_injection
 
+        from asset_model import arrivals as arrivals_mod
+        from generator import driver
+
         # TS-79 IN THE SAME WRITE (REQ-GEN-199 criterion 20), over the
         # original fifteen (REQ-GEN-207 criterion 4).
-        return scenario_injection.inheritance_placements(plan.state["original"])
+        out = scenario_injection.inheritance_placements(plan.state["original"])
+        # TS-52 FROM THE DELIVERIES AS WRITTEN (REQ-GEN-206 criteria 1 and 2).
+        recognised = arrivals_mod.arrivals_for(self.collection_id, self.run_prefix,
+                                               driver.deliveries_dir(), driver.receipts_dir())
+        injected = {a.get("delivery") for _inj, placement in plan.resolved
+                    for a in placement.arrivals if a.get("delivery")}
+        return out + [scenario_injection.held_case_workers_placement(recognised, injected)]
 
 
 PROVIDER = ChildProtection()

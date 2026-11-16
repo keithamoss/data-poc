@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**23 of 23 scenarios marked for injection have data behind them today.** 23 scenarios are registered in all.
+**24 of 24 scenarios marked for injection have data behind them today.** 24 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -320,6 +320,20 @@ for injection and has not been placed yet.
 | Supplies | `birth_registrations__202609081100000800` |
 | Period | 2026-09-07 |
 | Set "in the warehouse on" to | 2026-09-08 |
+
+### TS-53 - Keith's worked un-supersede case
+
+NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?
+
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202607231400000800`, `birth_registrations__202607231600000800`, `birth_registrations__202607231800000800` |
+| Period | 2026-07-23 |
+| Set "in the warehouse on" to | 2026-07-24 |
+| Built to | Pass, the 2026-07-23 14:00 arrival |
+| Built to | Pass, the 2026-07-23 16:00 arrival |
+| Built to | Fail on place_of_birth_facility.completeness (661 of 1,820), the 2026-07-23 18:00 arrival |
 
 ## Calendar corrections
 
@@ -762,6 +776,62 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
     ],
     "period": "2026-09-07",
     "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-53",
+   "mode": "INJECT",
+   "title": "Keith's worked un-supersede case",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad one rejected and the good one un-superseded, re-checked and promoted by the gate (REQ-PIPE-120). Under the rules as built a good file is superseded only while WAITING, and a passing one waits only behind a filled slot or a hold - in either case the gate does not promote it after the un-supersede without a further decision. What should the planted shape be?",
+   "breaksAs": null,
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-120"
+   ],
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202607231400000800",
+     "birth_registrations__202607231600000800",
+     "birth_registrations__202607231800000800"
+    ],
+    "period": "2026-07-23",
+    "inPlaceOn": "2026-07-24",
+    "targets": [
+     {
+      "date": "2026-07-23",
+      "at": "14:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": []
+     },
+     {
+      "date": "2026-07-23",
+      "at": "16:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": []
+     },
+     {
+      "date": "2026-07-23",
+      "at": "18:00",
+      "built_to": "red",
+      "rules": [
+       "place_of_birth_facility.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "place_of_birth_facility.completeness",
+        "to": "red",
+        "nulls": 661,
+        "of_rows": 1820,
+        "was": 55
+       }
+      ]
+     }
+    ],
     "subject": "supply-history-row"
    }
   },

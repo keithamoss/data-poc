@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**70 of 70 scenarios marked for injection have data behind them today.** 70 scenarios are registered in all.
+**28 of 70 scenarios marked for injection have data behind them today.** 70 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -43,12 +43,7 @@ for injection and has not been placed yet.
 
 *Config: Emergency Department, the quarterly calendar - the 1st of February, May, August and November, due 09:00, a 14-day claim window, so May 2025's window opens 09:00 on 17 April. February 2025's supply arrived as usual; this one arrives 10:00 on 16 April 2025, a day before May's window opens (REQ-GEN-236).*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202504161000000800` |
-| Period | 2025-Q2 |
-| Set "in the warehouse on" to | 2025-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-3b - Quarterly, prior slot UNFILLED
 
@@ -56,12 +51,7 @@ for injection and has not been placed yet.
 
 **What it would look like if the rule were wrong.** Files to May and leaves February owed for ever.
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202604161000000800` |
-| Period | 2026-Q2 |
-| Set "in the warehouse on" to | 2026-05-01 |
+**not injected - nothing to look at yet**
 
 ## Arrival classification
 
@@ -71,12 +61,7 @@ for injection and has not been placed yet.
 
 **What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 February anchor and reports the supply ~12 weeks LATE for 2024-Q1, a quarter that was filled months ago.
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202404221000000800` |
-| Period | 2024-Q2 |
-| Set "in the warehouse on" to | 2024-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-65 - Early, at the edge of the window
 
@@ -86,12 +71,7 @@ for injection and has not been placed yet.
 
 *Config: as TS-9 - Emergency Department, one file, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202507191000000800` |
-| Period | 2025-Q3 |
-| Set "in the warehouse on" to | 2025-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-66 - A couple of days early - the everyday case
 
@@ -101,12 +81,7 @@ for injection and has not been placed yet.
 
 *Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202510301000000800` |
-| Period | 2025-Q4 |
-| Set "in the warehouse on" to | 2025-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-67 - A quarterly supply sent too early
 
@@ -116,12 +91,7 @@ for injection and has not been placed yet.
 
 *Config: as TS-9 - Emergency Department, one file. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__202310121000000800` |
-| Period | 2023-Q4 |
-| Set "in the warehouse on" to | 2023-11-01 |
+**not injected - nothing to look at yet**
 
 ## Delivery and multi-table
 
@@ -194,6 +164,39 @@ TS-42a's placement; this link opens on the later file's asset day. *Config: as T
 | Set "in the warehouse on" to | 2019-11-29 |
 | Built to | Pass, the 2019-11-29 10:00 arrival |
 
+### TS-48 - A correction arriving before its partner is promoted
+
+NOT IN THE DATA YET. A single-table correction that starts failing on a cross-table check and is promoted when its partner's promotion re-checks it (REQ-PIPE-121) needs the Child Protection generator to place a partner's promotion between two arrivals of one quarter, which its delivery shapes do not yet express.
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
+| Period | 2024-Q2 |
+| Set "in the warehouse on" to | 2024-03-12 |
+
+### TS-50 - A reader re-checked against the newer version
+
+NOT IN THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a cross-table reader).
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201705010900000800`, `cp_clients__201705151000000800` |
+| Period | 2017-Q3 |
+| Set "in the warehouse on" to | 2017-05-22 |
+
+### TS-52 - Case Workers arriving in a period it does not deliver in
+
+NOT INJECTED: the ordinary history already produces it - Case Workers files arrive in every delivery and are held in the quarters it does not take part in (TS-33a, REQ-PIPE-131). An injection would record a placement for what is already there; it waits on the Child Protection injection supporting a placement with no extra arrival.
+
+| Where to look | |
+|---|---|
+| Dataset | cp-case-workers |
+| Supplies | `cp_case_workers__202605270100000000` |
+| Period | 2026-Q3 |
+| Set "in the warehouse on" to | 2026-05-28 |
+
 ### TS-54 - A period substituted onto an earlier promoted supply
 
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted passing - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary Warn drawn for 2026-Q3 to 2024-Q4 and this entry then said "promoted warning", but that Warn dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still passing and promoted. Whether it should be a Warn is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
@@ -204,6 +207,17 @@ In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): 
 | Supplies | — |
 | Period | 2025-Q2 |
 | Set "in the warehouse on" to | 2025-02-17 |
+
+### TS-55 - A period whose _manifest lists all three kinds
+
+NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
+
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | — |
+| Period | 2023-Q1 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-56 - A supply whose columns arrive in another order
 
@@ -321,12 +335,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: 2015-Q1's date is corrected from 1 to 2 February 2015; its one supply arrives at 12:00 on 2 February - late against the old date, on time against the corrected one.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201502021200000800` |
-| Period | 2015-Q1 |
-| Set "in the warehouse on" to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-57b - A correction that only re-judges, once confirmed
 
@@ -336,12 +345,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-57a.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201502021200000800` |
-| Period | 2015-Q1 |
-| Set "in the warehouse on" to | 2026-09-25 |
+**not injected - nothing to look at yet**
 
 ### TS-58a - A correction that moves a supply, before it is confirmed
 
@@ -351,12 +355,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: 2013-Q4's date is corrected from 1 November to 20 October 2013. Its supply arrives on 10 October, before the old window opened, so it is filed as a resupply of 2013-Q3; the corrected window covers it.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201310101000000800` |
-| Period | 2013-Q4 |
-| Set "in the warehouse on" to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-58b - A correction that moves a supply, once confirmed
 
@@ -366,12 +365,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-58a.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201310101000000800` |
-| Period | 2013-Q4 |
-| Set "in the warehouse on" to | 2026-09-25 |
+**not injected - nothing to look at yet**
 
 ### TS-59a - A supply the asset manager will keep, before the correction is confirmed
 
@@ -381,12 +375,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-58 for 2014-Q3, corrected from 1 August to 20 July 2014; its supply arrives on 10 July, filed as a resupply of 2014-Q2, which the corrected agreement would move. A scripted confirmation keeps it (contract/scripted_decisions.yaml).*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201407101000000800` |
-| Period | 2014-Q3 |
-| Set "in the warehouse on" to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-59b - A supply the asset manager kept
 
@@ -396,12 +385,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-59a.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201407101000000800` |
-| Period | 2014-Q3 |
-| Set "in the warehouse on" to | 2026-09-25 |
+**not injected - nothing to look at yet**
 
 ### TS-60a - A correction that leaves a supply with no period, before it is confirmed
 
@@ -411,12 +395,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: Emergency Department's first quarter, 2013-Q1, has its date corrected from 1 to 11 February 2013. Its supply arrived on 22 January, inside the old window, before the corrected one opens and with no quarter before it.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201301221000000800` |
-| Period | 2013-Q1 |
-| Set "in the warehouse on" to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-60b - A supply left with no period, once confirmed
 
@@ -426,12 +405,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-60a.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201301221000000800` |
-| Period | 2013-Q1 |
-| Set "in the warehouse on" to | 2026-09-25 |
+**not injected - nothing to look at yet**
 
 ### TS-61a - A move that will be blocked, before the correction is confirmed
 
@@ -441,12 +415,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: 2015-Q3's date is corrected from 1 to 11 August 2015. Its supply arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201507221000000800` |
-| Period | 2015-Q3 |
-| Set "in the warehouse on" to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-61b - A move that is blocked, once confirmed
 
@@ -456,12 +425,7 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 *Config: as TS-61a.*
 
-| Where to look | |
-|---|---|
-| Dataset | ed-presentations |
-| Supplies | `ed_presentations__201507221000000800` |
-| Period | 2015-Q3 |
-| Set "in the warehouse on" to | 2026-09-25 |
+**not injected - nothing to look at yet**
 
 ### TS-63a - A dataset turned off for a while: the turn-off
 
@@ -596,12 +560,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one row's linkage_key empty.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201608011730000800` |
-| Period | 2016-Q3 |
-| Set "in the warehouse on" to | 2016-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-87 - A dataset code nobody declared - a linked dataset as good as missing
 
@@ -611,12 +570,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2017-Q1's release codes every ED Presentations row EDDC_PRESENTATION_V2.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201702011730000800` |
-| Period | 2017-Q1 |
-| Set "in the warehouse on" to | 2017-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-88 - A surplus identifier
 
@@ -626,12 +580,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2, the contract's id_2 column being blank in every ordinary release (PROVISIONAL).*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201802011730000800` |
-| Period | 2018-Q1 |
-| Set "in the warehouse on" to | 2018-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-89 - One record linked twice
 
@@ -641,12 +590,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two keys.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201805011730000800` |
-| Period | 2018-Q2 |
-| Set "in the warehouse on" to | 2018-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-90 - A link to a record the quarter does not hold
 
@@ -656,12 +600,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a presentation not in ED's 2018-Q3 supply.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201808011730000800` |
-| Period | 2018-Q3 |
-| Set "in the warehouse on" to | 2018-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-91 - Coverage in the warn band
 
@@ -671,12 +610,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the Client Register's rows.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201811011730000800` |
-| Period | 2018-Q4 |
-| Set "in the warehouse on" to | 2018-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-92 - Coverage in the fail band
 
@@ -686,12 +620,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED Presentations' rows.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201905011730000800` |
-| Period | 2019-Q2 |
-| Set "in the warehouse on" to | 2019-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-93a - A Client Register held failing and rejected - its side of TS-93b
 
@@ -716,12 +645,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q1's release, built from the Client Register as received, checked with TS-93a's supply rejected.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201902011730000800` |
-| Period | 2019-Q1 |
-| Set "in the warehouse on" to | 2019-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-94 - A failing linkage release promoted by a person
 
@@ -731,27 +655,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client the quarter does not hold; a scripted person promotes it two days later ("TS-94 promote", REQ-PIPE-332 criterion 8).*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__202205011730000800` |
-| Period | 2022-Q2 |
-| Set "in the warehouse on" to | 2022-05-01 |
-
-### TS-95 - A linked dataset marked not supplied - named, not planted
-
-**What it demonstrates.** The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).
-
-**What it would look like if the rule were wrong.** Cp-clients' checks read Fail, could not run.
-
-*Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.*
-
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201505011725000800` |
-| Period | 2015-Q2 |
-| Set "in the warehouse on" to | 2015-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-96 - A quarter with no linkage release
 
@@ -761,12 +665,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied the day after its slot closed, 19 October 2020 ("TS-96 not supplied").*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | — |
-| Period | 2020-Q3 |
-| Set "in the warehouse on" to | 2020-10-19 |
+**not injected - nothing to look at yet**
 
 ### TS-97 - Large key groups in the warn band
 
@@ -776,12 +675,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to 230 records until just over 2 percent of distinct keys are large groups.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__202108011730000800` |
-| Period | 2021-Q3 |
-| Set "in the warehouse on" to | 2021-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-98 - Large key groups in the fail band
 
@@ -791,12 +685,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just over 4 percent of distinct keys are large groups.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__202208011730000800` |
-| Period | 2022-Q3 |
-| Set "in the warehouse on" to | 2022-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-99 - A blank expected identifier
 
@@ -806,12 +695,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2022-Q4's release, one DOC_CLIENTS row's id_1 blank.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__202211011730000800` |
-| Period | 2022-Q4 |
-| Set "in the warehouse on" to | 2022-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-100a - A Client Register held failing, then promoted by a person - its side of TS-100b
 
@@ -836,12 +720,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's Client Register is held.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__201908011730000800` |
-| Period | 2019-Q3 |
-| Set "in the warehouse on" to | 2019-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-101 - Emergency Department's same-round Fail, clearing
 
@@ -851,59 +730,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2021-Q4's release, received while ED Presentations' Fail supply of the morning is held, its resupply arriving days later; no ED arrival moved, no release re-timed.*
 
-| Where to look | |
-|---|---|
-| Dataset | linkage-keys |
-| Supplies | `linkage_keys__202111011730000800` |
-| Period | 2021-Q4 |
-| Set "in the warehouse on" to | 2021-11-01 |
+**not injected - nothing to look at yet**
 
 ## The geocoding history, planted (REQ-GEN-298)
-
-### TS-93c - A Client Register geocode whose source was rejected - named, not planted
-
-**What it demonstrates.** Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.
-
-**What it would look like if the rule were wrong.** The checks evaluated against another quarter's Client Register.
-
-*Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.*
-
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__201902011843000800` |
-| Period | 2019-Q1 |
-| Set "in the warehouse on" to | 2019-02-01 |
-
-### TS-100c - A Client Register geocode cleared by a person's promotion - named, not planted
-
-**What it demonstrates.** Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.
-
-**What it would look like if the rule were wrong.** Still failing after the promotion.
-
-*Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.*
-
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__201908011817000800` |
-| Period | 2019-Q3 |
-| Set "in the warehouse on" to | 2019-08-01 |
-
-### TS-101b - An ED geocode while ED's same-round Fail is held - named, not planted
-
-**What it demonstrates.** Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.
-
-**What it would look like if the rule were wrong.** ED's page coloured by a not-evaluated result.
-
-*Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.*
-
-| Where to look | |
-|---|---|
-| Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__202111011850000800` |
-| Period | 2021-Q4 |
-| Set "in the warehouse on" to | 2021-11-01 |
 
 ### TS-102 - A missing census year
 
@@ -913,12 +742,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 19:00 with 8 hours' grace; 2023-Q2's Client Register Geocodes, one census year's rows dropped for one to three records, the record's other years present - two or more years in force since 2017-Q3.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202305011830000800` |
-| Period | 2023-Q2 |
-| Set "in the warehouse on" to | 2023-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-103 - A duplicated census year
 
@@ -928,12 +752,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2022-Q1's ED Presentations Geocodes, one census year's row repeated, identical in every column, for one to three presentations.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__202202011830000800` |
-| Period | 2022-Q1 |
-| Set "in the warehouse on" to | 2022-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-104 - An unexpected census year
 
@@ -943,12 +762,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2016-Q2's Client Register Geocodes, a row for census year 2026 for one to three records - 2026 joins the set only from 2027-Q3.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__201605011830000800` |
-| Period | 2016-Q2 |
-| Set "in the warehouse on" to | 2016-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-105 - The share not geocoded in the warn band
 
@@ -958,12 +772,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2023-Q1's ED Presentations Geocodes, whole presentations turned not geocoded in every year, codes empty, until the share lies between 6 and 9 percent.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__202302011830000800` |
-| Period | 2023-Q1 |
-| Set "in the warehouse on" to | 2023-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-106 - The share not geocoded in the fail band
 
@@ -973,12 +782,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-105; 2024-Q1's Client Register Geocodes, until the share lies between 12 and 18 percent.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202402011830000800` |
-| Period | 2024-Q1 |
-| Set "in the warehouse on" to | 2024-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-107 - Coverage in the warn band
 
@@ -988,12 +792,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2021-Q2's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year. (Moved from 2014-Q1 on 2026-11-14, post-build-review #322: the quarter before it had no accepted ED geocodes, so drift read Fail across the gap beside the planted Warn.)*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__202105011830000800` |
-| Period | 2021-Q2 |
-| Set "in the warehouse on" to | 2021-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-108 - Coverage in the fail band
 
@@ -1003,12 +802,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-107; 2025-Q1's Client Register Geocodes, 3 to 6 percent of the quarter's clients left out.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202502011830000800` |
-| Period | 2025-Q1 |
-| Set "in the warehouse on" to | 2025-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-109 - A geocode for a record the quarter does not hold
 
@@ -1018,12 +812,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2017-Q4's ED Presentations Geocodes, one record's rows in every year naming a presentation not in ED's 2017-Q4 supply - added, so every presentation still has its geocodes.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-ed-presentations |
-| Supplies | `geo_ed_presentations__201711011830000800` |
-| Period | 2017-Q4 |
-| Set "in the warehouse on" to | 2017-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-110 - An empty geocoding file
 
@@ -1033,12 +822,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2025-Q4's geo_cp_clients.csv holds no rows while the quarter's Client Register holds its clients.*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202511011830000800` |
-| Period | 2025-Q4 |
-| Set "in the warehouse on" to | 2025-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-111 - A Client Register coloured by its geocodes' promotion
 
@@ -1048,12 +832,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-107; 2024-Q4's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes. (Moved from 2026-Q1 on 2026-11-14, post-build-review #322: it sat straight after TS-110's refused 2025-Q4, so drift read Fail across the gap.)*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202411011830000800` |
-| Period | 2024-Q4 |
-| Set "in the warehouse on" to | 2024-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-113 - A Client Register geocode whose placed mix drifts
 
@@ -1063,12 +842,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved from suburb placement to postcode placement to land the drift check's PSI in its warn band. The size is derived from the check's own band, as REQ-GEN-392 derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL (2026-11-16).)*
 
-| Where to look | |
-|---|---|
-| Dataset | geo-cp-clients |
-| Supplies | `geo_cp_clients__202608011830000800` |
-| Period | 2026-Q3 |
-| Set "in the warehouse on" to | 2026-08-01 |
+**not injected - nothing to look at yet**
 
 
 <!-- scenario-map-data
@@ -1086,15 +860,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-236",
     "REQ-QAC-108"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202504161000000800"
-    ],
-    "period": "2025-Q2",
-    "inPlaceOn": "2025-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-3b",
@@ -1105,15 +871,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "Files to May and leaves February owed for ever.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202604161000000800"
-    ],
-    "period": "2026-Q2",
-    "inPlaceOn": "2026-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-9",
@@ -1128,15 +886,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-235",
     "REQ-GEN-195"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202404221000000800"
-    ],
-    "period": "2024-Q2",
-    "inPlaceOn": "2024-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-12",
@@ -1273,6 +1023,72 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
+   "id": "TS-48",
+   "mode": "INJECT",
+   "title": "A correction arriving before its partner is promoted",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "NOT IN THE DATA YET. A single-table correction that starts failing on a cross-table check and is promoted when its partner's promotion re-checks it (REQ-PIPE-121) needs the Child Protection generator to place a partner's promotion between two arrivals of one quarter, which its delivery shapes do not yet express.",
+   "breaksAs": null,
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-121"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202402010900000800",
+     "cp_clients__202402291000000800"
+    ],
+    "period": "2024-Q2",
+    "inPlaceOn": "2024-03-12",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-50",
+   "mode": "INJECT",
+   "title": "A reader re-checked against the newer version",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "NOT IN THE DATA YET, for TS-48's reason (REQ-PIPE-118, REQ-PIPE-123 with a cross-table reader).",
+   "breaksAs": null,
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-118",
+    "REQ-PIPE-123"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201705010900000800",
+     "cp_clients__201705151000000800"
+    ],
+    "period": "2017-Q3",
+    "inPlaceOn": "2017-05-22",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-52",
+   "mode": "INJECT",
+   "title": "Case Workers arriving in a period it does not deliver in",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "NOT INJECTED: the ordinary history already produces it - Case Workers files arrive in every delivery and are held in the quarters it does not take part in (TS-33a, REQ-PIPE-131). An injection would record a placement for what is already there; it waits on the Child Protection injection supporting a placement with no extra arrival.",
+   "breaksAs": null,
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-131"
+   ],
+   "coordinates": {
+    "dataset": "cp-case-workers",
+    "supplies": [
+     "cp_case_workers__202605270100000000"
+    ],
+    "period": "2026-Q3",
+    "inPlaceOn": "2026-05-28",
+    "subject": "verdict-line"
+   }
+  },
+  {
    "id": "TS-54",
    "mode": "INJECT",
    "title": "A period substituted onto an earlier promoted supply",
@@ -1291,6 +1107,26 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "period": "2025-Q2",
     "inPlaceOn": "2025-02-17",
     "subject": "substitution-drill-down"
+   }
+  },
+  {
+   "id": "TS-55",
+   "mode": "INJECT",
+   "title": "A period whose _manifest lists all three kinds",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one period (REQ-PIPE-130, REQ-GEN-137 criterion 6).",
+   "breaksAs": null,
+   "config": null,
+   "requirements": [
+    "REQ-PIPE-130",
+    "REQ-GEN-137"
+   ],
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [],
+    "period": "2023-Q1",
+    "inPlaceOn": "2026-09-25",
+    "subject": "period-composition"
    }
   },
   {
@@ -1329,15 +1165,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-205",
     "REQ-PIPE-168"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201502021200000800"
-    ],
-    "period": "2015-Q1",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-57b",
@@ -1348,15 +1176,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "The late verdict overwritten, or no verdict naming the correction.",
    "config": "Config: as TS-57a.",
    "requirements": [],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201502021200000800"
-    ],
-    "period": "2015-Q1",
-    "inPlaceOn": "2026-09-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-58a",
@@ -1369,15 +1189,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-205"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201310101000000800"
-    ],
-    "period": "2013-Q4",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-58b",
@@ -1390,15 +1202,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201310101000000800"
-    ],
-    "period": "2013-Q4",
-    "inPlaceOn": "2026-09-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-59a",
@@ -1411,15 +1215,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-205"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201407101000000800"
-    ],
-    "period": "2014-Q3",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-59b",
@@ -1432,15 +1228,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201407101000000800"
-    ],
-    "period": "2014-Q3",
-    "inPlaceOn": "2026-09-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-60a",
@@ -1453,15 +1241,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-205"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201301221000000800"
-    ],
-    "period": "2013-Q1",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-60b",
@@ -1475,15 +1255,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-064",
     "REQ-GEN-205"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201301221000000800"
-    ],
-    "period": "2013-Q1",
-    "inPlaceOn": "2026-09-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-61a",
@@ -1497,15 +1269,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-251",
     "REQ-GEN-205"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201507221000000800"
-    ],
-    "period": "2015-Q3",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-61b",
@@ -1518,15 +1282,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__201507221000000800"
-    ],
-    "period": "2015-Q3",
-    "inPlaceOn": "2026-09-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-63a",
@@ -1585,15 +1341,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-131"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202507191000000800"
-    ],
-    "period": "2025-Q3",
-    "inPlaceOn": "2025-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-66",
@@ -1604,15 +1352,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "Shown as anything more alarming than early.",
    "config": "Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November) arrives 30 October at 10:00.",
    "requirements": [],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202510301000000800"
-    ],
-    "period": "2025-Q4",
-    "inPlaceOn": "2025-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-67",
@@ -1627,15 +1367,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-131",
     "REQ-GEN-135"
    ],
-   "coordinates": {
-    "dataset": "ed-presentations",
-    "supplies": [
-     "ed_presentations__202310121000000800"
-    ],
-    "period": "2023-Q4",
-    "inPlaceOn": "2023-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-75a",
@@ -1939,15 +1671,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201608011730000800"
-    ],
-    "period": "2016-Q3",
-    "inPlaceOn": "2016-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-87",
@@ -1960,15 +1684,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201702011730000800"
-    ],
-    "period": "2017-Q1",
-    "inPlaceOn": "2017-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-88",
@@ -1981,15 +1697,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201802011730000800"
-    ],
-    "period": "2018-Q1",
-    "inPlaceOn": "2018-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-89",
@@ -2002,15 +1710,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201805011730000800"
-    ],
-    "period": "2018-Q2",
-    "inPlaceOn": "2018-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-90",
@@ -2024,15 +1724,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201808011730000800"
-    ],
-    "period": "2018-Q3",
-    "inPlaceOn": "2018-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-91",
@@ -2046,15 +1738,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-337",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201811011730000800"
-    ],
-    "period": "2018-Q4",
-    "inPlaceOn": "2018-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-92",
@@ -2067,15 +1751,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201905011730000800"
-    ],
-    "period": "2019-Q2",
-    "inPlaceOn": "2019-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-93a",
@@ -2109,36 +1785,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201902011730000800"
-    ],
-    "period": "2019-Q1",
-    "inPlaceOn": "2019-02-01",
-    "subject": "supply-history-row"
-   }
-  },
-  {
-   "id": "TS-93c",
-   "mode": "INJECT",
-   "title": "A Client Register geocode whose source was rejected - named, not planted",
-   "section": "The geocoding history, planted (REQ-GEN-298)",
-   "demonstrates": "Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.",
-   "breaksAs": "The checks evaluated against another quarter's Client Register.",
-   "config": "Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.",
-   "requirements": [
-    "REQ-GEN-298"
-   ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__201902011843000800"
-    ],
-    "period": "2019-Q1",
-    "inPlaceOn": "2019-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-94",
@@ -2152,38 +1799,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__202205011730000800"
-    ],
-    "period": "2022-Q2",
-    "inPlaceOn": "2022-05-01",
-    "subject": "supply-history-row"
-   }
-  },
-  {
-   "id": "TS-95",
-   "mode": "INJECT",
-   "title": "A linked dataset marked not supplied - named, not planted",
-   "section": "The linkage history, planted (REQ-GEN-335)",
-   "demonstrates": "The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).",
-   "breaksAs": "Cp-clients' checks read Fail, could not run.",
-   "config": "Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.",
-   "requirements": [
-    "REQ-PIPE-332",
-    "REQ-GEN-335",
-    "REQ-GEN-205"
-   ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201505011725000800"
-    ],
-    "period": "2015-Q2",
-    "inPlaceOn": "2015-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-96",
@@ -2198,13 +1814,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-133",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [],
-    "period": "2020-Q3",
-    "inPlaceOn": "2020-10-19",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-97",
@@ -2217,15 +1827,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__202108011730000800"
-    ],
-    "period": "2021-Q3",
-    "inPlaceOn": "2021-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-98",
@@ -2238,15 +1840,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__202208011730000800"
-    ],
-    "period": "2022-Q3",
-    "inPlaceOn": "2022-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-99",
@@ -2259,15 +1853,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__202211011730000800"
-    ],
-    "period": "2022-Q4",
-    "inPlaceOn": "2022-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-100a",
@@ -2302,36 +1888,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-331",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__201908011730000800"
-    ],
-    "period": "2019-Q3",
-    "inPlaceOn": "2019-08-01",
-    "subject": "supply-history-row"
-   }
-  },
-  {
-   "id": "TS-100c",
-   "mode": "INJECT",
-   "title": "A Client Register geocode cleared by a person's promotion - named, not planted",
-   "section": "The geocoding history, planted (REQ-GEN-298)",
-   "demonstrates": "Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.",
-   "breaksAs": "Still failing after the promotion.",
-   "config": "Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.",
-   "requirements": [
-    "REQ-GEN-298"
-   ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__201908011817000800"
-    ],
-    "period": "2019-Q3",
-    "inPlaceOn": "2019-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-101",
@@ -2345,36 +1902,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-334",
     "REQ-GEN-335"
    ],
-   "coordinates": {
-    "dataset": "linkage-keys",
-    "supplies": [
-     "linkage_keys__202111011730000800"
-    ],
-    "period": "2021-Q4",
-    "inPlaceOn": "2021-11-01",
-    "subject": "supply-history-row"
-   }
-  },
-  {
-   "id": "TS-101b",
-   "mode": "INJECT",
-   "title": "An ED geocode while ED's same-round Fail is held - named, not planted",
-   "section": "The geocoding history, planted (REQ-GEN-298)",
-   "demonstrates": "Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.",
-   "breaksAs": "ED's page coloured by a not-evaluated result.",
-   "config": "Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.",
-   "requirements": [
-    "REQ-GEN-298"
-   ],
-   "coordinates": {
-    "dataset": "geo-ed-presentations",
-    "supplies": [
-     "geo_ed_presentations__202111011850000800"
-    ],
-    "period": "2021-Q4",
-    "inPlaceOn": "2021-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-102",
@@ -2387,15 +1915,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202305011830000800"
-    ],
-    "period": "2023-Q2",
-    "inPlaceOn": "2023-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-103",
@@ -2408,15 +1928,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-ed-presentations",
-    "supplies": [
-     "geo_ed_presentations__202202011830000800"
-    ],
-    "period": "2022-Q1",
-    "inPlaceOn": "2022-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-104",
@@ -2429,15 +1941,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__201605011830000800"
-    ],
-    "period": "2016-Q2",
-    "inPlaceOn": "2016-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-105",
@@ -2450,15 +1954,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-ed-presentations",
-    "supplies": [
-     "geo_ed_presentations__202302011830000800"
-    ],
-    "period": "2023-Q1",
-    "inPlaceOn": "2023-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-106",
@@ -2471,15 +1967,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202402011830000800"
-    ],
-    "period": "2024-Q1",
-    "inPlaceOn": "2024-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-107",
@@ -2493,15 +1981,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-298",
     "REQ-QAC-340"
    ],
-   "coordinates": {
-    "dataset": "geo-ed-presentations",
-    "supplies": [
-     "geo_ed_presentations__202105011830000800"
-    ],
-    "period": "2021-Q2",
-    "inPlaceOn": "2021-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-108",
@@ -2514,15 +1994,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202502011830000800"
-    ],
-    "period": "2025-Q1",
-    "inPlaceOn": "2025-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-109",
@@ -2535,15 +2007,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-ed-presentations",
-    "supplies": [
-     "geo_ed_presentations__201711011830000800"
-    ],
-    "period": "2017-Q4",
-    "inPlaceOn": "2017-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-110",
@@ -2557,15 +2021,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-QAC-340",
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202511011830000800"
-    ],
-    "period": "2025-Q4",
-    "inPlaceOn": "2025-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-111",
@@ -2579,15 +2035,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202411011830000800"
-    ],
-    "period": "2024-Q4",
-    "inPlaceOn": "2024-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-113",
@@ -2601,15 +2049,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-392",
     "REQ-GEN-298"
    ],
-   "coordinates": {
-    "dataset": "geo-cp-clients",
-    "supplies": [
-     "geo_cp_clients__202608011830000800"
-    ],
-    "period": "2026-Q3",
-    "inPlaceOn": "2026-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   }
  ]
 }
