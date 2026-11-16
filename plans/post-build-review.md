@@ -15837,3 +15837,46 @@ twice. It deliberately did not re-find the `TypeError`.
      - **The drift test still bites**: with TS-113 removed it fails ("the
        history holds drift, so the test can fail", `assert set()`).
      - **Ran**: see REQ-GEN-392's evidence.
+
+420. **[todo, 2026-11-16]** **[Dashboard UI]** **[Testing & dev tooling]** **After the regenerated history, TS-76's and TS-77a's pill lands 5.875px above the window.**
+     Found by the full gate on 4ca444d7 (passed on 06a850d7): three
+     real-browser tests, TS-76's and TS-77a's `standing-in` chip (y=-5.875) and
+     `test_the_page_head_stays_in_view_when_it_fits_beside_the_subject`
+     (`{'pill': -5.875, 'subBottom': 798.75}`). Reproduced on 4ca444d7 exactly:
+     3 failed, 14 passed.
+     - **NOT the timing batch.** 06a850d7's template, embedded over the same
+       reports and today's `supply_quarterly`, lands TS-76 at the identical
+       pixel (pill top -6, subject 524-799, scrollY 746). The run-time trend
+       sits in Supply history, ~1,900px below the subject, and nothing
+       between the head and the subject changed in the template.
+     - **The cause is the data.** On cp-placements on 2025-02-17, between the
+       view head's `Substituted from 2025-Q1` pill and TS-76's subject (the
+       substitution drill-down, 275px), the page now carries a 290px "1 thing
+       waiting for a person here" queue: cp-placements' 2019-Q3 supply,
+       `promotion-withheld` on 2019-05-14 (decision 230, "the Placements ->
+       Client Register check ... could not be checked") and never decided. With
+       it, pill top to subject bottom is ~805px, against an 800px window.
+     - **So the landing is doing exactly what was agreed, and the agreed rules
+       cannot all hold on this page.** The jump keeps the subject whole and
+       brings back as much of the head as fits (Keith, 2026-10-15; #202 F7,
+       #255), and REQ-GEN-199 criteria 36-37 (as amended by REQ-DASH-208)
+       require each quoted text inside the viewport. At 805px no landing does
+       both: the pill in view clips the subject's last ~6px. Shaving 6px from
+       something in between would pass today and fail on the next history.
+     - **Fixed (test assumption)**: the head-in-view test sized a spacer to make
+       pill-to-subject 700px, which only works when the natural span is under
+       700. It now sets the page's own blocks between head and subject aside
+       first when they alone are taller, and fails saying so if the two still
+       cannot fit. Its intent is unchanged; it passes.
+     - **For Keith - the page half, NOT changed (a change to agreed
+       behaviour)**: TS-76 and TS-77a's `standing-in` chips stay red until he
+       chooses. (a) RECOMMENDED: where the head and the subject cannot both
+       fit, a subject that is the head pill's own drill-down
+       (`substitution-drill-down`) lands with the pill at the top and the
+       subject's foot clipped - both quoted texts stay in view (the drill-down's
+       "Since removed" text is ~680px below the pill). (b) Keep the subject
+       whole always, and narrow REQ-GEN-199 c36-37 for a head quote that cannot
+       fit beside its subject. (c) Move the drill-down above the page's
+       notices - but TS-76's Expect places it "below the results' heading".
+     - **Ran** (`-k "TestTheAsAtScenarioChips or TestEveryScenarioJumpLands"
+       -n 2`, this tree): 2 failed (TS-76 and TS-77a `standing-in`), 15 passed.

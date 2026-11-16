@@ -6428,12 +6428,22 @@ class TestEveryScenarioJumpLands:
         head is never left above it - TS-76's quoted pill is in the head. A block
         between them is sized so the pill and the subject span 700px of the
         800px window, so the test does not depend on how long the queue above
-        happens to be."""
+        happens to be - in either direction: where what lies between them is
+        already taller than that, it is set aside first (post-build-review
+        #420: the regenerated history put a 290px 'waiting for a person' queue
+        there, and a spacer cannot be shorter than nothing)."""
         _scenario_chip(clean_page, built_dashboard_html, "TS-76")
         got = clean_page.evaluate("""() => {
             const head = document.querySelector('#view .view-head');
-            const span = document.querySelector('#view .scenario-subject').getBoundingClientRect().bottom
+            const subject = document.querySelector('#view .scenario-subject');
+            const spanNow = () => subject.getBoundingClientRect().bottom
                 - document.querySelector('[data-testid="standing-in"]').getBoundingClientRect().top;
+            for(let el = head.nextElementSibling; el && spanNow() > 700; el = el.nextElementSibling){
+                if(el.contains(subject) || el.matches('[data-scenario-label]')) break;
+                el.style.display = 'none';
+            }
+            const span = spanNow();
+            if(span > 700) return {unfit: span};
             const spacer = document.createElement('div');
             spacer.style.height = Math.max(0, 700 - span) + 'px';
             head.after(spacer);
@@ -6443,6 +6453,7 @@ class TestEveryScenarioJumpLands:
             const pill = document.querySelector('[data-testid="standing-in"]').getBoundingClientRect();
             return {pill: pill.top, subBottom: sub.bottom, vh: innerHeight};
         }""")
+        assert "unfit" not in got, f"the pill and the subject alone span {got['unfit']}px"
         assert 0 <= got["pill"] and got["subBottom"] <= got["vh"], got
 
     def test_back_after_a_date_change_restores_the_date(self, clean_page,
