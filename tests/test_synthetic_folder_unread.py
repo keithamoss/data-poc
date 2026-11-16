@@ -18,9 +18,9 @@ import synthetic_unread_support as support
 
 
 @pytest.fixture(scope="module")
-def runs(tmp_path_factory, worker_id):
+def runs(tmp_path_factory, worker_id, daily_history):
     return support.runs("civil-registration", "birth-registrations", tmp_path_factory,
-                        worker_id)
+                        worker_id, daily_history)
 
 
 class TestTheDailyAssetReadsNothingThere(support.Checks):

@@ -10,9 +10,9 @@ import synthetic_unread_support as support
 
 
 @pytest.fixture(scope="module")
-def runs(tmp_path_factory, worker_id):
+def runs(tmp_path_factory, worker_id, quarterly_history):
     return support.runs("emergency-department", "ed-presentations", tmp_path_factory,
-                        worker_id)
+                        worker_id, quarterly_history)
 
 
 class TestTheQuarterlyAssetReadsNothingThere(support.Checks):

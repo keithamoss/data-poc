@@ -197,27 +197,18 @@ def asset_folder(tmp: Path, *, synthetic: str | None) -> Path:
     return folder
 
 
-def corpus(root: Path, collection_id: str, dataset_id: str, deliveries: int) -> list[dict]:
-    """The real generator's output for `collection_id`, written under `root`
-    and cut to its first `deliveries` of `dataset_id` - generated before
-    anything is watched, since the generator is an allowed reader. Their
-    bookkeeping entries, in run order."""
-    import generator_isolation
-    from generator import driver
-
-    undo = generator_isolation.redirect(root)
-    try:
-        driver.generate(collection_id)
-    finally:
-        undo()
-    book = json.loads((root / "generator_bookkeeping.json").read_text())
-    entries = sorted(book[dataset_id], key=lambda e: e["run_index"])[:deliveries]
+def corpus(root: Path, collection_id: str, dataset_id: str, deliveries: int,
+           history) -> list[dict]:
+    """The real generator's output for `collection_id`, cut to its first
+    `deliveries` of `dataset_id` - copied under `root` from `history`, the
+    suite's shared history of the asset (REQ-TEST-402), so nothing is
+    generated while anything is watched. Their bookkeeping entries, in run
+    order."""
+    entries = sorted(history.book()[dataset_id], key=lambda e: e["run_index"])[:deliveries]
     keep = {e["delivery"] for e in entries}
     assert len(keep) == deliveries, "precondition: the generator wrote enough deliveries"
-    for tree in ("deliveries", "receipts"):
-        for d in (root / tree).iterdir():
-            if d.name not in keep:
-                shutil.rmtree(d)
+    root.rmdir()  # an empty folder of the caller's, which the copy creates
+    history.copy_to(root, only=keep)
     return entries
 
 
@@ -267,12 +258,12 @@ def run_and_build(collection_id: str, tree: Path, folder: Path, out: Path,
     return snap
 
 
-def runs(collection_id: str, dataset_id: str, tmp_path_factory, worker_id,
+def runs(collection_id: str, dataset_id: str, tmp_path_factory, worker_id, history,
          deliveries: int = 2) -> dict:
     """Both variants: "present" (a synthetic/ folder holding one real scripted
     decision) and "removed" (no synthetic/ folder)."""
     corpus_root = tmp_path_factory.mktemp(f"synthetic_unread_corpus_{dataset_id}")
-    entries = corpus(corpus_root, collection_id, dataset_id, deliveries)
+    entries = corpus(corpus_root, collection_id, dataset_id, deliveries, history)
     out = {}
     for key, synthetic in (("present", scripted(dataset_id, entries[0]["period"])),
                            ("removed", None)):
