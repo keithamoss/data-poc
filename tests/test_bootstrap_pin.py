@@ -384,3 +384,96 @@ class TestWhatABootstrapSaysAtTheEnd:
     def test_no_tree_snapshot_is_left_installed(self, stubbed):
         boot.bootstrap(collection="all")
         assert arrivals.installed_tree() is None
+
+
+class TestAFailedPinLeavesNothingHeld:
+    """post-build-review #396: the pass lock was taken before the pin, so a
+    pin that could not be installed left the lock held - in the TUI's
+    long-lived process, until it exited."""
+
+    def test_the_pass_lock_is_released_when_the_pin_cannot_be_installed(self, stubbed,
+                                                                         monkeypatch):
+        from qa_tools.common import processing_pass
+
+        def refused():
+            raise config_pin.PinRefused("refused for the test")
+        monkeypatch.setattr(config_pin, "pinned", refused)
+        from qa_tools.common import supply_db
+
+        with pytest.raises(config_pin.PinRefused) as raised:
+            boot.bootstrap(collection="all")
+        # THE FAILED CALL'S FRAMES ARE KEPT, as a long-lived process keeps
+        # whatever it was holding: nothing may still hold the lock.
+        assert raised.value is not None
+        with supply_db.connect(label="test", reuse=False) as conn:
+            held = conn.execute(
+                "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = ? "
+                "AND objid = 1 AND granted AND database = (SELECT oid FROM pg_database "
+                "WHERE datname = current_database())",
+                [processing_pass.PASS_LOCK_SPACE]).fetchone()[0]
+        assert held == 0, "the pass lock is still held after the pin failed"
+
+
+class TestGeneratingOnARealAssetIsARefusal:
+    """post-build-review #397: `generate-synthetic-data` on an asset that is
+    not synthetic ended in a PinRefused traceback."""
+
+    def test_it_says_the_refusal_and_exits(self, calendar):
+        import click
+
+        from cli import pipeline
+
+        path = calendar.parent / "data-asset.yaml"
+        real = asset_folders.real_folder() / "data-asset.yaml"
+        if path.is_symlink():
+            path.unlink()  # a link to the real file: never written through
+        path.write_text(real.read_text(encoding="utf-8").replace("synthetic: true",
+                                                                 "synthetic: false"),
+                        encoding="utf-8")
+        with pytest.raises(click.ClickException) as raised:
+            pipeline.generate_collection("civil-registration", trial=False)
+        assert "does not declare `synthetic: true`" in raised.value.message
+        assert config_pin.installed() is None
+
+
+class TestAFailedBootstrapSaysSoBeforeAnythingGreen:
+    """post-build-review #398: on a pin difference or a changed tree the CLI
+    printed a green 'Populated:' line before failing, and never repeated the
+    checkpoint it had taken."""
+
+    def test_no_populated_line_and_the_checkpoint_still_named(self, stubbed, monkeypatch):
+        import dataclasses
+
+        from click.testing import CliRunner
+
+        from cli import pipeline
+
+        real = boot._populate
+
+        def populate(**kwargs):
+            return dataclasses.replace(real(**kwargs), checkpoint="mothman_ckpt_test",
+                                       tree_changes=("Birth Registrations: a and b",))
+        monkeypatch.setattr(boot, "_populate", populate)
+        done = CliRunner().invoke(pipeline.bootstrap_command, [])
+        assert done.exit_code != 0
+        assert "Populated:" not in done.output
+        assert "Checkpoint kept: mothman_ckpt_test" in done.output
+        assert done.output.index("Checkpoint kept") < done.output.index("delivery tree changed")
+
+
+class TestARefusedHandOffIsSaidAsItself:
+    """post-build-review #398: a stream process refusing a snapshot whose
+    contents do not match its digest broke the pool, so the bootstrap said
+    BrokenProcessPool rather than what went wrong."""
+
+    def test_the_stream_raises_the_mismatch(self, monkeypatch):
+        from asset_model import assets
+
+        real = config_pin.ConfigSnapshot.take()
+        forged = config_pin.ConfigSnapshot(real.asset, {**real.texts, "/x.yaml": ""},
+                                           digest=real.digest)
+        name, layout, _pin, tree = assets.handoff()
+        monkeypatch.setattr(assets, "handoff", lambda: (name, layout, forged, tree))
+        with boot.stream_pool(1) as pool:
+            with pytest.raises(config_pin.PinMismatch, match="hand-off"):
+                pool.submit(boot._reporting, os.getpid).result()

@@ -50770,6 +50770,9 @@ requirements:
     - REQ-PIPE-254 CRITERION 15 AMENDED AS WORDED (Keith, 2026-11-14), applied in this commit.
     - 'SEEN FAILING FIRST: against 12f06b34''s product code the new modules failed at collection (no config_pin); with the pin''s read check removed (config_yaml.read ignoring the pin) tests/test_config_pin.py''s
       mid-pin edit, staged-correction, audit-hook and mid-generation tests failed, and passed with it restored.'
+    - 'FOUR MORE READERS AND A WIDER GATE (post-build-review #394 and #395, the critic on 22e45ff5): scripted_corrections.load, validate_check_lifecycle._sources and sources_fingerprint, soda_common.readable_checks_yaml
+      and synthetic_reset.asset_id now read through config_yaml (PROVISIONAL (2026-11-16): Soda''s check file pinned in both of its readers); the gate reads bootstrap/ and cli/ too and finds a parse imported
+      by name and a parse of a name assigned a file''s content. Tests: TestEveryReaderInsideARunIsPinned and test_validate_imports.py''s planted forms, failing against 22e45ff5.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50845,6 +50848,8 @@ requirements:
       and only the synthetic side installs one (REQ-PIPE-397 criterion 4).'
     - 'PROVISIONAL (2026-11-16): the bare command''s line reads ''Took generation 12s.'' (bootstrap/generation.took_line), and inside a bootstrap generation is the first entry of the one ''Took ...'' line.'
     - 'SEEN FAILING FIRST: with the pin''s read check removed, tests/test_config_pin.py::TestAGenerationReadsItsConfigurationOnce failed (the mid-generation calendar edit reached that generation''s receipts).'
+    - 'A REFUSAL, NOT A TRACEBACK (post-build-review #397): `generate-synthetic-data` on an asset that is not synthetic says the pin''s refusal as a ClickException. Tested by tests/test_bootstrap_pin.py::TestGeneratingOnARealAssetIsARefusal,
+      failing against 22e45ff5.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50911,6 +50916,9 @@ requirements:
       override is said as ''(set by GENERATOR_ANCHOR_DATE)''. The rolled wording waits for the rolled anchor (unmet, below).'
     - 'STATEMENTS END WITH A FULL STOP: ''Took ...'' and ''Adding <collection>: ...'' gained one, and the TUI''s step() passes a statement through as the CLI''s _step does - work under way still trails off.'
     - 'SEEN FAILING FIRST: with the pin''s read check removed, tests/test_bootstrap_pin.py''s mid-replay calendar edit test failed.'
+    - 'CRITIC FIXES (post-build-review #396-#398, on 22e45ff5): the pass lock and the pin are held by one ExitStack, so a refused pin releases the lock; the CLI names a kept checkpoint and then fails before
+      any green ''Populated:'' line; a stream process refusing a mismatched snapshot raises PinMismatch from its task rather than breaking the pool (PROVISIONAL (2026-11-16): the nested pools still surface
+      BrokenProcessPool). Each tested first.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50985,6 +50993,9 @@ requirements:
     - 'PROVISIONAL (2026-11-16): standing_on is keyed on the zones too, as criterion 1 reads, though its value does not depend on them: the cost is one timezone_versions() read per call, a dictionary look-up
       inside a pin.'
     - 'SEEN FAILING FIRST: with the memo''s hit path removed, tests/test_derived_once.py''s two counting tests failed.'
+    - 'THE HIERARCHY IS IN THE KEY (post-build-review #393, the critic on 22e45ff5): a dataset''s collection, and so the defaults its slots take, is the hierarchy''s, read from data-asset.yaml outside its timezone
+      block; the memo keys on (agreement, zones, hierarchy.tree()), the tree one value per text from hierarchy''s own Built store. Tested by tests/test_derived_once.py::TestAHierarchyEditIsSeenUnpinned, failing
+      against 22e45ff5.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50997,6 +51008,7 @@ requirements:
     - asset_model/schedule.py::periods_for_calendar
     - asset_model/agreement.py::Agreement
     - asset_model/agreement.py::from_doc
+    - asset_model/hierarchy.py::tree
     - asset_model/asset_time.py::parse_timezone_versions
     linked_tests:
     - tests/test_derived_once.py

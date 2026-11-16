@@ -334,6 +334,31 @@ def selected_asset(monkeypatch, request):
     _assets.release_claim()
 
 
+@pytest.fixture(autouse=True)
+def _no_pin_or_memo_carried_over():
+    """Every test starts with nothing remembered from another (post-build-
+    review #399): the derived schedule values cleared (REQ-PIPE-400), and no
+    configuration pin (REQ-PIPE-397) or delivery-tree snapshot (REQ-PIPE-430)
+    left installed - a leftover is released and the test that left it fails,
+    since every test after it would be answered from a stale copy."""
+    from asset_model import arrivals, config_pin, derived
+
+    derived.MEMO.clear()
+    yield
+    derived.MEMO.clear()
+    left = []
+    pin = config_pin.installed()
+    if pin is not None:
+        pin.release()
+        left.append(f"a configuration pin ({pin!r})")
+    tree = arrivals.installed_tree()
+    if tree is not None:
+        tree.release(check=False)
+        left.append("a delivery-tree snapshot")
+    if left:
+        pytest.fail(f"this test left {' and '.join(left)} installed")
+
+
 @pytest.fixture
 def no_recorded_filings(supply_dsn):
     """This worker database with no filing - and so no recorded verdict - left

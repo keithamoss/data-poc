@@ -276,6 +276,7 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
     says a refusal."""
     import time
 
+    from asset_model import config_pin
     from bootstrap import generation
 
     started = time.monotonic()
@@ -287,6 +288,10 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
         raise click.ClickException(str(exc)) from None
     except generation.TargetTrialUnavailable as exc:
         raise TargetTrialUnavailable(str(exc)) from None
+    except config_pin.PinRefused as exc:
+        # A REFUSAL, NOT A TRACEBACK (post-build-review #397): the asset is
+        # not synthetic, so there is nothing to generate.
+        raise click.ClickException(str(exc)) from None
     # ONE LINE, ITS OWN (REQ-GEN-398 criterion 3; CLI finding 4): run on its
     # own, the command says how long generation took. Inside a bootstrap it is
     # an entry of the 'Took ...' line instead, and this function is not used.
@@ -353,20 +358,20 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     # 4): the pinned digest, dimmed, then the closing line.
     if result.pin_digest:
         console.print(boot.pinned_line(result.pin_digest), style="dim")
-    console.print(f"Populated: {boot.closing_line(result)}", style="green", soft_wrap=True)
-    # A STARTED PROCESS UNDER ANOTHER PIN FAILS THE BOOTSTRAP (criterion 3).
-    mismatch = boot.pin_mismatch_message(result.pin_differences)
-    if mismatch:
-        raise click.ClickException(mismatch)
-    # A DELIVERY TREE CHANGED MID-REPLAY FAILS IT TOO (REQ-PIPE-430 criterion 3).
-    changed = boot.tree_changed_message(result.tree_changes)
-    if changed:
-        raise click.ClickException(changed)
     if result.checkpoint:
         # REPEATED AT THE END (post-build-review #133 B6) - the line that
-        # took it is hundreds of lines up.
+        # took it is hundreds of lines up - and before any failure below, so
+        # a failed run still names it (post-build-review #398).
         console.print(f"Checkpoint kept: {result.checkpoint}. Resume from it with "
                       f"`mothman pipeline resume {result.checkpoint}`.", style="green")
+    # A STARTED PROCESS UNDER ANOTHER PIN FAILS THE BOOTSTRAP (criterion 3), and
+    # so does a DELIVERY TREE CHANGED MID-REPLAY (REQ-PIPE-430 criterion 3) -
+    # said before anything green (post-build-review #398).
+    for message in (boot.pin_mismatch_message(result.pin_differences),
+                    boot.tree_changed_message(result.tree_changes)):
+        if message:
+            raise click.ClickException(message)
+    console.print(f"Populated: {boot.closing_line(result)}", style="green", soft_wrap=True)
     _fail_on_disagreements(result.disagreements)
 
 

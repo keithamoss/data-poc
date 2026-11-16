@@ -35,7 +35,7 @@ from __future__ import annotations
 import threading
 from collections import OrderedDict
 
-from asset_model import asset_time
+from asset_model import asset_time, hierarchy
 
 #: How many (agreement, zones) pairs are remembered: the committed one and a
 #: few staged corrections' (a replay stages one per arrival it re-reads).
@@ -43,40 +43,52 @@ AGREEMENTS = 16
 
 
 class Memo:
-    """Values worked out per (agreement, zones) pair, then per argument set."""
+    """Values worked out per (agreement, zones, hierarchy), then per argument
+    set."""
 
     def __init__(self, agreements: int = AGREEMENTS):
         self._limit = agreements
-        # (id(agreement), id(zones)) -> (agreement, zones, {key: value})
-        self._held: "OrderedDict[tuple[int, int], tuple[object, object, dict]]" = OrderedDict()
+        # (id(agreement), id(zones), id(tree)) -> (agreement, zones, tree, {key: value})
+        self._held: "OrderedDict[tuple[int, int, int], tuple]" = OrderedDict()
         self._lock = threading.Lock()
 
     def get(self, agreement, key: tuple, compute):
-        """The value `compute()` works out for `key` under `agreement` and the
-        zones in force now - worked out at most once per pair and key. A
-        computation that raises stores nothing."""
+        """The value `compute()` works out for `key` under `agreement`, the
+        zones in force now and the hierarchy as it reads now - worked out at
+        most once per triple and key. A computation that raises stores
+        nothing.
+
+        THE HIERARCHY IS PART OF THE KEY (post-build-review #393): a
+        dataset's collection - and so the collection defaults its slots and
+        periods take - is the hierarchy's (Agreement.collection_of), read from
+        data-asset.yaml outside its timezone block. hierarchy's own Built
+        store hands back one tree per text, so its identity is content-keyed,
+        as the agreement's is."""
         zones = asset_time.timezone_versions()
-        pair = (id(agreement), id(zones))
+        tree = hierarchy.tree()
+        triple = (id(agreement), id(zones), id(tree))
         with self._lock:
-            held = self._held.get(pair)
-            if held is not None and held[0] is agreement and held[1] is zones:
-                self._held.move_to_end(pair)
-                values = held[2]
+            held = self._held.get(triple)
+            if held is not None and held[0] is agreement and held[1] is zones \
+                    and held[2] is tree:
+                self._held.move_to_end(triple)
+                values = held[3]
                 if key in values:
                     return values[key]
         value = compute()
         with self._lock:
-            held = self._held.get(pair)
-            if held is None or held[0] is not agreement or held[1] is not zones:
-                held = self._held[pair] = (agreement, zones, {})
-            held[2][key] = value
-            self._held.move_to_end(pair)
+            held = self._held.get(triple)
+            if held is None or held[0] is not agreement or held[1] is not zones \
+                    or held[2] is not tree:
+                held = self._held[triple] = (agreement, zones, tree, {})
+            held[3][key] = value
+            self._held.move_to_end(triple)
             while len(self._held) > self._limit:
                 self._held.popitem(last=False)
         return value
 
     def __len__(self) -> int:
-        """How many (agreement, zones) pairs it holds."""
+        """How many (agreement, zones, hierarchy) triples it holds."""
         return len(self._held)
 
     def clear(self) -> None:

@@ -190,3 +190,51 @@ class TestNothingSharedCanBeChanged:
         periods = schedule.periods_for_dataset(DATASET, until=until)
         periods.pop()
         assert len(schedule.periods_for_dataset(DATASET, until=until)) == len(periods) + 1
+
+
+@pytest.mark.asset("quarterly")
+class TestAHierarchyEditIsSeenUnpinned:
+    """post-build-review #393: the memo was keyed on the agreement and the
+    zones only, but a dataset's collection - and so its collection's
+    participation defaults - is the hierarchy's, read from data-asset.yaml
+    outside its timezone block. An unpinned process kept answering slots
+    worked out under the old hierarchy."""
+
+    @pytest.fixture
+    def hierarchy_file(self, tmp_path) -> Path:
+        pointed = tmp_path / "pointed"
+        pointed.mkdir()
+        real = asset_folders.real_folder()
+        for name in ("calendar.yaml", "data-asset.yaml"):
+            (pointed / name).write_text((real / name).read_text(encoding="utf-8"),
+                                        encoding="utf-8")
+        asset_folders.point(pointed)
+        return pointed / "data-asset.yaml"
+
+    def test_a_swap_of_two_collections_is_seen(self, hierarchy_file):
+        until = date(2024, 1, 1)
+        before = slots.slots_for_dataset("cp-clients", until=until)
+        text = hierarchy_file.read_text(encoding="utf-8")
+        swapped = (text.replace("- id: child-protection\n", "- id: SWAP-A\n", 1)
+                   .replace("- id: emergency-department\n", "- id: child-protection\n", 1)
+                   .replace("- id: SWAP-A\n", "- id: emergency-department\n", 1))
+        assert swapped != text
+        hierarchy_file.write_text(swapped, encoding="utf-8")
+        derived.MEMO.clear()
+        fresh = slots.slots_for_dataset("cp-clients", until=until)
+        assert fresh != before, "precondition - the swap changes cp-clients' slots"
+        hierarchy_file.write_text(text, encoding="utf-8")
+        assert slots.slots_for_dataset("cp-clients", until=until) == before
+        hierarchy_file.write_text(swapped, encoding="utf-8")
+        assert slots.slots_for_dataset("cp-clients", until=until) == fresh
+
+    def test_an_unknown_dataset_is_refused_after_a_hit(self, hierarchy_file):
+        from asset_model import hierarchy
+
+        until = date(2024, 1, 1)
+        slots.slots_for_dataset("cp-clients", until=until)
+        text = hierarchy_file.read_text(encoding="utf-8")
+        hierarchy_file.write_text(text.replace("id: cp-clients\n", "id: cp-clientz\n", 1),
+                                  encoding="utf-8")
+        with pytest.raises(hierarchy.UnknownDatasetError):
+            slots.slots_for_dataset("cp-clients", until=until)

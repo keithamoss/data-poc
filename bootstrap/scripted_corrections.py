@@ -58,7 +58,7 @@ def load(path: Path | str | None = None) -> list[Confirmation]:
     p = _path(path)
     if not p.exists():
         return []
-    doc = config_yaml.parse(p.read_text()) or {}
+    doc = config_yaml.load(p) or {}
     out = []
     for raw in doc.get("corrections") or []:
         raw = raw or {}

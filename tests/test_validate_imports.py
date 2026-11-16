@@ -727,3 +727,50 @@ def test_the_two_rules_find_nothing_in_this_repository():
     assert findings, "the scan read nothing - the allowlist's findings are missing"
     said = [str(p) for p in problems if "REQ-PIPE-376" in str(p) or "REQ-PIPE-390" in str(p)]
     assert said == []
+
+
+# ---- configuration read through config_yaml (REQ-PIPE-397 criterion 8) -------
+
+PINNED_READS = {
+    "a PyYAML parse": "import yaml\nDOC = yaml.safe_load(open('x'))\n",
+    "a parse of its own read_text": (
+        "from pathlib import Path\nfrom asset_model import config_yaml\n"
+        "DOC = config_yaml.parse(Path('a.yaml').read_text())\n"),
+    "a read_text of a path naming a YAML file": (
+        "from pathlib import Path\nTEXT = Path('calendar.yaml').read_text()\n"),
+    # post-build-review #395: the forms the first rule missed.
+    "a parse imported by name": "from yaml import safe_load\nDOC = safe_load(TEXT)\n",
+    "a two-step read then parse": (
+        "from pathlib import Path\nfrom asset_model import config_yaml\n\n"
+        "def f(p):\n    text = Path(p).read_text()\n    return config_yaml.parse(text)\n"),
+    "a with-open read then parse": (
+        "from asset_model import config_yaml\n\n"
+        "def f(path):\n    with open(path) as fh:\n        text = fh.read()\n"
+        "    return config_yaml.parse(text)\n"),
+}
+
+
+@pytest.mark.parametrize("form", sorted(PINNED_READS))
+@pytest.mark.parametrize("home", ["qa_tools/common/thing.py", "bootstrap/thing.py",
+                                  "cli/thing.py", "generator/thing.py"])
+def test_a_configuration_read_outside_config_yaml_fails(repo, capsys, form, home):
+    _write(repo, home, PINNED_READS[form])
+    code, out = _run(repo, capsys)
+    assert code == 1, (form, out)
+    assert f"{home}:" in out and "reads configuration outside config_yaml" in out, out
+
+
+def test_a_parse_of_text_from_elsewhere_passes(repo, capsys):
+    _write(repo, HOMES["pipeline"],
+           "import subprocess\nfrom asset_model import config_yaml\n\n"
+           "def f(ref):\n    shown = subprocess.run(['show', ref], capture_output=True,"
+           " text=True)\n    return config_yaml.parse(shown.stdout)\n\n"
+           "def g(p):\n    return config_yaml.load(p)\n")
+    code, out = _run(repo, capsys)
+    assert code == 0, out
+
+
+def test_the_real_tree_reads_its_configuration_through_config_yaml():
+    findings, problems = vi.scan(ROOT)
+    assert findings, "the scan read nothing"
+    assert [str(p) for p in problems if "outside config_yaml" in str(p)] == []

@@ -435,3 +435,61 @@ def test_a_bare_generate_command_says_how_long_it_took():
     from bootstrap import generation
 
     assert generation.took_line(12.4) == "Took generation 12s."
+
+
+@pytest.fixture
+def opened(monkeypatch):
+    """Every file opened from here on, by any of the three ways Python opens
+    one - for a test that a reader opens no snapshot file inside a pin."""
+    import builtins
+    import io
+
+    seen: list[str] = []
+    real_io, real_os = io.open, os.open
+
+    def watching_io(file, *a, **k):
+        seen.append(os.path.realpath(os.fsdecode(file)) if isinstance(
+            file, (str, bytes, os.PathLike)) else repr(file))
+        return real_io(file, *a, **k)
+
+    def watching_os(file, *a, **k):
+        seen.append(os.path.realpath(os.fsdecode(file)))
+        return real_os(file, *a, **k)
+
+    monkeypatch.setattr(io, "open", watching_io)
+    monkeypatch.setattr(builtins, "open", watching_io)
+    monkeypatch.setattr(os, "open", watching_os)
+    return seen
+
+
+class TestEveryReaderInsideARunIsPinned:
+    """post-build-review #394: four readers reached during a pinned run read
+    their file themselves - the scripted corrections, the check-lifecycle
+    sources (through collect_checks, which tables_read and the re-checks
+    call), Soda's check file as handed to Soda, and the synthetic reset's
+    asset id - so a pin missed them in silence."""
+
+    @pytest.mark.parametrize("reader", ["scripted corrections", "check sources",
+                                        "soda checks", "synthetic reset"])
+    def test_it_opens_no_snapshot_file(self, reader, opened):
+        from asset_model import collections
+
+        def read():
+            if reader == "scripted corrections":
+                from bootstrap import scripted_corrections
+                return scripted_corrections.load()
+            if reader == "check sources":
+                from qa_tools.common import validate_check_lifecycle
+                return validate_check_lifecycle._sources(None)
+            if reader == "soda checks":
+                from qa_tools.common import soda_common
+                path = ROOT / collections.check_files("soda")[0]
+                return soda_common.readable_checks_yaml(str(path), {"x"})
+            from bootstrap import synthetic_reset
+            return synthetic_reset.asset_id()
+
+        with config_pin.ConfigSnapshot.take() as snapshot:
+            opened.clear()
+            read()
+            read_in_pin = [p for p in opened if p in snapshot.texts]
+        assert read_in_pin == [], read_in_pin

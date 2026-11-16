@@ -328,9 +328,11 @@ def status_rankings(rel: str, tree, root: Path) -> tuple[list[Finding], list[Pro
 # ---- configuration read through config_yaml (REQ-PIPE-397 criterion 8) -------
 
 #: Where the rule reads: the code that runs inside a pinned generation or
-#: replay - the shared reading code, the real pipeline, the generator and the
-#: dashboard build, and each asset's adapters and providers.
-PINNED_READ_TOPS = ("asset_model", "qa_tools", "generator", "pipeline", "dashboard")
+#: replay - the shared reading code, the real pipeline, the generator, the
+#: dashboard build, the bootstrap and the CLI that drives them
+#: (post-build-review #395), and each asset's adapters and providers.
+PINNED_READ_TOPS = ("asset_model", "qa_tools", "generator", "pipeline", "dashboard",
+                    "bootstrap", "cli")
 
 #: The one module allowed to read a configuration file itself.
 CONFIG_YAML = "asset_model/config_yaml.py"
@@ -354,6 +356,33 @@ def _yaml_names(tree) -> set[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             out |= {a.asname or a.name for a in node.names if a.name == "yaml"}
+    return out
+
+
+def _yaml_parse_imports(tree) -> list:
+    """`from yaml import safe_load` (or any parse call), each as its node."""
+    return [node for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module == "yaml" and node.level == 0
+            and any(a.name in YAML_PARSES for a in node.names)]
+
+
+def _read_names(tree, opened: set[str]) -> set[str]:
+    """Names assigned a file's content: `text = Path(p).read_text()`, `text =
+    open(p).read()`, or `text = fh.read()` on a handle a `with open(...)`
+    bound - however the name or the path is spelled (post-build-review
+    #395). File-wide, so a name reused for something else is read as the
+    stricter case."""
+    out = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)):
+            continue
+        value = node.value
+        handle_read = (isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute)
+                       and value.func.attr == "read" and isinstance(value.func.value, ast.Name)
+                       and value.func.value.id in opened)
+        if _is_file_read(value) or handle_read:
+            out.add(node.targets[0].id)
     return out
 
 
@@ -419,7 +448,9 @@ def pinned_reads(rel: str, tree, root: Path) -> tuple[list[Finding], list[Proble
     - a PyYAML parse call (yaml.safe_load, yaml.load, ...): config_yaml.parse
       for text the caller holds, config_yaml.load for a file;
     - config_yaml.parse of the caller's own read (x.read_text(), open(x), a
-      `with open(x) as f` handle): config_yaml.load(x) instead;
+      `with open(x) as f` handle, or a name assigned any of those or a
+      handle's read()): config_yaml.load(x) instead;
+    - `from yaml import safe_load` (any parse call imported by name);
     - read_text/open of a path naming a YAML file (a '.yaml' or '.yml' literal,
       or a name ending in yaml or yml): config_yaml.read or load.
 
@@ -433,6 +464,7 @@ def pinned_reads(rel: str, tree, root: Path) -> tuple[list[Finding], list[Proble
         return [], []
     yaml_names = _yaml_names(tree)
     opened = _opened_names(tree)
+    read_names = _read_names(tree, opened)
     parses = {id(c.node) for c in syntax_walk.calls_of(
         tree, rel, frozenset({"asset_model.config_yaml"}), "parse", root)}
     problems = []
@@ -443,6 +475,8 @@ def pinned_reads(rel: str, tree, root: Path) -> tuple[list[Finding], list[Proble
             f"{instead}, so a pinned run answers it from its snapshot (REQ-PIPE-397 "
             f"criterion 8)"))
 
+    for node in _yaml_parse_imports(tree):
+        found(node, ast.unparse(node), "import config_yaml and call config_yaml.parse or load")
     seen: set[int] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -456,7 +490,8 @@ def pinned_reads(rel: str, tree, root: Path) -> tuple[list[Finding], list[Proble
                 seen.add(id(sub))
         elif id(node) in parses and node.args:
             arg = node.args[0]
-            if _is_file_read(arg) or (isinstance(arg, ast.Name) and arg.id in opened):
+            if _is_file_read(arg) or (isinstance(arg, ast.Name)
+                                      and arg.id in opened | read_names):
                 found(node, f"parses its own read of {ast.unparse(arg)}",
                       "use config_yaml.load(path)")
                 for sub in ast.walk(arg):

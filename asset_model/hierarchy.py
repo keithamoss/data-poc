@@ -117,6 +117,13 @@ def _load() -> tuple[str, "MappingProxyType[str, Dataset]", "MappingProxyType[st
     return from_text(path, config_yaml.read(path))
 
 
+def tree():
+    """The hierarchy as it reads now - one value per text of data-asset.yaml
+    (REQ-PIPE-254), so its identity says which version answered; the memo of
+    derived schedule values keys on it (REQ-PIPE-400, post-build-review #393)."""
+    return _load()
+
+
 def from_text(path: Path, text: str) -> tuple[str, "MappingProxyType[str, Dataset]",
                                                "MappingProxyType[str, Dataset]"]:
     """The tree built from one read of `path` - what the registry and the

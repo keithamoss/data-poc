@@ -256,18 +256,23 @@ def bootstrap(collection: str = "all", force: bool = False,
     # (assets.handoff), never a fresh read. PROVISIONAL (2026-11-16): one pin
     # spans generation and replay, so the replay reads exactly the
     # configuration the history was generated from.
+    # ONE STACK, SO NOTHING IS LEFT HELD (post-build-review #396): a pin that
+    # cannot be installed still lets go of the pass lock - in the TUI's
+    # long-lived process it would otherwise be held until the process exits.
+    # _populate lets go of the lock itself once the replay is done; a second
+    # exit of a finished lock is a no-op.
+    from contextlib import ExitStack
+
     from asset_model import config_pin
 
-    pinning = config_pin.pinned()
-    snapshot = pinning.__enter__()
-    try:
+    with ExitStack() as stack:
+        stack.callback(lock.__exit__, None, None, None)
+        snapshot = stack.enter_context(config_pin.pinned())
         return _populate(names=chosen, groups=groups, collection=collection,
                          sequential=sequential, say=say, held=held, lock=lock,
                          taken=taken, before=before, checkpoint_before=checkpoint_before,
                          skip_target_trial=skip_target_trial, try_targets=try_targets,
                          snapshot=snapshot, wall_started=wall_started)
-    finally:
-        pinning.__exit__(None, None, None)
 
 
 def _populate(*, names, groups, collection, sequential, say, held, lock, taken, before,
@@ -997,11 +1002,30 @@ def stream_pool(workers: int):
 
     return ProcessPoolExecutor(max_workers=workers,
                                mp_context=multiprocessing.get_context("spawn"),
-                               initializer=assets.adopt, initargs=assets.handoff())
+                               initializer=_adopt_for_stream, initargs=assets.handoff())
+
+
+#: A hand-off the stream process refused (config_pin.PinMismatch), kept to be
+#: raised by its first task rather than breaking the pool (post-build-review
+#: #398): an initializer that raises surfaces only as BrokenProcessPool.
+_REFUSED_HANDOFF: BaseException | None = None
+
+
+def _adopt_for_stream(*handed) -> None:
+    """assets.adopt, its refusal of a mismatched snapshot kept for the task."""
+    global _REFUSED_HANDOFF
+    from asset_model import assets, config_pin
+
+    try:
+        assets.adopt(*handed)
+    except config_pin.PinMismatch as exc:
+        _REFUSED_HANDOFF = exc
 
 
 def _reporting(run, *args):
     """`run(*args)` in a started process, with the pin it ran under
     (REQ-GEN-399 criterion 3). TOP LEVEL, so a spawned process can import it
-    by name."""
+    by name. A refused hand-off is raised here, as itself."""
+    if _REFUSED_HANDOFF is not None:
+        raise _REFUSED_HANDOFF
     return run(*args), pin_report()
