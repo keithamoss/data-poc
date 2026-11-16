@@ -10,6 +10,11 @@ reports/). The other asset's folders are populated first, every file
 hashed, and compared byte for byte after every command, in both directions.
 It READS ONLY ITS OWN REPORTS - the copy's - so it needs no deployment.
 
+ITS SUBJECT INCLUDES GENERATION ITSELF - `generate-synthetic-data` and a
+bootstrap are among the commands whose writes it compares - so it generates in
+its copy rather than reading the suite's shared history (REQ-TEST-402
+criterion 7).
+
 A BOOTSTRAP THAT FAILS PARTWAY (post-build-review #345): a real bootstrap
 taking a checkpoint, stopped by an exception the moment the checkpoint is
 saved - after it has generated its deliveries, run the real tools over the
