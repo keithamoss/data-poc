@@ -237,11 +237,15 @@ SCENARIOS = {
     "TS-106": (CP, "2024-Q1", "not_geocoded_red"), "TS-107": (ED, "2021-Q2", "left_out_amber"),
     "TS-108": (CP, "2025-Q1", "left_out_red"), "TS-109": (ED, "2017-Q4", "orphan_record"),
     "TS-110": (CP, "2025-Q4", "empty_file"), "TS-111": (CP, "2024-Q4", "left_out_amber"),
+    # TS-113 (REQ-GEN-392 criterion 12, Keith 2026-11-16). Its quarter is
+    # PROVISIONAL (2026-11-16): the draft's 2019-Q4 holds TS-42a, a scenario of
+    # its source, so the planner refuses it there (REQ-GEN-298 criterion 7).
+    "TS-113": (CP, "2026-Q3", "placed_mix_shift"),
 }
 
 
 class TestTheNamedScenarios:
-    def test_ten_scenarios_one_fault_each_where_declared(self, plan):
+    def test_every_scenario_one_fault_each_where_declared(self, plan):
         placed = {i.scenario_id: (i.dataset_id, p.period) for i, p in plan.resolved
                   if i.dataset_id in (CP, ED)}
         assert placed == {sid: (d, q) for sid, (d, q, _f) in SCENARIOS.items()}
@@ -509,14 +513,119 @@ class TestDriftIsPlannedFromWhatTheDriftCheckReads:
 
 class TestWhatEachTriedFileIsMeasuredAgainst:
     def test_a_tried_files_reference_is_what_the_replay_promotes_before_it(self, plan):
+        """TS-93c's 2019-Q1 file, measured past its rejected source's quarter;
+        and a file whose reference was promoted by a knock-on. That second
+        half read 2019-Q4's Client Register Geocodes against TS-100c until
+        REQ-GEN-392 left 2019-Q4 undrifting, and so untried; it now reads
+        TS-103's 2022-Q1 ED file against TS-101b's, cleared by its knock-on
+        before 2022-Q1 arrives - the same rule, on a file tried by design.
+        PROVISIONAL (2026-11-16): TS-113 could not take 2019-Q4, which TS-42a
+        holds."""
         by_period = {j.period.name: j for j in _geo(plan)}
-        refs = {q: plan.state["geo_meta"][(by_period[q].slot_id, 1)]["references"][CP]
-                for q in ("2019-Q1", "2019-Q4")}
-        q4_ref_at = plan.state["geocoding"][by_period["2019-Q3"].slot_id][0]
-        assert refs["2019-Q4"] == asset_time.isoformat(q4_ref_at), \
-            "TS-100c, promoted by its knock-on before 2019-Q4 arrives"
+        meta = plan.state["geo_meta"]
+        q1_ref = meta[(by_period["2019-Q1"].slot_id, 1)]["references"][CP]
         q1_ref_at = plan.state["geocoding"][by_period["2018-Q4"].slot_id][0]
-        assert refs["2019-Q1"] == asset_time.isoformat(q1_ref_at)
+        assert q1_ref == asset_time.isoformat(q1_ref_at)
+        assert plan.state["geo_named"][(ED, "2021-Q4")] == "TS-101b"
+        ed_ref = meta[(by_period["2022-Q1"].slot_id, 1)]["references"][ED]
+        ed_ref_at = plan.state["geocoding"][by_period["2021-Q4"].slot_id][0]
+        assert ed_ref == asset_time.isoformat(ed_ref_at), \
+            "TS-101b, promoted by its knock-on before TS-103's 2022-Q1 file arrives"
+
+
+class TestTheDriftPlantedOnPurpose:
+    """TS-113 (REQ-GEN-392 criterion 12, Keith 2026-11-16): one Client Register
+    geocode drifts on purpose - whole records moved from suburb to postcode
+    placement until the drift check's PSI against the file's reference first
+    reaches the middle of the check's warn band, read from the check's own file
+    through check_bands."""
+
+    YEARS = (2011, 2016, 2021)
+
+    def _mixed_rows(self, n_suburb, n_postcode, start=0):
+        return _rows(_mixed(n_suburb, n_postcode, start=start), self.YEARS)
+
+    def _shift(self, rows, reference, catalogue, seed=3):
+        return lp.apply_geo_faults(
+            CP, rows, (f"placed_mix_shift@{CP}",), source_rows=None,
+            id_columns=("cp_client_id",), years=self.YEARS, rng=np.random.default_rng(seed),
+            where="TS-113", catalogue=catalogue, seed=seed, reference_rows=reference)
+
+    @staticmethod
+    def _psi(rows, reference):
+        from asset_model import drift
+
+        return drift.psi_of_counts(lp.value_counts(rows, "match_level", CP),
+                                   lp.value_counts(reference, "match_level", CP),
+                                   _drift_entry(CP))[0]
+
+    def test_the_band_is_the_drift_checks_own_through_check_bands(self, catalogue):
+        check_id, band = lp.drift_band(CP, catalogue)
+        assert check_id.endswith(f".{CP}.match_level.drift_psi_evidently")
+        entry = _drift_entry(CP)
+        assert band == (entry["warn_threshold"], entry["fail_threshold"])
+
+    def test_whole_records_move_to_postcode_until_psi_first_reaches_mid_band(self, catalogue):
+        reference = self._mixed_rows(450, 50, start=900)
+        rows = self._mixed_rows(450, 50)
+        shifted, verdict = self._shift(rows, reference, catalogue)
+        assert verdict == "amber" and lp.drift_verdict(CP, shifted, reference) == "amber"
+        assert len(shifted) == len(rows) and set(shifted["id_1"]) == set(rows["id_1"])
+        assert (shifted.groupby("id_1")["match_level"].nunique() == 1).all(), "whole records"
+        moved = shifted["match_level"].ne(rows["match_level"])
+        assert moved.any()
+        assert set(rows.loc[moved, "match_level"]) == {"suburb"}
+        assert set(shifted.loc[moved, "match_level"]) == {"postcode"}
+        assert shifted[["sa2_code", "lga_code"]].equals(rows[["sa2_code", "lga_code"]]), \
+            "codes kept, so no other check moves"
+        _check_id, (lo, hi) = lp.drift_band(CP, catalogue)
+        mid = (lo + hi) / 2
+        assert self._psi(shifted, reference) >= mid
+        # THE FIRST COUNT TO REACH IT: one record fewer falls short.
+        one_fewer = shifted.copy()
+        back = one_fewer["id_1"] == shifted.loc[moved, "id_1"].iloc[0]
+        one_fewer.loc[back, "match_level"] = "suburb"
+        assert self._psi(one_fewer, reference) < mid
+
+    def test_no_count_landing_in_the_band_is_refused_naming_scenario_check_and_band(
+            self, catalogue):
+        # Two suburb-placed records to move, against a reference holding many:
+        # the PSI never reaches the band.
+        reference = self._mixed_rows(400, 100, start=900)
+        rows = self._mixed_rows(2, 498)
+        with pytest.raises(lp.CannotGenerate,
+                           match=r"^TS-113: .*\.geo-cp-clients\.match_level\.drift_psi_evidently, "
+                                 r"warn band PSI above 0\.1 and not above 0\.25; nothing was "
+                                 r"written$"):
+            self._shift(rows, reference, catalogue)
+
+    def test_no_reference_is_refused(self, catalogue):
+        with pytest.raises(lp.CannotGenerate, match=r"^TS-113: .*no reference.*warn band"):
+            self._shift(self._mixed_rows(450, 50), None, catalogue)
+
+    def test_its_file_plans_warn_on_the_drift_check_alone(self, plan, catalogue):
+        d, q, fault = SCENARIOS["TS-113"]
+        job = next(j for j in _geo(plan) if j.period.name == q)
+        assert _faults(plan)[(job.slot_id, d)] == (f"{fault}@{d}",)
+        _at, files = lp.PROVIDER._geo_arrivals(plan, job)[0]
+        _d, rows, verdict = files[_table(d)]
+        assert verdict == "amber"
+        assert plan.state["geo_drift_bands"][(job.slot_id, d, 1)] == "amber"
+        assert lp.planned_verdict(d, rows, catalogue) == "green", "the share check passes"
+        meta = plan.state["geo_meta"][(job.slot_id, 1)]
+        assert meta["aimed"] == {d: ["match_level.drift_psi_evidently"]}
+        assert d in meta["tried"]
+        drifting = {k for k, band in plan.state["geo_drift_bands"].items() if band != "green"}
+        assert drifting == {(job.slot_id, d, 1)}, "TS-113 is the history's one drift"
+
+    def test_its_reference_is_the_quarter_befores_file(self, plan):
+        d, q, _fault = SCENARIOS["TS-113"]
+        by_period = {j.period.name: j for j in _geo(plan)}
+        names = [p.name for p in lp.PROVIDER._geo_periods(d)]
+        prev = by_period[names[names.index(q) - 1]]
+        ref = plan.state["geo_meta"][(by_period[q].slot_id, 1)]["references"][d]
+        assert ref == asset_time.isoformat(plan.state["geocoding"][prev.slot_id][0])
+        assert plan.state["geocoding"][prev.slot_id][1][_table(d)][2] == "green"
 
 
 def test_two_plans_place_the_same_faults(plan):

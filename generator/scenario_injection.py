@@ -2774,6 +2774,23 @@ INJECTIONS: tuple[Injection, ...] = (
                          "the delivery, Client Register Geocodes leaving 0.5 to 1.5 percent of clients out, promoted on its Warn", row_faults=('left_out_amber@geo-cp-clients',)),
         ),
     ),
+    # THE GEOCODING HISTORY'S DRIFT, ON PURPOSE (TS-113; REQ-GEN-392 criterion
+    # 12, Keith 2026-11-16): REQ-GEN-392's cleaner red Client Registers left no
+    # geocoding file drifting, so one is planted here instead of by accident.
+    Injection(
+        scenario_id="TS-113",
+        dataset_id="geo-cp-clients",
+        # 2026-Q3, PROVISIONAL (2026-11-16): the draft's 2019-Q4 holds TS-42a,
+        # a scenario of the Client Register, so the provider refuses it there
+        # (REQ-GEN-298 criterion 7). The newest quarter: its reference
+        # 2026-Q2's green file, and no later file measured against it.
+        anchor=-1,
+        config="quarterly, due 19:00 on the round with 8 hours' grace, files_go_to_period 0; the geocoding delivery is received at 18:30, after the quarter's linkage release and after its source supply is promoted. Whole Client Register records are moved from suburb placement to postcode placement, in every year and with their codes kept, until the drift check's PSI against the file's reference reaches the middle of its warn band.",
+        arrivals=(
+            ExtraArrival(0, "18:30", None,
+                         "the delivery, Client Register Geocodes' placed mix moved from suburb to postcode into the drift check's warn band", row_faults=('placed_mix_shift@geo-cp-clients',)),
+        ),
+    ),
     Injection(
         scenario_id="TS-100a",
         dataset_id="cp-clients",

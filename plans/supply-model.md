@@ -4560,6 +4560,22 @@ the Warn tag naming Linkage Products' 2024-Q4 Client Register Geocodes as the
 cause (REQ-PIPE-332 criterion 4), and earlier dates still show it passing.
 **Breaks as**: the Client Register demoted, or tagged before the promotion.
 
+**TS-113 `[INJECT]` A Client Register geocode whose placed mix drifts.**
+PLANTED by REQ-GEN-392 criterion 12 (Keith, 2026-11-16), replacing the drift
+Warns REQ-GEN-298 recorded as side effects of its dirtied Client Registers.
+*Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved
+from suburb placement to postcode placement to land the drift check's PSI in
+its warn band. The size is derived from the check's own band, as REQ-GEN-392
+derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the
+Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL
+(2026-11-16).)*
+**Expect**: the drift check on `match_level` reads Warn: the share of records
+placed at each match level has moved from the quarter before. Every other
+check of the file passes.
+**Breaks as**: the drift check reads Pass on a file whose placed mix visibly
+moved. Or the drift is read against the wrong reference: anything other than
+2026-Q2's file, which the replay has promoted by then.
+
 **TS-93c `[INJECT]` A Client Register geocode whose source was rejected -
 named, not planted.** NAMED by REQ-GEN-298 criterion 8 on 2019-Q1, TS-93a's
 quarter.

@@ -15560,3 +15560,28 @@ twice. It deliberately did not re-find the `TypeError`.
        two-rule Fail test added.
      - **Ran** (#381-#385): see REQ-GEN-392's evidence - 29 affected modules,
        629 passed, 2 skipped; ruff clean.
+
+410. **[done, 2026-11-16]** **[Data generation]** **[Testing & dev tooling]** **After REQ-GEN-392 no geocoding file drifted, and two geocoding tests went red.**
+     Found running tests/test_geocoding_faults.py on the merged tree:
+     `test_the_plans_drift_set_is_exactly_the_computed_drift` ("the history
+     holds drift, so the test can fail") and
+     `test_a_tried_files_reference_is_what_the_replay_promotes_before_it`
+     (`KeyError: 'references'`, 2019-Q4 no longer tried). REQ-GEN-392's
+     single-tier Fail plants 5 rows, so the red Client Registers that made
+     2019's geocoding files drift by accident no longer do. Not a code defect:
+     the history lost a side effect the tests relied on. Keith chose to plant
+     drift on purpose (REQ-GEN-392 criterion 12; docs/drafts/ts-113-geocoding-drift.md).
+     - **Built**: TS-113, a `placed_mix_shift` geocoding row fault moving whole
+       Client Register records from suburb to postcode placement until the drift
+       check's PSI first reaches the middle of its warn band, the band read
+       through check_bands; refused, naming the scenario, the check and the
+       band, where no count lands Warn. Recorded on REQ-GEN-392.
+     - **PROVISIONAL (2026-11-16), for Keith**: the draft's 2019-Q4 is refused
+       by the provider - TS-42a, a Client Register scenario, holds that quarter
+       (REQ-GEN-298 criterion 7). TS-113 sits in 2026-Q3. The reference test's
+       knock-on half now reads TS-103's 2022-Q1 ED file against TS-101b's
+       rather than 2019-Q4 against TS-100c. REQ-GEN-392's decisions give the
+       reasons and the rejected 2023-Q4.
+     - **The drift test still bites**: with TS-113 removed it fails ("the
+       history holds drift, so the test can fail", `assert set()`).
+     - **Ran**: see REQ-GEN-392's evidence.
