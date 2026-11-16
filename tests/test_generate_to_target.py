@@ -454,6 +454,9 @@ class TestAnInjectedTargetEndToEnd:
 
     @pytest.fixture(scope="class")
     def generated(self, tmp_path_factory):
+        """ITS SUBJECT IS GENERATION ITSELF (REQ-TEST-402 criterion 7): a
+        history generated with a test injection added and the ordinary plan
+        drawn clean - not the suite's shared history, which has neither."""
         import json
 
         g = collection_modules.provider_module("civil-registration")
@@ -543,7 +546,8 @@ class TestRefusedBeforeAnythingIsWritten:
     """Criterion 11: '...SHALL NOT emit the history' - a target naming a rule
     that cannot be moved stops generation before the first write."""
 
-    def test_an_unmovable_rule_stops_the_generator_with_nothing_written(self, tmp_path):
+    def test_an_unmovable_rule_stops_the_generator_with_nothing_written(self, tmp_path,
+                                                                        daily_history):
         g = collection_modules.provider_module("civil-registration")
         from generator import scenario_injection as si
         from generator.output import redirect
@@ -553,18 +557,18 @@ class TestRefusedBeforeAnythingIsWritten:
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target(
                 "amber", ("sex.conformity",))),))
         original = si.INJECTIONS
-        si.INJECTIONS = (*original, bad)
-        restore = redirect(tmp_path)
+        # A HISTORY ALREADY ON DISK SURVIVES THE REFUSAL: refused before the
+        # old one is cleared, not after. The old one is the test's own copy of
+        # the suite's shared history (REQ-TEST-402), not a generation of its own.
+        root = daily_history.copy_to(tmp_path / "history").root
+        restore = redirect(root)
         try:
-            # A HISTORY ALREADY ON DISK SURVIVES THE REFUSAL: refused before
-            # the old one is cleared, not after.
-            si.INJECTIONS = original
-            driver.generate("civil-registration")
-            before = sorted(p.name for p in (tmp_path / "deliveries").iterdir())
+            before = sorted(p.name for p in (root / "deliveries").iterdir())
+            assert before, "precondition: a history is on disk"
             si.INJECTIONS = (*original, bad)
             with pytest.raises(targeting.TargetError, match="TS-BAD.*sex.conformity"):
                 driver.generate("civil-registration")
-            assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
+            assert sorted(p.name for p in (root / "deliveries").iterdir()) == before
         finally:
             restore()
             si.INJECTIONS = original
@@ -681,21 +685,24 @@ class TestFindings155:
         assert m["was"] == _nulls(batch, "registering_parent_2_name")
 
     def test_an_ordinary_amber_refusal_leaves_the_last_history_standing(self, tmp_path,
-                                                                        monkeypatch):
-        """Finding 5."""
+                                                                        monkeypatch,
+                                                                        daily_history):
+        """Finding 5. The last history is the test's own copy of the suite's
+        shared one (REQ-TEST-402), not a generation of its own."""
         from generator.output import redirect
 
-        restore = redirect(tmp_path)
+        root = daily_history.copy_to(tmp_path / "history").root
+        restore = redirect(root)
         try:
-            driver.generate("civil-registration")
-            before = sorted(p.name for p in (tmp_path / "deliveries").iterdir())
+            before = sorted(p.name for p in (root / "deliveries").iterdir())
+            assert before, "precondition: a history is on disk"
 
             def refuse(*a, **k):
                 raise targeting.TargetError("refused")
             monkeypatch.setattr(targeting, "outside_hold", refuse)
             with pytest.raises(targeting.TargetError):
                 driver.generate("civil-registration")
-            assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
+            assert sorted(p.name for p in (root / "deliveries").iterdir()) == before
         finally:
             restore()
 
@@ -766,6 +773,9 @@ class TestLeadInsEndToEnd:
 
     @pytest.fixture(scope="class")
     def generated(self, tmp_path_factory):
+        """ITS SUBJECT IS GENERATION ITSELF (REQ-TEST-402 criterion 7): a
+        history generated with a test injection added and the ordinary plan
+        drawn clean - not the suite's shared history, which has neither."""
         import json
 
         g = collection_modules.provider_module("civil-registration")

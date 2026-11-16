@@ -272,7 +272,8 @@ class TestAThirdCollectionAtEverySite:
     def test_a_bootstrap_generates_and_runs_it_beside_the_others(self, third_collection,
                                                                  empty_db, monkeypatch):
         """And criterion 11: every registered collection goes to the
-        process-per-collection dispatch together."""
+        process-per-collection dispatch together. ITS SUBJECT IS GENERATION
+        ITSELF - a fake collection's, generated here (REQ-TEST-402 criterion 7)."""
         from bootstrap import bootstrap as boot
 
         dispatched = self._stub_the_real_collections(monkeypatch)

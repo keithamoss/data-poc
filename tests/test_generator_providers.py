@@ -7,6 +7,10 @@ scenario_injection.generated_periods(), generator/targeting.py and
 generator/targets.py reading its provider; and the refusals - a seed out of
 range, overlapping ranges, a target trial asked of a collection without
 one, a scenario naming a dataset no provider makes.
+
+ITS SUBJECT IS GENERATION ITSELF, so the tests here that generate a history
+generate their own rather than reading the suite's shared one (REQ-TEST-402
+criterion 7).
 """
 from __future__ import annotations
 

@@ -198,16 +198,12 @@ class TestWhatWasBuilt:
 # ---- the generation-time trial (criteria 1, 2, 5) ----
 
 @pytest.fixture
-def generated(tmp_path):
-    """The real Birth Registrations generator, everything under tmp_path."""
-    import generator_isolation
-
-    undo = generator_isolation.redirect(tmp_path)
-    try:
-        driver.generate("civil-registration")
-        yield tmp_path
-    finally:
-        undo()
+def generated(daily_history, tmp_path):
+    """The real Birth Registrations history, the test's own COPY of the
+    suite's shared one (REQ-TEST-402 criterion 6) under tmp_path, with the
+    generator's outputs pointed at it - a disagreeing trial removes it."""
+    with daily_history.copy_to(tmp_path / "history").as_generator_output() as mine:
+        yield mine.root
 
 
 def _only_ts43(monkeypatch, built_to=None):

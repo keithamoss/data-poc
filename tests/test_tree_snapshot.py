@@ -23,23 +23,10 @@ COLLECTION = "civil-registration"
 
 
 @pytest.fixture(scope="module")
-def generated(tmp_path_factory) -> Path:
-    """Birth Registrations' history, generated once, never under data/."""
-    import contextlib
-    import io
-    import warnings
-
-    from generator import driver, output
-
-    root = tmp_path_factory.mktemp("tree")
-    undo = output.redirect(root)
-    try:
-        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            driver.generate(COLLECTION)
-    finally:
-        undo()
-    return root
+def generated(daily_history) -> Path:
+    """Birth Registrations' history: the suite's shared one (REQ-TEST-402),
+    generated once per run, never under data/ - read-only, copied by `tree`."""
+    return daily_history.root
 
 
 @pytest.fixture

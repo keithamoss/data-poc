@@ -311,7 +311,11 @@ class TestRegeneratingToCompare:
     """Criterion 2: the deliveries are regenerated to compare, and nothing
     under data/ is touched in doing so."""
 
-    def test_regenerating_matches_the_real_tree_and_leaves_it_alone(self, tmp_path):
+    def test_regenerating_matches_the_real_tree_and_leaves_it_alone(self, quarterly_history):
+        """ITS SUBJECT IS THE REGENERATION ITSELF, so it regenerates (REQ-TEST-402
+        criterion 7) - once, compared with the suite's shared history, which
+        is a generation of its own: equal prints are the determinism this
+        once checked with a second regeneration."""
         from asset_model import delivery
 
         real = Path(delivery.default_deliveries_dir())
@@ -320,7 +324,8 @@ class TestRegeneratingToCompare:
         after = sorted(p.name for p in real.iterdir()) if real.exists() else None
         assert after == before
         assert regenerated and all(a.content for a in regenerated)
-        assert ri.regenerated_print("child-protection") == regenerated, "not deterministic"
+        assert ri.deliveries_print("child-protection", quarterly_history.deliveries,
+                                   quarterly_history.receipts) == regenerated, "not deterministic"
 
 
 class TestAnArrivalHoldingSeveralFiles:
