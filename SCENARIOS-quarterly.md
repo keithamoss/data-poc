@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**69 of 70 scenarios marked for injection have data behind them today.** 70 scenarios are registered in all.
+**70 of 70 scenarios marked for injection have data behind them today.** 70 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -1063,7 +1063,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved from suburb placement to postcode placement to land the drift check's PSI in its warn band. The size is derived from the check's own band, as REQ-GEN-392 derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL (2026-11-16).)*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202608011830000800` |
+| Period | 2026-Q3 |
+| Set "in the warehouse on" to | 2026-08-01 |
 
 
 <!-- scenario-map-data
@@ -2596,7 +2601,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-392",
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202608011830000800"
+    ],
+    "period": "2026-Q3",
+    "inPlaceOn": "2026-08-01",
+    "subject": "supply-history-row"
+   }
   }
  ]
 }
