@@ -34,3 +34,30 @@ here. Move it into REQ-PIPE-403's evidence, verbatim, in the change that builds 
         STAYS UNMET until the stage split is measured (PROVISIONAL, overnight
         2026-11-16).
 ```
+
+## The after-measurement (2026-11-16 Perth, morning, with Keith around)
+
+Same method as the baseline: from empty, `mothman env reset-synthetic` then
+`mothman pipeline bootstrap`, quarterly then daily, no test, agent or other
+mothman process running (counted at each start: 0). Commit 6433e8a8: speed
+batch B (REQ-PIPE-397/400/430, REQ-GEN-398/399), the timing batch, REQ-GEN-392,
+TS-113 and the rolling-anchor batch (critic-fixed) on top of the baseline's code.
+Logs: scratchpad/a403/{quarterly,daily}.log (session-local).
+
+- QUARTERLY: 07:58:39-08:19:42 UTC, load 0.57/1.35/1.67 at the start and
+  1.20/1.21/1.36 at the end. "Took generation 1m 04s, Child Protection and
+  Emergency Department and Linkage Products 20m, in total 21m." "OVER BUDGET:
+  this bootstrap took 1262s ... 542s over." Against the baseline's 2437s: 1175s
+  less, 48% faster.
+- DAILY: 08:19:45-08:25:08 UTC, load 1.20/1.21/1.36 at the start and
+  1.23/1.27/1.35 at the end. "Took generation 44s, Birth Registrations 4m 36s,
+  in total 5m 20s." "Within budget ... 321s." Against the baseline's 357s: 36s
+  less, 10% faster.
+- Both runs logged 74 datacontract-cli "relation ... does not exist" warnings
+  on Child Protection's cross-table checks, the same count as the baseline
+  log. Not new.
+- The quarterly asset is still 542s over REQ-PIPE-250's 720s budget.
+- An earlier attempt at 07:57 was refused by the reset's identity guard before
+  doing anything: the container's environment carried stale MOTHMAN_ASSET and
+  MOTHMAN_SUPPLY_DSN values (`data-asset-1`, `.../supply`). Both were unset for
+  the measured runs.
