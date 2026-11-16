@@ -379,3 +379,35 @@ def session(asset: str, fail):
         fail(f"the shared {asset} history at {history.root} was changed during this session - "
              f"{len(changed)} file(s), first {changed[:5]}. Delete {CACHE_DIR} and find the "
              f"test that wrote there.")
+
+
+def answer_regenerations(history: History, monkeypatch) -> None:
+    """Product code that REGENERATES a history only to read it - a checkpoint's
+    arrival numbering (bootstrap.checkpoints.arrivals_of) and a resume's
+    comparison print (bootstrap.replay_inputs.regenerated_print) - answered
+    from `history` for one test, for a test whose subject is not that
+    regeneration (REQ-TEST-402 criterion 7). Each generates every collection
+    at the installed anchor into a folder of its own and reads it, so at the
+    fixed anchor its answer IS the shared history's; at any other anchor
+    installed, the real regeneration runs."""
+    from asset_model import arrivals as arrival_tree
+    from asset_model import history_anchor
+    from bootstrap import checkpoints, replay_inputs
+
+    real_arrivals, real_print = checkpoints.arrivals_of, replay_inputs.regenerated_print
+
+    def at_the_fixed_anchor() -> bool:
+        return history_anchor.installed() in (None, history_anchor.FIXED_TEST_ANCHOR)
+
+    def arrivals_of(collection_id):
+        if not at_the_fixed_anchor():
+            return real_arrivals(collection_id)
+        return arrival_tree.arrivals_for(collection_id, "", history.deliveries, history.receipts)
+
+    def regenerated_print(collection_id):
+        if not at_the_fixed_anchor():
+            return real_print(collection_id)
+        return replay_inputs.deliveries_print(collection_id, history.deliveries, history.receipts)
+
+    monkeypatch.setattr(checkpoints, "arrivals_of", arrivals_of)
+    monkeypatch.setattr(replay_inputs, "regenerated_print", regenerated_print)
