@@ -785,3 +785,18 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
   empty today, as often as REQ-GEN-392 c11-c13 and REQ-GEN-206 need (last
   night's approval was for that night only)?
 - Keith: "Yes, reset as needed". The same terms as last night, for 2026-11-16.
+
+## REQ-GEN-392 criterion 12: geocoding drift lost (Keith, 2026-11-16 morning)
+
+- Found: after REQ-GEN-392, single-tier Fail faults plant 5 rows, so Child
+  Protection's red Client Registers carry 5 null suburbs where they had 11-16.
+  The 2019 geocoding files then hold fewer postcode placements. The only three
+  drift Warns in the geocoding history (TS-93c 2019-Q1, TS-100c 2019-Q3, the
+  ordinary 2019-Q4) read green. Diagnosis: scratchpad/dia/.
+- Asked: plant drift on purpose, raise the Fail size to 10 or more, or accept
+  no geocoding drift. Keith: "Plant drift on purpose".
+- Asked: approve TS-113 as drafted (docs/drafts/ts-113-geocoding-drift.md:
+  2019-Q4's Client Register Geocodes shift placed mix from suburb to postcode
+  until match_level's PSI sits mid-warn, sized from the check's own band; every
+  other check passes; REQ-GEN-298's recorded drift finding amended as
+  history)? Keith: "Approve as drafted".
