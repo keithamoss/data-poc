@@ -497,11 +497,12 @@ class TestEveryAttemptIsRecorded:
         _run(monkeypatch, run_id, then=lambda rid: _write(
             rid, _result(f"{CHECK}.cp-notifications.notification_id.not_null_dbt")))
         crashed, completed = _attempts(conn, run_id)
-        assert crashed["outcome"] == qa_store.CRASHED
-        assert crashed["error_type"] == "QaRunFailure"
+        # A TOOL'S FAILURE IS TOOL-ERROR, WITH THE TOOL'S OWN TYPE AND MESSAGE
+        # (REQ-PIPE-410 criteria 1 and 9 - this assertion was 'QaRunFailure').
+        assert crashed["outcome"] == qa_store.TOOL_ERROR
+        assert (crashed["tool"], crashed["error_type"]) == ("dbt-core", "ValueError")
         assert crashed["ended_at"] is not None
-        assert crashed["error_message"].startswith(f"{COLLECTION} run {run_id}: dbt-core failed")
-        assert len(crashed["error_message"]) == 1000
+        assert crashed["error_message"] == "x" * 1000
         assert completed["outcome"] == qa_store.COMPLETED
 
     def test_a_keyboard_interrupt_is_interrupted_never_crashed(self, conn, monkeypatch):
@@ -595,7 +596,11 @@ class TestAStopFromOutside:
         _run(monkeypatch, run_id)
         dead, retry = _attempts(conn, run_id)
         assert (dead["outcome"], dead["ended_at"]) == (qa_store.INTERRUPTED, None)
+        # NO RUN TIME FOR ONE FOUND DEAD (REQ-PIPE-409 criterion 3): never
+        # estimated from instants or from the retry's start.
+        assert dead["elapsed_ms"] is None
         assert retry["outcome"] == qa_store.COMPLETED
+        assert retry["elapsed_ms"] is not None
 
     def test_an_attempt_running_elsewhere_is_reported_and_left_alone(self, conn, monkeypatch):
         """Test 23."""

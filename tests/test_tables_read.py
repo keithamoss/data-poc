@@ -328,9 +328,25 @@ class TestTheFailureNamesTheDatasetAndTheTool:
         assert "child-protection" in message
         assert "datacontract-cli" in message
         assert "cp_run_007" in message
-        assert "INCOMPLETE" in message
+        # THE CONSEQUENCE AND THE NEXT STEP (REQ-TEST-416 criterion 8), which
+        # replaced "This run is INCOMPLETE ... under an unfinished run".
+        assert "INCOMPLETE" not in message
+        assert mod.NEXT_STEP in message
         # The original diagnosis is chained, never replaced.
         assert isinstance(caught.value.__cause__, ValueError)
+
+    def test_a_message_ending_in_a_full_stop_gets_one(self):
+        """post-build-review #406: '... run this again.. Its supply ...'."""
+        from qa_tools.tools import orchestrate as mod
+
+        def boom():
+            raise ValueError("Run `mothman env dbt-deps`, then run this again.")
+
+        with pytest.raises(mod.QaRunFailure) as caught:
+            mod._run_step("child-protection", "dbt-core", "cp_run_007", boom)
+        message = str(caught.value)
+        assert ".." not in message
+        assert "run this again. Its supply" in message
 
     def test_a_succeeding_step_is_returned_untouched(self):
         from qa_tools.tools import orchestrate as mod

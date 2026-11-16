@@ -198,3 +198,35 @@ def format_periods_in(text: str) -> str:
     to write, not this function's.
     """
     return _ISO_DAY_IN_TEXT.sub(lambda m: format_period(m.group(1)), text or "")
+
+
+def _half_up(x: float) -> int:
+    """Round half up, as JavaScript's Math.round - so both twins agree on .5."""
+    import math
+
+    return math.floor(x + 0.5)
+
+
+def format_elapsed(seconds: float) -> str:
+    """A RUN TIME, or a duration shown beside one, in the one compact format
+    (REQ-TEST-416 criterion 4): '45s', '3m 12s', '45m', '2h 05m', 'under 1s'.
+
+    A NAME OF ITS OWN, not asset_model.schedule.format_duration, which writes
+    the authored configuration form of a claim window and keeps it. Its twin
+    is the template's fmtElapsed; both answer duration-cases.json.
+
+    Rounded once, half up, BEFORE the unit is chosen, so 59.6s is '1m 00s'
+    and never '60s'. Seconds are shown below ten minutes only (PROVISIONAL,
+    2026-11-16 - see duration-cases.json); from an hour it is hours and
+    minutes, never days."""
+    if seconds < 1:
+        return "under 1s"
+    whole = _half_up(seconds)
+    if whole < 60:
+        return f"{whole}s"
+    if whole < 600:
+        return f"{whole // 60}m {whole % 60:02d}s"
+    minutes = _half_up(seconds / 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    return f"{minutes // 60}h {minutes % 60:02d}m"

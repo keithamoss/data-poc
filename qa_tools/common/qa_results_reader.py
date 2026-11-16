@@ -34,6 +34,7 @@ is reachable from this module at all.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from qa_tools.common import qa_store, supply_db
 
@@ -365,13 +366,184 @@ def list_run_ids(agency: str, collection: str,
             conn.close()
 
 
+@dataclass(frozen=True)
+class RunAttempts:
+    """One run and every attempt at it, as the record of attempts says
+    (REQ-PIPE-411 criterion 1) - read by attempts_by_run."""
+
+    run_key: str
+    agency_id: str
+    collection_id: str
+    dataset_id: str | None
+    scope: str
+    supply_id: str | None
+    trial: bool
+    gate_application: int | None
+    caused_by_decision: int | None
+    caused_by_load: int | None
+    completed: bool
+    run_seq: int | None
+    delivery: str | None
+    received_instant: object
+    #: Every attempt at the run key, oldest first by run_seq - each a dict of
+    #: qa.run_attempt's columns, error_message included (for the terminal's
+    #: own view, REQ-TEST-418; never published, criterion 6).
+    attempts: tuple[dict, ...]
+
+    @property
+    def run_time_ms(self) -> int | None:
+        """REQ-PIPE-409 criterion 7: the newest attempt's, where it completed."""
+        return qa_store.run_time_ms(self.attempts)
+
+    @property
+    def newest(self) -> dict | None:
+        return self.attempts[-1] if self.attempts else None
+
+    @property
+    def not_checked(self) -> bool:
+        """THE ONE STATEMENT OF A NOT-CHECKED RUN (REQ-PIPE-411 criterion 4): a
+        run of a supply, not a trial's, in no gate application, that is its
+        supply's ARRIVAL run or a FULL re-check caused by a decision or by the
+        reload of a supply that could not be loaded; that has not completed;
+        and whose newest attempt by run_seq did not complete - whether or not
+        that attempt has ended. A run that completed and was then reopened
+        and failed is one (B2): its completion was cleared by the reopen."""
+        newest = self.newest
+        return (self.supply_id is not None and not self.trial
+                and self.gate_application is None
+                and (self.scope == "arrival"
+                     or (self.scope == "full" and (self.caused_by_decision is not None
+                                                   or self.caused_by_load is not None)))
+                and not self.completed
+                and newest is not None and newest["outcome"] != qa_store.COMPLETED)
+
+
+def attempts_by_run(conn=None, *, agency: str | None = None, collection: str | None = None,
+                    dataset_ids=None, run_keys=None) -> dict[str, RunAttempts]:
+    """{run key: RunAttempts} for every run with at least one attempt, of the
+    collection, the datasets or the run keys given - THE ONE READER OF
+    ATTEMPTS for the build (REQ-PIPE-411 criterion 1): the results file's run
+    times, tries and not-checked runs (results_history, through run_facts),
+    the 'Could not be checked' blocker (REQ-PIPE-417) and
+    pipeline/package_gating's stopped runs all read through it, so what
+    counts as not checked is said once (RunAttempts.not_checked, criterion
+    4's condition exactly).
+
+    READS qa.run, qa.run_attempt, and the recorded receipt beside the run's
+    supply - recorded QA metadata only, never pg_locks or any schema holding
+    supply rows (criterion 9), which is why a running try and a dead one read
+    the same here. ORDERED BY run_seq ALONE (criterion 8)."""
+    where, params = [], []
+    if agency is not None:
+        where.append("r.agency_id = ?")
+        params.append(agency)
+    if collection is not None:
+        where.append("r.collection_id = ?")
+        params.append(collection)
+    for column, values in (("r.dataset_id", dataset_ids), ("r.run_key", run_keys)):
+        if values is not None:
+            values = list(values)
+            if not values:
+                return {}
+            where.append(f"{column} IN ({', '.join('?' for _ in values)})")
+            params.extend(values)
+    conn, mine = _conn(conn)
+    try:
+        rows = conn.execute(
+            f'SELECT r.run_key, r.agency_id, r.collection_id, r.dataset_id, r.scope, '
+            f'r.supply_id, r.trial, r.gate_application, r.caused_by_decision, '
+            f'r.caused_by_load, r.completed_at IS NOT NULL, r.run_seq, rc.delivery, '
+            f'rc.received_instant, a.run_seq, a.began_at, a.ended_at, a.outcome, '
+            f'a.elapsed_ms, a.tool, a.error_type, a.error_message '
+            f'FROM "{qa_store.SCHEMA}".run r '
+            f'JOIN "{qa_store.SCHEMA}".run_attempt a ON a.run_key = r.run_key '
+            f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
+            "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
+            + (f"WHERE {' AND '.join(where)} " if where else "")
+            + "ORDER BY a.run_seq", params).fetchall()
+    finally:
+        if mine:
+            conn.close()
+    runs: dict[str, dict] = {}
+    for (key, agency_id, collection_id, dataset_id, scope, supply, trial, application,
+         decision, load, completed, run_seq, delivery, instant, a_seq, began, ended, outcome,
+         elapsed, tool, error_type, message) in rows:
+        run = runs.setdefault(key, {
+            "run_key": key, "agency_id": agency_id, "collection_id": collection_id,
+            "dataset_id": dataset_id, "scope": scope, "supply_id": supply, "trial": bool(trial),
+            "gate_application": application, "caused_by_decision": decision,
+            "caused_by_load": load, "completed": bool(completed), "run_seq": run_seq,
+            "delivery": delivery, "received_instant": instant, "attempts": []})
+        run["attempts"].append({
+            "run_seq": a_seq, "began_at": began, "ended_at": ended, "outcome": outcome,
+            "elapsed_ms": elapsed, "tool": tool, "error_type": error_type,
+            "error_message": message})
+    return {key: RunAttempts(**{**run, "attempts": tuple(run["attempts"])})
+            for key, run in runs.items()}
+
+
+#: THE FIRST TRY AND THE NEWEST FIVE (REQ-PIPE-411 criterion 3; TR3).
+NEWEST_TRIES = 5
+
+
+def _iso_or_none(value):
+    return value.isoformat() if value is not None else None
+
+
+def tries_emitted(attempts) -> dict | None:
+    """What the results file carries about a run's tries (criterion 3): the
+    count, the FIRST and the NEWEST FIVE in run_seq order, each numbered from
+    1, and how many are left out between them - or None for a run with
+    exactly one attempt that completed, which needs no list.
+
+    AN EXPLICIT LIST OF FIELDS, NOT SPREAD-THEN-OVERRIDE - the one justified
+    exception to CLAUDE.md's rule (TA Q5, SETTLED by Keith 2026-11-14): an
+    attempt's error_message can quote a value from the supply, a host or a
+    path, so a field added to the record must be added here on purpose to be
+    published. run_seq itself is never emitted (criterion 8)."""
+    attempts = list(attempts)
+    if not attempts or (len(attempts) == 1
+                        and attempts[0]["outcome"] == qa_store.COMPLETED):
+        return None
+    numbered = list(enumerate(attempts, start=1))
+    shown = numbered[:1] + [n for n in numbered[-NEWEST_TRIES:] if n[0] != 1]
+    return {"count": len(attempts),
+            "left_out": len(attempts) - len(shown),
+            "tries": [{"number": n, "began_at": _iso_or_none(a["began_at"]),
+                       "ended_at": _iso_or_none(a["ended_at"]), "outcome": a["outcome"],
+                       "run_time_ms": a["elapsed_ms"], "tool": a["tool"],
+                       "error_type": a["error_type"]}
+                      for n, a in shown]}
+
+
+def _cause(key, supply, application, decision, load, delivery, instant) -> str | None:
+    if supply is None:
+        return None
+    if application is not None:
+        # EVERY RUN INSIDE A GATE APPLICATION IS ONE POINT, keyed on the
+        # application (REQ-PIPE-267 criterion 10, amending REQ-PIPE-279's
+        # point key): its last round's result per check is the one shown.
+        return f"gate:{application}"
+    if decision is not None:
+        return f"decision:{decision}"
+    if load is not None:
+        return f"load:{load}"
+    if delivery is not None:
+        return f"arrival:{delivery}@{instant.isoformat()}"
+    return f"arrival:{key}"
+
+
 def run_facts(agency: str, collection: str, conn=None, *,
               also: tuple[str, ...] | list[str] = ()) -> dict[str, dict]:
     """{run id: what qa.run says the run is} for every complete run of the
-    collection (REQ-PIPE-279 criteria 16 and 17): its dataset, its scope, the
-    supply it belongs to, its CAUSE, and its RANK - dense, from run_seq
+    collection (REQ-PIPE-279 criteria 16 and 17), AND EVERY NOT-CHECKED RUN
+    (REQ-PIPE-411 criterion 4, `not_checked: true`): its dataset, its scope,
+    the supply it belongs to, its CAUSE, its RANK - dense, from run_seq
     within the collection, so run_seq itself, which another collection's
-    runs interleave, never leaves the database.
+    runs interleave, never leaves the database - its RUN TIME (REQ-PIPE-409
+    criterion 7, null where it has none) and, where they say something, its
+    TRIES (REQ-PIPE-411 criterion 3). A not-checked run is ranked among the
+    rest by its newest attempt's run_seq, which is its run's (criterion 5).
 
     THE CAUSE is what made the run happen: an arrival's is its arrival - the
     supplies filed from one delivery at one receipt instant, REQ-PIPE-265's
@@ -395,32 +567,38 @@ def run_facts(agency: str, collection: str, conn=None, *,
         own = {row[0] for row in rows}
         extra = [k for k in dict.fromkeys(also) if k not in own]
         if extra:
-            rows = sorted([*rows, *conn.execute(
+            rows = [*rows, *conn.execute(
                 select + f"WHERE r.run_key IN ({', '.join('?' for _ in extra)})",
-                extra).fetchall()], key=lambda row: row[9])
+                extra).fetchall()]
+        tried = attempts_by_run(conn, agency=agency, collection=collection)
+        visible = {row[0] for row in rows}
+        foreign = [row[0] for row in rows if row[0] not in tried]
+        if foreign:
+            tried.update(attempts_by_run(conn, run_keys=foreign))
     finally:
         if mine:
             conn.close()
+    unchecked = [(key, ra.dataset_id, ra.scope, ra.supply_id, ra.caused_by_decision,
+                  ra.caused_by_load, ra.delivery, ra.received_instant, ra.gate_application,
+                  ra.run_seq)
+                 for key, ra in tried.items() if ra.not_checked and key not in visible]
     out = {}
     for rank, (key, dataset_id, scope, supply, decision, load, delivery, instant,
-               application, _seq) in enumerate(rows, start=1):
-        if supply is None:
-            cause = None
-        elif application is not None:
-            # EVERY RUN INSIDE A GATE APPLICATION IS ONE POINT, keyed on the
-            # application (REQ-PIPE-267 criterion 10, amending REQ-PIPE-279's
-            # point key): its last round's result per check is the one shown.
-            cause = f"gate:{application}"
-        elif decision is not None:
-            cause = f"decision:{decision}"
-        elif load is not None:
-            cause = f"load:{load}"
-        elif delivery is not None:
-            cause = f"arrival:{delivery}@{instant.isoformat()}"
-        else:
-            cause = f"arrival:{key}"
-        out[key] = {"dataset_id": dataset_id, "scope": scope, "supply_id": supply,
-                    "rank": rank, "cause": cause}
+               application, _seq) in enumerate(sorted([*rows, *unchecked],
+                                                      key=lambda row: row[9]), start=1):
+        attempts = tried[key].attempts if key in tried else ()
+        fact = {"dataset_id": dataset_id, "scope": scope, "supply_id": supply,
+                "rank": rank,
+                "cause": _cause(key, supply, application, decision, load, delivery, instant),
+                "run_time_ms": qa_store.run_time_ms(attempts),
+                # WHEN ITS NEWEST TRY ENDED, for the as-of view (REQ-DASH-413
+                # criterion 6): a run time is shown from that date on.
+                "ended_at": _iso_or_none(attempts[-1]["ended_at"]) if attempts else None,
+                "not_checked": key not in visible}
+        tries = tries_emitted(attempts)
+        if tries is not None:
+            fact["attempts"] = tries
+        out[key] = fact
     return out
 
 

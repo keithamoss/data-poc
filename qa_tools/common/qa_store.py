@@ -155,6 +155,8 @@ COMPLETED = "COMPLETED"
 TIMED_OUT = "TIMED-OUT"
 INTERRUPTED = "INTERRUPTED"
 CRASHED = "CRASHED"
+#: One of the four tools' evaluation raised (REQ-PIPE-410).
+TOOL_ERROR = "TOOL-ERROR"
 
 #: The key space of an attempt's session advisory lock, beside the
 #: processing pass's (51510, 51511) and the owed-run claim's (51512); the
@@ -200,7 +202,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 50
+SCHEMA_VERSION = 51
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -303,14 +305,27 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".run_attempt (
     began_at       timestamptz NOT NULL,
     ended_at       timestamptz,
     outcome        text CHECK (outcome IN ('COMPLETED', 'TIMED-OUT', 'INTERRUPTED',
-                                           'CRASHED')),
-    -- CRASHED only: the exception's type, and its message truncated before it
-    -- is stored (the security NFR - a driver's message can repeat a DSN).
+                                           'CRASHED', 'TOOL-ERROR')),
+    -- CRASHED, TOOL-ERROR and TIMED-OUT: the exception's type, and its message
+    -- truncated before it is stored (the security NFR - a driver's message can
+    -- repeat a DSN). A TOOL-ERROR's are the TOOL'S OWN exception's, never
+    -- QaRunFailure's (REQ-PIPE-410 criterion 1; schema 51).
     error_type     text,
     error_message  text CHECK (length(error_message) <= 1000),
+    -- TOOL-ERROR only: which of the four tools failed, by the run step's own
+    -- name for it - 'dbt-core', 'Soda Core', 'datacontract-cli', 'Evidently'
+    -- (REQ-PIPE-410 criteria 1 and 6; schema 51).
+    tool           text,
+    -- THE ATTEMPT'S REAL RUN TIME, in whole milliseconds from a monotonic
+    -- counter read in the attempt's own process (REQ-PIPE-409; schema 51) -
+    -- never a difference of the stamps beside it, which a replay simulates.
+    -- Recorded exactly when an end is: an attempt found dead has neither.
+    elapsed_ms     bigint CHECK (elapsed_ms >= 0),
     PRIMARY KEY (run_key, run_seq),
     CHECK (outcome IS NOT NULL OR ended_at IS NULL),
-    CHECK ((outcome = 'CRASHED') = (error_type IS NOT NULL))
+    CHECK ((ended_at IS NULL) = (elapsed_ms IS NULL)),
+    CHECK ((outcome IN ('CRASHED', 'TOOL-ERROR', 'TIMED-OUT')) = (error_type IS NOT NULL)),
+    CHECK ((outcome = 'TOOL-ERROR') = (tool IS NOT NULL))
 );
 
 --   "this supply's runs, newest first" - criterion 5's read, newest by
@@ -2491,16 +2506,34 @@ def set_run_seq(conn: supply_db.SupplyConnection, run_key: str, run_seq: int) ->
 
 
 def end_attempt(conn: supply_db.SupplyConnection, run_key: str, run_seq: int,
-                outcome: str, *, error_type: str | None = None,
-                error_message: str | None = None) -> None:
+                outcome: str, *, elapsed_ms: int, error_type: str | None = None,
+                error_message: str | None = None, tool: str | None = None) -> None:
     """Record how an attempt ended, once - an attempt that has ended is
-    never changed (criterion 6)."""
+    never changed (criterion 6).
+
+    `elapsed_ms` IS GIVEN, NEVER WORKED OUT HERE (REQ-PIPE-409 criteria 1-2):
+    the attempt measured it from a monotonic counter in its own process, and
+    this stays a recorder that reads no counter. It lands in the same UPDATE
+    as the end."""
     conn.execute(
         f'UPDATE "{SCHEMA}".run_attempt SET ended_at = ?, outcome = ?, error_type = ?, '
-        "error_message = ? WHERE run_key = ? AND run_seq = ? AND outcome IS NULL",
+        "error_message = ?, tool = ?, elapsed_ms = ? "
+        "WHERE run_key = ? AND run_seq = ? AND outcome IS NULL",
         [_stamp(), outcome, error_type,
          error_message[:ERROR_MESSAGE_LIMIT] if error_message is not None else None,
-         run_key, run_seq])
+         tool, int(elapsed_ms), run_key, run_seq])
+
+
+def run_time_ms(attempts: Sequence[Mapping[str, Any]]) -> int | None:
+    """A run's RUN TIME (REQ-PIPE-409 criterion 7): the elapsed_ms of its
+    NEWEST attempt by run_seq where that attempt is COMPLETED, else None -
+    so a run reopened and then failed has none, whatever an older attempt
+    recorded, because every opening replaces the results that older attempt
+    described. Pure, over the attempt rows of one run key."""
+    if not attempts:
+        return None
+    newest = max(attempts, key=lambda a: a["run_seq"])
+    return newest["elapsed_ms"] if newest["outcome"] == COMPLETED else None
 
 
 def attempts_of(conn: supply_db.SupplyConnection, run_key: str) -> list[dict]:

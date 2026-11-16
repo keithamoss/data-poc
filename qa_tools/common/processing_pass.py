@@ -160,6 +160,9 @@ class Recorded:
     completed_runs: set[str] = field(default_factory=set)
     gated: set[tuple[str, str]] = field(default_factory=set)
     held: set[tuple[str, str]] = field(default_factory=set)
+    #: Supplies a PERSON's rejection has taken effect on (REQ-PIPE-417
+    #: criterion 10; TV2).
+    rejected: set[tuple[str, str]] = field(default_factory=set)
 
 
 def _base(supply: str) -> str:
@@ -172,7 +175,8 @@ def _base(supply: str) -> str:
 
 def recorded(conn) -> Recorded:
     """Everything criterion 2 asks about, in ONE statement."""
-    from qa_tools.common import qa_store
+    from asset_model import asset_time
+    from qa_tools.common import decision_log, qa_store
 
     out = Recorded()
     s = qa_store.SCHEMA
@@ -182,11 +186,22 @@ def recorded(conn) -> Recorded:
             f"UNION ALL SELECT 'gate', dataset_id, supply FROM \"{s}\".decision "
             f"WHERE action IN ({', '.join('?' for _ in GATED_ACTIONS)}) "
             f"UNION ALL SELECT 'hold', dataset_id, supply_id FROM \"{s}\".hold "
-            "WHERE resolved_by IS NULL", list(GATED_ACTIONS)).fetchall():
+            "WHERE resolved_by IS NULL "
+            # A PERSON'S REJECTION THAT HAS TAKEN EFFECT (REQ-PIPE-417
+            # criterion 10), on the one clock.
+            f"UNION ALL SELECT 'reject', dataset_id, supply FROM \"{s}\".decision "
+            "WHERE action = ? AND actor_kind = ? AND effective_at <= ?",
+            [*GATED_ACTIONS, decision_log.REJECT, decision_log.PERSON,
+             asset_time.now()]).fetchall():
         if kind == "run":
             out.completed_runs.add(a)
         elif kind == "gate":
             out.gated.add((a, _base(b)))
+        elif kind == "reject":
+            # By its ARRIVAL, whichever form the decision names the supply in.
+            from qa_tools.common import dataset_blockers
+
+            out.rejected.add((a, f"{a}@{dataset_blockers._arrival_of(b)}"))
         else:
             out.held.add((a, _base(b)))
     return out
@@ -205,6 +220,12 @@ def state_of(arrival, rec: Recorded) -> str:
     """Criterion 2: checked AND gated (or held) is processed; checked but not
     gated is owed its gate; anything else is owed the whole lifecycle."""
     if arrival.run_id not in rec.completed_runs:
+        # A REJECTED ARRIVAL NOBODY COULD CHECK IS SETTLED (REQ-PIPE-417
+        # criterion 10; TV2, Keith 2026-11-14): not retried, and holding back
+        # no later arrival of its collection - the person's one decision on a
+        # supply that always crashes must not leave the collection stuck.
+        if supply_of(arrival) in rec.rejected:
+            return PROCESSED
         return UNCHECKED
     key = supply_of(arrival)
     return PROCESSED if key in rec.gated or key in rec.held else UNGATED
@@ -414,8 +435,18 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         # own collection, which depend on what it would have filed - and no
         # other collection's.
         blocked.add(arrival.collection_id)
-        report.failures.append((arrival.run_id, f"{type(exc).__name__}: {exc}"))
-        say(f"{arrival.run_id}: FAILED - {type(exc).__name__}: {exc}; it and every "
+        # SAID ONCE (REQ-TEST-416 criterion 8): a failed QA attempt's message
+        # was printed beneath the run step's summary line, so this names the
+        # arrival, the stage and what follows without it.
+        from qa_tools.common import run_summary
+
+        if run_summary.already_said(exc):
+            stage = getattr(exc, "stage", "checks")
+            why = f"the {stage} stage failed, as its summary line above says"
+        else:
+            why = f"{type(exc).__name__}: {exc}"
+        report.failures.append((arrival.run_id, why))
+        say(f"{arrival.run_id}: FAILED - {why}; it and every "
             f"later {arrival.collection_id} arrival are left for the next pass")
         # WHAT ITS PACKAGE-MATES WAIT FOR (REQ-PIPE-276 criterion 17).
         from qa_tools.common import gate

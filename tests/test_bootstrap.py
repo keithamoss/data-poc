@@ -261,6 +261,15 @@ class TestCollectionsRunSideBySide:
         boot.bootstrap(collection="all")
         assert dispatched == [STREAMS]
 
+    def test_the_took_line_is_in_the_shared_run_time_format(self, spy, monkeypatch):
+        """REQ-TEST-416 criterion 5: '1m 04s', never '64s'."""
+        monkeypatch.setattr(boot, "_run_concurrently",
+                            lambda names, sequential: {n: 64.0 for n in names})
+        steps: list[str] = []
+        boot.bootstrap(collection="all", on_step=steps.append)
+        (took,) = [s for s in steps if s.startswith("Took ")]
+        assert "1m 04s" in took and "64s" not in took
+
     def test_the_unclaimed_deliveries_are_recorded_once_after_both_run(self, spy):
         """REQ-TEST-159 reversed REQ-TEST-116's record-everything-first: each
         collection records a delivery at its first arrival (one transaction,

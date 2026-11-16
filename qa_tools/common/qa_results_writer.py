@@ -104,6 +104,8 @@ somebody maintained by hand.
 """
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass
 from typing import Any
 
 def _with_tables_read(verified: list[dict], run_id: str) -> tuple[list[dict], dict]:
@@ -793,10 +795,16 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
             qa_store.set_run_purpose(lock, run_id, **(stated or _arrival_purpose(
                 lock, run_id, dataset_id, delivery=delivery, received_at=received_at)))
             qa_store.set_run_seq(lock, run_id, run_seq)
+            # THE EARLIER TRIES, read once here in the same transaction - after
+            # begin_attempt has closed any found dead - so the run step's
+            # summary line can say "on the second try - the first ..." with
+            # no read of its own (REQ-TEST-416 criterion 3).
+            earlier = [a for a in qa_store.attempts_of(lock, run_id) if a["run_seq"] != run_seq]
     except BaseException:
         lock.close()
         raise
     attempt = Attempt(run_id, run_seq, lock, fingerprints)
+    attempt.earlier = earlier
     _open_attempts[run_id] = attempt
     return attempt
 
@@ -804,6 +812,35 @@ def open_run(agency: str, collection: str, run_id: str, run_timestamp: str,
 #: The attempts this process has open, by run key - what finish_run and
 #: orchestrate.run_one's finally end.
 _open_attempts: dict[str, "Attempt"] = {}
+
+#: THE COUNTER AN ATTEMPT'S RUN TIME IS READ FROM (REQ-PIPE-409 criteria 1
+#: and 11): time.monotonic, which no clock installation replaces - a replay
+#: installs a clock, never this. A module attribute so a test can inject it
+#: and assert exact milliseconds.
+_counter = time.monotonic
+
+
+@dataclass(frozen=True)
+class Ended:
+    """How an attempt ended, as Attempt.end recorded it."""
+
+    outcome: str
+    elapsed_ms: int
+    tool: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+    #: The run key's earlier attempts, oldest first, as open_run read them.
+    earlier: tuple = ()
+
+
+#: How each run key's latest attempt in this process ended, until the run
+#: step takes it for its summary line (take_ended).
+_ended: dict[str, Ended] = {}
+
+
+def take_ended(run_id: str) -> Ended | None:
+    """How this process's latest attempt at `run_id` ended, once."""
+    return _ended.pop(run_id, None)
 
 
 class Attempt:
@@ -824,15 +861,25 @@ class Attempt:
                    census, which is not part of the attempt
       TIMED-OUT    SQLSTATE 55P03 lock_not_available or 57014 query_canceled
                    on one of THIS PROJECT'S connections, anywhere in the
-                   exception chain. Only psycopg's errors are ours: dbt and
-                   Soda connect through their own drivers, so a tool's own
-                   timeout arrives as QaRunFailure over an error this cannot
-                   see as one, and records CRASHED - never guessed from text.
+                   exception chain - or, for a tool's failure, in the chain of
+                   the tool's own exception - with that error's type and
+                   message. Only psycopg's errors are ours: dbt and Soda
+                   connect through their own drivers, so a tool's own timeout
+                   arrives as a TOOL-ERROR - never guessed from text.
+      TOOL-ERROR   one of the four tools' evaluation raised (REQ-PIPE-410):
+                   the tool, and the tool's own exception's type and message,
+                   from QaRunFailure's fields
       INTERRUPTED  a stop seen from outside - KeyboardInterrupt, SystemExit,
                    or SIGTERM, which raises SystemExit while an attempt is
                    open in the main thread - with its end time
       CRASHED      any other exception, with its type and its message cut to
                    qa_store.ERROR_MESSAGE_LIMIT characters
+
+    ITS RUN TIME IS MEASURED HERE (REQ-PIPE-409 criteria 1 and 2): a monotonic
+    counter read when the attempt opens and again when it ends, in this
+    process, so a replay's simulated clock - which jumps forward on decision
+    events mid-run - never enters it. Every end above has one; an attempt
+    found dead by a later one has none.
     """
 
     def __init__(self, run_key: str, run_seq: int, lock, fingerprints: dict[str, str]) -> None:
@@ -847,19 +894,34 @@ class Attempt:
         #: stamped with.
         self.fingerprints = fingerprints
         self.ended = False
+        #: How it ended, once it has (Ended) - what end() returns.
+        self.result: Ended | None = None
+        #: The run key's earlier attempts, oldest first, as open_run read them.
+        self.earlier: list[dict] = []
+        # THE COUNTER, NEVER THE CLOCK (REQ-PIPE-409 criterion 1).
+        self._began = _counter()
         self._sigterm = _stop_on_sigterm()
 
-    def end(self, exc: BaseException | None, *, completed: bool = False) -> None:
+    def end(self, exc: BaseException | None, *, completed: bool = False) -> "Ended | None":
+        """Record how this attempt ended and return it - the outcome and run
+        time the run step's summary line prints, with no re-read of the
+        record (REQ-TEST-416 criterion 1). None where it had already ended."""
         if self.ended:
-            return
+            return None
         self.ended = True
         from qa_tools.common import qa_store, supply_db
 
-        outcome, error_type, message = _outcome(exc, completed)
+        elapsed_ms = max(0, round((_counter() - self._began) * 1000))
+        outcome, tool, error_type, message = _outcome(exc, completed)
+        self.result = Ended(outcome, elapsed_ms, tool, error_type, message,
+                            tuple(self.earlier))
+        _ended[self.run_key] = self.result
         try:
             with supply_db.connect(reuse=False, label="mothman:qa-run-attempt-end") as fresh:
                 qa_store.end_attempt(fresh, self.run_key, self.run_seq, outcome,
-                                     error_type=error_type, error_message=message)
+                                     elapsed_ms=elapsed_ms, error_type=error_type,
+                                     error_message=message, tool=tool)
+            return self.result
         finally:
             _open_attempts.pop(self.run_key, None)
             if self._sigterm is not None:
@@ -895,27 +957,56 @@ def _stop_on_sigterm():
 _TIMEOUT_STATES = ("55P03", "57014")
 
 
-def _outcome(exc: BaseException | None, completed: bool) -> tuple[str, str | None, str | None]:
-    """(outcome, error type, error message) for an attempt ending with `exc`."""
+def _timeout_in(exc: BaseException | None, *, not_into=()) -> BaseException | None:
+    """The 55P03/57014 from one of this project's own connections anywhere in
+    `exc`'s chain, or None - never looking past a link of a type in
+    `not_into`."""
     import psycopg
 
-    from qa_tools.common import qa_store
-
-    if completed:
-        return qa_store.COMPLETED, None, None
-    if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-        return qa_store.INTERRUPTED, None, None
     seen, link = set(), exc
     while link is not None and id(link) not in seen:
+        if link is not exc and isinstance(link, not_into):
+            return None
         seen.add(id(link))
         if isinstance(link, psycopg.Error) and link.sqlstate in _TIMEOUT_STATES:
-            return qa_store.TIMED_OUT, None, None
+            return link
         link = link.__cause__ or link.__context__
+    return None
+
+
+def _outcome(exc: BaseException | None,
+             completed: bool) -> tuple[str, str | None, str | None, str | None]:
+    """(outcome, tool, error type, error message) for an attempt ending with
+    `exc` - THE ONE PLACE all five are told apart (REQ-PIPE-410 criterion 7),
+    from the exception's type and fields, never its text.
+
+    A TOOL'S FAILURE IS READ FROM QaRunFailure's FIELDS (criterion 2), never
+    from __cause__ or __context__: when two lanes fail, the one re-raised has
+    the other's failure left in its context."""
+    from qa_tools.common import qa_store
+    from qa_tools.tools.orchestrate import QaRunFailure
+
+    limit = qa_store.ERROR_MESSAGE_LIMIT
+    if completed:
+        return qa_store.COMPLETED, None, None, None
+    if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+        return qa_store.INTERRUPTED, None, None, None
+    tools_own = exc.cause if isinstance(exc, QaRunFailure) and exc.tool else None
+    # A TOOL'S OWN CHAIN STOPS AT ANOTHER TOOL'S FAILURE: one raised while a
+    # second lane's was being handled carries it as context, and that wait
+    # was not this tool's (B3).
+    timeout = (_timeout_in(tools_own, not_into=QaRunFailure) if tools_own is not None
+               else _timeout_in(exc))
+    if timeout is not None:
+        return qa_store.TIMED_OUT, None, type(timeout).__name__, str(timeout)[:limit]
+    if tools_own is not None:
+        return (qa_store.TOOL_ERROR, exc.tool, type(tools_own).__name__,
+                str(tools_own)[:limit])
     if exc is None:
         # Not a path the orchestrator has: its runs end in finish_run or raise.
-        return qa_store.CRASHED, "None", "the attempt ended without its run being completed"
-    return (qa_store.CRASHED, type(exc).__name__,
-            str(exc)[:qa_store.ERROR_MESSAGE_LIMIT])
+        return (qa_store.CRASHED, None, "None",
+                "the attempt ended without its run being completed")
+    return qa_store.CRASHED, None, type(exc).__name__, str(exc)[:limit]
 
 
 def close_attempt(run_id: str, exc: BaseException | None) -> None:

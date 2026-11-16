@@ -137,14 +137,30 @@ def for_collection(conn, collection_id: str) -> dict[str, dict[str, list[dict]]]
             "GROUP BY supply_id", ids).fetchall():
         checked_at[sup] = _instant(at)
 
+    # A RUN STOPPED where an attempt of it ended other than COMPLETED - read
+    # through THE ONE READER OF ATTEMPTS (REQ-PIPE-411 criterion 1), in place
+    # of a query of this module's own.
+    from qa_tools.common import qa_results_reader
+
+    # WHEN EACH SUPPLY COULD NOT BE CHECKED (REQ-PIPE-417 criterion 8): its
+    # 'Could not be checked' replaces these forms on its own page, and stops a
+    # package-mate's line saying nothing needs deciding.
+    from qa_tools.common import dataset_blockers
+
+    unchecked: dict[str, list[tuple]] = {}
+    for b in dataset_blockers.could_not_check(conn):
+        if b.dataset_id in datasets:
+            unchecked.setdefault(b.supply, []).append(
+                (_instant(b.opened_at),
+                 _instant(b.resolved_at) if b.resolved_at is not None else None))
+
     stopped_at: dict[str, list[datetime]] = {}
-    for sup, at in conn.execute(
-            f'SELECT r.supply_id, a.ended_at FROM "{s}".run_attempt a '
-            f'JOIN "{s}".run r ON r.run_key = a.run_key '
-            f"WHERE r.dataset_id IN ({marks}) AND r.supply_id IS NOT NULL "
-            "AND r.scope <> 'readers' AND a.ended_at IS NOT NULL "
-            "AND a.outcome <> 'COMPLETED'", ids).fetchall():
-        stopped_at.setdefault(sup, []).append(_instant(at))
+    for ra in qa_results_reader.attempts_by_run(conn, dataset_ids=ids).values():
+        if ra.supply_id is None or ra.scope == "readers":
+            continue
+        for a in ra.attempts:
+            if a["ended_at"] is not None and a["outcome"] != "COMPLETED":
+                stopped_at.setdefault(ra.supply_id, []).append(_instant(a["ended_at"]))
 
     owed: dict[tuple, list] = {}
     contended: set[tuple] = set()
@@ -201,7 +217,7 @@ def for_collection(conn, collection_id: str) -> dict[str, dict[str, list[dict]]]
             if len(pkg.members) < 2 and not gate_owed and not app_windows:
                 continue
             points = _points(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at,
-                             settles.get(sup, []), zones)
+                             settles.get(sup, []), zones, unchecked)
             if points:
                 out.setdefault(ds, {})[sup] = points
     return out
@@ -227,8 +243,13 @@ def _settled_by(settles, when: datetime) -> bool:
 
 
 def _state(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at, settles,
-           when: datetime) -> dict | None:
+           when: datetime, unchecked=None) -> dict | None:
+    unchecked = unchecked or {}
     if when < pkg.received:
+        return None
+    # ITS OWN 'COULD NOT BE CHECKED' WINS (REQ-PIPE-417 criterion 8): the
+    # page shows that, with its item, in place of any of these forms.
+    if _open(unchecked.get(sup, ()), when):
         return None
     m = len(pkg.members)
     checked = {s for _d, s in pkg.members if s in checked_at and checked_at[s] <= when}
@@ -246,7 +267,12 @@ def _state(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at, settles
         return None
     stopped = [d for d, s in pkg.members if s != sup and s not in checked
                and any(at <= when for at in stopped_at.get(s, ()))]
-    return {"form": form, "n": n, "m": m, "stopped": sorted(set(stopped), key=_order)}
+    # A MATE THAT COULD NOT BE CHECKED NEEDS A PERSON (TR2): its line keeps
+    # "<dataset>'s run stopped" and stops saying nothing needs deciding.
+    decided = not any(_open(unchecked.get(s, ()), when)
+                      for d, s in pkg.members if s != sup)
+    return {"form": form, "n": n, "m": m, "stopped": sorted(set(stopped), key=_order),
+            **({} if decided else {"mate_could_not_check": True})}
 
 
 def _order(dataset_id: str) -> int:
@@ -259,11 +285,12 @@ def words(state: dict, received) -> tuple[str, list[dict]]:
     segment the page renders as a link."""
     when = display_time.format_instant(received)
     form = state["form"]
+    nothing = "" if state.get("mate_could_not_check") else " Nothing needs deciding yet."
     if form == GATING:
-        rest = [_text(f" (received {when}). Nothing needs deciding yet.")]
+        rest = [_text(f" (received {when}).{nothing}")]
     else:
-        rest = [_text(f" (received {when}): {state['n']} of {state['m']} files checked. "
-                      "Nothing needs deciding yet.")]
+        rest = [_text(f" (received {when}): {state['n']} of {state['m']} files checked."
+                      f"{nothing}")]
     for d in state["stopped"]:
         rest += [_text(" "), {"dataset": d},
                  _text("'s run stopped; the next processing pass re-runs it.")]
@@ -271,7 +298,7 @@ def words(state: dict, received) -> tuple[str, list[dict]]:
 
 
 def _points(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at, settles,
-            zones) -> list[dict]:
+            zones, unchecked=None) -> list[dict]:
     """The state at the end of every day anything about it changed, from the
     receipt's day on, with a last point where it ends."""
     events = {pkg.received}
@@ -284,13 +311,17 @@ def _points(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at, settle
         if b is not None:
             events.add(b)
     events.update(at for at, _s in settles)
+    for a, b in [w for _d, s in pkg.members for w in (unchecked or {}).get(s, ())]:
+        events.add(a)
+        if b is not None:
+            events.add(b)
     days = sorted({asset_time.local_date(e, zones) for e in events
                    if e >= pkg.received})
     points: list[dict] = []
     for day in days:
         when = asset_time.end_of_day(day, zones)
         state = _state(ds, sup, pkg, gate_owed, app_windows, checked_at, stopped_at,
-                       settles, when)
+                       settles, when, unchecked)
         if state is None:
             p = {"on": day.isoformat(), "form": None}
         else:

@@ -312,6 +312,22 @@ def own_runs(manifest: list[dict], dataset_id: str, facts: dict[str, dict]) -> l
             if facts[m["run_id"]]["dataset_id"] in (None, dataset_id)]
 
 
+def run_times(dataset_id: str, facts: dict[str, dict]) -> list[dict]:
+    """Every run of `dataset_id` with its run time and tries, in rank order
+    (REQ-PIPE-411 criterion 2) - from the results file's run_facts alone, so
+    nothing here reads the record. The slow mark (REQ-PIPE-412) is added by
+    slow_runs.marks over these."""
+    from pipeline import slow_runs
+
+    out = [{"run_id": key, "rank": f["rank"], "scope": f["scope"], "cause": f["cause"],
+            "supply_id": f["supply_id"], "run_time_ms": f.get("run_time_ms"),
+            "ended_at": f.get("ended_at"), "not_checked": bool(f.get("not_checked")),
+            "attempts": f.get("attempts")}
+           for key, f in sorted(facts.items(), key=lambda kv: kv[1]["rank"])
+           if f["dataset_id"] == dataset_id and f["supply_id"] is not None]
+    return slow_runs.marks(out)
+
+
 def superseded_runs(facts: dict[str, dict], manifest: list[dict]) -> dict[str, dict]:
     """{run id: {replaced_by, supply_run}} for every run a newer run of the
     same supply replaced (post-build-review #266, Keith 2026-10-24, answer
@@ -323,7 +339,9 @@ def superseded_runs(facts: dict[str, dict], manifest: list[dict]) -> dict[str, d
     listed = {m["run_id"] for m in manifest}
     runs_of: dict[tuple[str, str], list[str]] = {}
     for run_id, fact in sorted(facts.items(), key=lambda item: item[1]["rank"]):
-        if fact["supply_id"] is None or fact["scope"] == "readers":
+        # A NOT-CHECKED RUN (REQ-PIPE-411 criterion 4) recorded no result, so
+        # it neither replaces a run nor is one the page lists a supply by.
+        if fact["supply_id"] is None or fact["scope"] == "readers" or fact.get("not_checked"):
             continue
         runs_of.setdefault((fact["dataset_id"], fact["supply_id"]), []).append(run_id)
     out: dict[str, dict] = {}
@@ -915,7 +933,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     if "runs_by_supply" not in view:
         view["runs_by_supply"] = {}
         for fact in facts.values():
-            if fact.get("supply_id"):
+            if fact.get("supply_id") and not fact.get("not_checked"):
                 view["runs_by_supply"].setdefault(fact["supply_id"], []).append(fact)
     promotion_words = cross_table_grid.promotion_words(
         dataset_id, period_of, log=view["log"], slots=view["slots"], receipts=view["receipts"],
@@ -1081,7 +1099,19 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         "runs": [{**m, "run_date": _run_date(m), "rank": rank(m["run_id"]),
                   # ITS SUPPLY (qa.run.supply_id), which a cross-table card's
                   # counted points are keyed by (REQ-PIPE-269).
-                  "supply_id": facts[m["run_id"]]["supply_id"]} for m in manifest],
+                  "supply_id": facts[m["run_id"]]["supply_id"],
+                  # ITS RUN TIME AND ITS TRIES (REQ-PIPE-411 criteria 2 and 3).
+                  "run_time_ms": facts[m["run_id"]].get("run_time_ms"),
+                  "attempts": facts[m["run_id"]].get("attempts")} for m in manifest],
+        # EVERY RUN OF THIS DATASET WITH ITS RUN TIME (REQ-PIPE-411 criterion
+        # 2), in rank order - the run-time trend's points and each row's
+        # re-check note read these, and the slow mark is judged over them
+        # (REQ-PIPE-412). A not-checked run is among them, with its tries.
+        # A NOT-CHECKED RUN (REQ-PIPE-411 criterion 4) is among them, flagged
+        # not_checked, with its supply, cause, rank and tries - and no check
+        # result. (A separate notChecked list was dropped as unread,
+        # post-build-review #407.)
+        "runTimes": run_times(dataset_id, facts),
         "columns": columns_out,
         "_provenance": presented["provenance"].format(
             table_description=table_description(coll, dataset)),
@@ -1121,6 +1151,13 @@ def build_datasets(collection_id: str) -> list[dict]:
     if "run_facts" not in payload:
         raise ValueError(
             f"{coll.id}: the results file has no run_facts - written before REQ-PIPE-279. "
+            f"Rebuild it: `mothman dashboard rebuild-results`.")
+    # RUN TIMES AND TRIES (REQ-PIPE-411 criterion 10): refused on the KEY
+    # absent - a file written before them - never on a null run time, which
+    # is legitimate.
+    if any("run_time_ms" not in f for f in payload["run_facts"].values()):
+        raise ValueError(
+            f"{coll.id}: the results file has no run times - written before REQ-PIPE-411. "
             f"Rebuild it: `mothman dashboard rebuild-results`.")
     facts = payload["run_facts"]
     manifest = sorted(payload["runs"], key=lambda m: facts[m["run_id"]]["rank"])

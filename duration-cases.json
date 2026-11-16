@@ -1,0 +1,40 @@
+{
+ "_readme": [
+  "The one compact format a RUN TIME is written in, for a person to read",
+  "(REQ-TEST-416 criterion 4; TR10, Keith 2026-11-14). Two implementations",
+  "answer every case identically: qa_tools/common/display_time.py's",
+  "format_elapsed (the terminal, the bootstrap's 'Took' line, the bulk",
+  "re-check) and the dashboard template's fmtElapsed. Read by",
+  "tests/test_duration_cases.py and tests-js/duration-cases.test.js;",
+  "neither suite owns it, so neither side can bend a case to what it does.",
+  "",
+  "Input is SECONDS (a run time's elapsed_ms / 1000). Under a second reads",
+  "'under 1s'; under a minute in whole seconds; under ten minutes as minutes",
+  "and two-digit seconds; under an hour as whole minutes; from an hour, as",
+  "hours and two-digit minutes - never days. Rounding is half up, as",
+  "JavaScript's Math.round, and is done BEFORE the unit is chosen, so 59.6s",
+  "is '1m 00s' and never '60s'. PROVISIONAL (2026-11-16): the ten-minute",
+  "point where seconds stop being shown is the builder's choice, the one",
+  "rule that gives both '1m 00s' and '45m' as the criterion asks."
+ ],
+ "cases": [
+  {"id": "zero", "seconds": 0, "expect": "under 1s"},
+  {"id": "under-a-second", "seconds": 0.4, "expect": "under 1s"},
+  {"id": "just-under-a-second", "seconds": 0.999, "expect": "under 1s"},
+  {"id": "one-second", "seconds": 1, "expect": "1s"},
+  {"id": "forty-five-seconds", "seconds": 45, "expect": "45s"},
+  {"id": "rounds-up-to-a-minute-never-60s", "seconds": 59.6, "expect": "1m 00s"},
+  {"id": "half-a-second-short-of-a-minute-rounds-up", "seconds": 59.5, "expect": "1m 00s"},
+  {"id": "one-minute-four", "seconds": 64, "expect": "1m 04s"},
+  {"id": "three-twelve", "seconds": 192, "expect": "3m 12s"},
+  {"id": "just-under-ten-minutes", "seconds": 599.4, "expect": "9m 59s"},
+  {"id": "half-a-second-short-of-ten-minutes", "seconds": 599.5, "expect": "10m"},
+  {"id": "ten-minutes", "seconds": 600, "expect": "10m"},
+  {"id": "exactly-forty-five-minutes", "seconds": 2700, "expect": "45m"},
+  {"id": "fifty-nine-minutes", "seconds": 3540, "expect": "59m"},
+  {"id": "fifty-nine-and-a-half-minutes-rounds-to-the-hour", "seconds": 3570, "expect": "1h 00m"},
+  {"id": "rounds-to-the-hour", "seconds": 3599.5, "expect": "1h 00m"},
+  {"id": "two-oh-five", "seconds": 7500, "expect": "2h 05m"},
+  {"id": "more-than-a-day-stays-in-hours", "seconds": 99000, "expect": "27h 30m"}
+ ]
+}

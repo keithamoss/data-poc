@@ -295,7 +295,10 @@ def bootstrap(collection: str = "all", force: bool = False,
             # supplies a correction can move (PROVISIONAL).
             _confirm_corrections(say)
         timings["total"] = time.monotonic() - started
-        say("Took " + ", ".join(f"{_label(k)} {v:.0f}s" for k, v in timings.items()))
+        # THE SHARED RUN-TIME FORMAT (REQ-TEST-416 criterion 5).
+        from qa_tools.common.display_time import format_elapsed
+
+        say("Took " + ", ".join(f"{_label(k)} {format_elapsed(v)}" for k, v in timings.items()))
     finally:
         lock.__exit__(None, None, None)
 

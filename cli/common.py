@@ -452,6 +452,20 @@ def confirm_drop(message: str, *, yes: bool) -> bool:
     return yes or click.confirm(_named(message), default=False)
 
 
+def _run_time_said(run_id: str) -> str | None:
+    """'checked in 3m 12s' for `run_id`'s run time (REQ-PIPE-409 criterion 7),
+    or None where it has none or it cannot be read - a panel line, never a
+    reason to fail."""
+    from qa_tools.common import qa_store, run_summary, supply_db
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:report-run-time") as conn:
+            took = qa_store.run_time_ms(qa_store.attempts_of(conn, run_id))
+    except Exception:  # noqa: BLE001 - the panel still says what was recorded
+        return None
+    return None if took is None else f"checked in {run_summary.run_time(took)}"
+
+
 def report_recorded(run_id: str, count: int) -> None:
     """The real success affordance after an interactive check that was
     kept (Keith's own ask, 2026-09-19, about the step this replaces:
@@ -475,7 +489,12 @@ def report_recorded(run_id: str, count: int) -> None:
     body = Text()
     body.append(f"{count} check result{'' if count == 1 else 's'} recorded for {run_id}\n",
                  style="bold green")
-    body.append("in this environment's QA history.\n\n", style="green")
+    body.append("in this environment's QA history.\n", style="green")
+    # ITS RUN TIME (REQ-TEST-416 criterion 7).
+    took = _run_time_said(run_id)
+    if took:
+        body.append(f"Its run {took}.\n", style="green")
+    body.append("\n")
     body.append("Nothing has been published yet - publishing is a separate step\n"
                  "(mothman dashboard publish).", style="dim")
     console.print(Panel(body, title="Recorded", border_style="green", expand=False))

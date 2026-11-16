@@ -294,6 +294,22 @@ class TestRunning:
         assert "Ctrl-C stops it at any point" in out
         assert "mothman pipeline process" in out
 
+    def test_elapsed_and_left_are_in_the_shared_run_time_format(self, conn, monkeypatch,
+                                                                 capsys):
+        """REQ-TEST-416 criterion 5: the bulk re-check's elapsed and remaining
+        time are written as a run time is - '1m 04s', not '1m'."""
+        _p, rec = _recorded(conn, 3)
+        monkeypatch.setattr(recheck, "run", lambda owed_id, **k: recheck.Outcome(
+            owed_id, "r", True, "ok", status="green"))
+        from cli import bulk_recheck_tui
+
+        ticks = iter([0.0, 0.0, 64.0])
+        monkeypatch.setattr(bulk_recheck_tui, "time",
+                            SimpleNamespace(monotonic=lambda: next(ticks, 128.0)))
+        bulk_recheck_tui.run_foreground(rec)
+        out = " ".join(capsys.readouterr().out.split())  # the console wraps
+        assert "(1m 04s elapsed, about 2m 08s left)" in out, out
+
     def test_ctrl_c_ends_with_a_summary_and_the_rest_owed(self, conn, monkeypatch, capsys):
         _p, rec = _recorded(conn, 3)
         calls = []

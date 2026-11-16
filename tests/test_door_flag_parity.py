@@ -50,6 +50,14 @@ HIDDEN: dict[tuple[str, str], str] = {
     (filing_queue.COULD_NOT_LOAD, fd.REFILE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUPERSEDE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUBSTITUTE): _QUEUE_ONLY_STATE,
+    # A SUPPLY NOBODY COULD CHECK IS OFFERED REJECT ALONE, as a failed load is
+    # (REQ-PIPE-417 criterion 6): nothing is known about its data.
+    (filing_queue.COULD_NOT_CHECK, fd.REFILE): _QUEUE_ONLY_STATE,
+    (filing_queue.COULD_NOT_CHECK, fd.SUPERSEDE): _QUEUE_ONLY_STATE,
+    (filing_queue.COULD_NOT_CHECK, fd.SUBSTITUTE): _QUEUE_ONLY_STATE,
+    (filing_queue.COULD_NOT_CHECK, fd.EXCUSE_LATENESS): (
+        "a supply that could not be checked is offered reject alone (REQ-PIPE-417 "
+        "criterion 6) - the flags still record an excuse"),
     (filing_queue.COULD_NOT_LOAD, fd.EXCUSE_LATENESS): (
         "a failed load is offered reject alone (REQ-GHUB-229 criterion 16, REQ-PIPE-153 "
         "criteria 5 and 6): whether it was late is not the question while it cannot be "
@@ -379,6 +387,29 @@ def ex_could_not_load(conn, mint):
     return got, supply
 
 
+def ex_could_not_check(conn, mint):
+    """A filed supply whose only check crashed (REQ-PIPE-417 criterion 6)."""
+    import filing_support
+    from asset_model import assignment, hierarchy
+    from qa_tools.common import qa_results_writer
+
+    s = mint("due")
+    arrival = f"t{uuid.uuid4().hex[:10]}"
+    supply = f"{DS}@{arrival}"
+    filing_support.file(assignment.Assignment(
+        dataset_id=DS, supply_id=supply, slot=s.name, branch=assignment.OPEN_UNFILLED,
+        considered=(s.name,)))
+    ds = hierarchy.dataset(DS)
+    run_id = f"{TABLE}__{arrival}"
+    qa_results_writer.open_run(ds.agency_id, ds.collection_id, run_id,
+                               "2026-01-01T00:00:00+08:00", "parity@example.gov.au",
+                               purpose={"dataset_id": DS, "supply_id": supply,
+                                        "scope": "arrival"})
+    qa_results_writer.close_attempt(run_id, RuntimeError("the check crashed"))
+    (got,) = [x for x in filing_queue.could_not_check(conn, COL) if x.supply == supply]
+    return got, supply
+
+
 def ex_two_files(conn, mint):
     """An open pair - Birth Registrations', whose pattern admits two files a
     day (pair_support), on a free day of the coming year."""
@@ -439,6 +470,7 @@ EXAMPLES = {
     slot_state.TWO_FILES: ex_two_files,
     filing_queue.ANOTHER_VERSION_WAITING: ex_another_version_waiting,
     filing_queue.COULD_NOT_LOAD: ex_could_not_load,
+    filing_queue.COULD_NOT_CHECK: ex_could_not_check,
     filing_queue.RECHECKED_WORSE: ex_rechecked_worse,
     filing_queue.SUPERSEDED: ex_superseded,
     # A closed, unfilled period is OVERDUE with `closed` set: its own offers.
