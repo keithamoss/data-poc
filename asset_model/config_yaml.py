@@ -103,14 +103,7 @@ def _anchor_offset(loader, node):
 
     where = f"{getattr(_parsing, 'name', None) or 'a configuration file'}, line {node.start_mark.line + 1}"
     if not getattr(_parsing, "checking", False):
-        _parsing.checking = True
-        try:
-            from asset_model import asset_time
-
-            synthetic = asset_time.declared_synthetic()
-        finally:
-            _parsing.checking = False
-        if not synthetic:
+        if not _asset_is_synthetic():
             raise OffsetRefused(
                 f"{where} writes a date as an offset from the history's anchor "
                 f"({ANCHOR_TAG}), and this asset does not declare `synthetic: true` - a real "
@@ -125,6 +118,34 @@ def _anchor_offset(loader, node):
         raise ValueError(f"{where}: {ANCHOR_TAG} takes a number of days, e.g. -7, or a "
                          f"string naming one in braces, e.g. \"version {{+0}}\" - not {value!r}")
     return _OFFSET.sub(lambda m: (anchor + timedelta(days=int(m.group(1)))).isoformat(), value)
+
+
+#: Whether the selected asset is synthetic, by its data-asset.yaml's text.
+_SYNTHETIC: "OrderedDict[str, bool]" = OrderedDict()
+
+
+def _asset_is_synthetic() -> bool:
+    """asset_time.declared_synthetic(), remembered by data-asset.yaml's text -
+    so the answer is part of an offset-using document's cache key and the
+    refusal holds on every load (post-build-review #435). The declaration is
+    read with `checking` set: data-asset.yaml may itself write offsets, which
+    resolve unchecked there, since the check is what is being answered."""
+    from asset_model import asset_time
+
+    text = read(asset_time.data_asset_yaml())
+    found = _SYNTHETIC.get(text)
+    if found is None:
+        before = getattr(_parsing, "checking", False)
+        _parsing.checking = True
+        try:
+            found = asset_time.declared_synthetic()
+        finally:
+            _parsing.checking = before
+        with _lock:
+            _SYNTHETIC[text] = found
+            while len(_SYNTHETIC) > MAX_DOCUMENTS:
+                _SYNTHETIC.popitem(last=False)
+    return found
 
 
 class _Loader(LOADER):
@@ -164,6 +185,13 @@ def anchored_key(text):
         return text
     from asset_model import history_anchor
 
+    if getattr(_parsing, "checking", False):
+        # The synthetic check's own read: never remembered (parse()).
+        return f"checking\0{text}"
+    if not _asset_is_synthetic():
+        # Refused when parsed, so nothing is ever kept under this key - and an
+        # offset document kept while the asset was synthetic is not answered.
+        return f"real\0{text}"
     return f"{history_anchor.for_offsets().isoformat()}\0{text}"
 
 
@@ -222,6 +250,13 @@ def parse(source, *, name: str | None = None, remember: bool = True):
                                                  mark.column, None, None))
         raise
     if not remember:
+        return parsed
+    if getattr(_parsing, "checking", False) and uses_anchor(text):
+        # RESOLVED UNCHECKED, SO NEVER REMEMBERED (post-build-review #435): this
+        # parse is the synthetic check's own read of data-asset.yaml, whose
+        # offset dates resolve without asking - the check is what is being
+        # answered. Remembered, the next load of the file would be answered
+        # from it and an asset that is not synthetic would be refused once.
         return parsed
     with _lock:
         _cache[key] = parsed

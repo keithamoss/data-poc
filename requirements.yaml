@@ -51234,6 +51234,8 @@ requirements:
     - 'A CHECKPOINT AND A ROLL ARE NOT TAKEN TOGETHER (PROVISIONAL (2026-11-16)): `--checkpoint-before` with `--roll-anchor` is refused, because the checkpoint''s arrival numbers are checked before the roll''s date is known; `--anchor <date>` with a checkpoint works.'
     - 'AN ANCHOR GIVEN WITH --anchor SAYS SO ON THE CLOSING LINE (PROVISIONAL (2026-11-16)): ''(given with `--anchor <date>`)'', since REQ-GEN-399 criterion 4 words only the fixed and the rolled cases.'
     - 'INSTALLED BEFORE THE FIRST CONFIGURATION READ (found building REQ-GEN-406): the bootstrap and the generate command install the anchor asked for, or the fixed one, before anything reads the configuration, so an asset writing offset dates can be read where no anchor file exists yet.'
+    - 'STRUCTURE-ONLY READS START WITHOUT AN ANCHOR (post-build-review #432, the post-build critic, 2026-11-16): building the CLI, the registry its collection options read, the reset and the generate commands'' steps before generating read configuration inside history_anchor.structure_only(), which resolves offsets against the anchor they resolve to at its start or, where none does, the fixed test anchor as a placeholder released when the block ends - so the commands that write the anchor file can start without one, and a reset that deletes it part-way can finish. A command that reads a framing date with no anchor is still refused, now in one line from cli.app.main(). NOT the fallback for a checkout with no delivery tree, which #431 leaves with Keith. REJECTED catching AnchorUnknown at the CLI import only (every command would then refuse, the remedies included).'
+    - 'A RUNNER IS `ci` IN EVERY WORKFLOW THAT READS AN ASSET (post-build-review #433): validate-config.yml set no MOTHMAN_ENVIRONMENT, so its daily leg could not read the daily asset''s offset dates on a fresh checkout; it now sets `ci`, the honest answer for a GitHub Actions runner.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51246,6 +51248,8 @@ requirements:
     - 'tests/test_rolling_anchor.py::TestTheCacheKey'
     - 'tests/test_rolling_anchor.py::TestTheResume'
     - 'tests/test_rolling_anchor.py::TestTheDailyHistoryMovesWithTheAnchor'
+    - 'tests/test_rolling_anchor.py::TestNoAnchorFileInASandbox'
+    - 'tests/test_rolling_anchor.py::TestValidateConfigRunsOnAFreshCheckout'
     implemented_by:
     - 'asset_model/history_anchor.py::anchored'
     - 'asset_model/history_anchor.py::for_offsets'
@@ -51263,10 +51267,13 @@ requirements:
     - 'bootstrap/replay_inputs.py::cache_key'
     - 'qa_tools/common/qa_store.py::record_history_anchor'
     - 'cli/pipeline.py::bootstrap_command'
+    - 'asset_model/history_anchor.py::structure_only'
+    - 'cli/app.py::main'
     evidence:
     - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
     - '2026-11-16: Birth Registrations generated twice at 2026-09-25 wrote identical trees (sha256 prefix b004667bd47e), the same bytes before and after its calendar became offsets; at 2026-10-15 654dc4b3f8bc and at 2026-11-13 ffe62e48cf30, each tree''s history_anchor naming its date.'
     - 'README.md''s anchor paragraph and every help text name --anchor; GENERATOR_ANCHOR_DATE appears only in the refusal that names it.'
+    - '2026-11-16 (Perth), worktree agent-a788cb7f, the post-build critic''s fixes (post-build-review #432-#439): 46 test modules (every module naming the anchor, the reset, generate-synthetic-data or config_yaml, plus test_schedule, test_publish, test_cli_config_unreadable, test_replay_clock, test_scripted_decisions), -m ''not needs_deployment'', -n 4: 1234 passed, 0 failed, 0 skipped. Each fix''s test was red first at the previous commit - see the entries.'
   - id: REQ-GEN-405
     title: A bootstrap rolls the demo's anchor only when asked with --roll-anchor, to the latest day on the asset's own clock whose planned receipts have all passed; otherwise - and always for the test suite and CI - it generates at the fixed test anchor 2026-09-25, and a test reading a deployment's history refuses one generated at any other anchor
     date_written: '2026-11-14'
@@ -51309,6 +51316,9 @@ requirements:
     - 'THE STEP-BACK IS SAID BEFORE THE LONG PART (CLI finding 7): a person can stop a two-hour run whose date is not what they meant.'
     - 'THE DRY BUILD IS A GENERATION INTO A THROWAWAY FOLDER (PROVISIONAL (2026-11-16)): each candidate day generates every collection under a temporary directory, never data/, and reads the latest received_at its receipt files record - per file, so a pair''s later file counts. A roll looks back at most seven days, then refuses naming the fallback.'
     - 'THE DEPLOYMENT CHECK RUNS TRYLAST (PROVISIONAL (2026-11-16)): a plugin registered in tests/conftest.py''s pytest_configure checks after `-m` has deselected, so the fast half, which reads no deployment, is never stopped by the local database. It reads qa.history_anchor with one read-only SELECT and raises one pytest.UsageError naming each asset''s database, the anchor found, the count of tests and the rebuild.'
+    - 'THE DEPLOYMENT CHECK READS THE DEPLOYMENT FROM THE ENVIRONMENT AT COLLECTION (post-build-review #434, the post-build critic, 2026-11-16): it ran at collection but read the DSN from globals the session fixture sets afterwards, so it never fired; tests/conftest.py''s _deployment_inputs() reads the fixture''s copies once it has run and the environment before. ONE MESSAGE UNDER XDIST: a UsageError raised in a worker is an INTERNALERROR at the controller with no message, so a worker finding the problem deselects every item and hands the message to the controller through workeroutput, which prints it once and ends the session with exit 4.'
+    - 'THE SUITE NEVER READS THE CHECKOUT''S ANCHOR FILE (post-build-review #438, criterion 2): tests/conftest.py points history_anchor.path at a file that never exists for the whole test process, from import, so a rolled checkout still tests the fixed anchor and offsets agree with the generator''s default. ACCEPTED LIMIT: a subprocess a test starts reads the real path.'
+    - 'A ROLL THAT STEPPED BACK SAYS SO (post-build-review #437): Chosen records the days back, and the closing line never says ''today'' of a day that was not.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51321,6 +51331,8 @@ requirements:
     - 'tests/test_rolling_anchor.py::TestTheDeploymentHalfRefusesAnotherAnchor'
     - 'tests/test_rolling_anchor.py::TestTheResetDeletesTheGeneratedFiles'
     - 'tests/test_anchor_date.py'
+    - 'tests/test_rolling_anchor.py::TestTheClosingLine'
+    - 'tests/test_rolling_anchor.py::TestTheSuiteSeesTheFixedAnchor'
     implemented_by:
     - 'bootstrap/anchoring.py::roll'
     - 'bootstrap/anchoring.py::chosen_without_roll'
@@ -51329,9 +51341,13 @@ requirements:
     - 'cli/pipeline.py::bootstrap_command'
     - 'cli/env.py::reset_synthetic_command'
     - 'tests/conftest.py::_refuse_a_deployment_at_another_anchor'
+    - 'tests/conftest.py::_deployment_inputs'
+    - 'tests/conftest.py::_AnchorCheck'
+    - 'bootstrap/bootstrap.py::generated_up_to'
     evidence:
     - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
     - 'Every local deployment bootstrapped before this records no anchor, so the deployment half stops on it until `mothman env reset-synthetic` then `mothman pipeline bootstrap` per asset (decision ''NO RECORDED ANCHOR IS REFUSED TOO''); the fast half is unaffected.'
+    - '2026-11-16 (Perth), worktree agent-a788cb7f, the post-build critic''s fixes (post-build-review #432-#439): 46 test modules (every module naming the anchor, the reset, generate-synthetic-data or config_yaml, plus test_schedule, test_publish, test_cli_config_unreadable, test_replay_clock, test_scripted_decisions), -m ''not needs_deployment'', -n 4: 1234 passed, 0 failed, 0 skipped. Each fix''s test was red first at the previous commit - see the entries.'
     unmet_criteria:
     - criterion: 'Criterion 10 - every test whose result depends on today takes its date from the fixed test anchor.'
       why: 'Not audited in this build: the tests touched here pin their clock or take the fixed anchor, but no sweep of the suite for wall-clock ''today'' was made.'
@@ -51376,6 +51392,7 @@ requirements:
     - 'ONE TAG, RESOLVED AT THE ONE PARSE (PROVISIONAL (2026-11-16)): `!anchor -99` is the date 99 days before the anchor and `!anchor "version {+0}"` writes one into a string, resolved by asset_model/config_yaml.py''s loader to the plain ''YYYY-MM-DD'' text the file would otherwise hold, so no reader changed. A document using the tag is cached, and a Built value keyed, with the anchor as well as the text.'
     - 'WHICH DAILY DATES MOVED (PROVISIONAL (2026-11-16)): every effective_from from 2026-06-18 to 2026-09-25 in the daily calendar and data-asset.yaml (calendar versions, files_go_to_period, participation, amber and replacement eras), the TS-62 correction''s date and the item naming its version. 1970, 2013 and 2023 versions and every changelog date stay absolute: a changelog date says when an edit was made.'
     - 'check-yaml CHECKS SYNTAX ONLY (PROVISIONAL (2026-11-16)): the pre-commit hook runs with --unsafe, because safe_load refuses to construct the tag.'
+    - 'THE REFUSAL HOLDS ON EVERY LOAD (post-build-review #435, the post-build critic, 2026-11-16): the synthetic check''s own read of data-asset.yaml resolves its offsets unchecked, and the cache kept that parse, so only the first load of a real asset was refused. A parse made while the check runs, of text using the tag, is never remembered.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51395,6 +51412,7 @@ requirements:
     - '2026-11-16: at the fixed anchor the daily calendar.yaml and data-asset.yaml parse equal to their text at HEAD; generating Birth Registrations at 2026-11-13 succeeded, where before the offsets it raised CannotPlace for TS-78a (outside the hold era). Plans at 2026-09-25 and 2026-11-13: Birth Registrations 100 jobs, 20 placements, nothing owed before its first supply at either.'
     - '2026-11-16, quarterly plans at 2026-09-25, 2026-11-13 and 2027-01-20: Emergency Department 54/55/55 jobs and Linkage Products 108/110/110, nothing owed before their first supply; placements 16, 11 and 26 at all three; Child Protection keeps 47 jobs and owes one slot before its first supply at the later anchors (criterion 5, unmet).'
     - 'tests-js/scenario-jump.test.js and generated-up-to.test.js: 4 failed against the HEAD template, all pass after.'
+    - '2026-11-16 (Perth), worktree agent-a788cb7f, the post-build critic''s fixes (post-build-review #432-#439): 46 test modules (every module naming the anchor, the reset, generate-synthetic-data or config_yaml, plus test_schedule, test_publish, test_cli_config_unreadable, test_replay_clock, test_scripted_decisions), -m ''not needs_deployment'', -n 4: 1234 passed, 0 failed, 0 skipped. Each fix''s test was red first at the previous commit - see the entries.'
     unmet_criteria:
     - criterion: 'Criterion 5 - Child Protection generates from its configured start to the anchor.'
       why: 'Its periods are a fixed count of drawn run plans (fifteen original quarters plus the grown ones, REQ-GEN-207 and REQ-GEN-238); generating from its start means drawing severities for each quarter rolled and keeping the fixed-anchor history byte-stable, which is generator work of its own. Measured: at 2026-11-13 it owes one slot before its first supply.'
@@ -51493,6 +51511,7 @@ requirements:
     - 'THE LAST MOMENT TO READ THE ANCHOR (CLI finding 1): REQ-GEN-404''s reproducibility is ''give that date back'', so the reset says the date it is about to delete.'
     - 'THE SUITE''S RESET DELETES A FOLDER OF THE TEST''S OWN (PROVISIONAL (2026-11-16)): tests/conftest.py''s autouse _reset_deletes_no_real_files points the reset''s data folder under the session''s base temp, so no test can delete the main checkout''s data/<asset>.'
     - 'THE DATABASE IS NOT DROPPED WHILE ITS FILES CANNOT FOLLOW: reset() runs the symlink and hand-filed refusals after the phrase check and before any schema is dropped, as the command runs them before asking for the phrase.'
+    - 'THE BOOKKEEPING GOES LAST (post-build-review #436, the post-build critic, 2026-11-16): it is what tells a generated delivery folder from a hand-filed one, so it is deleted only once the delivery and receipt trees are gone, and otherwise kept and named among what remains - deleted first, the next reset read every folder left as hand-filed and refused, which broke criterion 5. Unreadable bookkeeping is a refusal before the phrase, not a traceback.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51511,6 +51530,7 @@ requirements:
     - 'tests/conftest.py::_reset_deletes_no_real_files'
     evidence:
     - '2026-11-16 (Perth), worktree anc: tests/test_rolling_anchor.py and tests/test_anchor_date.py, -n 2: 43 and 12 passed; red first - at HEAD ded8f2c7 both modules fail to collect (asset_model.history_anchor and bootstrap.anchoring did not exist).'
+    - '2026-11-16 (Perth), worktree agent-a788cb7f, the post-build critic''s fixes (post-build-review #432-#439): 46 test modules (every module naming the anchor, the reset, generate-synthetic-data or config_yaml, plus test_schedule, test_publish, test_cli_config_unreadable, test_replay_clock, test_scripted_decisions), -m ''not needs_deployment'', -n 4: 1234 passed, 0 failed, 0 skipped. Each fix''s test was red first at the previous commit - see the entries.'
     unmet_criteria:
     - criterion: 'Criterion 8''s guard test - regenerate at one anchor, reset, regenerate at a later anchor, bootstrap, and find exactly one history.'
       why: 'Not built: it needs a from-empty bootstrap of a test asset on a scratch database, and that run was not made in this build. The refusal, phrase and symlink tests are built.'

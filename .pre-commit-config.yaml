@@ -23,9 +23,9 @@ repos:
         # parses without constructing, which still catches the quoting slip
         # this hook was added for. asset_model/config_yaml.py resolves the tag.
         args: [--unsafe]
-  # check-yaml above only proves a file PARSES. It uses yaml.safe_load,
-  # which accepts a duplicate mapping key silently and keeps the last
-  # one - so a second `decisions:` block on one requirement discarded
+  # check-yaml above only proves a file PARSES. Run with --unsafe it
+  # parses without constructing (it was yaml.safe_load), and either way a
+  # duplicate mapping key is accepted silently and the last one kept - so a second `decisions:` block on one requirement discarded
   # five real decisions on 2026-09-20 with nothing anywhere noticing.
   # yamllint's key-duplicates rule is the purpose-built check for that;
   # see .yamllint for why every other rule is off, and why a schema

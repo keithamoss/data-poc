@@ -15908,9 +15908,21 @@ twice. It deliberately did not re-find the `TypeError`.
        dashboard build and every pipeline command. That includes the main
        checkout today, whose tree was generated before the file existed, and
        every fresh builder worktree.
-     - `mothman pipeline bootstrap` and `generate-synthetic-data` are not
+     - ~~`mothman pipeline bootstrap` and `generate-synthetic-data` are not
        blocked: they install their anchor before reading anything.
-       `mothman env current` says there is no anchor file rather than failing.
+       `mothman env current` says there is no anchor file rather than failing.~~
+       **CORRECTED 2026-11-16 by the post-build critic: both claims were
+       wrong.** On the daily asset with no anchor file and an environment
+       other than test or ci, EVERY `mothman` command died with a traceback
+       while the CLI imported (building the collection groups reads
+       data-asset.yaml, which writes offset dates) - bootstrap, generate,
+       `env current` and the reset included, so a reset (which deletes the
+       file) locked itself out of the bootstrap that was its remedy. The
+       claims were checked in a worktree whose anchor file had been written
+       by hand. Fixed as #432, which leaves this question open as it was.
+     - **And validate-config.yml's daily leg was broken the same way** on a
+       fresh checkout, which has no data/ (it set no MOTHMAN_ENVIRONMENT) -
+       #433.
      - **The main checkout needs `MOTHMAN_ASSET=daily mothman env
        reset-synthetic` then a bootstrap anyway** (qa schema 52, and the
        deployment half refusing a history with no recorded anchor,
@@ -15924,3 +15936,189 @@ twice. It deliberately did not re-find the `TypeError`.
        asset is rebuilt every command reading `supply_<asset>` - here, `mothman
        check`'s `patterns` gate - is refused as an older schema, before any
        DDL runs. Not reset from this session (the builder's terms).
+
+432. **[done, 2026-11-16]** **[Data generation]** **[Testing & dev tooling]** **With no anchor file, every daily command died at import - the reset and the bootstrap that remedy it included.**
+     The post-build critic on the rolling-anchor batch, verified against the
+     code before fixing. On the daily asset, with no
+     `data/daily/history_anchor` and MOTHMAN_ENVIRONMENT neither test nor ci,
+     `cli/app.py` built every collection's command group while importing,
+     which reads data-asset.yaml, which writes offset dates - and
+     `history_anchor.for_offsets()` raised AnchorUnknown, a RuntimeError the
+     import guard (yaml.YAMLError only) did not catch. So every `mothman`
+     command, `--help` included, ended in a traceback. The reset deletes the
+     anchor file, so reset-then-bootstrap locked itself out. #431's claim that
+     bootstrap, generate and `env current` were not blocked was wrong; it had
+     been checked in a worktree whose anchor file was written by hand.
+     - **Fixed, test-first** (minor defect, no agreed behaviour changed):
+       `history_anchor.structure_only()` - a block that reads configuration for
+       its STRUCTURE (which collections and commands exist, whether the asset
+       is synthetic, what a reset deletes) resolves offsets against the anchor
+       they resolve to at its start, or the fixed test anchor as a placeholder
+       where none resolves, released when the block ends. Used for building the
+       CLI, the registry the CLI's collection options read, the reset (which
+       also deletes the file part-way through) and the generate commands' steps
+       before generating. And `cli.app.main()` turns AnchorUnknown into one
+       line on stderr naming the missing file and `mothman pipeline bootstrap`,
+       exit 2.
+     - **NOT the fallback #431 asks Keith about.** The placeholder never
+       reaches a framing date a command uses: a command that reads one with no
+       anchor (`mothman schedule show`, the dashboard build, the pipeline) is
+       refused as before, now in one line. Safe for the caches because a parse
+       is keyed on the anchor with the text.
+     - **Tests** (tests/test_rolling_anchor.py::TestNoAnchorFileInASandbox):
+       the console script's own `main()` in a fresh `sandbox` process with the
+       data folder pointed at an empty one - `env list`, `env current`, `env
+       reset-synthetic`, `pipeline bootstrap` and `bdm generate-synthetic-data`
+       each start (the last two to their own clean refusal of a future
+       `--anchor`, so nothing is generated); `schedule show` is one line, exit
+       2; a real reset with the file present finishes and the bootstrap still
+       starts after it. All three failed at the previous commit (a traceback
+       at import in each), and pass now.
+
+433. **[done, 2026-11-16]** **[Testing & dev tooling]** **validate-config.yml's daily leg could not read the daily asset on a fresh checkout.**
+     The same critic. The workflow set no MOTHMAN_ENVIRONMENT, and a runner's
+     fresh checkout has no data/ and so no anchor file, so its daily leg hit
+     #432 - eight of its twelve gates, reproduced locally with data/ moved
+     aside and only the job's environment set (each refused, exit 2).
+     - **Fixed, test-first**: the job sets `MOTHMAN_ENVIRONMENT: ci`, the honest
+       answer for a GitHub Actions runner (assets/environments.yaml's `ci`
+       entry), under which offsets resolve against the fixed test anchor
+       without a file (REQ-GEN-404 criterion 12). All twelve gates then pass on
+       both legs with data/ absent. No gate in that workflow behaves
+       differently under `ci` otherwise.
+     - **Test**: tests/test_rolling_anchor.py::TestValidateConfigRunsOnAFreshCheckout
+       reads the job's own `env:` from the workflow and runs its `schedule
+       validate` step with exactly that environment and an empty data folder;
+       red before the workflow change (exit 2, the anchor refusal), green after.
+       tests/test_publish.py's TestTheWorkflowCarriesEveryVariableThePipelineNeeds
+       covers test.yml and critical.yml only, which already set the variable.
+     - **For the record, not a defect**: the CI bootstrap cache key changes
+       once with the rolling-anchor batch (calendar.yaml, data-asset.yaml and
+       child_protection.py changed text), so the next hand-started test.yml is
+       a cache miss - budget the miss figure from CLAUDE.md, not the hit.
+
+434. **[done, 2026-11-16]** **[Testing & dev tooling]** **The deployment half's anchor check was never armed, and under xdist could not have said one message anyway.**
+     The same critic, and REQ-GEN-405 criteria 8 and 12 were listed met while
+     this was so. `_refuse_a_deployment_at_another_anchor` runs at collection
+     and asked `deployment_dsn_for`, which read the deployment DSN and server
+     from globals the session fixture `supply_dsn` sets only after collection
+     - so it saw no deployment and never fired. Its test patched
+     `deployment_dsn_for` away, so it could not see that.
+     - **Found while fixing**: armed, the check raised pytest.UsageError inside
+       each xdist worker, which the controller reports as an INTERNALERROR
+       naming a test, with the message itself nowhere in the output (reproduced
+       at `-n 2`). The default run is `-n auto`, so the "one message" criterion
+       could not have held.
+     - **Fixed, test-first**: `_deployment_inputs()` reads the fixture's
+       remembered values once it has run and the environment itself before -
+       which at collection nothing has redirected yet. Under xdist a worker
+       that finds the problem deselects every item and hands the message to the
+       controller (workeroutput), which prints it once and ends the session as
+       a usage error (exit 4); without xdist the UsageError is raised as
+       before. Still trylast, so `-m "not needs_deployment"` is never stopped.
+     - **Tests**: TestTheDeploymentHalfRefusesAnotherAnchor rewritten to drive
+       a real nested pytest session (tests/test_dashboard_e2e.py's
+       needs_deployment tests) against a scratch database: unrecorded at `-n 2`
+       stops once with one ERROR, a paragraph per asset and no INTERNALERROR;
+       rolled at `-n0` stops once; the fixed anchor and the fast half pass. The
+       one thing the nested run replaces is `deployment_dsn_for`'s preference
+       for supply_<asset> on this server, which would find this machine's own
+       deployment. Red at the previous commit (the session was not stopped -
+       the needs_deployment tests began to run), and with only the DSN fix the
+       xdist case failed on the INTERNALERROR.
+     - **Consequence, intended**: this machine's supply_daily and
+       supply_quarterly are at qa schema 51 with no anchor recorded, so a local
+       deployment-half run now stops with the message until each is rebuilt
+       (`mothman env reset-synthetic` then `mothman pipeline bootstrap`). Not
+       rebuilt from this session.
+
+435. **[done, 2026-11-16]** **[Data generation]** **The refusal of offset dates on a real asset held for one load only.**
+     The same critic. `config_yaml._anchor_offset` asks
+     `asset_time.declared_synthetic()`, which loads data-asset.yaml; on an
+     asset whose data-asset.yaml itself writes offsets, that inner parse
+     resolved them unchecked (the `checking` flag) and the cache kept the
+     result, so the first load raised OffsetRefused and every later load of
+     the file answered the resolved dates. The old test mocked
+     `declared_synthetic` and parsed with `remember=False`, so it could not
+     see it.
+     - **Found while fixing, the same bypass a second way**: a document using
+       offsets kept while the asset WAS synthetic (calendar.yaml, unchanged
+       text) was answered from the cache after data-asset.yaml stopped saying
+       so - the first fix alone failed that way in a batch run.
+     - **Fixed, test-first**: a parse made while the check is running, of text
+       that uses the tag, is never remembered; and whether the asset is
+       synthetic - remembered by data-asset.yaml's text - is part of an
+       offset-using document's cache key, so a refusal can never be answered
+       from a parse kept under the other answer. Documents without the tag are
+       keyed as before (the quarterly asset has none).
+     - **Test**: TestOffsetDates::test_refused_on_an_asset_that_is_not_synthetic_on_every_load
+       - the daily asset's real data-asset.yaml with `synthetic: false`, after
+       calendar.yaml was loaded while synthetic: data-asset.yaml loaded three
+       times, `declared_synthetic()` three times and calendar.yaml twice, each
+       refused. Red at the previous commit (DID NOT RAISE).
+     - **And** the stale comment in .pre-commit-config.yaml (it still said
+       check-yaml used yaml.safe_load, though it runs `--unsafe` now) is
+       corrected.
+
+436. **[done, 2026-11-16]** **[Data generation]** **A reset that failed part-way could not be finished by running it again.**
+     The same critic. `synthetic_reset.delete_generated()` carried on past a
+     failure, so it could delete the generator's bookkeeping while the delivery
+     tree stayed; the next reset's `hand_filed()` then read every folder left
+     as hand-filed and refused - contradicting REQ-GEN-408 criterion 5
+     ("running again finishes it"). And unreadable bookkeeping was a JSON
+     traceback.
+     - **Fixed, test-first**: the bookkeeping is deleted last, and only once
+       the delivery and receipt trees it vouches for are gone; otherwise it is
+       kept and named among what remains. Unreadable bookkeeping is a refusal
+       before the phrase, naming the file and what to do by hand.
+     - **Tests**: test_running_again_after_a_partial_failure_finishes_it runs
+       the reset command twice, the first with the delivery tree undeletable,
+       and the second finishes; test_unreadable_bookkeeping_is_a_refusal; and
+       test_a_part_that_cannot_be_deleted_is_named now asserts the bookkeeping
+       is kept (it asserted the defect). All three red before.
+
+437. **[done, 2026-11-16]** **[Pipeline & publishing]** **A roll that stepped back a day closed with 'rolled to today'.**
+     The same critic, polish. `Chosen` now records how many days back a roll
+     stepped, and the closing line says "rolled to the latest day whose
+     planned receipts had all passed on <zone>'s clock" for one that stepped
+     back. Test: TestTheClosingLine::test_a_roll_that_stepped_back_does_not_say_today,
+     from a real `anchoring.roll()` that steps back.
+
+438. **[done, 2026-11-16]** **[Testing & dev tooling]** **The suite read the checkout's own anchor file, so a rolled checkout failed fast-half tests.**
+     The same critic. In the suite `history_anchor.for_offsets()` read the
+     checkout's real data/<asset>/history_anchor before falling back, while
+     `generator.anchor_date.get_anchor_date()` defaults to the fixed anchor -
+     two anchors in one process. With the file at 2026-11-13,
+     tests/test_schedule.py's TestTheDailyCalendarStartsWhereTheFeedDoes
+     failed two tests in the fast half. REQ-GEN-405 criterion 2: tests always
+     test the fixed anchor.
+     - **Found while fixing**: with NO anchor file and a developer's
+       `sandbox` environment, a daily test module's import-time reads refused
+       at collection (an INTERNALERROR at `-n 4`), because the session fixture
+       that states the `test` environment runs after collection. The real
+       anchor file had hidden that too.
+     - **Fixed, test-first**: tests/conftest.py points `history_anchor.path`,
+       for the whole test process from import, at a file of the suite's own
+       holding the fixed test anchor - so collection and every test resolve
+       offsets at the fixed anchor whatever the checkout holds; a test about the
+       anchor file patches the path itself, as they already did. The generator
+       still writes its anchor file where it always does (driver.anchor_path),
+       which nothing in the suite reads unasked.
+     - **ACCEPTED LIMIT**: a `mothman` subprocess a test starts is a fresh
+       process and reads the real path - under MOTHMAN_ENVIRONMENT=test it
+       falls back only where no file exists. None of the suite's subprocess
+       tests reads a framing date today.
+     - **Test**: TestTheSuiteSeesTheFixedAnchor plants a rolled anchor file
+       where the checkout's would be and shows offsets, the generator and the
+       daily calendar's first day all at the fixed anchor - red before. And the
+       critic's own case, reproduced: with data/daily/history_anchor at
+       2026-11-13, TestTheDailyCalendarStartsWhereTheFeedDoes failed 2 before
+       and passes 2 after.
+
+439. **[done, 2026-11-16]** **[Testing & dev tooling]** **Untested branches in the reset's safety check and the roll's dry build.**
+     The same critic, coverage polish. Added: a symlink inside a delivery tree
+     is refused; the dry build writes nothing under data/ (an asset data
+     folder pointed at an empty one stays absent) and returns a receipt
+     instant. NOT added: refuse_unsafe's "resolves outside" branch, which no
+     path built as data_dir()/<name> can reach once the symlink branches have
+     run - recorded rather than tested.

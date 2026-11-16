@@ -53,6 +53,9 @@ class Chosen:
     anchor: date
     how: str
     said: str | None = None
+    #: For a roll, how many days back from today it stepped (SA Q5) - so the
+    #: closing line never says 'today' of a day that was not.
+    days_back: int = 0
 
 
 def environment() -> str | None:
@@ -178,7 +181,7 @@ def roll(*, now: datetime | None = None, latest_receipt_at=dry_build_latest_rece
                         else f"{local:%H:%M} on {local.date().isoformat()}")
                 said = (f"Rolling to {candidate.isoformat()}: a receipt is still planned for "
                         f"{when}, {zone} time.")
-            return Chosen(candidate, "rolled", said)
+            return Chosen(candidate, "rolled", said, back)
         late = latest if late is None else late
     raise AnchorRefused(
         f"no day from {today.isoformat()} back to "

@@ -98,6 +98,19 @@ class TestTheRoll:
         assert chosen.said == ("Rolling to 2026-11-15: a receipt is still planned for "
                                "14:30 today, Perth time.")
 
+    @pytest.mark.asset("daily")
+    def test_the_dry_build_writes_nothing_under_data(self, tmp_path, monkeypatch):
+        """SA Q5's dry build: every collection generated somewhere of its own,
+        never data/, and the latest receipt it planned read off it."""
+        from asset_model import assets
+
+        data = tmp_path / "data" / "daily"
+        monkeypatch.setattr(assets, "data_dir", lambda: data)
+        latest = anchoring.dry_build_latest_receipt(FIXED)
+        assert latest is not None and latest.date() <= FIXED + timedelta(days=1), latest
+        assert not data.exists(), "the dry build wrote under data/"
+        assert history_anchor.installed() is None
+
     def test_the_latest_receipt_is_read_off_every_receipt_file(self, tmp_path):
         folder = tmp_path / "receipts" / "d1"
         folder.mkdir(parents=True)
@@ -293,6 +306,14 @@ class TestTheResetDeletesTheGeneratedFiles:
                 synthetic_reset.reset(conn, synthetic_reset.confirmation_phrase())
         assert (real / "receipts").exists()
 
+    def test_a_symlink_inside_a_tree_is_refused(self, tmp_path):
+        root = self._generated()
+        (tmp_path / "outside.csv").write_text("x")
+        (root / "deliveries" / "d1" / "linked.csv").symlink_to(tmp_path / "outside.csv")
+        with pytest.raises(synthetic_reset.UnsafeFiles, match=r"linked.csv is a symbolic link"):
+            synthetic_reset.refuse_unsafe()
+        assert (tmp_path / "outside.csv").exists()
+
     def test_a_folder_that_is_not_this_assets_is_refused(self, tmp_path, monkeypatch):
         monkeypatch.setattr(synthetic_reset, "data_dir", lambda: tmp_path / "other")
         with pytest.raises(synthetic_reset.UnsafeFiles, match="not this asset's data folder"):
@@ -309,7 +330,51 @@ class TestTheResetDeletesTheGeneratedFiles:
         monkeypatch.setattr(shutil, "rmtree", stuck)
         deleted, remains = synthetic_reset.delete_generated()
         assert any("deliveries" in r for r in remains)
-        assert any("generator_bookkeeping.json" in d for d in deleted)
+        # THE BOOKKEEPING STAYS WHILE A TREE IT VOUCHES FOR DOES (post-build-
+        # review #436): without it, every folder left reads as hand-filed.
+        assert not any("generator_bookkeeping.json" in d for d in deleted)
+        assert any("generator_bookkeeping.json" in r and "kept" in r for r in remains)
+
+    def test_running_again_after_a_partial_failure_finishes_it(self, private_supply_dsn,
+                                                               monkeypatch):
+        """REQ-GEN-408 criterion 5: 'running again finishes it' - by running
+        it again, through the command, after the first run left the delivery
+        tree behind."""
+        import shutil
+
+        from cli.env import env_group
+
+        root = self._generated()
+        real_rmtree = shutil.rmtree
+
+        def stuck_on_deliveries(path, *a, **k):
+            if str(path).endswith("deliveries"):
+                raise PermissionError(13, "Permission denied")
+            return real_rmtree(path, *a, **k)
+
+        phrase = synthetic_reset.confirmation_phrase() + "\n"
+        monkeypatch.setattr(shutil, "rmtree", stuck_on_deliveries)
+        first = CliRunner().invoke(env_group, ["reset-synthetic"], input=phrase)
+        assert first.exit_code == 1 and "deliveries" in first.output, first.output
+        assert (root / "deliveries").exists()
+        monkeypatch.setattr(shutil, "rmtree", real_rmtree)
+        second = CliRunner().invoke(env_group, ["reset-synthetic"], input=phrase)
+        assert second.exit_code == 0, second.output
+        assert not any(p.exists() for p in synthetic_reset.generated_paths())
+
+    def test_unreadable_bookkeeping_is_a_refusal(self, private_supply_dsn):
+        from cli.env import env_group
+
+        root = self._generated()
+        (root / "generator_bookkeeping.json").write_text("{not json")
+        result = CliRunner().invoke(env_group, ["reset-synthetic"],
+                                    input=synthetic_reset.confirmation_phrase() + "\n")
+        flat = " ".join(result.output.replace("│", " ").split())
+        assert result.exit_code == 1 and isinstance(result.exception, SystemExit), flat
+        assert "generator_bookkeeping.json" in "".join(flat.split()), flat
+        assert "cannot be read" in flat, flat
+        assert "Nothing was deleted" in flat and "Type" not in flat
+        assert all(p.exists() for p in synthetic_reset.generated_paths())
 
 
 class TestEnvCurrentSaysTheAnchor:
@@ -354,59 +419,114 @@ class TestTheClosingLine:
             "7 staged table(s) in this environment, generated up to 2026-09-25 "
             "(the fixed test anchor).")
 
+    def test_a_roll_that_stepped_back_does_not_say_today(self):
+        """post-build-review #437: a roll that stepped back a day, because a
+        receipt was still to come, closed with 'rolled to today'."""
+        now = datetime(2026, 11, 13, 10, 0, tzinfo=timezone(timedelta(hours=8)))
+        later_today = datetime(2026, 11, 13, 23, 0, tzinfo=timezone(timedelta(hours=8)))
+        chosen = anchoring.roll(now=now, latest_receipt_at=lambda d: later_today
+                                if d == date(2026, 11, 13) else now - timedelta(hours=1))
+        result = bootstrap.BootstrapResult(populated=True, staged_before=0, staged_after=7,
+                                           generated_up_to=bootstrap.generated_up_to(chosen))
+        said = bootstrap.closing_line(result)
+        assert "today" not in said, said
+        assert said == ("7 staged table(s) in this environment, generated up to 2026-11-12 "
+                        "(rolled to the latest day whose planned receipts had all passed on "
+                        "Perth's clock; `--anchor 2026-11-12` reproduces it).")
+
     def test_rolled(self):
         assert self._said("rolled") == (
             "7 staged table(s) in this environment, generated up to 2026-11-13 (rolled to "
             "today on Perth's clock; `--anchor 2026-11-13` reproduces it).")
 
 
+# Loaded into the nested pytest run below with -p, in its workers too. The one
+# thing it replaces is deployment_dsn_for's preference for supply_<asset> on
+# the deployment's own server, which on a developer's machine is that
+# machine's real deployment database, not the scratch one the test made: every
+# asset's deployment is the scratch database. The DSN itself still comes from
+# the environment at collection, which is what post-build-review #434 broke.
+_SCRATCH_DEPLOYMENT_PLUGIN = """
+import os, sys
+
+def pytest_configure(config):
+    dsn = os.environ["MOTHMAN_SUPPLY_DSN"]
+    for module in list(sys.modules.values()):
+        found = getattr(module, "_DEPLOYMENT_BY_ASSET", None)
+        if isinstance(found, dict) and (getattr(module, "__file__", "") or "").endswith(
+                "conftest.py"):
+            found.update(daily=dsn, quarterly=dsn)
+"""
+
+
 class TestTheDeploymentHalfRefusesAnotherAnchor:
     """REQ-GEN-405 criterion 8: checked once per asset's database before any
     test runs, stopping the session with one message - never per test, never
-    a skip."""
+    a skip, and never in the fast half. Driven as a real nested pytest session
+    against a scratch database (post-build-review #434: the check read the
+    deployment's DSN before the fixture that remembers it had run, so it never
+    fired, and the old test patched that lookup away)."""
 
-    class _Item:
-        def __init__(self, asset):
-            self.asset = asset
+    @pytest.fixture
+    def nested(self, private_supply_dsn, tmp_path):
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
 
-        def get_closest_marker(self, name):
-            import types
+        (tmp_path / "plugin").mkdir()
+        (tmp_path / "plugin" / "scratch_deployment.py").write_text(_SCRATCH_DEPLOYMENT_PLUGIN)
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith(("PYTEST_", "COV_CORE_")) and k != "MOTHMAN_PG"}
+        env.update(MOTHMAN_SUPPLY_DSN=private_supply_dsn, MOTHMAN_TEST_DB_TAG="anchornest",
+                   PYTHONPATH=os.pathsep.join(filter(None, [str(tmp_path / "plugin"),
+                                                            env.get("PYTHONPATH")])))
+        root = Path(__file__).resolve().parent.parent
 
-            if name == "asset":
-                return types.SimpleNamespace(args=(self.asset,))
-            if name == "needs_deployment":
-                return object()
-            return None
+        def run(*args):
+            done = subprocess.run(
+                [sys.executable, "-m", "pytest", "tests/test_dashboard_e2e.py", "-q",
+                 "-p", "scratch_deployment", "-p", "no:cacheprovider",
+                 f"--basetemp={tmp_path / 'bt'}", *args],
+                cwd=root, env=env, capture_output=True, text=True, timeout=600)
+            return done.returncode, done.stdout + done.stderr
+        return run
 
-    def _check(self, monkeypatch, found):
-        import conftest
+    @staticmethod
+    def _record(anchor):
+        with supply_db.connect(label="test-anchor") as conn:
+            qa_store.ensure_schema(conn)
+            qa_store.record_history_anchor(conn, anchor)
 
-        monkeypatch.setattr(conftest, "deployment_dsn_for", lambda a: f"dsn-{a}")
-        reads = []
-        monkeypatch.setattr(conftest, "recorded_anchor_of",
-                            lambda dsn: reads.append(dsn) or found)
-        items = [self._Item("quarterly")] * 40 + [self._Item("daily")] * 2
-        try:
-            conftest._refuse_a_deployment_at_another_anchor(items)
-        except pytest.UsageError as exc:
-            return str(exc), reads
-        return None, reads
-
-    def test_a_rolled_history_stops_the_session_once(self, monkeypatch):
-        said, reads = self._check(monkeypatch, LATER)
-        assert reads == ["dsn-daily", "dsn-quarterly"], "one read per asset's database"
-        assert said.count("2026-11-13") == 2 and said.count("not a code fault") == 2
-        assert "40 test(s) need it" in said and "2 test(s) need it" in said
+    def test_an_unrecorded_history_stops_the_session_once_under_xdist(self, nested):
+        code, out = nested("-m", "needs_deployment", "-n", "2")
+        assert code == pytest.ExitCode.USAGE_ERROR, out
+        assert out.count("ERROR: ") == 1, out
+        assert out.count("none recorded - bootstrapped before REQ-GEN-404") == 2, out
+        assert out.count("not a code fault") == 2, "one paragraph per asset"
+        assert "asset 'daily'" in out and "asset 'quarterly'" in out
         assert "mothman env reset-synthetic` then `MOTHMAN_ASSET=quarterly mothman pipeline " \
-               "bootstrap`" in said and "replaces a rolled demo" in said
+               "bootstrap`" in out and "replaces a rolled demo" in out
+        assert "no tests ran" in out and "INTERNALERROR" not in out, out
 
-    def test_an_unrecorded_history_is_refused_too(self, monkeypatch):
-        said, _ = self._check(monkeypatch, None)
-        assert "none recorded - bootstrapped before REQ-GEN-404" in said
+    def test_a_rolled_history_stops_a_serial_session_once(self, nested):
+        self._record(LATER)
+        code, out = nested("-m", "needs_deployment", "-n0")
+        assert code == pytest.ExitCode.USAGE_ERROR, out
+        assert out.count("ERROR: ") == 1 and out.count("2026-11-13") == 2, out
+        assert " test(s) need it" in out
 
-    def test_the_fixed_anchor_passes(self, monkeypatch):
-        said, _ = self._check(monkeypatch, FIXED)
-        assert said is None
+    def test_the_fixed_anchor_passes(self, nested):
+        self._record(FIXED)
+        code, out = nested("-m", "needs_deployment", "-n0", "--co")
+        assert code == 0 and "not a code fault" not in out, out
+
+    def test_the_fast_half_is_never_stopped(self, nested):
+        self._record(LATER)
+        code, out = nested("tests/test_anchor_date.py", "-m", "not needs_deployment", "-n0",
+                           "--co")
+        assert code == 0 and "not a code fault" not in out, out
+        assert " collected" in out, out
 
 
 @pytest.mark.asset("daily")
@@ -549,12 +669,32 @@ class TestOffsetDates:
         with history_anchor.anchored(LATER):
             assert store.get("k", text, build) == "2026-11-13"
 
-    def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch):
-        from asset_model import asset_time, config_yaml
+    @pytest.mark.asset("daily")
+    def test_refused_on_an_asset_that_is_not_synthetic_on_every_load(self, tmp_path):
+        """post-build-review #435: the check read data-asset.yaml through the
+        cache with its own offsets resolved unchecked, so the first load was
+        refused and every later one answered the resolved dates. The daily
+        asset's own data-asset.yaml writes offsets; declared not synthetic, it
+        is refused on every real load, and so is a calendar using them."""
+        import asset_folders
 
-        monkeypatch.setattr(asset_time, "declared_synthetic", lambda: False)
-        with pytest.raises(config_yaml.OffsetRefused, match=r"cal.yaml, line 2"):
-            config_yaml.parse("x: 1\na: !anchor -3\n", name="cal.yaml", remember=False)
+        from asset_model import asset_time, assets, config_yaml, hierarchy
+
+        text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
+        assert "\nsynthetic: true\n" in text and "!anchor" in text
+        with asset_folders.pointed(tmp_path / "real-asset"):
+            # Kept while the asset was synthetic, as any earlier test may have.
+            config_yaml.load(assets.selected().folder / "calendar.yaml")
+            asset_folders.replace("data-asset.yaml",
+                                  text.replace("\nsynthetic: true\n", "\nsynthetic: false\n"))
+            for _ in range(3):
+                with pytest.raises(config_yaml.OffsetRefused, match=r"data-asset.yaml, line"):
+                    config_yaml.load(hierarchy.data_asset_yaml())
+                with pytest.raises(config_yaml.OffsetRefused):
+                    asset_time.declared_synthetic()
+            for _ in range(2):
+                with pytest.raises(config_yaml.OffsetRefused, match=r"calendar.yaml, line"):
+                    config_yaml.load(assets.selected().folder / "calendar.yaml")
 
 
 #: The data asset this module's tests act for (C11).
@@ -693,3 +833,23 @@ class TestValidateConfigRunsOnAFreshCheckout:
         assert done.returncode == 0, done.stdout + done.stderr
         assert "schedule validation OK" in done.stdout
         assert not (tmp_path / "daily").exists(), "a gate writes nothing"
+
+
+@pytest.mark.asset("daily")
+class TestTheSuiteSeesTheFixedAnchor:
+    """REQ-GEN-405 criterion 2, post-build-review #438: a checkout whose
+    anchor file says a rolled date still tests the fixed anchor - offsets,
+    the generator and the calendar agreeing on one anchor in one process."""
+
+    def test_a_rolled_anchor_file_beside_the_checkouts_tree_is_not_read(self, tmp_path,
+                                                                        monkeypatch):
+        from asset_model import assets, schedule
+        from generator.anchor_date import get_anchor_date
+
+        data = tmp_path / "data" / "daily"
+        monkeypatch.setattr(assets, "data_dir", lambda: data)
+        history_anchor.write(LATER, assets.data_path(history_anchor.FILE))
+        assert history_anchor.installed() is None
+        assert history_anchor.for_offsets() == FIXED == get_anchor_date()
+        start = min(v.effective_from for v in schedule.calendar("daily").versions)
+        assert start == FIXED - timedelta(days=99)

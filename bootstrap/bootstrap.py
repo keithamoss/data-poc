@@ -466,7 +466,7 @@ def _populate(*, dated, names, groups, collection, sequential, say, held, lock, 
                            disagreements=disagreements, wall_seconds=wall,
                            pin_digest=snapshot.digest, pin_differences=differences,
                            tree_changes=tuple(tree.changes),
-                           generated_up_to=(dated.anchor.isoformat(), dated.how))
+                           generated_up_to=generated_up_to(dated))
 
 
 class _Trees:
@@ -535,6 +535,13 @@ def pinned_line(digest: str) -> str:
     return f"Configuration pinned: {digest[:12]}"
 
 
+def generated_up_to(dated) -> tuple[str, str]:
+    """(the anchor, how it was chosen) for the closing line - 'rolled-back' for
+    a roll that stepped back from today (post-build-review #437)."""
+    how = "rolled-back" if dated.how == "rolled" and dated.days_back else dated.how
+    return dated.anchor.isoformat(), how
+
+
 def closing_line(result: "BootstrapResult") -> str:
     """The closing line after the pinned digest (REQ-GEN-399 criterion 4,
     REQ-DASH-407 criterion 7): the staged tables and the date the history was
@@ -550,6 +557,9 @@ def closing_line(result: "BootstrapResult") -> str:
         elif how == "rolled":
             said = (f"rolled to today on {generator.zone_name()}'s clock; "
                     f"`--anchor {up_to}` reproduces it")
+        elif how == "rolled-back":
+            said = (f"rolled to the latest day whose planned receipts had all passed on "
+                    f"{generator.zone_name()}'s clock; `--anchor {up_to}` reproduces it")
         else:
             said = f"given with `--anchor {up_to}`"
         tail = f", generated up to {up_to} ({said})"

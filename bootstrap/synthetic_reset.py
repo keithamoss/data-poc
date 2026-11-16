@@ -158,7 +158,17 @@ def hand_filed() -> list[str]:
     tree = data_dir() / "deliveries"
     if not tree.is_dir():
         return []
-    written = generator.written_delivery_names(data_dir() / delivery.BOOKKEEPING_FILE)
+    book = data_dir() / delivery.BOOKKEEPING_FILE
+    try:
+        written = generator.written_delivery_names(book)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        # A REFUSAL, NOT A TRACEBACK (post-build-review #436): with no
+        # readable list, no folder can be told from a hand-filed one.
+        raise HandFiled(
+            f"the generator's bookkeeping, {_shown(book)}, cannot be read ({exc}), so which "
+            f"folders in {_shown(tree)} the generator wrote is not known. Nothing was "
+            f"deleted. Move aside any folder that was filed by hand, then delete the "
+            f"bookkeeping and the delivery tree by hand.") from None
     return sorted(p.name for p in tree.iterdir() if p.is_dir() and p.name not in written)
 
 
@@ -189,12 +199,27 @@ def recorded_anchor_line(conn) -> str:
 def delete_generated() -> tuple[list[str], list[str]]:
     """Delete every generated file and tree (criterion 1); returns (what was
     deleted, what remains after a failure). Carries on past one failure, so a
-    second reset finishes what the first left."""
+    second reset finishes what the first left.
+
+    THE BOOKKEEPING LAST, AND ONLY ONCE THE TREES IT VOUCHES FOR ARE GONE
+    (post-build-review #436): it is what tells a generated delivery folder from
+    a hand-filed one, so deleted while the delivery tree remained, the next
+    reset read every folder left as hand-filed and refused - the opposite of
+    'running again finishes it'."""
     import shutil
 
+    from qa_tools.common import delivery
+
     deleted, remains = [], []
-    for path in generated_paths():
+    root = data_dir()
+    book = root / delivery.BOOKKEEPING_FILE
+    vouched = (root / "deliveries", root / "receipts")
+    for path in [p for p in generated_paths() if p != book] + [book]:
         if not path.exists():
+            continue
+        if path == book and any(p.exists() for p in vouched):
+            remains.append(f"{_shown(path)} (kept: it lists the delivery folders still there, "
+                           f"so the next reset can tell them from a hand-filed one)")
             continue
         try:
             if path.is_dir():
