@@ -99,3 +99,17 @@ def this_assets_scenarios() -> set[str]:
     from generator import scenario_injection
 
     return scenario_injection.this_assets_scenarios()
+
+
+def anchor_statement():
+    """(the date the generated history runs up to, how it was chosen) - what a
+    bootstrap's closing line says (REQ-GEN-399 criterion 4): 'fixed' for the
+    committed test anchor, 'override' for GENERATOR_ANCHOR_DATE. A rolled
+    anchor is REQ-GEN-404's and not built."""
+    import os
+
+    from generator import anchor_date
+
+    up_to = anchor_date.get_anchor_date()
+    how = "override" if os.environ.get("GENERATOR_ANCHOR_DATE") else "fixed"
+    return up_to.isoformat(), how

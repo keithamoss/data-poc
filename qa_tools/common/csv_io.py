@@ -48,8 +48,7 @@ def load_null_values_by_column(contract_path: str) -> dict[str, dict[str, list[s
     vocabulary (never includes "" itself - that's always implicit,
     handled separately below). A table/column with no `nullValues` entry
     simply won't appear here; callers treat that as an empty list."""
-    with open(contract_path) as f:
-        contract = config_yaml.parse(f)
+    contract = config_yaml.load(contract_path)
     out: dict[str, dict[str, list[str]]] = {}
     for table in contract.get("schema", []):
         cols = {}

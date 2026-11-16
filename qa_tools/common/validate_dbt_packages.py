@@ -20,7 +20,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -45,7 +45,7 @@ def asset_projects(root: Path = ROOT) -> dict[str, Path]:
 
 
 def _read(path: Path):
-    return yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else ABSENT
+    return config_yaml.load(path) if path.is_file() else ABSENT
 
 
 def first_difference(a, b, where: str = "") -> tuple[str, object, object] | None:

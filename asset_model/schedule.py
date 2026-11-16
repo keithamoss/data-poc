@@ -57,7 +57,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from asset_model import asset_time, hierarchy, in_force
+from asset_model import asset_time, derived, hierarchy, in_force
 
 
 # Full month names, lower-cased for comparison. Full names ONLY: an
@@ -620,7 +620,9 @@ def _effect_windows(cal: Calendar) -> list[tuple[CalendarVersion, date, date | N
 
 def periods_for_calendar(calendar_name: str, until: date | None = None,
                          agreement=None) -> list[Period]:
-    """One calendar's full period sequence, in date order (REQ-PIPE-051).
+    """One calendar's full period sequence, in date order (REQ-PIPE-051) -
+    worked out once per argument set for the agreement used and the zones in
+    force (REQ-PIPE-400), the caller's own list.
 
     DERIVED VERSION BY VERSION, and that is the whole point rather than
     an implementation detail. Each version contributes only the periods
@@ -632,6 +634,15 @@ def periods_for_calendar(calendar_name: str, until: date | None = None,
     window, named by its date, so a calendar can legitimately change
     from a rule to authored dates or back.
     """
+    agreement = agreement_to_read(agreement)
+    return derived.remembered(agreement, "periods_for_calendar", (calendar_name, until),
+                              lambda: compute_periods_for_calendar(calendar_name, until,
+                                                                   agreement))
+
+
+def compute_periods_for_calendar(calendar_name: str, until: date | None,
+                                 agreement) -> list[Period]:
+    """periods_for_calendar, worked out - what the memo calls."""
     cal = calendar(calendar_name, agreement)
     out = _authored_periods(cal)
     for version, start, end in _effect_windows(cal):
@@ -664,11 +675,21 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
 
     Periods the dataset declares not-expected are RETURNED, flagged,
     never dropped - see DatasetPeriod.
+
+    WORKED OUT ONCE per argument set for the agreement used and the zones in
+    force (REQ-PIPE-400); the caller's own list.
     """
+    agreement = agreement_to_read(agreement)
+    return derived.remembered(agreement, "periods_for_dataset", (dataset_id, until),
+                              lambda: compute_periods_for_dataset(dataset_id, until, agreement))
+
+
+def compute_periods_for_dataset(dataset_id: str, until: date | None,
+                                agreement) -> list[DatasetPeriod]:
+    """periods_for_dataset, worked out - what the memo calls."""
     from asset_model.agreement import TURNED_OFF
 
     cal = calendar_for_dataset(dataset_id, agreement)
-    agreement = agreement_to_read(agreement)
     months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
     skipped = not_expected_periods(dataset_id, agreement)

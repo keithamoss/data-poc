@@ -471,7 +471,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
         monkeypatch.delenv(assets.ASSET_ENV)
         monkeypatch.setattr(assets, "selected", lambda: here)
         monkeypatch.setattr(bootstrap, "_run_stream", _which_asset_and_adapter)
-        got = bootstrap._run_concurrently(["child-protection"], sequential=True)
+        got, _pins = bootstrap._run_concurrently(["child-protection"], sequential=True)
         assert got == {"child-protection": (
             "quarterly", str(ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"))}
 
@@ -485,7 +485,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
         assets.use_root(root)
         monkeypatch.setenv(assets.ASSET_ENV, "daily")
         monkeypatch.setattr(bootstrap, "_run_stream", _which_adapter_file)
-        got = bootstrap._run_concurrently(["same_name"], sequential=True)
+        got, _pins = bootstrap._run_concurrently(["same_name"], sequential=True)
         assert got == {"same_name": str(root / "daily" / "collections" / "same_name.py")}
 
     def test_a_manifest_worker_is_handed_the_asset_and_layout(self, monkeypatch, tmp_path):

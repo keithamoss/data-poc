@@ -72,8 +72,7 @@ def parse_people_config(path: Path | str | None = None) -> dict:
     if not Path(path).exists():
         return {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
                 "asset_assignments": [], "roles": []}
-    with open(path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(path) or {}
 
     people = {p["email"]: p for p in doc.get("people") or []}
     agency_assignments: dict[str, list[dict]] = {}
@@ -286,8 +285,7 @@ def this_asset_id() -> str | None:
     the gate but everything at runtime)."""
     from asset_model.hierarchy import data_asset_yaml
 
-    with open(data_asset_yaml()) as f:
-        return (config_yaml.parse(f) or {}).get("data_asset_id")
+    return (config_yaml.load(data_asset_yaml()) or {}).get("data_asset_id")
 
 
 def _asset_is_synthetic() -> bool:
@@ -296,8 +294,7 @@ def _asset_is_synthetic() -> bool:
     which nothing but `mothman env` may name."""
     from asset_model.hierarchy import data_asset_yaml
 
-    with open(data_asset_yaml()) as f:
-        return (config_yaml.parse(f) or {}).get("synthetic") is True
+    return (config_yaml.load(data_asset_yaml()) or {}).get("synthetic") is True
 
 
 class RoleRefused(UnknownActor):

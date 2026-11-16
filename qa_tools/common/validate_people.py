@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 import yaml
+from asset_model import config_yaml
 
 from qa_tools.common.people import people_yaml
 
@@ -35,7 +36,7 @@ def _data_asset_id() -> str | None:
     from asset_model.hierarchy import data_asset_yaml
 
     try:
-        return (yaml.safe_load(Path(data_asset_yaml()).read_text()) or {}).get("data_asset_id")
+        return (config_yaml.load(Path(data_asset_yaml())) or {}).get("data_asset_id")
     except (OSError, yaml.YAMLError):
         return None
 
@@ -52,7 +53,7 @@ def problems(path: Path | str | None = None) -> list[str]:
     if not path.exists():
         return []
     try:
-        doc = yaml.safe_load(path.read_text()) or {}
+        doc = config_yaml.load(path) or {}
     except yaml.YAMLError as exc:
         return [f"{path} does not parse as YAML: {exc}"]
 
@@ -180,7 +181,7 @@ def main() -> int:
         for line in found:
             print(f"  - {line}")
         return 1
-    doc = yaml.safe_load(people_yaml().read_text()) if people_yaml().exists() else {}
+    doc = config_yaml.load(people_yaml()) if people_yaml().exists() else {}
     people = (doc or {}).get("people") or []
     placeholders = sum(1 for p in people if (p or {}).get("placeholder"))
     print(f"people validation OK - {len(people)} person/people, "

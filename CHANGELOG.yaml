@@ -162,6 +162,28 @@ releases:
               datacontract-cli now checks a supply in a process of its own,
               at the same time as Soda Core and Evidently, rather than after
               them. --sequential still runs all four tools one after another.
+          - headline: A bootstrap reads its configuration once
+            components: ["Pipeline & publishing", "Data generation"]
+            description: >
+              A bootstrap and a generation now read the asset's configuration
+              once, when they start, and use that copy to the end - so an edit
+              you make while one runs is picked up by the next. The closing
+              lines say which copy it was ("Configuration pinned: ...") and
+              the date the history runs up to.
+          - headline: Schedule arithmetic worked out once
+            components: ["Pipeline & publishing"]
+            description: >
+              Each dataset's slots and periods, and its standing on a date,
+              are worked out once for the calendar in force rather than again
+              on every question. A Birth Registrations generation now takes
+              about 8 seconds on this sandbox.
+          - headline: The delivery tree read once per replay
+            components: ["Pipeline & publishing"]
+            description: >
+              A bootstrap recognises the delivery tree it has just generated
+              once, and the replay reads that. If the tree changes while it
+              runs - a hand filing, or a generation in another terminal - the
+              bootstrap fails and says how to start again.
   - date: "2026-11-15"
     summary: >
       New checks keep the code's boundaries, the two assets' dbt packages and

@@ -37,8 +37,9 @@ deriving them from arrival rather than from anything a supplier said.
 """
 from __future__ import annotations
 
-import warnings
 import dataclasses
+import os
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -255,6 +256,27 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
                   receipts_dir: Path | None = None) -> list[Arrival]:
     """Every recognised arrival for one collection, OLDEST FIRST.
 
+    WHILE A DELIVERY-TREE SNAPSHOT IS INSTALLED (REQ-PIPE-430) - a bootstrap's
+    replay of a tree generated before it began - a collection it holds, asked
+    of the same folders, is answered from it rather than recognised again,
+    each caller getting arrivals no other caller can change. Otherwise the
+    tree is recognised as it is now, on every call, so a live pass sees a
+    delivery the moment it lands (criterion 4).
+    """
+    held = _tree
+    if held is not None:
+        found = held.answer(collection_id, deliveries_dir, receipts_dir)
+        if found is not None:
+            return found
+    return recognise_arrivals(collection_id, run_id_prefix, deliveries_dir, receipts_dir)
+
+
+def recognise_arrivals(collection_id: str, run_id_prefix: str,
+                       deliveries_dir: Path | None = None,
+                       receipts_dir: Path | None = None) -> list[Arrival]:
+    """arrivals_for, recognised from the tree on disk now - never answered
+    from a snapshot. What a snapshot is taken with.
+
     AN UNKNOWN COLLECTION RAISES rather than answering `[]`, which is
     what it used to do. Empty means "nothing has arrived yet", an
     ordinary state; a collection the tree does not define is a
@@ -355,3 +377,158 @@ def unplaceable(deliveries_dir: Path | None = None,
     """Deliveries nothing could place - reported, never guessed at."""
     return [d for d in delivery.list_deliveries(deliveries_dir, receipts_dir)
             if recognise(d).is_unplaceable]
+
+
+# ---- THE DELIVERY-TREE SNAPSHOT (REQ-PIPE-430) --------------------------------
+#
+# WHY. REQ-PIPE-250's profile put a quarter of the quarterly replay's samples in
+# recognising the whole delivery tree - every arrival, and every next-receipt
+# look-up, re-read every delivery and every receipt (0.6s on 229 deliveries,
+# several times an arrival). A bootstrap generates the whole tree BEFORE any
+# replay starts ('so no pipeline recognises a delivery tree a generator is
+# still writing'), so for the replay's span the tree cannot have changed.
+#
+# ITS OWN INSTALLATION, NOT THE CONFIGURATION PIN (the architect's B4): a
+# generation pins the configuration too, and recognises the tree it has just
+# written, so this is installed by the bootstrap after generation and never
+# during one (REQ-GEN-398 criterion 4). Its end digest is what proves the
+# 'cannot have changed': a tree that did change mid-replay fails the bootstrap.
+#
+# NOT A CONFIGURATION CACHE: the tree is supplier files, not configuration, so
+# REQ-PIPE-254's content rule does not govern it.
+
+
+class TreeChanged(RuntimeError):
+    """A delivery tree changed while a snapshot of it was installed."""
+
+
+def _folder(path) -> str:
+    return os.path.abspath(os.fspath(path))
+
+
+def _arrival_facts(found) -> list:
+    return [(a.run_id, a.delivery_name, a.received_at.isoformat(), a.sequence,
+             sorted((k, tuple(v)) for k, v in a.files_by_dataset.items()),
+             tuple(a.unmatched), tuple(a.anomalies)) for a in found]
+
+
+def _listing(folder: Path, read: bool) -> list:
+    """(relative path, size, and the content where `read`) of every file
+    under `folder`, sorted."""
+    out = []
+    if not folder.is_dir():
+        return out
+    for root, dirs, files in os.walk(folder):
+        dirs.sort()
+        for f in sorted(files):
+            path = Path(root) / f
+            rel = path.relative_to(folder).as_posix()
+            try:
+                out.append((rel, path.stat().st_size,
+                            path.read_bytes().hex() if read else ""))
+            except OSError:
+                out.append((rel, None, ""))
+    return out
+
+
+def _tree_digest(collection_id: str, found, deliveries_dir: Path, receipts_dir: Path) -> str:
+    """A collection's recognised tree: its arrivals as recognised, and the
+    listing and receipts of every delivery folder they came from."""
+    import hashlib
+    import json
+
+    names = sorted({a.delivery_name for a in found})
+    facts = {"arrivals": _arrival_facts(found),
+             "deliveries": {n: _listing(deliveries_dir / n, read=False) for n in names},
+             "receipts": {n: _listing(receipts_dir / n, read=True) for n in names}}
+    return hashlib.sha256(json.dumps(facts, sort_keys=True, default=str).encode()).hexdigest()
+
+
+class TreeSnapshot:
+    """Each named collection's arrivals, recognised ONCE from the delivery
+    tree at `deliveries_dir` and `receipts_dir` (the selected asset's by
+    default), with a digest of each collection's recognised tree.
+
+    install() answers arrivals_for from it; release() puts recognition back
+    and returns each collection whose tree no longer matches its digest.
+    Picklable, so a bootstrap hands it to each process it starts
+    (assets.handoff)."""
+
+    def __init__(self, collection_ids, deliveries_dir: Path | None = None,
+                 receipts_dir: Path | None = None):
+        self.deliveries_dir = Path(deliveries_dir or delivery.default_deliveries_dir())
+        self.receipts_dir = Path(receipts_dir or delivery.default_receipts_dir())
+        self.collections = tuple(dict.fromkeys(collection_ids))
+        self.arrivals: dict[str, tuple[Arrival, ...]] = {}
+        self.digests: dict[str, str] = {}
+        for cid in self.collections:
+            found = recognise_arrivals(cid, "", self.deliveries_dir, self.receipts_dir)
+            self.arrivals[cid] = tuple(found)
+            self.digests[cid] = _tree_digest(cid, found, self.deliveries_dir,
+                                             self.receipts_dir)
+        self._folders = (_folder(self.deliveries_dir), _folder(self.receipts_dir))
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, TreeSnapshot) and self.key == other.key
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    @property
+    def key(self) -> tuple:
+        return (self._folders, tuple(sorted(self.digests.items())))
+
+    def answer(self, collection_id: str, deliveries_dir=None, receipts_dir=None):
+        """The collection's arrivals from the snapshot, each the caller's own
+        (files_by_dataset copied, criterion 5) - or None where the snapshot
+        does not hold that collection or those folders."""
+        held = self.arrivals.get(collection_id)
+        if held is None:
+            return None
+        asked = (_folder(deliveries_dir or delivery.default_deliveries_dir()),
+                 _folder(receipts_dir or delivery.default_receipts_dir()))
+        if asked != self._folders:
+            return None
+        return [dataclasses.replace(a, files_by_dataset=dict(a.files_by_dataset))
+                for a in held]
+
+    def install(self) -> "TreeSnapshot":
+        global _tree
+        _tree = self
+        return self
+
+    def changed(self) -> list[str]:
+        """Each collection whose tree, recognised again now, no longer
+        matches the digest taken at install."""
+        out = []
+        for cid in self.collections:
+            found = recognise_arrivals(cid, "", self.deliveries_dir, self.receipts_dir)
+            if _tree_digest(cid, found, self.deliveries_dir, self.receipts_dir) \
+                    != self.digests[cid]:
+                out.append(cid)
+        return out
+
+    def release(self, *, check: bool = True) -> list[str]:
+        """Put recognition back; with `check`, every collection whose tree
+        changed while this was installed (criterion 3)."""
+        global _tree
+        if _tree is self:
+            _tree = None
+        return self.changed() if check else []
+
+
+#: The snapshot installed in this process, or None.
+_tree: TreeSnapshot | None = None
+
+
+def installed_tree() -> TreeSnapshot | None:
+    """The delivery-tree snapshot installed in this process, or None - for the
+    hand-off to a started process (assets.handoff)."""
+    return _tree
+
+
+def adopt_tree(snapshot: TreeSnapshot | None) -> None:
+    """A started process's half of the hand-off: hold the tree snapshot it was
+    handed, or none. Its digest is checked by the process that took it."""
+    global _tree
+    _tree = snapshot

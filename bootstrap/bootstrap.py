@@ -76,6 +76,18 @@ class BootstrapResult:
     #: The whole bootstrap's wall clock, generation to target agreement
     #: (REQ-PIPE-250 criterion 3) - what the budget line is measured on.
     wall_seconds: float = 0.0
+    #: The digest of the configuration pinned for the run (REQ-GEN-399
+    #: criterion 4), printed as 'Configuration pinned: <first 12>'.
+    pin_digest: str | None = None
+    #: Each started process that ran under a different pin, and which files
+    #: differed (REQ-GEN-399 criterion 3). Non-empty fails the bootstrap.
+    pin_differences: tuple[str, ...] = ()
+    #: Each collection whose delivery tree changed mid-replay, with its
+    #: folders (REQ-PIPE-430 criterion 3). Non-empty fails the bootstrap.
+    tree_changes: tuple[str, ...] = ()
+    #: (the date the history was generated up to, how it was chosen) - the
+    #: closing line's 'generated up to' (REQ-GEN-399 criterion 4).
+    generated_up_to: tuple | None = None
 
 
 def staged_table_count(conn) -> int:
@@ -235,13 +247,54 @@ def bootstrap(collection: str = "all", force: bool = False,
     except processing_pass.PassLockHeld as exc:
         return BootstrapResult(populated=False, staged_before=before,
                                staged_after=before, refused=True, reason=str(exc))
+    # THE ASSET'S CONFIGURATION PINNED FOR THE WHOLE RUN (REQ-GEN-398 criterion
+    # 2, REQ-GEN-399 criteria 1 and 6): installed here, by the bootstrap's own
+    # call, as it installs the replay clock - before the first collection is
+    # generated, around the replay, and through the confirmations and the
+    # target agreement after it - and released only when the bootstrap
+    # returns. Every process it starts is handed this snapshot
+    # (assets.handoff), never a fresh read. PROVISIONAL (2026-11-16): one pin
+    # spans generation and replay, so the replay reads exactly the
+    # configuration the history was generated from.
+    # ONE STACK, SO NOTHING IS LEFT HELD (post-build-review #396): a pin that
+    # cannot be installed still lets go of the pass lock - in the TUI's
+    # long-lived process it would otherwise be held until the process exits.
+    # _populate lets go of the lock itself once the replay is done; a second
+    # exit of a finished lock is a no-op.
+    from contextlib import ExitStack
+
+    from asset_model import config_pin
+
+    with ExitStack() as stack:
+        stack.callback(lock.__exit__, None, None, None)
+        snapshot = stack.enter_context(config_pin.pinned())
+        return _populate(names=chosen, groups=groups, collection=collection,
+                         sequential=sequential, say=say, held=held, lock=lock,
+                         taken=taken, before=before, checkpoint_before=checkpoint_before,
+                         skip_target_trial=skip_target_trial, try_targets=try_targets,
+                         snapshot=snapshot, wall_started=wall_started)
+
+
+def _populate(*, names, groups, collection, sequential, say, held, lock, taken, before,
+              checkpoint_before, skip_target_trial, try_targets, snapshot,
+              wall_started) -> BootstrapResult:
+    """The bootstrap's work once it holds the pass lock and the pin."""
+    differences: tuple[str, ...] = ()
+    tree = _Trees()
     try:
         # THE COLLECTIONS COME FROM THE REGISTRY (REQ-PIPE-240), each run
         # through its adapter - imported lazily, because the orchestrators
         # pull in all four QA tools, several seconds of import time that a
         # caller only checking `already_populated()` should not pay.
         started = time.monotonic()
-        names = chosen
+        generating = 0.0
+
+        def generate(name: str) -> None:
+            nonlocal generating
+            say(f"Generating synthetic data ({_label(name)})")
+            began = time.monotonic()
+            _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
+            generating += time.monotonic() - began
 
         if checkpoint_before is not None or len(names) < 2:
             # ONE COLLECTION - what a checkpoint, and a one-collection
@@ -249,8 +302,11 @@ def bootstrap(collection: str = "all", force: bool = False,
             # 2026-10-19; plans/running-thoughts.md #111).
             timings = {}
             for name in names:
-                say(f"Generating synthetic data ({_label(name)})")
-                _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
+                # EACH COLLECTION'S TREE SNAPSHOT AFTER ITS OWN GENERATION, and
+                # released before the next one's (REQ-PIPE-430 criterion 2).
+                tree.release()
+                generate(name)
+                tree.install([_collection(name).id])
                 after_each = None
                 if checkpoint_before is not None:
                     after_each = _checkpoint_hook(name, checkpoint_before, held, say,
@@ -268,11 +324,15 @@ def bootstrap(collection: str = "all", force: bool = False,
             # 416s to generate on this sandbox before the geocoding trials
             # (2026-11-01), and those trials run the real tools over about 50
             # supplies before anything is kept, on the quarterly bootstrap's
-            # critical path - their wall clock is said by the generate command,
-            # measured with REQ-PIPE-296's.
+            # critical path - their wall clock is the 'Took' line's generation
+            # entry (REQ-GEN-398 criterion 3).
             for name in names:
-                say(f"Generating synthetic data ({_label(name)})")
-                _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
+                generate(name)
+            # THE TREE SNAPSHOT ONCE GENERATION IS DONE, NEVER DURING IT
+            # (REQ-PIPE-430 criterion 1, REQ-GEN-398 criterion 4): every
+            # collection replayed recognised once, here, and handed to each
+            # stream process with the configuration pin.
+            tree.install([_collection(n).id for n in names])
             keys = [_stream_key(g) for g in groups]
             if sequential:
                 # ONE STREAM AFTER ANOTHER (criterion 7): --sequential changes
@@ -282,10 +342,12 @@ def bootstrap(collection: str = "all", force: bool = False,
                     say(f"Running the real checks against every {_label(key)} supply")
                     timings[key] = _run_stream(key, sequential)
             else:
-                # SIDE BY SIDE, A PROCESS PER STREAM (criterion 6).
+                # SIDE BY SIDE, A PROCESS PER STREAM (criterion 6), each
+                # reporting the pin it ran under (REQ-GEN-399 criterion 3).
                 say("Running the real checks against every supply - "
                     + " beside ".join(_label(k) for k in keys))
-                timings = _run_concurrently(keys, sequential)
+                timings, reports = _run_concurrently(keys, sequential)
+                differences = pin_differences(snapshot, reports)
             # THE DELIVERIES NO STREAM CLAIMED, once all are done.
             _record_deliveries()
         if collection == "all":
@@ -294,12 +356,14 @@ def bootstrap(collection: str = "all", force: bool = False,
             # then, as a one-collection bootstrap has not replayed the other's
             # supplies a correction can move (PROVISIONAL).
             _confirm_corrections(say)
-        timings["total"] = time.monotonic() - started
-        # THE SHARED RUN-TIME FORMAT (REQ-TEST-416 criterion 5).
-        from qa_tools.common.display_time import format_elapsed
-
-        say("Took " + ", ".join(f"{_label(k)} {format_elapsed(v)}" for k, v in timings.items()))
+        tree.release()
+        # GENERATION IS AN ENTRY OF THE ONE 'Took' LINE (REQ-GEN-398 criterion
+        # 3; CLI finding 4), first, as it ran first.
+        timings = {GENERATION: generating, **timings,
+                   "total": time.monotonic() - started}
+        say(took_line(timings))
     finally:
+        tree.release(check=False)
         lock.__exit__(None, None, None)
 
     say("Comparing every targeted supply's recorded verdict with what it was built to")
@@ -310,7 +374,155 @@ def bootstrap(collection: str = "all", force: bool = False,
     say(budget_line(wall))
     return BootstrapResult(populated=True, staged_before=before, staged_after=after,
                            timings=timings, checkpoint=taken[0] if taken else None,
-                           disagreements=disagreements, wall_seconds=wall)
+                           disagreements=disagreements, wall_seconds=wall,
+                           pin_digest=snapshot.digest, pin_differences=differences,
+                           tree_changes=tuple(tree.changes),
+                           generated_up_to=generator.anchor_statement())
+
+
+class _Trees:
+    """The bootstrap's delivery-tree snapshot (REQ-PIPE-430): installed after
+    a generation, released before the next one or once the replay is done,
+    each release checking the tree against the digest taken at install."""
+
+    def __init__(self):
+        self.held = None
+        self.changes: list[str] = []
+
+    def install(self, collection_ids) -> None:
+        from asset_model import arrivals
+
+        self.held = arrivals.TreeSnapshot(collection_ids).install()
+
+    def release(self, *, check: bool = True) -> None:
+        if self.held is None:
+            return
+        held, self.held = self.held, None
+        changed = held.release(check=check)
+        self.changes += [tree_change(held, cid) for cid in changed]
+
+
+def tree_change(held, collection_id: str) -> str:
+    """One collection whose delivery tree changed mid-replay, named with its
+    folders (REQ-PIPE-430 criterion 3)."""
+    return (f"{_label(_collection_short(collection_id))}: {_shown(str(held.deliveries_dir))} "
+            f"and {_shown(str(held.receipts_dir))}")
+
+
+def tree_changed_message(changes) -> str | None:
+    """The one wording every bootstrap caller gives when a delivery tree
+    changed while the replay read it from its snapshot (REQ-PIPE-430
+    criterion 3; CLI finding 10) - the CLI and the TUI alike."""
+    if not changes:
+        return None
+    return ("The delivery tree changed while this bootstrap was replaying it:\n"
+            + "\n".join(f"  - {c}" for c in changes)
+            + "\nThe replay read every arrival from the tree as it stood once generation "
+              "finished, so what changed was not replayed. The likely cause is a hand "
+              "filing, or a generation run in another terminal, during the run. The "
+              "history it recorded is kept but is not to be trusted - replace it with "
+              "`mothman env reset-synthetic` then `mothman pipeline bootstrap`.")
+
+
+#: The 'Took' line's entry for generation (REQ-GEN-398 criterion 3).
+GENERATION = "generation"
+
+
+def took_line(timings: dict[str, float]) -> str:
+    """The one 'Took ...' line: each stage's wall clock, generation first and
+    the total last - a statement, so it ends with a full stop and never
+    trails off (REQ-GEN-399 criterion 4)."""
+    # THE SHARED RUN-TIME FORMAT (REQ-TEST-416 criterion 5): '1m 04s', never
+    # '64s' - the one formatter the dashboard's own fmtElapsed is held equal to.
+    from qa_tools.common.display_time import format_elapsed
+
+    return "Took " + ", ".join(f"{_label(k)} {format_elapsed(v)}"
+                               for k, v in timings.items()) + "."
+
+
+def pinned_line(digest: str) -> str:
+    """'Configuration pinned: <first 12 characters of the digest>'
+    (REQ-GEN-399 criterion 4), printed dimmed after the budget line."""
+    return f"Configuration pinned: {digest[:12]}"
+
+
+def closing_line(result: "BootstrapResult") -> str:
+    """The closing line after the pinned digest (REQ-GEN-399 criterion 4): the
+    staged tables and the date the history was generated up to. ONLY THE
+    FIXED TEST ANCHOR EXISTS YET - the rolled anchor's wording waits for
+    REQ-GEN-404 and REQ-GEN-405; GENERATOR_ANCHOR_DATE's override is said as
+    itself (PROVISIONAL (2026-11-16))."""
+    up_to, how = result.generated_up_to or (None, None)
+    tail = ""
+    if up_to is not None:
+        said = {"fixed": "the fixed test anchor",
+                "override": "set by GENERATOR_ANCHOR_DATE"}.get(how, how)
+        tail = f", generated up to {up_to} ({said})"
+    return f"{result.staged_after} staged table(s) in this environment{tail}."
+
+
+def pin_report() -> tuple[str | None, dict[str, str]]:
+    """What a process this bootstrap started reports of the pin it ran under
+    (REQ-GEN-399 criterion 3): its digest and each file's own digest, so a
+    difference can be named file by file. TOP LEVEL, so a spawned process can
+    run it by name."""
+    import hashlib
+
+    from asset_model import config_pin
+
+    held = config_pin.installed()
+    if held is None:
+        return None, {}
+    return held.digest, {path: hashlib.sha256(text.encode("utf-8")).hexdigest()
+                         for path, text in held.texts.items()}
+
+
+def pin_differences(snapshot, reports) -> tuple[str, ...]:
+    """Each started process whose reported pin differs from the bootstrap's,
+    naming the process and the files that differed. `reports` maps a stream's
+    key to what pin_report() returned in its process."""
+    import hashlib
+
+    mine = {path: hashlib.sha256(text.encode("utf-8")).hexdigest()
+            for path, text in snapshot.texts.items()}
+    out = []
+    for process, (digest, files) in reports.items():
+        if digest == snapshot.digest:
+            continue
+        if digest is None:
+            out.append(f"{_label(process)}'s process ran with no configuration pinned")
+            continue
+        differed = sorted({p for p in mine.keys() | files.keys()
+                           if mine.get(p) != files.get(p)})
+        out.append(f"{_label(process)}'s process ran under {digest[:12]}, not "
+                   f"{snapshot.digest[:12]} - differing: "
+                   + ", ".join(_shown(p) for p in differed or ["(no file differs)"]))
+    return tuple(out)
+
+
+def _shown(path: str) -> str:
+    from pathlib import Path
+
+    from asset_model import assets
+
+    try:
+        return str(Path(path).relative_to(assets.ROOT))
+    except ValueError:
+        return path
+
+
+def pin_mismatch_message(differences) -> str | None:
+    """The one wording every bootstrap caller gives when a started process
+    ran under another pin (REQ-GEN-399 criterion 3; CLI finding 10) - the CLI
+    and the TUI alike."""
+    if not differences:
+        return None
+    return ("A process this bootstrap started ran under a different configuration "
+            "snapshot from the bootstrap's own. This is a fault in mothman's hand-off "
+            "of the pinned configuration, not anything you did:\n"
+            + "\n".join(f"  - {d}" for d in differences)
+            + "\nThe history it recorded is kept but is not to be trusted - replace it "
+              "with `mothman env reset-synthetic` then `mothman pipeline bootstrap`.")
 
 
 def _collection(short: str):
@@ -336,7 +548,7 @@ def with_what_it_reads(names: list[str], say=lambda _m: None) -> list[str]:
                 why.setdefault(other, set()).add(name)
     for other, readers in sorted(why.items()):
         say(f"Adding {_label(other)}: {', '.join(_label(r) for r in sorted(readers))}'s "
-            f"checks read its tables")
+            f"checks read its tables.")
     wanted |= set(why)
     return [n for n in _shorts() if n in wanted]
 
@@ -410,6 +622,8 @@ def _label(key: str) -> str:
     each of its collections (REQ-PIPE-262 criterion 10) - or the total."""
     if key == "total":
         return "in total"
+    if key == GENERATION:
+        return GENERATION
     return " and ".join(_adapter(k).label for k in key.split(STREAM_JOIN))
 
 
@@ -612,13 +826,29 @@ class ResumeResult:
     #: As BootstrapResult's: a resume is a replay too (REQ-GEN-186
     #: criterion 3), compared in the resume's own database.
     disagreements: tuple[str, ...] = ()
+    #: As BootstrapResult's (REQ-PIPE-430 criterion 3).
+    tree_changes: tuple[str, ...] = ()
 
 
 def resume(name: str, sequential: bool = False,
            on_step: Callable[[str], None] | None = None) -> ResumeResult:
     """REQ-TEST-159 criteria 2 to 4 and 6: copy a checkpoint into a database
     of its own and replay into it arrival N onwards - once REQ-TEST-160 has
-    found nothing changed before N. Refusals change nothing."""
+    found nothing changed before N. Refusals change nothing.
+
+    WITH THE ASSET'S CONFIGURATION PINNED (REQ-GEN-399 criterion 1), as a
+    bootstrap is: one snapshot from the regeneration it compares through the
+    replay and the confirmations. An asset that is not synthetic is refused
+    in the resume's own words first, so nothing is pinned for it."""
+    from asset_model import asset_time, config_pin
+
+    if not asset_time.declared_synthetic():
+        return _resume(name, sequential, on_step)
+    with config_pin.pinned():
+        return _resume(name, sequential, on_step)
+
+
+def _resume(name: str, sequential: bool, on_step) -> ResumeResult:
     import os
 
     from bootstrap import checkpoints, decision_player, replay_inputs
@@ -687,17 +917,22 @@ def resume(name: str, sequential: bool = False,
     previous = os.environ.get(supply_db.SUPPLY_DSN_ENV)
     os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
     supply_db.release_connections()
+    tree = _Trees()
     try:
         with processing_pass.pass_lock("resume"):
             player = decision_player.Player(
                 cp.collection_id,
                 scripts=[scripted_decisions.Script(**s) for s in cp.pending_scripts])
+            # THE TREE SNAPSHOT AFTER THE RESUME'S GENERATION (REQ-PIPE-430
+            # criterion 1), released once its replay is done.
+            tree.install([cp.collection_id])
             say(f"Replaying {_label(short)} from arrival {cp.before}")
             _run_collection(short, sequential, record_deliveries=True,
                             start_at=cp.before, player=player)
             # AS A BOOTSTRAP FROM EMPTY DOES (REQ-GEN-205 criterion 19): the
             # copy holds every other collection's replay already.
             _confirm_corrections(say)
+            tree.release()
         _rebuild_results(short)
         say("Comparing every targeted supply's recorded verdict with what it was built to")
         disagreements = targets_agree([short])
@@ -708,6 +943,7 @@ def resume(name: str, sequential: bool = False,
             f"`mothman pipeline checkpoint delete {resume_db}` removes it.")
         raise
     finally:
+        tree.release(check=False)
         supply_db.release_connections()
         if previous is None:
             os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
@@ -715,7 +951,7 @@ def resume(name: str, sequential: bool = False,
             os.environ[supply_db.SUPPLY_DSN_ENV] = previous
     return ResumeResult(replayed=True, dsn=dsn, first_affected=first.arrival,
                         reason=f"{first.reason}; replayed from arrival {cp.before}",
-                        disagreements=disagreements)
+                        disagreements=disagreements, tree_changes=tuple(tree.changes))
 
 
 def _rebuild_results(short: str) -> None:
@@ -732,8 +968,9 @@ def _rebuild_results(short: str) -> None:
         results_history.build_results_from_history(_adapter(short).collection_id)
 
 
-def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
-    """Each collection in a process of its own.
+def _run_concurrently(names: list[str], sequential: bool):
+    """Each collection in a process of its own; ({stream: seconds}, {stream:
+    the pin it ran under}).
 
     PROCESSES, NOT THREADS. The four QA tools run in-process and keep
     process-wide state - Soda Core reloads `.env` into os.environ on its
@@ -751,14 +988,49 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
     layout, and adopts both itself before it loads any adapter by path - never an
     adapter object, which a path-loaded module cannot be unpickled into.
     """
+    with stream_pool(len(names)) as pool:
+        # _run_stream LOOKED UP HERE and handed by reference, so the process
+        # runs whatever this module names it now.
+        futures = {n: pool.submit(_reporting, _run_stream, n, sequential) for n in names}
+        ran = {n: f.result() for n, f in futures.items()}
+    return {n: r[0] for n, r in ran.items()}, {n: r[1] for n, r in ran.items()}
+
+
+def stream_pool(workers: int):
+    """The bootstrap's own process pool: SPAWNED, each process handed the
+    asset, its layout and the pinned configuration through the one hand-off
+    (assets.handoff; REQ-PIPE-397 criterion 12), never re-read."""
     import multiprocessing
     from concurrent.futures import ProcessPoolExecutor
 
     from asset_model import assets
 
-    context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=len(names), mp_context=context,
-                             initializer=assets.adopt,
-                             initargs=assets.handoff()) as pool:
-        futures = {n: pool.submit(_run_stream, n, sequential) for n in names}
-        return {n: f.result() for n, f in futures.items()}
+    return ProcessPoolExecutor(max_workers=workers,
+                               mp_context=multiprocessing.get_context("spawn"),
+                               initializer=_adopt_for_stream, initargs=assets.handoff())
+
+
+#: A hand-off the stream process refused (config_pin.PinMismatch), kept to be
+#: raised by its first task rather than breaking the pool (post-build-review
+#: #398): an initializer that raises surfaces only as BrokenProcessPool.
+_REFUSED_HANDOFF: BaseException | None = None
+
+
+def _adopt_for_stream(*handed) -> None:
+    """assets.adopt, its refusal of a mismatched snapshot kept for the task."""
+    global _REFUSED_HANDOFF
+    from asset_model import assets, config_pin
+
+    try:
+        assets.adopt(*handed)
+    except config_pin.PinMismatch as exc:
+        _REFUSED_HANDOFF = exc
+
+
+def _reporting(run, *args):
+    """`run(*args)` in a started process, with the pin it ran under
+    (REQ-GEN-399 criterion 3). TOP LEVEL, so a spawned process can import it
+    by name. A refused hand-off is raised here, as itself."""
+    if _REFUSED_HANDOFF is not None:
+        raise _REFUSED_HANDOFF
+    return run(*args), pin_report()

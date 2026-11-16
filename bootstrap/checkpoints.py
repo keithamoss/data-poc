@@ -298,16 +298,22 @@ def arrivals_of(collection_id: str) -> list:
     """The collection's arrivals as a regeneration would produce them, in
     receipt order - generated somewhere of its own, never data/ - so an
     arrival number can be checked, and shown, before anything is touched
-    (#133 B3 and B4). About five seconds."""
+    (#133 B3 and B4). About five seconds.
+
+    A GENERATION, SO ONE PIN (REQ-GEN-398 criterion 1): every collection it
+    generates reads the configuration as it stood when this began - and never
+    a delivery-tree snapshot (criterion 4), since it recognises the temporary
+    tree it has just written."""
     import contextlib
     import io
     import tempfile
     import warnings
 
+    from asset_model import config_pin
     from generator.public import generated_into
     from asset_model import arrivals as arrival_tree
 
-    with tempfile.TemporaryDirectory(prefix="mothman-ckpt-") as tmp, \
+    with config_pin.pinned(), tempfile.TemporaryDirectory(prefix="mothman-ckpt-") as tmp, \
             contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         with generated_into(Path(tmp)) as root:

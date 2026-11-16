@@ -327,8 +327,11 @@ def readable_checks_yaml(path: str, unreadable, keep=None) -> str:
     from qa_tools.common.qa_results_writer import _declared_reads_tables
 
     gone = set(unreadable)
-    with open(path) as f:
-        text = f.read()
+    # ONE READ, THROUGH config_yaml, as left_out_checks reads the same file
+    # (post-build-review #394; PROVISIONAL (2026-11-16): both pinned): this is
+    # mothman's own read of the check file, handed to Soda as text, so a
+    # pinned run hands Soda the file as the run began.
+    text = config_yaml.read(path)
     if not gone and keep is None:
         # VERBATIM in the ordinary case, so a run that can read every
         # table is handed exactly the authored file and no round-trip.
@@ -348,8 +351,7 @@ def left_out_checks(path: str, unreadable, keep=None) -> list[str]:
     gone = set(unreadable)
     if not gone:
         return []
-    with open(path) as f:
-        doc = config_yaml.parse(f)
+    doc = config_yaml.load(path)
     _, removed = _split(doc, gone, _declared_reads_tables(), keep)
     return removed
 

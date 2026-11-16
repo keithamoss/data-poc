@@ -264,7 +264,8 @@ class TestAThirdCollectionAtEverySite:
 
         def run(names, sequential):
             dispatched.append(list(names))
-            return {n: boot._run_stream(n, sequential) for n in names}
+            return ({n: boot._run_stream(n, sequential) for n in names},
+                    {n: boot.pin_report() for n in names})
         monkeypatch.setattr(boot, "_run_concurrently", run)
         return dispatched
 

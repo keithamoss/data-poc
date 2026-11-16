@@ -32,7 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from asset_model import asset_time, schedule
+from asset_model import asset_time, derived, schedule
 from asset_model import assets as _assets
 from asset_model.schedule import Period
 
@@ -262,8 +262,17 @@ def slots_for_dataset(dataset_id: str, until: date | None = None,
     different from how periods themselves behave: a not-expected period
     is still RETURNED by the schedule, flagged, so the dashboard can
     show "no November file, agreed" rather than a silent gap.
+
+    WORKED OUT ONCE per argument set for the agreement used and the zones in
+    force (REQ-PIPE-400); the caller's own list of frozen slots.
     """
     agreement = schedule.agreement_to_read(agreement)
+    return derived.remembered(agreement, "slots_for_dataset", (dataset_id, until),
+                              lambda: compute_slots_for_dataset(dataset_id, until, agreement))
+
+
+def compute_slots_for_dataset(dataset_id: str, until: date | None, agreement) -> list[Slot]:
+    """slots_for_dataset, worked out - what the memo calls."""
 
     def claim_opens(period_date: date) -> datetime:
         # Resolved PER PERIOD, on that period's own date, so a new calendar

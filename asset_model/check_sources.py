@@ -127,7 +127,7 @@ def dbt_definitions(read, files_in, singular_dir: str) -> "cl.DbtDefinition":
 
 def _read_working(rel: str, root: Path) -> str | None:
     path = Path(root) / rel
-    return path.read_text() if path.is_file() else None
+    return config_yaml.read(path) if path.is_file() else None
 
 
 def collect_working_tree(yaml_sources, evidently, root: Path = ROOT) -> list[cl.CheckMetadata]:
@@ -160,4 +160,4 @@ def working_tree_checks() -> list[cl.CheckMetadata]:
     what the lifecycle gate reads as its "new" side."""
     from asset_model import hierarchy
 
-    return collect_working_tree(*sources(hierarchy.data_asset_yaml().read_text()), ROOT)
+    return collect_working_tree(*sources(config_yaml.read(hierarchy.data_asset_yaml())), ROOT)

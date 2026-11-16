@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 from asset_model import assets as _assets
 
 REPO = Path(__file__).resolve().parent.parent
@@ -51,7 +51,7 @@ class Placing:
 
 def _doc(root: Path) -> dict:
     path = _path(root)
-    return (yaml.safe_load(path.read_text()) or {}) if path.exists() else {}
+    return (config_yaml.load(path) or {}) if path.exists() else {}
 
 
 def placings(root: Path = REPO) -> dict[str, Placing]:
@@ -70,7 +70,7 @@ def placings(root: Path = REPO) -> dict[str, Placing]:
 def _table(root: Path, contract: str, table: str) -> dict:
     from asset_model.linked_datasets import asset_folder
 
-    doc = yaml.safe_load((asset_folder(root) / contract).read_text()) or {}
+    doc = config_yaml.load((asset_folder(root) / contract)) or {}
     return next((t for t in doc.get("schema") or [] if t.get("name") == table), {}) or {}
 
 
@@ -87,7 +87,7 @@ def problems(root: Path = REPO) -> list[str]:
     from asset_model import assets
     from asset_model.linked_datasets import asset_folder, walk
 
-    asset = yaml.safe_load((asset_folder(root) / "data-asset.yaml").read_text()) or {}
+    asset = config_yaml.load((asset_folder(root) / "data-asset.yaml")) or {}
     where = {ds.get("id"): (coll, ds) for _a, coll, ds in walk(asset)}
     out = []
     for p in placings(root).values():

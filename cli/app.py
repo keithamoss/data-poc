@@ -231,7 +231,10 @@ def _bootstrap_menu() -> None:
         elif msg.startswith(boot.WITHIN_BUDGET):
             console.print(msg, style="green")
         else:
-            console.print(f"{msg}...", style="dim")
+            # A STATEMENT IS PASSED THROUGH, NEVER GIVEN '...' (REQ-GEN-399
+            # criterion 4), as the CLI's _step already does: only work still
+            # under way trails off.
+            console.print(msg if msg.endswith((".", ")")) else f"{msg}...", style="dim")
     from cli.pipeline import try_targets
 
     result = boot.bootstrap(on_step=step, try_targets=try_targets)
@@ -242,12 +245,24 @@ def _bootstrap_menu() -> None:
     # post-build-review #157): the same message the CLI fails with.
     from cli.pipeline import disagreement_message
 
+    # THE PINNED DIGEST, DIMMED, AFTER THE BUDGET LINE (REQ-GEN-399 criterion 4).
+    if result.pin_digest:
+        console.print(boot.pinned_line(result.pin_digest), style="dim")
     wrong = disagreement_message(result.disagreements)
     if wrong:
         console.print(wrong, style="red")
         return
-    console.print(f"Ready - {result.staged_after} staged table(s) in this "
-                   f"environment.", style="green")
+    # NOT "READY" UNDER A PIN SOME PROCESS DID NOT SHARE (criterion 3).
+    mismatch = boot.pin_mismatch_message(result.pin_differences)
+    if mismatch:
+        console.print(mismatch, style="red")
+        return
+    # NOR OVER A TREE THAT CHANGED MID-REPLAY (REQ-PIPE-430 criterion 3).
+    changed = boot.tree_changed_message(result.tree_changes)
+    if changed:
+        console.print(changed, style="red")
+        return
+    console.print(f"Ready - {boot.closing_line(result)}", style="green", soft_wrap=True)
 
 
 class _MothmanGroup(click.RichGroup):

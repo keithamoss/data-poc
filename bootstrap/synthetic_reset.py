@@ -57,7 +57,7 @@ def in_production() -> bool:
 def asset_id() -> str:
     from asset_model import asset_time
 
-    return (config_yaml.parse(asset_time.data_asset_yaml().read_text()) or {})["data_asset_id"]
+    return (config_yaml.load(asset_time.data_asset_yaml()) or {})["data_asset_id"]
 
 
 def confirmation_phrase() -> str:

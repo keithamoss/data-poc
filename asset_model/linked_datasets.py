@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 from asset_model import assets as _assets
 
 REPO = Path(__file__).resolve().parent.parent
@@ -28,7 +28,7 @@ _ID = re.compile(r"^id_(\d+)$")
 
 
 def _load(path: Path):
-    return yaml.safe_load(path.read_text()) if path.exists() else None
+    return config_yaml.load(path) if path.exists() else None
 
 
 def walk(asset: dict):

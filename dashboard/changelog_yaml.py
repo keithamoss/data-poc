@@ -48,7 +48,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 
 from qa_tools.common.schemas import Changelog
 from qa_tools.common.vocab import CHANGELOG_CATEGORIES
@@ -73,8 +73,7 @@ def parse_changelog(path: str | Path) -> dict:
     and still reads the raw YAML itself rather than going through this,
     so it can report every problem in one run instead of stopping at the
     first."""
-    with open(path) as f:
-        doc = yaml.safe_load(f) or {}
+    doc = config_yaml.load(path) or {}
 
     feed = Changelog(**(doc or {}))
     intro_paragraphs = [p.strip() for p in feed.intro.split("\n\n") if p.strip()]

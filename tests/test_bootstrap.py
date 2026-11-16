@@ -202,7 +202,8 @@ def _in_process(monkeypatch, called=None):
     def run(names, sequential):
         if called is not None:
             called.append("concurrently")
-        return {n: boot._run_stream(n, sequential) for n in names}
+        return ({n: boot._run_stream(n, sequential) for n in names},
+                {n: boot.pin_report() for n in names})
     monkeypatch.setattr(boot, "_run_concurrently", run)
 
 
@@ -228,7 +229,8 @@ class TestCollectionsRunSideBySide:
 
         def run(names, sequential):
             dispatched.append(list(names))
-            return {n: boot._run_stream(n, sequential) for n in names}
+            return ({n: boot._run_stream(n, sequential) for n in names},
+                    {n: boot.pin_report() for n in names})
         monkeypatch.setattr(boot, "_run_concurrently", run)
         return called, dispatched
 
@@ -264,7 +266,8 @@ class TestCollectionsRunSideBySide:
     def test_the_took_line_is_in_the_shared_run_time_format(self, spy, monkeypatch):
         """REQ-TEST-416 criterion 5: '1m 04s', never '64s'."""
         monkeypatch.setattr(boot, "_run_concurrently",
-                            lambda names, sequential: {n: 64.0 for n in names})
+                            lambda names, sequential: ({n: 64.0 for n in names},
+                                                       {n: boot.pin_report() for n in names}))
         steps: list[str] = []
         boot.bootstrap(collection="all", on_step=steps.append)
         (took,) = [s for s in steps if s.startswith("Took ")]
@@ -298,7 +301,7 @@ class TestCollectionsRunSideBySide:
     def test_the_wall_clock_is_reported(self, spy):
         """Criterion 6: the gain is measured rather than estimated."""
         result = boot.bootstrap(collection="all")
-        assert set(result.timings) == {*STREAMS, "total"}
+        assert set(result.timings) == {boot.GENERATION, *STREAMS, "total"}
         assert all(isinstance(v, float) for v in result.timings.values())
 
 

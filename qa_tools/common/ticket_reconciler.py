@@ -198,8 +198,7 @@ def policy_from_config(config: dict | None = None) -> str:
 
         from asset_model import hierarchy
 
-        with open(hierarchy.data_asset_yaml()) as handle:
-            config = config_yaml.parse(handle) or {}
+        config = config_yaml.load(hierarchy.data_asset_yaml()) or {}
     value = (config or {}).get("ticket_policy") or DEFAULT_POLICY
     if value not in POLICIES:
         print(f"note: ticket_policy {value!r} is not one of "

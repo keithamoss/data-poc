@@ -36,7 +36,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from asset_model import assets, check_sources
+from asset_model import assets, check_sources, config_yaml
 from asset_model import check_id as cid
 from asset_model import check_lifecycle as cl
 from qa_tools.common.diff_base import diff_base
@@ -64,7 +64,10 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
         assets.dbt_rel()
     asset = hierarchy.data_asset_yaml()
     rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
-    text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
+    # THROUGH config_yaml (post-build-review #394): reached during runs by
+    # collect_checks(None), so a pinned run answers it from its snapshot.
+    text = (config_yaml.read(asset) if ref is None or rel_asset is None
+            else _old_file_content(rel_asset, ref))
     return check_sources.sources(text)
 
 
@@ -111,7 +114,12 @@ def sources_fingerprint() -> str:
     for path in dict.fromkeys(paths):
         digest.update(str(path).encode())
         try:
-            digest.update(path.read_bytes())
+            # A CONFIGURATION FILE THROUGH config_yaml (post-build-review
+            # #394), so inside a pinned run the fingerprint names the same
+            # pinned text the checks are then collected from; dbt's SQL,
+            # which no pin holds, read as it is.
+            digest.update(config_yaml.read(path).encode("utf-8")
+                          if path.suffix in (".yaml", ".yml") else path.read_bytes())
         except FileNotFoundError:
             digest.update(b"\0missing")
     return digest.hexdigest()

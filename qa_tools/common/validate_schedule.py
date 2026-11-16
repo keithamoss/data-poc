@@ -49,6 +49,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
+from asset_model import config_yaml
 
 from asset_model import asset_time, assets, schedule
 from qa_tools.common import period_schema
@@ -106,7 +107,7 @@ class Source:
         # calendar.yaml, so fall back to the data-asset.yaml beside it.
         for path in (self.asset_path, self.asset_path.parent / "data-asset.yaml"):
             try:
-                asset_id = (yaml.safe_load(path.read_text()) or {}).get("data_asset_id")
+                asset_id = (config_yaml.load(path) or {}).get("data_asset_id")
             except (OSError, yaml.YAMLError, AttributeError):
                 asset_id = None
             if asset_id:
@@ -801,7 +802,7 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
         if path.name == src.name or rel in declared:
             continue
         try:
-            doc = yaml.safe_load(path.read_text()) or {}
+            doc = config_yaml.load(path) or {}
         except yaml.YAMLError:
             continue  # reported by the yamllint gate, not twice here
         if not isinstance(doc, dict) or doc.get("kind") != "DataContract":
@@ -827,7 +828,7 @@ def _sla_properties_errors(src: Source) -> list[ConfigError]:
     out: list[ConfigError] = []
     for path in sorted(src.contract_dir.rglob("*.yaml")):
         try:
-            doc = yaml.safe_load(path.read_text()) or {}
+            doc = config_yaml.load(path) or {}
         except yaml.YAMLError:
             continue
         if isinstance(doc, dict) and "slaProperties" in doc:
@@ -916,7 +917,7 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
             stamp = base_at.isoformat()
         content = _content_at(rel_path, sha)
         try:
-            doc = yaml.safe_load(content or "") or {}
+            doc = config_yaml.parse(content or "") or {}
         except yaml.YAMLError:
             continue
         if not isinstance(doc, dict):
@@ -960,7 +961,7 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
         if text is None:
             return None
         try:
-            doc = yaml.safe_load(text) or {}
+            doc = config_yaml.parse(text) or {}
         except yaml.YAMLError:
             return None
         return doc if isinstance(doc, dict) else None
@@ -988,7 +989,7 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
         if not walked:
             for sha, at in freeze.commits_since(ref, rels):
                 def doc_at(r, sha=sha):
-                    return yaml.safe_load(_content_at(r, sha) or "") or {}
+                    return config_yaml.parse(_content_at(r, sha) or "") or {}
                 try:
                     cal_doc = doc_at(rel(cal_path)) if rel(cal_path) else {}
                     asset_doc = doc_at(rel(asset_path)) if rel(asset_path) else {}
@@ -1053,7 +1054,7 @@ def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
     name = _repo_path(src.asset_path)
     previous = _content_at(name, ref) if name else None
     try:
-        old_doc = (yaml.safe_load(previous) or {}) if previous else {}
+        old_doc = (config_yaml.parse(previous) or {}) if previous else {}
     except yaml.YAMLError:
         old_doc = {}
     keys = sorted(set(amber_setting.list_setting_keys(raw))
@@ -1100,7 +1101,7 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     if previous is None:
         return standing
     try:
-        old_doc = yaml.safe_load(previous) or {}
+        old_doc = config_yaml.parse(previous) or {}
     except yaml.YAMLError:
         return standing
     if not isinstance(old_doc, dict):
@@ -2277,7 +2278,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
                              "This file is the asset's own configuration; nothing works without it.")]
 
     try:
-        raw = yaml.safe_load(src.asset_path.read_text()) or {}
+        raw = config_yaml.load(src.asset_path) or {}
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
@@ -2300,7 +2301,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
                             "This file holds the delivery agreement - the calendars and each "
                             "dataset's participation; nothing is owed without it.")]
     try:
-        cal_raw = yaml.safe_load(cal_path.read_text()) or {}
+        cal_raw = config_yaml.load(cal_path) or {}
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
@@ -2548,7 +2549,7 @@ def main(src: Source | None = None) -> int:
         return 1
 
     n_calendars = len(schedule.calendars())
-    n_datasets = len(list(_walk_datasets(yaml.safe_load(src.asset_path.read_text()))))
+    n_datasets = len(list(_walk_datasets(config_yaml.load(src.asset_path))))
     # A STATEMENT ABOUT THE CONFIGURATION, NOT ABOUT TODAY
     # (plans/post-build-review.md #17, Keith's call 2026-09-24).
     #

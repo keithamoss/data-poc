@@ -15653,3 +15653,162 @@ twice. It deliberately did not re-find the `TypeError`.
        queue, 'crashed in <tool>' in the run step's summary line.
        #401's question above.
      - **Ran**: see REQ-PIPE-417's evidence.
+
+390. **[done, 2026-11-16]** **[QA pipeline]** **One pinned generation built 329 agreements from the same few documents, so REQ-PIPE-400's memo kept forgetting the committed one.**
+     Found building REQ-PIPE-400: `tests/test_derived_once.py`'s counting test
+     saw `Agreement.standing_on` worked out twice for the same agreement,
+     zones and arguments. generator/correction_claims builds the agreement
+     either side of each declared correction afresh on every call
+     (`agreement.from_doc`), and a staged correction parses its zones afresh
+     each time, so one Birth Registrations generation passed 329 distinct
+     (agreement, zones) pairs through a memo that keeps 16 - the committed
+     agreement's values were evicted and worked out again.
+     - **Fix** (defect of the build, failing test first): `agreement.from_doc`
+       answers one instance per document content and
+       `asset_time.parse_timezone_versions` one tuple per `timezone:` block,
+       each through a `config_yaml.Built` keyed on the canonical JSON. The
+       same generation sees 3 pairs; the counting test passes. Both values
+       are immutable, so sharing one instance is safe.
+
+391. **[todo, 2026-11-16]** **[QA pipeline]** **[Testing & dev tooling]** **dbt's own partial parse misses a schema edit that keeps the file's modification time.**
+     Found writing REQ-PIPE-397 criterion 15's "a dbt model edited inside a
+     pin reaches dbt": an in-place edit of a daily schema.yml with its
+     modification time put back (the REQ-PIPE-254 test style) changed
+     `dbt_common._project_fingerprint`, so `parsed_test_nodes` asked dbt to
+     parse again - and dbt answered the old meta name, very likely from the
+     long-lived worker's partial-parse file, which outlives the call (not
+     traced further). With the time moved, dbt sees the edit (the test now
+     moves it). NOT CAUSED BY THE PIN: dbt reads
+     its project itself, outside config_yaml (SA Q4). It means a mothman
+     cache keyed on content can sit over a dbt answer keyed on time - the
+     shape REQ-PIPE-254 criterion 15 exists to forbid, one layer down.
+     - **Confirmed by the critic on 22e45ff5**: dbt-core skips re-reading a
+       schema file whose modification time has not changed
+       (`dbt/parser/read_files.py` lines 75-88), so the partial parse is the
+       cause.
+     - **For Keith**: worth a requirement? RECOMMENDED (the critic's): delete
+       the dbt worker's `partial_parse.msgpack` whenever
+       `dbt_common._project_fingerprint` changes, so a content change always
+       reaches a full parse while an unchanged project keeps the fast path.
+       The other option was passing `--no-partial-parse` to the parse in
+       `parsed_test_nodes` only, which pays a full parse every time. Not built
+       here: outside the speed batch's criteria, and it touches the dbt worker
+       REQ-PIPE-157 settled.
+
+392. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **The fast half's own run shows three failures this branch did not cause.**
+     Seen in the speed batch's fast-half run (`-m "not needs_deployment" -n 2`,
+     data/ and reports/ moved aside, 2026-11-16): (a)
+     `tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group`
+     fails whenever `-m "not needs_deployment"` deselects part of
+     `tests/test_recheck_trial.py` (it fails with only those two modules
+     selected; neither file nor conftest.py is touched by this branch); (b)
+     `tests/test_geocoding_faults.py`'s two plan tests fail identically against
+     12f06b34's product code - Linkage Products' plan reads the Child
+     Protection and ED trees, which a checkout with no data/quarterly lacks;
+     (c) `tests/test_period_opening.py::TestOweNothingQuarter` failed and
+     `tests/test_refused_dataset_freezes.py::TestAnOwedReCheckWaits` errored at
+     setup (the period-view drop guard refusing a period_2099 schema another
+     test left), and both modules pass alone, 30 of 30, at HEAD and at
+     12f06b34. A sighting, not a diagnosis: (a) and (b) look like the CI
+     fast half's own conditions; (c) like worker-database pollution between
+     modules.
+
+
+393. **[done, 2026-11-16]** **[QA pipeline]** **REQ-PIPE-400's memo ignored the hierarchy.**
+     The critic on 22e45ff5 (F1): the memo keyed on (agreement, zones) only,
+     but `Agreement.collection_of()` reads `hierarchy.dataset()`, and #390 keyed
+     the zones on the `timezone:` block alone - so an unpinned process kept
+     answering slots and periods worked out under an old hierarchy (two
+     collection ids swapped left `slots_for_dataset("cp-clients")` stale), and
+     a hit skipped the unknown-dataset refusal.
+     - **Fix** (defect, failing test first): the key is (agreement, zones,
+       hierarchy tree), the tree being `hierarchy.tree()` - one value per text
+       of data-asset.yaml from hierarchy's own Built store, held strongly as
+       the other two are. `tests/test_derived_once.py::TestAHierarchyEditIsSeenUnpinned`
+       (the swap, and an unknown dataset after a hit) failed against 22e45ff5
+       and passes.
+
+394. **[done, 2026-11-16]** **[QA pipeline]** **Four readers inside a pinned run read their file themselves.**
+     The critic (F2): `bootstrap/scripted_corrections.load`,
+     `validate_check_lifecycle._sources(None)` (reached during runs through
+     `collect_checks(None)` from tables_read, bulk_recheck, qa_results_reader
+     and the held-back notices) and `synthetic_reset.asset_id` read raw, and
+     Soda's check file was read raw by `readable_checks_yaml` and pinned by
+     `left_out_checks`.
+     - **Fix** (defect, failing test first): all four through config_yaml;
+       Soda's file pinned in both (PROVISIONAL (2026-11-16), the coordinator's
+       choice: it is mothman's own read, handed to Soda as text). Found by the
+       new test: `sources_fingerprint` read every check file raw too, so it now
+       reads a YAML file through config_yaml (dbt's SQL as before).
+       `tests/test_config_pin.py::TestEveryReaderInsideARunIsPinned` (four
+       readers, no snapshot file opened inside a pin) failed against
+       22e45ff5 and passes.
+
+395. **[done, 2026-11-16]** **[Testing & dev tooling]** **The pinned-reads gate had blind spots and no failing test.**
+     The critic (F3): `bootstrap/` and `cli/` were out of scope, and `from yaml
+     import safe_load`, a two-step `text = Path(p).read_text()` then
+     `config_yaml.parse(text)`, and `with open(path) as fh: text = fh.read()`
+     then a parse all passed.
+     - **Fix** (failing tests first): both folders in scope; a parse call
+       imported by name is a finding at its import; a name assigned a file's
+       content (read_text, open().read(), a with-open handle's read()) is
+       tracked file-wide, so its parse is a finding however the name or path
+       is spelled. `tests/test_validate_imports.py`: one planted case per form
+       in each of four folders (18 of the 24 failed against 22e45ff5), a parse
+       of text from elsewhere passing, and the real tree passing - which it
+       does with nothing new found once #394's readers moved.
+
+396. **[done, 2026-11-16]** **[Pipeline & publishing]** **A pin that could not be installed left the pass lock held.**
+     The critic (F4): the bootstrap entered the pass lock, then the pin; a
+     refused pin left the lock held - in the TUI's long-lived process, until
+     it exited.
+     - **Fix** (defect, failing test first): one ExitStack holds the lock's
+       release and the pin. `tests/test_bootstrap_pin.py::TestAFailedPinLeavesNothingHeld`
+       (the lock counted in pg_locks after a refused pin, the failed call's
+       frames kept) found it held against 22e45ff5 and released now.
+
+397. **[done, 2026-11-16]** **[Data generation]** **`generate-synthetic-data` on a real asset ended in a traceback.**
+     The critic (F5): a PinRefused from the generation's pin escaped
+     `cli/pipeline.generate_collection`.
+     - **Fix** (defect, failing test first): said as a ClickException with the
+       refusal's own text. `tests/test_bootstrap_pin.py::TestGeneratingOnARealAssetIsARefusal`
+       failed against 22e45ff5 and passes. Writing it, the first draft wrote
+       `synthetic: false` THROUGH the asset folder's link to the real
+       data-asset.yaml - caught by `git status` at once and restored; the test
+       now unlinks before writing.
+
+398. **[done, 2026-11-16]** **[Pipeline & publishing]** **A failed bootstrap printed green first and dropped the checkpoint line; a refused hand-off read as BrokenProcessPool.**
+     The critic (F9): on a pin difference or a changed tree the CLI printed
+     "Populated: ..." in green before exiting non-zero, and skipped
+     "Checkpoint kept:"; a PinMismatch in a pool initializer surfaced as
+     BrokenProcessPool.
+     - **Fix** (defects, failing tests first): the checkpoint line comes
+       first, then either failure, and "Populated:" only on success. The
+       bootstrap's own stream pool keeps a refused hand-off and raises it from
+       the stream's first task, as itself. PROVISIONAL (2026-11-16): the other
+       pools (target trial, parallel_orchestrate, the datacontract worker)
+       still break with BrokenProcessPool on a mismatch - unwrapping them
+       would put the same code into pipeline modules for a fault that cannot
+       happen through the one hand-off. Tests:
+       `TestAFailedBootstrapSaysSoBeforeAnythingGreen` and
+       `TestARefusedHandOffIsSaidAsItself`, both failing against 22e45ff5.
+
+399. **[done, 2026-11-16]** **[Testing & dev tooling]** **Nothing cleared the memo or caught a leftover pin between tests.**
+     The critic (F8). tests/conftest.py's autouse
+     `_no_pin_or_memo_carried_over` clears `derived.MEMO` before and after
+     every test, and releases and fails on a leftover configuration pin or
+     delivery-tree snapshot. Hygiene, not a defect.
+
+409. **[todo, 2026-11-16]** **[QA pipeline]** **For Keith: what the pin and the memo do not hold.**
+     Recorded from the critic, no behaviour changed:
+     - **F6**: a pin holds files' TEXT. Whether a file exists, and what a
+       folder lists, are still asked of the disk inside a pin
+       (`Path.exists()`, `is_file()`, `assets.Resolver.names`, the file
+       listing `declared_files` itself) - REQ-PIPE-397's PERFORMANCE NFR
+       allows it, but a file added or removed mid-run is seen at once while an
+       edited one is not.
+     - **F7**: the memo is bounded per (agreement, zones, hierarchy) triple -
+       16 of them - not per entry, so one triple's entries grow with the
+       distinct arguments a run asks (thousands at thirty collections, per
+       REQ-PIPE-400's SCALABILITY NFR). Worth a per-entry bound only if a
+       long-running unpinned process shows it.

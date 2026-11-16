@@ -98,17 +98,24 @@ class TestOneLoaderOneImmutableValue:
         assert new.claim_opens_at == new.due_at - timedelta(hours=2)
 
     def test_reading_it_opens_nothing_under_data(self, monkeypatch):
-        """Criterion 23."""
+        """Criterion 23. Both opens are watched: the loader reads through
+        config_yaml.read, which opens with os.open (REQ-PIPE-397 criterion 7)."""
         import builtins
+        import os
 
         opened = []
-        real_open = builtins.open
+        real_open, real_os_open = builtins.open, os.open
 
         def watching(file, *args, **kwargs):
             opened.append(str(file))
             return real_open(file, *args, **kwargs)
 
+        def watching_os(file, *args, **kwargs):
+            opened.append(str(file))
+            return real_os_open(file, *args, **kwargs)
+
         monkeypatch.setattr(builtins, "open", watching)
+        monkeypatch.setattr(os, "open", watching_os)
         agreement.load(agreement.calendar_yaml())
         assert opened and not [p for p in opened if "/data/" in p], opened
 

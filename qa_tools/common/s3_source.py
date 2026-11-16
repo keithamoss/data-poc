@@ -31,8 +31,7 @@ def dataset_s3_config(contract_path: str) -> dict:
     "confirm in the morning" item). Missing entries read as None, not an
     error - a contract that genuinely has no S3 source configured yet is
     a real, valid state, not a config bug."""
-    with open(contract_path) as f:
-        doc = config_yaml.parse(f)
+    doc = config_yaml.load(contract_path)
     props = {cp["property"]: cp["value"] for cp in doc.get("customProperties") or [] if "property" in cp}
     return {
         "prefix": props.get("s3Source"),

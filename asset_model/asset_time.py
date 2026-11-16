@@ -84,10 +84,31 @@ class ZoneVersion:
         return datetime.combine(self.effective_from, time.min, tzinfo=self.zone)
 
 
+#: Timezone versions parsed from a document, keyed on its `timezone:` block
+#: (REQ-PIPE-400).
+_FROM_BLOCK = config_yaml.Built(versions=16)
+
+
 def parse_timezone_versions(doc: dict, where: str = "assets/<asset>/data-asset.yaml") -> tuple[ZoneVersion, ...]:
     """The asset's timezone versions from a parsed data-asset.yaml, oldest
     first. Refuses the old bare `timezone: <name>` form and a fixed UTC
-    offset (criterion 1) rather than reading either."""
+    offset (criterion 1) rather than reading either.
+
+    THE SAME TUPLE FOR THE SAME BLOCK (REQ-PIPE-400): a staged correction
+    parses the zones again for every arrival it is staged for, and the values
+    derived under a set of zones are remembered per instance
+    (asset_model/derived.py). Keyed on the block's canonical text; a block
+    that cannot be written canonically is parsed afresh."""
+    import json
+
+    try:
+        text = json.dumps(doc.get("timezone"), sort_keys=True, default=repr)
+    except (TypeError, ValueError):
+        return _parse_timezone_versions(doc, where)
+    return _FROM_BLOCK.get(where, text, lambda: _parse_timezone_versions(doc, where))
+
+
+def _parse_timezone_versions(doc: dict, where: str) -> tuple[ZoneVersion, ...]:
     block = doc.get("timezone")
     if not block:
         raise ValueError(

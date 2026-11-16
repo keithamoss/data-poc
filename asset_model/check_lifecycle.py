@@ -401,8 +401,7 @@ def _parse_dbt_singular_test(entry: dict, source: str,
 
 def parse_dbt_check_metadata(schema_yml_path: Path | str, *,
                              definition: "DbtDefinition | None" = None) -> list[CheckMetadata]:
-    with open(schema_yml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(schema_yml_path) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(schema_yml_path)
@@ -542,8 +541,7 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
 
 
 def parse_soda_check_metadata(soda_yml_path: Path | str) -> list[CheckMetadata]:
-    with open(soda_yml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(soda_yml_path) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(soda_yml_path)
@@ -653,8 +651,7 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str, *,
 def contract_rule_models(contract_yaml_path: Path | str) -> dict[str, str]:
     """check_id -> the contract model (table) its quality rule sits on -
     what datacontract-cli's `schema_name` narrows by (REQ-PIPE-190)."""
-    with open(contract_yaml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(contract_yaml_path) or {}
     out: dict[str, str] = {}
     for table in doc.get("schema", []) or []:
         rules = list(table.get("quality", []) or [])
@@ -677,8 +674,7 @@ def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str,
     a check_id's column segment agrees with where its rule really sits -
     the two were free to disagree before, and nothing would have said
     so."""
-    with open(contract_yaml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(contract_yaml_path) or {}
     out: list[tuple[str, str | None]] = []
     for table in doc.get("schema", []) or []:
         for rule in table.get("quality", []) or []:
@@ -744,8 +740,7 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
     """
     from asset_model import file_check_definitions, hierarchy
 
-    with open(file_checks_yaml_path) as f:
-        doc = config_yaml.parse(f) or {}
+    doc = config_yaml.load(file_checks_yaml_path) or {}
     source = str(file_checks_yaml_path)
     out: list[CheckMetadata] = []
     for meta in doc.get("checks") or []:
@@ -810,7 +805,7 @@ def evidently_checks_from_text(text: str, source: str) -> dict:
 
 def load_evidently_checks(path: Path | str) -> dict:
     """evidently_checks_from_text() over a file on disk."""
-    return evidently_checks_from_text(Path(path).read_text(), str(path))
+    return evidently_checks_from_text(config_yaml.read(path), str(path))
 
 def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[CheckMetadata]:
     """`check_lifecycle` is a `{check_id: metadata}` dict, as
@@ -1004,7 +999,7 @@ def contract_columns(paths=None) -> dict[str, set[str]]:
     root = Path(__file__).resolve().parent.parent
     out: dict[str, set[str]] = {}
     for rel in collections.check_files("contract") if paths is None else paths:
-        doc = config_yaml.parse((root / rel).read_text()) or {}
+        doc = config_yaml.load(root / rel) or {}
         for table in doc.get("schema") or []:
             out.setdefault(str(table.get("name")), set()).update(
                 str(p.get("name")) for p in table.get("properties") or [])

@@ -44,7 +44,7 @@ _majors: dict = {}
 def _declared_value(path=None):
     from asset_model.hierarchy import data_asset_yaml
 
-    text = Path(path or data_asset_yaml()).read_text()
+    text = config_yaml.read(path or data_asset_yaml())
     if text not in _majors:
         if len(_majors) > 16:
             _majors.clear()
@@ -112,12 +112,12 @@ def image_tags(compose=None, workflow=None) -> dict[str, str]:
     EVERY job of test.yml - its services and its own `container` - every one,
     not the first (post-build-review #87)."""
     found: dict[str, str] = {}
-    compose_doc = config_yaml.parse(Path(compose or COMPOSE).read_text()) or {}
+    compose_doc = config_yaml.load(Path(compose or COMPOSE)) or {}
     for name, service in (compose_doc.get("services") or {}).items():
         image = str((service or {}).get("image") or "")
         if image and _is_postgres(image):
             found[f".devcontainer/docker-compose.yml service {name}"] = image
-    wf = config_yaml.parse(Path(workflow or TEST_WORKFLOW).read_text()) or {}
+    wf = config_yaml.load(Path(workflow or TEST_WORKFLOW)) or {}
     for job_name, job in (wf.get("jobs") or {}).items():
         job = job or {}
         for svc_name, svc in (job.get("services") or {}).items():
