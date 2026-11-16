@@ -189,6 +189,13 @@ class TestAResumeIsRefusedBeforeItCopiesAnything:
 
     @pytest.fixture
     def taken(self, scratch_source, monkeypatch):
+        # THE ANCHOR A BOOTSTRAP RECORDS BEFORE ITS FIRST RUN (REQ-GEN-404
+        # criterion 4), which the copy carries and a resume regenerates at.
+        from asset_model import history_anchor
+        from qa_tools.common import qa_store
+
+        with supply_db.connect(dsn=scratch_source, label="test-checkpoint") as conn:
+            qa_store.record_history_anchor(conn, history_anchor.FIXED_TEST_ANCHOR)
         cp = checkpoints.save("child-protection", 5, recorded=_recorded(), pending_scripts=[],
                               dsn=scratch_source)
         monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, scratch_source)

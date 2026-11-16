@@ -33,13 +33,15 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Callable
 
 import psycopg
 
 from bootstrap import generation
 from generator import public as generator
-from qa_tools.common import supply_db
+from asset_model import history_anchor
+from qa_tools.common import qa_store, supply_db
 from qa_tools.common.streams import (  # noqa: F401 - the bootstrap's names for them
     HISTORY_REFUSAL,
     StreamRefused,
@@ -131,8 +133,16 @@ def bootstrap(collection: str = "all", force: bool = False,
               on_step: Callable[[str], None] | None = None,
               checkpoint_before: int | None = None,
               skip_target_trial: bool = False,
-              try_targets: Callable[[str], object] | None = None) -> BootstrapResult:
+              try_targets: Callable[[str], object] | None = None,
+              anchor: str | date | None = None,
+              roll_anchor: bool = False) -> BootstrapResult:
     """Ensure this environment's database has data and QA results.
+
+    THE ANCHOR (REQ-GEN-404, REQ-GEN-405): the fixed test anchor unless
+    `anchor` names another date or `roll_anchor` rolls to today on the asset's
+    clock - both refused under test and CI, and refused over a database that
+    already holds a history. Installed for the whole run, handed to every
+    process it starts, and recorded in the qa schema.
 
     `force` runs even when staging already holds tables - but NEVER over
     recorded QA history (REQ-PIPE-144 criterion 38): that is refused,
@@ -147,6 +157,35 @@ def bootstrap(collection: str = "all", force: bool = False,
     `try_targets(collection_id)` runs a collection's target trial - the
     command's, handed in by cli/, which this package may not import.
     """
+    # AN ANCHOR INSTALLED BEFORE THE FIRST CONFIGURATION READ (REQ-GEN-404
+    # criterion 12, REQ-GEN-406 criterion 3): a synthetic asset's offset dates
+    # resolve against it, and with no anchor file a sandbox could not read its
+    # own configuration. The date asked for - or the fixed test anchor - until
+    # the run's own anchor is settled below; the retired variable refused first.
+    try:
+        generator.refuse_the_retired_variable()
+    except generator.AnchorRefused as exc:
+        return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                               refused=True, reason=str(exc))
+    with history_anchor.anchored(_provisional(anchor)):
+        return _bootstrap(collection, force, sequential, on_step, checkpoint_before,
+                          skip_target_trial, try_targets, anchor, roll_anchor)
+
+
+def _provisional(anchor) -> date:
+    """The date `--anchor` names, if it is one, else the fixed test anchor -
+    what configuration reads resolve against until the anchor is validated."""
+    if isinstance(anchor, date):
+        return anchor
+    try:
+        return date.fromisoformat(str(anchor).strip()) if anchor is not None \
+            else history_anchor.FIXED_TEST_ANCHOR
+    except ValueError:
+        return history_anchor.FIXED_TEST_ANCHOR
+
+
+def _bootstrap(collection, force, sequential, on_step, checkpoint_before,
+               skip_target_trial, try_targets, anchor, roll_anchor) -> BootstrapResult:
     say = on_step or (lambda _msg: None)
     wall_started = time.monotonic()
 
@@ -154,6 +193,23 @@ def bootstrap(collection: str = "all", force: bool = False,
     if refused:
         return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                refused=True, reason=refused)
+    from bootstrap import anchoring
+
+    try:
+        anchoring.requested(anchor, roll_anchor)
+        dated = anchoring.chosen_without_roll(anchor)
+    except generator.AnchorRefused as exc:
+        return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                               refused=True, reason=str(exc))
+    if roll_anchor and checkpoint_before is not None:
+        # PROVISIONAL (2026-11-16): a checkpoint is a test-development tool and
+        # a roll is a demo regeneration; the arrival numbers a checkpoint is
+        # checked against would be worked out before the roll's date is known.
+        return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                               refused=True,
+                               reason="--checkpoint-before is not taken with --roll-anchor - "
+                                      "take checkpoints on a bootstrap at the fixed test "
+                                      "anchor, or with --anchor <date>")
 
     # A CHECKPOINT IS OF ONE COLLECTION, on a synthetic asset (REQ-TEST-159):
     # both side by side are never both between arrivals at once.
@@ -179,8 +235,10 @@ def bootstrap(collection: str = "all", force: bool = False,
             # B3): against a regeneration somewhere of its own, so a refusal
             # never follows a rewritten data/ tree.
             say("Checking where the checkpoint can be taken")
-            checkpoints.snapped(checkpoints.arrivals_of(_collection(collection).id),
-                                checkpoint_before)
+            # AT THE ANCHOR THIS BOOTSTRAP GENERATES AT (REQ-GEN-404 criterion 6).
+            with history_anchor.anchored(dated.anchor):
+                found = checkpoints.arrivals_of(_collection(collection).id)
+            checkpoints.snapped(found, checkpoint_before)
         except checkpoints.CheckpointRefused as exc:
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True, reason=str(exc))
@@ -212,6 +270,18 @@ def bootstrap(collection: str = "all", force: bool = False,
         supply_db.ensure_schemas(conn)
         before = staged_table_count(conn)
         history = holds_history(conn)
+        recorded_anchor = qa_store.history_anchor(conn)
+
+    if (roll_anchor or anchor is not None) and (before or history):
+        # A DATE ASKED OF A POPULATED DATABASE IS REFUSED (REQ-GEN-405
+        # criterion 6; CLI finding 2), naming what is there and what replaces it.
+        flag = "--roll-anchor" if roll_anchor else f"--anchor {anchor}"
+        there = recorded_anchor.isoformat() if recorded_anchor else "not recorded"
+        return BootstrapResult(
+            populated=False, staged_before=before, staged_after=before, refused=True,
+            reason=f"{flag} was given, and this database already holds a history (anchor: "
+                   f"{there}) - nothing was generated. To replace it, run `mothman env "
+                   f"reset-synthetic`, then `mothman pipeline bootstrap {flag}` again")
 
     if checkpoint_before is not None and before:
         # ASKED FOR A CHECKPOINT AND GOT NONE is a refusal, not "nothing to
@@ -234,6 +304,17 @@ def bootstrap(collection: str = "all", force: bool = False,
         return BootstrapResult(populated=False, staged_before=before,
                                staged_after=before, refused=True,
                                reason=HISTORY_REFUSAL[0].upper() + HISTORY_REFUSAL[1:])
+
+    if roll_anchor:
+        # THE ROLL, SAID BEFORE THE LONG PART (REQ-GEN-405 criteria 3 and 5; CLI
+        # finding 7): after the populated check, before generation.
+        say("Working out the date to roll to")
+        try:
+            dated = anchoring.roll()
+        except generator.AnchorRefused as exc:
+            return BootstrapResult(populated=False, staged_before=before,
+                                   staged_after=before, refused=True, reason=str(exc))
+        say(dated.said)
 
     # THE PASS LOCK (REQ-PIPE-151 criterion 16): a bootstrap and a
     # processing pass against one database would each process the same
@@ -267,20 +348,28 @@ def bootstrap(collection: str = "all", force: bool = False,
 
     with ExitStack() as stack:
         stack.callback(lock.__exit__, None, None, None)
+        # THE ANCHOR INSTALLED FOR THE WHOLE RUN (REQ-GEN-404 criterion 10),
+        # handed to every process it starts with the pin (assets.handoff).
+        stack.enter_context(history_anchor.anchored(dated.anchor))
         snapshot = stack.enter_context(config_pin.pinned())
-        return _populate(names=chosen, groups=groups, collection=collection,
+        return _populate(dated=dated, names=chosen, groups=groups, collection=collection,
                          sequential=sequential, say=say, held=held, lock=lock,
                          taken=taken, before=before, checkpoint_before=checkpoint_before,
                          skip_target_trial=skip_target_trial, try_targets=try_targets,
                          snapshot=snapshot, wall_started=wall_started)
 
 
-def _populate(*, names, groups, collection, sequential, say, held, lock, taken, before,
+def _populate(*, dated, names, groups, collection, sequential, say, held, lock, taken, before,
               checkpoint_before, skip_target_trial, try_targets, snapshot,
               wall_started) -> BootstrapResult:
     """The bootstrap's work once it holds the pass lock and the pin."""
     differences: tuple[str, ...] = ()
     tree = _Trees()
+    # THE ANCHOR RECORDED IN THE QA SCHEMA, ONCE PER HISTORY (REQ-GEN-404
+    # criterion 4), before the first run - so a checkpoint copied mid-replay
+    # carries it, and a resume regenerates at it (criterion 6).
+    with supply_db.connect(label="mothman:bootstrap") as conn:
+        qa_store.record_history_anchor(conn, dated.anchor)
     try:
         # THE COLLECTIONS COME FROM THE REGISTRY (REQ-PIPE-240), each run
         # through its adapter - imported lazily, because the orchestrators
@@ -377,7 +466,7 @@ def _populate(*, names, groups, collection, sequential, say, held, lock, taken, 
                            disagreements=disagreements, wall_seconds=wall,
                            pin_digest=snapshot.digest, pin_differences=differences,
                            tree_changes=tuple(tree.changes),
-                           generated_up_to=generator.anchor_statement())
+                           generated_up_to=(dated.anchor.isoformat(), dated.how))
 
 
 class _Trees:
@@ -447,16 +536,22 @@ def pinned_line(digest: str) -> str:
 
 
 def closing_line(result: "BootstrapResult") -> str:
-    """The closing line after the pinned digest (REQ-GEN-399 criterion 4): the
-    staged tables and the date the history was generated up to. ONLY THE
-    FIXED TEST ANCHOR EXISTS YET - the rolled anchor's wording waits for
-    REQ-GEN-404 and REQ-GEN-405; GENERATOR_ANCHOR_DATE's override is said as
-    itself (PROVISIONAL (2026-11-16))."""
+    """The closing line after the pinned digest (REQ-GEN-399 criterion 4,
+    REQ-DASH-407 criterion 7): the staged tables and the date the history was
+    generated up to - '(the fixed test anchor)', or for a roll '(rolled to
+    today on <zone>'s clock; `--anchor <date>` reproduces it)'. An anchor given
+    with --anchor says so (PROVISIONAL (2026-11-16): the criterion names only
+    the two)."""
     up_to, how = result.generated_up_to or (None, None)
     tail = ""
     if up_to is not None:
-        said = {"fixed": "the fixed test anchor",
-                "override": "set by GENERATOR_ANCHOR_DATE"}.get(how, how)
+        if how == "fixed":
+            said = "the fixed test anchor"
+        elif how == "rolled":
+            said = (f"rolled to today on {generator.zone_name()}'s clock; "
+                    f"`--anchor {up_to}` reproduces it")
+        else:
+            said = f"given with `--anchor {up_to}`"
         tail = f", generated up to {up_to} ({said})"
     return f"{result.staged_after} staged table(s) in this environment{tail}."
 
@@ -849,10 +944,8 @@ def resume(name: str, sequential: bool = False,
 
 
 def _resume(name: str, sequential: bool, on_step) -> ResumeResult:
-    import os
 
-    from bootstrap import checkpoints, decision_player, replay_inputs
-    from qa_tools.common import processing_pass, scripted_decisions
+    from bootstrap import checkpoints
 
     say = on_step or (lambda _msg: None)
     try:
@@ -883,6 +976,27 @@ def _resume(name: str, sequential: bool, on_step) -> ResumeResult:
                    "would have to start from the first arrival, which is before this "
                    "checkpoint - nothing was copied or replayed. Start again with a "
                    "bootstrap from empty")
+
+    # THE ANCHOR THE HISTORY WAS GENERATED AT, NEVER TODAY'S (REQ-GEN-404
+    # criterion 6): every regeneration below - the comparison's and the
+    # replay's - is at it, and a checkpoint recording none is refused.
+    anchor = checkpoints.recorded_anchor(cp)
+    if anchor is None:
+        return ResumeResult(
+            replayed=False, refused=True,
+            reason=f"{name} records no anchor for the history it copied (it was taken before "
+                   f"REQ-GEN-404), so its deliveries cannot be regenerated as they were - "
+                   f"nothing was copied or replayed. Run `mothman env reset-synthetic` then "
+                   f"`mothman pipeline bootstrap`")
+    with history_anchor.anchored(anchor):
+        return _resume_at(name, cp, sequential, say)
+
+
+def _resume_at(name, cp, sequential: bool, say) -> ResumeResult:
+    import os
+
+    from bootstrap import checkpoints, decision_player, replay_inputs
+    from qa_tools.common import processing_pass, scripted_decisions
 
     say("Regenerating the deliveries to compare them with the checkpoint's")
     first = replay_inputs.first_affected(cp.recorded)

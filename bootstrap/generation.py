@@ -76,6 +76,35 @@ def _generate_collection(collection_id: str, *, trial: bool, try_targets, say) -
     scenario_map.write_map(naming_mine=public.this_assets_scenarios())
 
 
+def generate_on_its_own(collection_id: str, *, trial: bool,
+                        try_targets: Callable[[str], object] | None = None,
+                        say: Callable[[str], None] = print, anchor=None) -> None:
+    """`mothman <collection> generate-synthetic-data`: one collection generated
+    at the anchor its caller asked for - `anchor`, else the fixed test anchor
+    (REQ-GEN-405 criterion 4) - installed for the generation and handed to every
+    process it starts (REQ-GEN-404 criterion 10).
+
+    REFUSED BEFORE ANYTHING IS WRITTEN (REQ-GEN-404 criteria 7, 8 and 9): the
+    retired GENERATOR_ANCHOR_DATE; an anchor that is not a date, is in the
+    future or is before the fixed one; another anchor than the fixed one under
+    test or CI; and an anchor other than the one recorded for the asset's
+    current history (SR3), naming reset then bootstrap."""
+    from asset_model import history_anchor
+    from bootstrap import anchoring, bootstrap
+
+    public.refuse_the_retired_variable()
+    # INSTALLED BEFORE THE FIRST CONFIGURATION READ, the validation's own
+    # included (REQ-GEN-404 criterion 12).
+    with history_anchor.anchored(bootstrap._provisional(anchor)):
+        anchoring.requested(anchor, False)
+        chosen = anchoring.chosen_without_roll(anchor)
+        problem = anchoring.mismatch(chosen.anchor, history_anchor.recorded())
+        if problem:
+            raise anchoring.AnchorRefused(problem)
+        with history_anchor.anchored(chosen.anchor):
+            generate_collection(collection_id, trial=trial, try_targets=try_targets, say=say)
+
+
 def took_line(seconds: float) -> str:
     """What `mothman <collection> generate-synthetic-data` prints when it ends
     on its own (REQ-GEN-398 criterion 3): one line naming how long generation

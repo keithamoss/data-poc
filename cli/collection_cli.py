@@ -123,7 +123,7 @@ class CollectionCLI:
         provider = _provider(self.coll)
         return bool(provider and provider.target_trial)
 
-    def generate_synthetic_data(self, trial: bool | None = None) -> None:
+    def generate_synthetic_data(self, trial: bool | None = None, anchor: str | None = None) -> None:
         """Generate through the shared driver (REQ-GEN-246), then the target
         trial where the provider declares one, then the scenario map -
         cli/pipeline.py's generate_collection(). The trial defaults to what
@@ -132,7 +132,8 @@ class CollectionCLI:
         from cli.pipeline import generate_collection
 
         generate_collection(self.collection_id,
-                            trial=self.has_target_trial if trial is None else trial)
+                            trial=self.has_target_trial if trial is None else trial,
+                            anchor=anchor)
 
     # ---- the target trial (REQ-GEN-186; REQ-GEN-298 criterion 10) ----------
 

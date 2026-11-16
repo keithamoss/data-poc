@@ -63,4 +63,8 @@ def supply_files_under_data() -> set[Path]:
 
 #: Everything a generator run legitimately leaves under its output root.
 GENERATOR_OUTPUTS = {"deliveries", "receipts", "generator_bookkeeping.json",
-                     "scenario_placements.json"}
+                     "scenario_placements.json",
+                     # the anchor file beside the tree (REQ-GEN-404 criterion 3)
+                     "history_anchor"}
+
+

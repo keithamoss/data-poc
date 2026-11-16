@@ -228,8 +228,11 @@ class TestTheTableHoldsTheRunTimeToItsEnd:
             qa_store.end_attempt(conn, run_key, seq, qa_store.CRASHED, elapsed_ms=1,
                                  error_type="X", error_message="m", tool="dbt-core")
 
-    def test_the_schema_is_version_51(self):
-        assert qa_store.SCHEMA_VERSION == 51
+    def test_the_schema_is_at_least_version_51(self):
+        """Version 51 brought this shape in; a later bump (52, the history
+        anchor, REQ-GEN-404) is work succeeding, not this shape going
+        (CLAUDE.md test rule 4)."""
+        assert qa_store.SCHEMA_VERSION >= 51
 
 
 # ---------------------------------------------------------------------------

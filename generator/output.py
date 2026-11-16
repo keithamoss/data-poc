@@ -43,6 +43,7 @@ def redirect(root: Path):
     names = {(driver, "deliveries_dir"): root / "deliveries",
              (driver, "receipts_dir"): root / "receipts",
              (driver, "bookkeeping_path"): root / "generator_bookkeeping.json",
+             (driver, "anchor_path"): root / "history_anchor",
              (scenario_injection, "placements_path"): root / "scenario_placements.json"}
     original = {key: getattr(*key) for key in names}
     for (module, name), value in names.items():

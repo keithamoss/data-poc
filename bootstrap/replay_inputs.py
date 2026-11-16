@@ -135,13 +135,27 @@ def _digest(files: dict[str, str]) -> str:
     return h.hexdigest()
 
 
-def cache_key(asset: str | None = None) -> str:
+def cache_key(asset: str | None = None, anchor=None) -> str:
     """CI's bootstrap cache key for `asset`, default the selected one
     (REQ-TEST-117; REQ-PIPE-365 criterion 3): its inputs as one digest, the
     asset named in the key so two assets' caches can never be mistaken for
-    each other's, whatever their files."""
+    each other's, whatever their files.
+
+    THE ANCHOR IS FOLDED IN (REQ-GEN-404 criterion 11; REQ-GEN-405 criterion
+    11): `anchor`, default the one installed for this run, else the fixed test
+    anchor. At the fixed test anchor the key is exactly what it was before the
+    anchor became an input - committed inputs only, never the calendar - so
+    CI's cache does not miss; at any other anchor it carries the date, so a
+    history generated there can never match the fixed-anchor key."""
+    from asset_model import history_anchor
+
     asset = _asset(asset)
-    return f"{KEY_PREFIX}{asset}-{_digest(input_files(inputs(asset)))}"
+    key = f"{KEY_PREFIX}{asset}-{_digest(input_files(inputs(asset)))}"
+    if anchor is None:
+        anchor = history_anchor.installed() or history_anchor.FIXED_TEST_ANCHOR
+    if anchor != history_anchor.FIXED_TEST_ANCHOR:
+        key += f"-at-{anchor.isoformat()}"
+    return key
 
 
 @dataclass(frozen=True)

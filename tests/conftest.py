@@ -640,6 +640,23 @@ def private_supply_dsn(supply_dsn, request):
         conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
+@pytest.fixture(autouse=True)
+def _reset_deletes_no_real_files(request, monkeypatch, tmp_path_factory):
+    """`mothman env reset-synthetic` deletes the asset's generated files
+    (REQ-GEN-408), so in the suite its data folder is a folder of the test's
+    own - never this checkout's data/<asset>, which in the main checkout holds
+    the real synthetic history. Nothing is created until a test writes there.
+    A test proving a refusal about the folder itself patches both again."""
+    from bootstrap import synthetic_reset
+
+    here = (tmp_path_factory.getbasetemp() / "reset-data"
+            / re.sub(r"\W+", "_", request.node.nodeid)[-90:])
+    monkeypatch.setattr(synthetic_reset, "data_dir",
+                        lambda: here / _assets.selected().name)
+    monkeypatch.setattr(synthetic_reset, "expected_data_dir",
+                        lambda: here / _assets.selected().name)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _no_test_files_a_real_delivery():
     """No test writes a delivery into this repo's own delivery tree.
@@ -685,6 +702,10 @@ def _no_test_files_a_real_delivery():
     # fired on thirteen tests that were already doing the right thing.
     # Caught by the gate, which is where a guard this broad should be
     # caught.
+    # EVERY ASSET'S REAL TREE, not the one asset selected when the first test ran
+    # (post-build-review #430): a worker whose first test acts for the daily
+    # asset captured data/daily/ only, and a quarterly clear went unguarded.
+    real_trees = {(_assets.ROOT / "data" / n / "deliveries").resolve() for n in _assets.names()}
     real_tree = Path(delivery_tree.default_deliveries_dir()).resolve()
 
     # BOUND THROUGH THE REAL SIGNATURE rather than picking `deliveries_dir`
@@ -701,7 +722,7 @@ def _no_test_files_a_real_delivery():
         bound.apply_defaults()
         named = bound.arguments.get("deliveries_dir")
         target = Path(named or delivery_tree.default_deliveries_dir()).resolve()
-        if target == real_tree:
+        if target in real_trees:
             raise AssertionError(
                 f"a test tried to file delivery "
                 f"{bound.arguments.get('name')!r} into this repo's real "
@@ -718,6 +739,7 @@ def _no_test_files_a_real_delivery():
     remove_signature = inspect.signature(real_remove)
 
     real_receipts = Path(delivery_tree.default_receipts_dir()).resolve()
+    every_real_receipts = {(_assets.ROOT / "data" / n / "receipts").resolve() for n in _assets.names()}
 
     @functools.wraps(real_remove)
     def guarded_remove(*args, **kwargs):
@@ -727,11 +749,11 @@ def _no_test_files_a_real_delivery():
         # THE RECEIPTS TOO (post-build-review #232): a clear redirecting only
         # the deliveries would still delete real receipts.
         receipts = Path(bound.arguments.get("receipts_dir") or delivery_tree.default_receipts_dir()).resolve()
-        if receipts == real_receipts:
+        if receipts in every_real_receipts:
             raise AssertionError(
                 f"a test tried to clear receipts from this repo's real {real_receipts} - point "
                 f"receipts_dir at tmp_path as well as deliveries_dir")
-        if target == real_tree:
+        if target in real_trees:
             raise AssertionError(
                 f"a test tried to clear deliveries from this repo's real {real_tree} - "
                 f"redirect the generator (generator/output.py's redirect()) or point "
@@ -1410,6 +1432,80 @@ def pytest_collection_modifyitems(config, items):
             items[:] = [i for i in items if asset_of(i) == only]
     _group_by_asset(items)
     _group_for_distribution(items)
+
+
+class _AnchorCheck:
+    """REQ-GEN-405 criterion 8's check, TRYLAST: after `-m` has deselected,
+    so the fast half (`-m "not needs_deployment"`), which reads no deployment,
+    is never stopped by one."""
+
+    @pytest.hookimpl(trylast=True)
+    def pytest_collection_modifyitems(self, config, items):
+        _refuse_a_deployment_at_another_anchor(items)
+
+
+def pytest_configure(config):
+    config.pluginmanager.register(_AnchorCheck(), "mothman-anchor-check")
+
+
+def recorded_anchor_of(dsn: str):
+    """The anchor recorded for the history in the database at `dsn`
+    (qa.history_anchor, REQ-GEN-404 criterion 4), or None - read with one
+    plain SELECT, so it never writes and never needs the identity check."""
+    import psycopg
+
+    with psycopg.connect(dsn, autocommit=True, connect_timeout=5,
+                         application_name="mothman:test-anchor-check") as conn:
+        conn.execute("SET default_transaction_read_only = on")
+        if not conn.execute("SELECT to_regclass('qa.history_anchor')").fetchone()[0]:
+            return None
+        row = conn.execute("SELECT anchor FROM qa.history_anchor").fetchone()
+        return row[0] if row else None
+
+
+def anchor_refusal(found, needing: int, asset: str) -> str:
+    """The one message (REQ-GEN-405 criterion 8; CLI finding 3, SR2)."""
+    from asset_model import history_anchor
+
+    fixed = history_anchor.FIXED_TEST_ANCHOR.isoformat()
+    said = found.isoformat() if found else "none recorded - bootstrapped before REQ-GEN-404"
+    return (
+        f"the local deployment database of asset {asset!r} holds a history whose recorded "
+        f"anchor is {said}, and the deployment-half tests read a history generated at the "
+        f"fixed test anchor, {fixed}. This is the state of the local database, not a code "
+        f"fault. {needing} test(s) need it. Rebuild it with `MOTHMAN_ASSET={asset} mothman "
+        f"env reset-synthetic` then `MOTHMAN_ASSET={asset} mothman pipeline bootstrap` - "
+        f"which replaces a rolled demo. (A second worktree with its own data/ and its own "
+        f"database keeps a demo beside it; mind that deployment_dsn_for prefers "
+        f"supply_<asset>.)")
+
+
+def _refuse_a_deployment_at_another_anchor(items):
+    """REQ-GEN-405 criterion 8: before any test runs, ONCE per asset's
+    deployment database, stop the session when the history the deployment
+    half would read was generated at another anchor than the fixed test one,
+    or records none - never a skip, never a message per test, never a compare
+    against the history."""
+    from asset_model import history_anchor
+
+    needing: dict[str, int] = {}
+    for item in items:
+        if item.get_closest_marker(NEEDS_DEPLOYMENT) is not None:
+            asset = asset_of(item)
+            needing[asset] = needing.get(asset, 0) + 1
+    problems = []
+    for asset, count in sorted(needing.items()):
+        dsn = deployment_dsn_for(asset)
+        if not dsn:
+            continue
+        try:
+            found = recorded_anchor_of(dsn)
+        except Exception:  # noqa: BLE001 - an unreachable database is the fixture's to say
+            continue
+        if found != history_anchor.FIXED_TEST_ANCHOR:
+            problems.append(anchor_refusal(found, count, asset))
+    if problems:
+        raise pytest.UsageError("\n\n".join(problems))
 
 
 #: The hand-picked set every push runs in CI (REQ-TEST-375). Applied BY HAND

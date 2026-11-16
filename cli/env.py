@@ -71,8 +71,44 @@ def _state_the_asset() -> None:
     asset = assets.selected_or_none()
     if asset is not None:
         console.print(f"Asset: {asset.name}", style="green")
+        _state_the_anchor()
     else:
         console.print(assets.why_not_selected(), style="yellow")
+
+
+def anchor_line() -> str | None:
+    """REQ-DASH-407 criterion 8: on a synthetic asset, 'Synthetic data generated
+    up to <date>' and whether that is the fixed test anchor or a rolled one -
+    read from the anchor file beside the delivery tree, needing no database;
+    where there is no anchor file, a line saying so. None on a real asset."""
+    from asset_model import asset_time, history_anchor
+
+    try:
+        if not asset_time.declared_synthetic():
+            return None
+    except history_anchor.AnchorUnknown:
+        # A SYNTHETIC ASSET WRITING OFFSET DATES, WITH NO ANCHOR FILE TO
+        # RESOLVE THEM AGAINST (REQ-GEN-404 criterion 12): said, not raised.
+        return (f"Synthetic data generated up to: not known - there is no anchor file, "
+                f"{history_anchor.path()}")
+    except Exception:  # noqa: BLE001 - this line never changes the command's outcome
+        return None
+    try:
+        found = history_anchor.recorded()
+    except (OSError, ValueError) as exc:
+        return f"Synthetic data generated up to: the anchor file cannot be read ({exc})"
+    if found is None:
+        return (f"Synthetic data generated up to: not known - there is no anchor file, "
+                f"{history_anchor.path()}")
+    said = ("(the fixed test anchor)" if history_anchor.kind(found) == "fixed"
+            else "(rolled; the deployment-half tests refuse it)")
+    return f"Synthetic data generated up to {found.isoformat()} {said}"
+
+
+def _state_the_anchor() -> None:
+    line = anchor_line()
+    if line:
+        console.print(line, style="green")
 
 
 @env_group.command("dbt-deps")
@@ -97,13 +133,17 @@ def dbt_deps_command() -> None:
 
 @env_group.command("reset-synthetic")
 def reset_synthetic_command() -> None:
-    """Delete this SYNTHETIC asset's whole QA history, to start from empty.
+    """Delete this SYNTHETIC asset's whole QA history AND its generated files,
+    to start from empty.
 
     Deliveries, delivery files, filings, holds, decisions, runs and results,
-    and every schema holding supply rows - rebuild-from-empty made explicit
-    (REQ-PIPE-144). Refused unless assets/<asset>/data-asset.yaml declares the asset
-    synthetic, and only after you type a phrase naming what goes. Follow it
-    with `mothman pipeline bootstrap`.
+    and every schema holding supply rows (REQ-PIPE-144) - and the files the
+    generator wrote: the asset's delivery and receipt trees under
+    data/<asset>/, the generator's bookkeeping, the scenario placements and
+    the anchor file (REQ-GEN-408). Refused unless assets/<asset>/data-asset.yaml
+    declares the asset synthetic, while the delivery tree holds a folder the
+    generator did not write, and until you type a phrase naming what goes.
+    Follow it with `mothman pipeline bootstrap`.
     """
     from qa_tools.common import supply_db
     from bootstrap import synthetic_reset
@@ -116,14 +156,28 @@ def reset_synthetic_command() -> None:
             f"{synthetic_reset.asset_id()} is not declared synthetic in "
             f"{_assets.config_dir()}/data-asset.yaml - its history is treated as real, and "
             f"nothing was deleted.")
+    # REFUSED BEFORE THE PHRASE IS ASKED (REQ-GEN-408 criteria 4 and 7): a
+    # folder the generator did not write, a symlink, a folder out of place.
+    try:
+        synthetic_reset.refuse_unsafe()
+        synthetic_reset.refuse_hand_filed()
+    except (synthetic_reset.UnsafeFiles, synthetic_reset.HandFiled) as exc:
+        raise click.ClickException(str(exc)) from None
     with supply_db.connect(label="mothman:reset-synthetic") as conn:
         counts = synthetic_reset.what_it_deletes(conn)
         schemas = synthetic_reset.schemas_to_drop(conn)
-    console.print(f"This deletes ALL recorded QA history for "
+        anchor_line = synthetic_reset.recorded_anchor_line(conn)
+    console.print(f"This deletes ALL recorded QA history and generated files for "
                   f"{synthetic_reset.asset_id()}:", style="bold yellow")
     for table, n in counts.items():
         console.print(f"  {table}: {n} row(s)")
     console.print(f"  and {len(schemas)} schema(s): {', '.join(schemas) or 'none'}")
+    # EACH TREE AND FILE BY PATH, WITH ITS FILE COUNT, AND THE ANCHOR
+    # (REQ-GEN-408 criterion 2).
+    for path in synthetic_reset.generated_paths():
+        console.print(f"  {synthetic_reset._shown(path)}: "
+                      f"{synthetic_reset.file_count(path)} file(s)")
+    console.print(f"  The history: {anchor_line}")
     phrase = synthetic_reset.confirmation_phrase()
     from cli import common
 
@@ -135,10 +189,24 @@ def reset_synthetic_command() -> None:
             # a schema created in between must not be dropped unseen.
             dropped = synthetic_reset.reset(conn, typed, schemas=schemas)
         except (synthetic_reset.NotSynthetic, synthetic_reset.WouldReachOutside,
+                synthetic_reset.UnsafeFiles, synthetic_reset.HandFiled,
                 ValueError) as exc:
             raise click.ClickException(str(exc)) from None
-    console.print(f"Deleted {len(dropped)} schema(s). Run `mothman pipeline bootstrap` "
-                  f"to regenerate.", style="green")
+    deleted, remains = synthetic_reset.delete_generated()
+    # WHAT WENT, PART BY PART (REQ-GEN-408 criterion 5).
+    console.print(f"Deleted {len(dropped)} schema(s), and the generated files: "
+                  f"{', '.join(deleted) or 'none were there'}.", style="green")
+    if remains:
+        raise click.ClickException(
+            "these could not be deleted and remain: " + "; ".join(remains)
+            + ". Nothing else was skipped. Running `mothman env reset-synthetic` again "
+              "finishes it.")
+    # BOTH NEXT STEPS (REQ-GEN-405 criterion 7; CLI finding 5).
+    console.print("Next, either:\n"
+                  "  `mothman pipeline bootstrap` - the fixed test anchor, 2026-09-25; the "
+                  "local gate passes on it\n"
+                  "  `mothman pipeline bootstrap --roll-anchor` - a demo up to today; the "
+                  "deployment-half tests refuse it", style="green")
     # A DROPPED SCHEMA TAKES ITS GRANTS WITH IT, so a least-privilege
     # publisher role set up on it can no longer read anything.
     console.print("If a publisher role was set up, grant it again afterwards: "
