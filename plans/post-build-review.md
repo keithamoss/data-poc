@@ -15895,8 +15895,7 @@ twice. It deliberately did not re-find the `TypeError`.
        guarded at all.
      - **Fixed (minor, test tooling)**: the guard now refuses every asset's
        `data/<asset>/deliveries` and `receipts`. The two tests pass with it in
-       the runs since; whether they now pass in the ordering that failed is
-       for the next fast half to show.
+       every run since, a whole fast half at `-n 2` included.
 
 431. **[todo, 2026-11-16]** **[Data generation]** **[Pipeline & publishing]** **For Keith: with offset dates in the daily configuration, a sandbox with no anchor file cannot read the daily asset.**
      REQ-GEN-404 criterion 12 (SR1) says offset dates resolve against the

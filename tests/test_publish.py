@@ -354,7 +354,10 @@ class TestTheArtifactSaysWhereItCameFrom:
 
         assert self._embedded_provenance(monkeypatch, tmp_path) == {
             "environment": {"id": "sandbox", "label": "A sandbox", "publishes": False},
-            "commit": sha}
+            "commit": sha,
+            # REQ-DASH-407 criterion 4: a synthetic asset's generated-up-to
+            # date - none recorded in this worker's database.
+            "synthetic": True, "generated_up_to": None}
 
     def test_absence_of_either_is_tolerated_rather_than_invented(self, monkeypatch, tmp_path):
         """An environment is unset on a checkout nobody configured, and a
@@ -380,7 +383,7 @@ class TestTheArtifactSaysWhereItCameFrom:
         monkeypatch.setattr(edd.environments, "current_or_none", lambda: None)
 
         assert self._embedded_provenance(monkeypatch, tmp_path) == {
-            "environment": None, "commit": None}
+            "environment": None, "commit": None, "synthetic": True, "generated_up_to": None}
 
 
 @pytest.mark.critical

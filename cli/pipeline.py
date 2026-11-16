@@ -276,7 +276,7 @@ def generate_collection(collection_id: str, *, trial: bool, anchor: str | None =
     says a refusal."""
     import time
 
-    from asset_model import config_pin
+    from asset_model import config_pin, config_yaml
     from bootstrap import generation
     from generator import public as generator_public
 
@@ -292,7 +292,7 @@ def generate_collection(collection_id: str, *, trial: bool, anchor: str | None =
         raise click.ClickException(str(exc)) from None
     except generation.TargetTrialUnavailable as exc:
         raise TargetTrialUnavailable(str(exc)) from None
-    except config_pin.PinRefused as exc:
+    except (config_pin.PinRefused, config_yaml.OffsetRefused) as exc:
         # A REFUSAL, NOT A TRACEBACK (post-build-review #397): the asset is
         # not synthetic, so there is nothing to generate.
         raise click.ClickException(str(exc)) from None

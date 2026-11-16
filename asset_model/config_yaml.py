@@ -132,6 +132,12 @@ class _Loader(LOADER):
 
 
 _Loader.add_constructor(ANCHOR_TAG, _anchor_offset)
+# ON PyYAML'S OWN SAFE LOADERS TOO (PROVISIONAL (2026-11-16)): a reader that
+# parses a configuration file itself - a test copying an asset folder, a tool's
+# own safe_load - resolves the tag the same way rather than failing on it. The
+# one tag is all that is added, so nothing else safe_load accepts changes.
+for _safe in {yaml.SafeLoader, getattr(yaml, "CSafeLoader", yaml.SafeLoader)}:
+    _safe.add_constructor(ANCHOR_TAG, _anchor_offset)
 
 #: Whether a text uses the tag, remembered by the text itself (a pinned run
 #: hands the same string objects a million times, whose hash is cached).
@@ -161,12 +167,18 @@ def anchored_key(text):
     return f"{history_anchor.for_offsets().isoformat()}\0{text}"
 
 
-def _parse_raw(text: str, name: str | None = None):
+def _parse_raw(text: str):
     """One real parse - separate so a test can count them."""
+    return yaml.load(text, Loader=_Loader)  # noqa: S506 - a SafeLoader, C or Python
+
+
+def _parse_named(text: str, name: str | None):
+    """_parse_raw, with the file's name where an offset date's refusal can say
+    it."""
     before = getattr(_parsing, "name", None)
     _parsing.name = name
     try:
-        return yaml.load(text, Loader=_Loader)  # noqa: S506 - a SafeLoader, C or Python
+        return _parse_raw(text)
     finally:
         _parsing.name = before
 
@@ -198,7 +210,7 @@ def parse(source, *, name: str | None = None, remember: bool = True):
                 _cache.move_to_end(key)
                 return copy.deepcopy(_cache[key])
     try:
-        parsed = _parse_raw(text, name)
+        parsed = _parse_named(text, name)
     except yaml.MarkedYAMLError as exc:
         if name:
             # A C-loader mark's name is read-only, so each is replaced by the
