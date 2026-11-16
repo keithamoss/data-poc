@@ -50494,25 +50494,6 @@ requirements:
     signed_off:
       by: Keith
       date: '2026-11-14'
-    unmet_criteria:
-    - criterion: Criterion 11 - Birth Registrations' and Child Protection's dirty supplies regenerated, each asset bootstrapped from empty, and every committed artefact the regeneration moves re-captured (SCENARIOS-daily.md, SCENARIOS-quarterly.md, tests/fixtures/arrival_semantics_golden.json if it moves, and every test or scenario expectation asserting a recorded count or verdict of a regenerated supply).
-      why: It needs real-database resets of supply_daily and supply_quarterly on a quiet machine, and it must follow #134 step 3 (REQ-GEN-381), which changes the bootstrap the regeneration runs through, so the history is regenerated once. The overnight builder of 2026-11-16 was told to leave it to the main session.
-      owner: the main session, after REQ-GEN-381
-      blocked_by:
-        requirements:
-        - REQ-GEN-381
-    - criterion: Criterion 12 - after regeneration, any scenario or target that today lands on a named verdict (REQ-GEN-186's agreement check) and no longer does stops the build and is reported to Keith rather than re-aimed.
-      why: Only the regeneration of criterion 11 can show it. The build's early warning is in evidence (2026-11-16) - no REQ-GEN-186 target goes through a preset, but per-check verdicts inside Fail supplies move.
-      owner: the main session, after REQ-GEN-381
-      blocked_by:
-        requirements:
-        - REQ-GEN-381
-    - criterion: Criterion 13 - a CHANGELOG.yaml entry, in the same push as the regenerated history, telling a reader that Birth Registrations' and Child Protection's sample history was regenerated on purpose, why, and that some supplies' Pass, Warn and Fail moved with it.
-      why: Its push is criterion 11's, which has not happened; shipping the entry before the regeneration would announce a history nobody has generated. Its text is drafted in decisions (PROVISIONAL).
-      owner: the main session, after REQ-GEN-381
-      blocked_by:
-        requirements:
-        - REQ-GEN-381
     linked_tests:
     - tests/test_fault_sizing.py
     - tests/test_dirty.py
@@ -50554,6 +50535,26 @@ requirements:
     - assets/quarterly/synthetic/collections/linkage_products.py::_replay_reference
     - generator/scenario_injection.py::INJECTIONS
     evidence:
+    - >
+      CRITERIA 11-13 (2026-11-16, Keith's resets approved that morning). Both
+      assets reset and bootstrapped from empty on commit 3c88932b (392,
+      TS-113, step 3, speed A and B and the timing batch merged), quarterly
+      then daily, nothing else running: quarterly rc=0 in 1371s (the
+      2026-11-16 baseline, before speed B, was 2437s), daily rc=0 in 323s
+      (357s). The bootstrap's own target agreement passed on both.
+      Re-captured: SCENARIOS-quarterly.md (TS-113 placed, 70 of 70 scenarios
+      with data); SCENARIOS-daily.md and
+      tests/fixtures/arrival_semantics_golden.json did not move (git status
+      clean after the run). Criterion 12: the only verdicts that moved were
+      the three geocoding drift Warns (TS-93c, TS-100c, the ordinary 2019-Q4),
+      stopped and taken to Keith, who chose a planted drift (TS-113); its
+      drift check reads Warn at PSI 0.1779 on the rebuilt database, the
+      history's only drift Warn. The needs-deployment scenario tests
+      (test_scenario_map, test_scripted_decisions, test_scenario_injection,
+      test_target_agreement, test_geocoding_faults, test_as_at_scenarios,
+      test_every_filed_supply) gave 19 passed, 1 xfailed (#175's) against the
+      rebuilt databases. Criterion 13: two CHANGELOG.yaml items under
+      2026-11-16, in the same push.
     - '2026-11-16 (overnight build, wip/gen-392): criterion 14''s tests SEEN FAILING FIRST against the literal rates - tests/test_fault_sizing.py run against the presets as they stood at 49fdff10: 14 failed, 3 passed (the two derivation-unit refusals and same-seed-same-bytes, which do not depend on the rates). The failures were on values, not imports, wherever a preset could be called: a single-tier Birth Registrations rule planted with 74 rows where 5 is derived, a Warn facility of 554 nulls where 443 is, client postcodes 15 where 29 (and 21 with a changed band) are and 3 where 7 (and 5) are, four different count sets from four seeds where one is, a cut to 1,637 rows where 1,650 is, duplicate carers {4, 7, 8, 9, 10} across five seeds where {5} is, a 3-row case_workers frame planted rather than refused.'
     - '2026-11-16: after the build, tests/test_fault_sizing.py 19 passed, among them two through the real tools via the `mothman bdm qa --trial` path on a real 1,900-row batch: every rule BIRTH_REGISTRATIONS_AIMS names fails in at least one tool on a Fail preset (the drop against the previous supply included), and a Warn preset fails no check at all.'
     - '2026-11-16, the affected modules, two runs of the final code tree (-n 2): (1) 29 modules - test_fault_sizing, test_dirty, test_cli_population, the BDM and CP real-tool modules (test_run_{dbt,soda,evidently,datacontract}_{bdm,cp}, test_run_evidently_cp_real, the scoped and lifecycle modules, test_orchestrate_single_run, test_fixture_ids), the generator modules (test_generate_runs, test_generate_cp_runs, test_generate_to_target, test_generator_providers, test_provider_imports, test_resupply, test_cp_pair, test_cli_cp), test_target_agreement and test_validate_imports: 617 passed, 2 skipped (test_target_agreement:365, "this checkout has no generated history"). (2) test_scenario_injection, test_geocoding_generator and test_cli_bdm: 121 passed, 3 skipped, 5 failed - all five TestTheEarlyEmergencyDepartmentSupplies, which read the real deployment database''s placements (deployment_history) for Emergency Department, a collection no preset touches; environmental, not this change. A first combined run of all 32 also showed 4 errors that neither split run reproduced.'

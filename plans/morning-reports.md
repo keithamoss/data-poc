@@ -3723,4 +3723,38 @@ one or more component tags, and a date.
       A (431/432) and after REQ-PIPE-380, so it is not a clean "before" for
       either. Those were measured per run instead (431/432), and 380's 5% NFR
       has no pre-move baseline from tonight.
+    - **THE MORNING, WITH KEITH (2026-11-16, ~06:10-09:45 Perth)**. He said
+      "keep going" and approved today's resets.
+      - **REQ-PIPE-403 c1 baseline**: quarterly 2437s, daily 357s, from empty,
+        nothing else running. It is held in
+        `docs/drafts/req-pipe-403-baseline-2026-11-16.md`, because the
+        register refuses evidence on an unbuilt requirement. Its stage split
+        is not measured: the bootstrap buffers its output, and py-spy is not
+        installed.
+      - **Merged, each critic-fixed**:
+        - REQ-GEN-392;
+        - speed B (REQ-PIPE-397/400/430, REQ-GEN-398/399; #390-#399, #409);
+        - the timing batch (REQ-PIPE-409 to 412 and 417, REQ-TEST-416/418,
+          REQ-DASH-413 to 415; #400-#408; schema 51);
+        - TS-113.
+      - **REQ-GEN-392 c12 STOPPED for Keith**. Fail sizing made Child
+        Protection's red Client Registers cleaner, and the history's only
+        three geocoding drift Warns went green. Keith chose to plant drift on
+        purpose. TS-113 is now in 2026-Q3, because 2019-Q4 is TS-42a's; Keith
+        approved the quarter and the reference test's move.
+      - **Rebuilt from empty on 3c88932b**: quarterly 1371s (it was 2437s),
+        daily 323s (357s), both with rc=0 and target agreement passing. TS-113
+        reads Warn at PSI 0.1779. Nothing else moved. REQ-GEN-392 is now fully
+        met.
+      - **For Keith, from the critics** (recorded, not changed):
+        - #391: dbt's partial parse versus content-keyed caches. The
+          recommended fix is in the entry.
+        - Timing F6: the "could not be checked" next step is printed for runs
+          that can never become that.
+        - Timing F7: a running first try reads COULD_NOT_CHECK in the
+          terminal.
+        - Should a crashed re-check of an old period turn a later period red?
+        - "failed in" versus "crashed in".
+        - Speed F6/F7: file existence is not pinned; the memo is bounded per
+          agreement.
 

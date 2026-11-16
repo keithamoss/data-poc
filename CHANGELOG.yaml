@@ -149,6 +149,19 @@ releases:
               supply that could not be checked, with its full error.
       - category: Improved
         items:
+          - headline: The sample history, regenerated
+            components: ["Data generation"]
+            description: >
+              Each deliberately broken sample supply is now broken by exactly
+              what its checks' own limits call for, so some Pass, Warn and Fail
+              results moved, and a failing supply shows a handful of failing
+              rows rather than dozens.
+          - headline: A geocode that drifts on purpose
+            components: ["Data generation", "QA checks & contract"]
+            description: >
+              The sample history now holds a 2026-Q3 Client Register geocode
+              whose drift check reads Warn by design, so you can see what
+              drift looks like without waiting for one to happen by chance.
           - headline: dbt tests side by side
             components: ["QA checks & contract", "Pipeline & publishing"]
             description: >
