@@ -146,7 +146,9 @@ def show_command(dataset: str | None, until, show_all: bool, on) -> None:
         try:
             _show_dataset(dataset, until.date() if until else None, show_all,
                            hierarchy, schedule, on.date() if on else None)
-        except (hierarchy.UnknownDatasetError, schedule.ScheduleConfigError) as exc:
+        except schedule.ScheduleConfigError as exc:
+            raise click.ClickException(common.schedule_refusal(exc)) from None
+        except hierarchy.UnknownDatasetError as exc:
             raise click.ClickException(_unwrap(exc)) from None
         return
 

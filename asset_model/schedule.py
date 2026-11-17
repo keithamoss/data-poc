@@ -241,6 +241,10 @@ def format_duration(value: timedelta) -> str:
     than showing something nobody could type back in.
     """
     seconds = int(value.total_seconds())
+    if seconds == 0 and value == timedelta(0):
+        # NOTHING, written as it is read (post-build-review #470): `0h`
+        # parses, so a grace of nothing has an authored form to show.
+        return "0h"
     if seconds and seconds % 86400 == 0:
         return f"{seconds // 86400}d"
     if seconds and seconds % 3600 == 0:

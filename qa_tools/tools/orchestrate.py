@@ -564,7 +564,16 @@ def _claim_window(collection_id: str, arrival):
     datasets = list(getattr(arrival, "files_by_dataset", None) or ())
     if not datasets and adapter.claim_window_dataset:
         datasets = [adapter.claim_window_dataset]
-    return min((schedule.claim_window(d, on=on) for d in datasets), default=None)
+    windows = []
+    for d in datasets:
+        try:
+            windows.append(schedule.claim_window(d, on=on))
+        except schedule.ScheduleConfigError:
+            # NO VERSION IN FORCE ON THE RECEIPT DATE (REQ-PIPE-378 criterion
+            # 6, 378 Q2 (a), SETTLED by Keith): this dataset is left out of the
+            # minimum - never a borrowed window.
+            continue
+    return min(windows, default=None)
 
 
 def effective_at_of(collection_id: str, arrival) -> str:

@@ -485,7 +485,11 @@ def is_owed_supplies(dataset_id: str) -> bool:
         # below, because that one means somebody got the configuration
         # wrong and this one means they got it right.
         return False
-    except (schedule.ScheduleConfigError, KeyError):
+    except KeyError:
+        # AN UNKNOWN DATASET (hierarchy.UnknownDatasetError) answers as it
+        # always has. A ScheduleConfigError is NOT caught (REQ-PIPE-378
+        # criterion 13, Q9 of 2026-11-14, SETTLED by Keith): broken
+        # configuration stops the step rather than reading as nothing owed.
         return False
     if calendar.current.is_cadence_rule:
         return True
@@ -501,7 +505,14 @@ def period_claimed_at(dataset_id: str, at: datetime, agreement=None) -> str | No
         found = slots_for_dataset(
             dataset_id, until=claimable_until(dataset_id, asset_time.local_date(at), agreement),
             agreement=agreement)
-    except (ValueError, KeyError, schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+    except schedule.ScheduleConfigError:
+        # RAISED, NEVER ANSWERED AS NONE (REQ-PIPE-378 criteria 13 and 14): it
+        # is a ValueError, so the broad catch below once swallowed it.
+        raise
+    except (ValueError, KeyError, schedule.NoCalendarAgreed):
+        # A schedule not yet agreed, an unknown dataset, and any other
+        # ValueError (none is known to reach here - the decision records the
+        # reading) still answer that no period's window holds `at`.
         return None
     hit = None
     for slot in found:

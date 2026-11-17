@@ -195,6 +195,193 @@ class TestALinkageReleaseBeforeTheFirstVersion:
         assert "the 2020-Q1 linkage release" in said and "2020-02-01" in said, said
 
 
+class TestTheSlotHelpersStopSwallowing:
+    """Criteria 13 and 14: slots.is_owed_supplies and slots.period_claimed_at
+    raise a ScheduleConfigError rather than answering False or None; a
+    schedule not yet agreed keeps its quiet answer ('nothing owed'), and an
+    unknown dataset its answer as today. Criterion 15: their callers let it
+    stop the step - arrivals.recognise's unexpected-table test is one."""
+
+    @pytest.fixture
+    def broken(self, monkeypatch):
+        from asset_model import slots
+
+        def refuse(dataset_id, *a, **k):
+            raise schedule.ScheduleConfigError(f"calendar for {dataset_id} is broken")
+        monkeypatch.setattr(schedule, "calendar_for_dataset", refuse)
+        monkeypatch.setattr(slots, "slots_for_dataset", refuse)
+        return slots
+
+    def test_is_owed_supplies_raises(self, broken):
+        with pytest.raises(schedule.ScheduleConfigError, match="is broken"):
+            broken.is_owed_supplies("cp-clients")
+
+    def test_period_claimed_at_raises(self, broken):
+        from datetime import datetime, timezone
+
+        with pytest.raises(schedule.ScheduleConfigError, match="is broken"):
+            broken.period_claimed_at("cp-clients", datetime(2026, 2, 1, tzinfo=timezone.utc))
+
+    def test_no_calendar_agreed_is_still_nothing_owed(self, monkeypatch):
+        from datetime import datetime, timezone
+
+        from asset_model import slots
+
+        def not_agreed(dataset_id, *a, **k):
+            raise schedule.NoCalendarAgreed(dataset_id, "never")
+        monkeypatch.setattr(schedule, "calendar_for_dataset", not_agreed)
+        monkeypatch.setattr(slots, "slots_for_dataset", not_agreed)
+        assert slots.is_owed_supplies("cp-clients") is False
+        assert slots.period_claimed_at("cp-clients",
+                                       datetime(2026, 2, 1, tzinfo=timezone.utc)) is None
+
+    def test_an_unknown_dataset_answers_as_today(self):
+        from datetime import datetime, timezone
+
+        from asset_model import slots
+
+        assert slots.is_owed_supplies("no-such-dataset") is False
+        assert slots.period_claimed_at("no-such-dataset",
+                                       datetime(2026, 2, 1, tzinfo=timezone.utc)) is None
+
+
+class TestTheOrchestratorsShortestWindow:
+    """Criterion 6 (378 Q2 (a), SETTLED by Keith): a dataset whose window
+    cannot be read on the receipt date is left out of the shortest-window
+    minimum, answering none if none remain - never a borrowed one."""
+
+    @pytest.fixture
+    def arrival(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        return SimpleNamespace(received_at=datetime(2026, 2, 1, 1, tzinfo=timezone.utc),
+                               files_by_dataset={"cp-clients": [], "cp-carers": []})
+
+    def test_the_broken_one_is_left_out(self, monkeypatch, arrival):
+        from datetime import timedelta
+
+        from qa_tools.tools import orchestrate
+
+        def window(dataset_id, on=None, **k):
+            if dataset_id == "cp-carers":
+                raise schedule.ScheduleConfigError("no version in force")
+            return timedelta(days=14)
+        monkeypatch.setattr(schedule, "claim_window", window)
+        assert orchestrate._claim_window("child-protection", arrival) == timedelta(days=14)
+
+    def test_none_when_none_remain(self, monkeypatch, arrival):
+        from qa_tools.tools import orchestrate
+
+        def window(dataset_id, on=None, **k):
+            raise schedule.ScheduleConfigError("no version in force")
+        monkeypatch.setattr(schedule, "claim_window", window)
+        assert orchestrate._claim_window("child-protection", arrival) is None
+
+
+class TestTheDashboardBuildRefuses:
+    """Criterion 16 (Dash A): the dashboard build refuses a dataset whose
+    schedule configuration is broken, naming it and the asset's calendar
+    file, rather than publishing it as having no slots; a schedule not yet
+    agreed keeps its quiet answer."""
+
+    @pytest.fixture
+    def broken(self, monkeypatch):
+        from asset_model import slots
+
+        def refuse(dataset_id, *a, **k):
+            raise schedule.ScheduleConfigError("no version in force on 2026-02-01")
+        monkeypatch.setattr(slots, "slots_for_dataset", refuse)
+
+    def test_the_period_slots_build_step(self, broken):
+        from pipeline import period_slots
+
+        with pytest.raises(period_slots.ScheduleRefusesBuild) as refused:
+            period_slots.for_dataset("cp-clients")
+        said = str(refused.value)
+        assert "cp-clients" in said and "calendar.yaml" in said, said
+
+    def test_the_embed_step(self, broken):
+        from dashboard import embed_dashboard_data
+        from pipeline import period_slots
+
+        with pytest.raises(period_slots.ScheduleRefusesBuild, match="calendar.yaml"):
+            embed_dashboard_data._slots_by_dataset()
+
+    def test_no_calendar_agreed_stays_quiet(self, monkeypatch):
+        from asset_model import slots
+        from dashboard import embed_dashboard_data
+
+        def not_agreed(dataset_id, *a, **k):
+            raise schedule.NoCalendarAgreed(dataset_id, "never")
+        monkeypatch.setattr(slots, "slots_for_dataset", not_agreed)
+        assert embed_dashboard_data._slots_by_dataset() == {}
+
+
+class TestARefusalAtTheCommandLine:
+    """Criterion 17: a ScheduleConfigError reaching a `mothman` command is a
+    one-paragraph refusal with exit 1, never a traceback, naming the asset's
+    calendar file and ending with the remedy. Criterion 18: a pipeline step
+    stopped on one says what was recorded before the stop and that it will
+    stop the same way on every pass until the configuration is fixed."""
+
+    def test_the_real_command_refuses(self, tmp_path, monkeypatch):
+        from click.testing import CliRunner
+
+        from cli.app import cli
+
+        agreement_split.repoint(monkeypatch, tmp_path, _doc(_authored()),
+                                base=agreement_split.participation("d", grace="2h"))
+
+        def broken(*a, **k):
+            raise schedule.ScheduleConfigError(
+                "calendar 'c' has no version in force on 2020-02-01 - its earliest is 2023-01-01")
+        monkeypatch.setattr(schedule, "periods_for_dataset", broken)
+        got = CliRunner().invoke(cli, ["schedule", "show", "--dataset", "d"])
+        out = " ".join(got.output.replace("│", " ").replace("╰", " ").replace("─", " ")
+                       .replace("╯", " ").split())
+        assert got.exit_code == 1, got.output
+        assert "Traceback" not in out and got.exception is None or \
+            isinstance(got.exception, SystemExit), got.exception
+        assert "calendar.yaml" in out and "2020-02-01" in out and "2023-01-01" in out, out
+        assert out.rstrip().endswith(
+            "Fix the configuration, then `mothman schedule validate` checks it."), out
+
+    def test_any_command_refuses_through_the_group(self, monkeypatch):
+        """The catch is the group's (cli/app.py _MothmanGroup.invoke), so a
+        command with no catch of its own refuses the same way."""
+        import rich_click as click
+        from click.testing import CliRunner
+
+        from cli.app import cli
+
+        @click.command("raise-schedule-error")
+        def boom():
+            raise schedule.ScheduleConfigError(
+                "calendar 'quarterly' has no version in force on 2012-06-01 - "
+                "its earliest is 2013-01-01")
+        monkeypatch.setitem(cli.commands, "raise-schedule-error", boom)
+        got = CliRunner().invoke(cli, ["raise-schedule-error"])
+        out = " ".join(got.output.replace("│", " ").split())
+        assert got.exit_code == 1, (got.output, got.exception)
+        assert "calendar.yaml" in out and "mothman schedule validate" in out, out
+
+    def test_a_stopped_step_says_it_will_stop_again(self, monkeypatch):
+        from cli import lifecycle_report
+        from qa_tools.common import arrival_lifecycle
+
+        said = []
+        monkeypatch.setattr(lifecycle_report.console, "print",
+                            lambda text="", *a, **k: said.append(str(text)))
+        exc = arrival_lifecycle.StageFailed(
+            "cp_run_001", "filing", ("staging",),
+            schedule.ScheduleConfigError("calendar 'c' has no version in force on 2020-02-01"))
+        lifecycle_report.stage_failure(exc)
+        text = " ".join(said)
+        assert "Completed before it: staging." in text, text
+        assert "every pass" in text and "calendar.yaml" in text, text
+
+
 class TestAPeriodsRoundIsRequired:
     """Criterion 19: DatasetPeriod.round has no default."""
 
@@ -207,3 +394,15 @@ class TestAPeriodsRoundIsRequired:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestAZeroDurationHasAnAuthoredForm:
+    """post-build-review #470: `0h` parses (a grace of nothing), but
+    format_duration refused timedelta(0), so `mothman schedule show` failed
+    on any dataset whose grace was 0h. It writes back the form it reads."""
+
+    def test_it_round_trips(self):
+        from datetime import timedelta
+
+        assert schedule.format_duration(schedule.parse_duration("0h", "x")) == "0h"
+        assert schedule.format_duration(timedelta(0)) == "0h"

@@ -27,6 +27,25 @@ def _iso(instant) -> str | None:
     return instant.isoformat() if instant is not None else None
 
 
+class ScheduleRefusesBuild(RuntimeError):
+    """A dataset's schedule configuration is broken, so the dashboard build is
+    refused (REQ-PIPE-378 criterion 16, Dash A, SETTLED by Keith 2026-11-14):
+    never published as owing nothing - the live page stays at the last good
+    build."""
+
+
+def refuse_build(dataset_id: str, exc: Exception) -> ScheduleRefusesBuild:
+    """The one refusal both build paths raise, naming the dataset and the
+    asset's calendar file."""
+    from asset_model import assets
+
+    return ScheduleRefusesBuild(
+        f"dataset {dataset_id!r}'s schedule configuration in "
+        f"{assets.config_dir()}/calendar.yaml is broken: {exc}. No page was written - the "
+        f"live page stays at the last good build. Fix the configuration, then "
+        f"`mothman schedule validate` checks it.")
+
+
 def for_dataset(dataset_id: str, now=None) -> dict | None:
     """{filesGo, slots: [{period, date, round, opens, due, closes}]}, oldest
     first, or None for a cadence-rule calendar or a dataset with none."""
@@ -38,15 +57,17 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
         cal = schedule.calendar_for_dataset(dataset_id)
     except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
         return None             # no calendar, or a dataset outside the hierarchy
-    if cal.version_in_force(today).is_cadence_rule:
-        return None
-    until = today + timedelta(days=400)
-    agr = schedule.agreement_to_read(None)
     try:
+        if cal.version_in_force(today).is_cadence_rule:
+            return None
+        until = today + timedelta(days=400)
+        agr = schedule.agreement_to_read(None)
         found = slots.slots_for_dataset(dataset_id, until=until)
         sequence = slots.period_sequence(dataset_id, until, agr)
-    except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+    except schedule.NoCalendarAgreed:
         return None
+    except schedule.ScheduleConfigError as exc:
+        raise refuse_build(dataset_id, exc) from exc
     owed = {s.period.name: s for s in found}
     begins = found[0].round_date if found and found[0].round_date else None
     out = []

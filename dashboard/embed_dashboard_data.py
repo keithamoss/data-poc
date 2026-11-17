@@ -367,8 +367,14 @@ def _slots_by_dataset() -> dict:
     for entry in hierarchy.all_datasets():
         try:
             out[entry.dataset_id] = slots.slots_for_dataset(entry.dataset_id, until=until)
-        except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed):
+        except schedule.NoCalendarAgreed:
             continue
+        except schedule.ScheduleConfigError as exc:
+            # BROKEN CONFIGURATION REFUSES THE BUILD (REQ-PIPE-378 criterion
+            # 16): never published as a dataset with no slots.
+            from pipeline import period_slots
+
+            raise period_slots.refuse_build(entry.dataset_id, exc) from exc
     return out
 
 

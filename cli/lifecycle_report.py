@@ -374,6 +374,16 @@ def stage_failure(exc) -> None:
                   + (f"Completed before it: {', '.join(exc.completed)}."
                      if exc.completed else "Nothing had completed."),
                   style="red", markup=False, highlight=False)
+    from asset_model import schedule
+
+    if isinstance(exc.cause, schedule.ScheduleConfigError):
+        # IT WILL STOP THE SAME WAY ON EVERY PASS (REQ-PIPE-378 criterion 18):
+        # nothing retries it away - the named configuration is the fix.
+        from cli import common
+
+        console.print("This step will stop the same way on every pass until the "
+                      "configuration is fixed: " + common.schedule_refusal(exc.cause),
+                      style="red", markup=False, highlight=False)
     from qa_tools.common import gate
 
     for line in gate.crashed_sibling_lines(exc):

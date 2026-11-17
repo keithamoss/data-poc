@@ -1367,3 +1367,15 @@ def _default_unless_required(default, required: bool) -> dict:
     counts an explicit `default=None` as a value given, so `required` never
     fired and a command ran with None."""
     return {} if required else {"default": default}
+
+
+def schedule_refusal(exc) -> str:
+    """A ScheduleConfigError as the one-paragraph refusal REQ-PIPE-378
+    criterion 17 asks for: what is wrong (its own message names the calendar,
+    the date and the earliest version, and the dataset where the caller knew
+    one), where to fix it, and the check that confirms the fix."""
+    from asset_model import assets
+
+    message = str(exc.args[0] if exc.args else exc).rstrip(".")
+    return (f"{message} - in {assets.config_dir()}/calendar.yaml. "
+            f"Fix the configuration, then `mothman schedule validate` checks it.")

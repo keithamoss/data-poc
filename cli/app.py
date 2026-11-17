@@ -41,6 +41,7 @@ def _config_refusal(exc) -> str:
 
 
 from asset_model import history_anchor as _history_anchor  # noqa: E402
+from asset_model.schedule import ScheduleConfigError  # noqa: E402
 
 try:
     # STRUCTURE ONLY (post-build-review #432): building the commands reads the
@@ -319,6 +320,10 @@ class _MothmanGroup(click.RichGroup):
         except yaml.YAMLError as exc:
             # The same refusal for a file read only once a command runs.
             raise click.ClickException(_config_refusal(exc)) from None
+        except ScheduleConfigError as exc:
+            # BROKEN SCHEDULE CONFIGURATION, a refusal of one paragraph with
+            # exit 1 (REQ-PIPE-378 criterion 17): never a traceback.
+            raise click.ClickException(common.schedule_refusal(exc)) from None
 
 
 @click.group(cls=_MothmanGroup, invoke_without_command=True)
