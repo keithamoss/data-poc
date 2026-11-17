@@ -15941,7 +15941,7 @@ twice. It deliberately did not re-find the `TypeError`.
        `data/<asset>/deliveries` and `receipts`. The two tests pass with it in
        every run since, a whole fast half at `-n 2` included.
 
-431. **[todo, 2026-11-16]** **[Data generation]** **[Pipeline & publishing]** **For Keith: with offset dates in the daily configuration, a sandbox with no anchor file cannot read the daily asset.**
+431. **[done, 2026-11-18]** **[Data generation]** **[Pipeline & publishing]** **For Keith: with offset dates in the daily configuration, a sandbox with no anchor file cannot read the daily asset.**
      REQ-GEN-404 criterion 12 (SR1) says offset dates resolve against the
      anchor file beside the delivery tree, fall back to the fixed test anchor
      only under `test` and `ci`, and refuse elsewhere. Built as signed. Its
@@ -15980,6 +15980,19 @@ twice. It deliberately did not re-find the `TypeError`.
        asset is rebuilt every command reading `supply_<asset>` - here, `mothman
        check`'s `patterns` gate - is refused as an older schema, before any
        DDL runs. Not reset from this session (the builder's terms).
+     - **DECIDED 2026-11-18 (Keith): the fallback.** A checkout with no
+       delivery tree at all (absent or empty) resolves offset dates against
+       the fixed test anchor in every environment; one whose tree holds a
+       generated history with no anchor file still refuses, in one line
+       (#432). REQ-GEN-404 criterion 12 is amended to say so.
+       `history_anchor._generated()` decides it. Fixed test-first in
+       tests/test_rolling_anchor.py `TestNoAnchorFileInASandbox`: the two
+       new tests (no tree, an empty tree) failed before (2 failed) and pass
+       after; the refusal test now gives its sandbox a delivery tree. Ran
+       test_rolling_anchor.py and test_anchor_date.py, `-n 4`: 68 passed.
+       Keith did not take up the separate question of whether the docs gate
+       should need an anchor at all; a checkout with a delivery tree and no
+       anchor file still fails it.
 
 432. **[done, 2026-11-16]** **[Data generation]** **[Testing & dev tooling]** **With no anchor file, every daily command died at import - the reset and the bootstrap that remedy it included.**
      The post-build critic on the rolling-anchor batch, verified against the
@@ -16293,7 +16306,7 @@ twice. It deliberately did not re-find the `TypeError`.
      which is which, and #442's "the ordinary geocoding draw moved with it" is
      corrected there: the geocoding plan is identical before and after.
 
-448. **[todo, 2026-11-16]** **[Data generation]** **[Dashboard UI]** **For
+448. **[done, 2026-11-18]** **[Data generation]** **[Dashboard UI]** **For
      Keith: TS-112b's verdict line is REQ-DASH-204 criterion 16's no-queue-item
      form, not its turned-down form, as REQ-GEN-206 criterion 20 says.** The
      critic on 4f85789e, verified in the code. The page gives "The <dataset>
@@ -16320,6 +16333,9 @@ twice. It deliberately did not re-find the `TypeError`.
      criterion 2's last sentence when the verdict line already says when the
      checks run again (`said`, UX critic on 7093c20, S4, PROVISIONAL); the
      Expect now says so, as TS-80's does.
+     - **DECIDED 2026-11-18 (Keith): amend criterion 20's 'b' half to the
+       page as built** - the no-queue-item form with REQ-DASH-337's 'was
+       rejected' clause. No page change. REQ-GEN-206's unmet entry is cleared.
 
 449. **[done, 2026-11-16]** **[Testing & dev tooling]** **REQ-GEN-335's
      byte-identical-neighbours test was loosened to accept any amber
@@ -16341,7 +16357,7 @@ twice. It deliberately did not re-find the `TypeError`.
      about ED Presentations. Where the ambers landed is in REQ-GEN-206's
      decisions. **Ran**: both tests pass on this tree (see the commit).
 
-450. **[todo, 2026-11-16]** **[Data generation]** **For Keith: TS-112's
+450. **[done, 2026-11-18]** **[Data generation]** **For Keith: TS-112's
      settlement is "on the asset day after its arrival" only as scripted.**
      The critic on 4f85789e. Criterion 19 says settled on the asset day after
      the arrival; the choose-file is scripted for 11:00 on 2 February 2017 and
@@ -16353,6 +16369,9 @@ twice. It deliberately did not re-find the `TypeError`.
      (unowned). **Keith to decide**: accept the week and amend criterion 19 to
      "scripted for the asset day after its arrival", or ask for a settlement
      that lands on 2 February - which needs the lag rule or the arrival moved.
+     - **DECIDED 2026-11-18 (Keith): accept the week.** Criterion 19 now
+       reads 'scripted for the asset day after its arrival'. REQ-GEN-206's
+       unmet entry is cleared.
 
 451. **[done, 2026-11-16]** **[Testing & dev tooling]** **TS-52's chooser never
      had a test for the supply a declared correction claims.** The critic on

@@ -130,18 +130,33 @@ def write(anchor: date, at: Path | None = None) -> Path:
     return p
 
 
+def _generated() -> bool:
+    """Whether the selected asset's delivery tree holds anything - a history
+    was generated here. An absent or empty tree is none."""
+    from asset_model import assets
+
+    tree = assets.deliveries_dir()
+    return tree.is_dir() and any(tree.iterdir())
+
+
 def for_offsets() -> date:
     """The anchor an offset date in a synthetic asset's configuration resolves
     against (REQ-GEN-406 criterion 3; REQ-GEN-404 criterion 12): the installed
     one during a generation or a bootstrap, else the anchor file beside the
-    delivery tree, else - only where MOTHMAN_ENVIRONMENT is test or ci - the
-    fixed test anchor. Refused elsewhere, naming the missing file."""
+    delivery tree, else - where MOTHMAN_ENVIRONMENT is test or ci, or where
+    the asset has no delivery tree at all - the fixed test anchor. Refused
+    only where a history was generated (a delivery tree holds something) and
+    no anchor file says at which anchor, naming the missing file.
+
+    NO DELIVERY TREE FALLS BACK (post-build-review #431, Keith 2026-11-18): a
+    fresh clone, a builder's worktree or a checkout just reset has generated
+    nothing, so there is no other date for the fixed one to disagree with."""
     if _installed is not None:
         return _installed
     found = recorded()
     if found is not None:
         return found
-    if os.environ.get("MOTHMAN_ENVIRONMENT") in FALLBACK_ENVIRONMENTS:
+    if os.environ.get("MOTHMAN_ENVIRONMENT") in FALLBACK_ENVIRONMENTS or not _generated():
         return FIXED_TEST_ANCHOR
     raise AnchorUnknown(
         f"this asset's configuration writes a date as an offset from its history's anchor, "

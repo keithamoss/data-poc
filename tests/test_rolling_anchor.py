@@ -774,11 +774,29 @@ class TestNoAnchorFileInASandbox:
             assert said in both, (args, both)
 
     def test_a_command_needing_a_framing_date_is_refused_in_one_line(self, sandbox):
+        # A delivery tree with no anchor file: a history was generated and its
+        # anchor is unknown, so guessing would be wrong (#431 keeps this case).
+        (sandbox.data / "deliveries" / "d1").mkdir(parents=True)
         code, out, err = sandbox("schedule", "show")
         assert code == 2, (out, err)
         assert "Traceback" not in err and len(err.strip().splitlines()) == 1, err
         assert f"{sandbox.data / history_anchor.FILE} does not exist" in err
         assert "`mothman pipeline bootstrap` writes it" in err
+
+    def test_with_no_delivery_tree_at_all_a_framing_date_uses_the_fixed_anchor(self, sandbox):
+        """post-build-review #431, Keith's call 2026-11-18: a checkout that has
+        generated nothing - a fresh clone, a builder's worktree, just after a
+        reset - has no other date to disagree with, so it reads the fixed test
+        anchor rather than refusing."""
+        assert not (sandbox.data / "deliveries").exists()
+        code, out, err = sandbox("schedule", "show")
+        assert code == 0, (out, err)
+        assert "Traceback" not in err and "no anchor to resolve" not in out + err, (out, err)
+
+    def test_an_empty_delivery_tree_is_no_delivery_tree(self, sandbox):
+        (sandbox.data / "deliveries").mkdir(parents=True)
+        code, out, err = sandbox("schedule", "show")
+        assert code == 0, (out, err)
 
     def test_the_reset_finishes_and_the_remedy_still_starts_after_it(self, sandbox):
         import json

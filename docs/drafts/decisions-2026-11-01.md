@@ -822,3 +822,13 @@ Purpose recalled: insurance for a real deployment's published QA page; REQ-QAC-3
 - Next: Keith chose (a), the rolling-anchor batch (REQ-GEN-404 to 408,
   REQ-DASH-407, REQ-TEST-402), over REQ-GEN-206, the timing browser tests, or
   stopping for the day.
+
+## 2026-11-18 (Perth morning)
+
+- REQ-GEN-206 criterion 19: accept the week. Amended to "scripted for the asset
+  day after its arrival" (post-build-review #450).
+- REQ-GEN-206 criterion 20 'b': amend to match the page as built - the
+  no-queue-item form with the 'was rejected' clause (#448). No page change.
+- #431: take the fallback - a checkout with no delivery tree reads the fixed
+  test anchor in every environment; REQ-GEN-404 criterion 12 amended. Built
+  test-first the same morning.
