@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import calendar as _calendar
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from asset_model import asset_time, derived, hierarchy, in_force
@@ -129,9 +129,10 @@ class DatasetPeriod:
     not_expected_reason: str | None = None
     #: THE ROUND whose slot fills this period (REQ-PIPE-321 criterion 1) - the
     #: calendar date the files arrive on. At files_go_to_period 0 it is the
-    #: period itself; at N it is the round N periods before. None only where
-    #: a caller built a DatasetPeriod by hand, which means the period itself.
-    round: Period | None = None
+    #: period itself; at N it is the round N periods before. REQUIRED, with no
+    #: default (REQ-PIPE-378 criterion 19): both product constructors set it,
+    #: and a hand-built one that left it out stood for the period itself.
+    round: Period = field(kw_only=True)
 
     @property
     def name(self) -> str:
@@ -147,7 +148,7 @@ class DatasetPeriod:
     @property
     def round_date(self) -> date:
         """The date of the round this period's slot is due on."""
-        return (self.round or self.period).date
+        return self.round.date
 
 
 @dataclass(frozen=True)
@@ -411,7 +412,7 @@ def on_baseline(period_name: str, agreement=None) -> bool:
         return False
     if day.isoformat() != period_name or day < base.versions[0].effective_from:
         return False
-    return version_in_force_or_first(base, day).is_cadence_rule
+    return base.version_in_force(day).is_cadence_rule
 
 
 def calendar(name: str, agreement=None) -> Calendar:
@@ -689,7 +690,6 @@ def compute_periods_for_dataset(dataset_id: str, until: date | None,
     """periods_for_dataset, worked out - what the memo calls."""
 
     cal = calendar_for_dataset(dataset_id, agreement)
-    months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
     skipped = not_expected_periods(dataset_id, agreement)
     begins = owes_from(dataset_id, agreement)
@@ -725,13 +725,13 @@ def compute_periods_for_dataset(dataset_id: str, until: date | None,
             out.append((r, target))
         return out
 
-    if version.is_cadence_rule and months is not None:
-        raise ScheduleConfigError(
-            f"dataset {dataset_id!r} is on calendar {cal.name!r}, which is a cadence rule, "
-            f"AND its participation names months. Months only mean something against authored dates; "
-            f"a dataset on a cadence rule participates in every period the rule generates. "
-            f"Rejected rather than ignored, because a key that is accepted and discarded is "
-            f"how a dataset ends up expecting something other than what its author wrote.")
+    # THE MONTHS CHECK IS PER ROUND ONLY (REQ-PIPE-378 criterion 12, Q7 of
+    # 2026-11-14, SETTLED by Keith): supplies_in_round judges each round's
+    # months against the calendar version in force on its own date. The
+    # check against the calendar's CURRENT version that stood here went - it
+    # refused months named while the calendar was authored once a later
+    # version became a cadence rule. The refusal of an unbounded ask of a
+    # cadence rule is not a months check, and stays.
     if version.is_cadence_rule and until is None:
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} is on cadence calendar {cal.name!r}, which generates "
@@ -796,19 +796,10 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     cal = calendar_for_dataset(dataset_id, agreement)
     if on is None:
         return cal.current.claim_window
-    return version_in_force_or_first(cal, on).claim_window
-
-
-def version_in_force_or_first(cal: Calendar, on: date) -> CalendarVersion:
-    """The version whose period of effect contains `on`.
-
-    A date BEFORE the first version's effective_from takes that first
-    version rather than raising - the same thing `periods_for_calendar`
-    does implicitly by never generating such a period, and the only
-    answer that does not turn "this calendar was authored later than
-    its own earliest data" into an error nobody can act on.
-    """
-    return in_force.version_on(cal.versions, on) or cal.versions[0]
+    # BEFORE THE CALENDAR'S FIRST VERSION IT RAISES (REQ-PIPE-378 criteria 1
+    # and 3, Q6 of 2026-11-14, SETTLED by Keith): no borrowed window - the
+    # first version's fallback that stood here went.
+    return cal.version_in_force(on).claim_window
 
 
 def candidate_dates(calendar_name: str, year: int) -> list[tuple[Period, str]]:
@@ -993,7 +984,7 @@ def supplies_in_round(dataset_id: str, on: date, agreement=None, *, cal=None,
     months = delivery_months(dataset_id, on, agr)
     if months is not None:
         cal = cal if cal is not None else calendar_for_dataset(dataset_id, agr)
-        if version_in_force_or_first(cal, on).is_cadence_rule:
+        if cal.version_in_force(on).is_cadence_rule:
             # CRITERION 7 PER VERSION: months mean nothing against a cadence
             # rule, and dropping the period would leave the dataset silently
             # owing nothing for it.

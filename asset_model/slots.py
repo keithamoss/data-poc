@@ -325,7 +325,7 @@ def compute_slots_for_dataset(dataset_id: str, until: date | None, agreement) ->
             continue
         # EVERY INSTANT FROM THE ROUND'S DATE (REQ-PIPE-321 criteria 1 and 2),
         # never the date of the period it fills.
-        round_period = dataset_period.round or dataset_period.period
+        round_period = dataset_period.round
         instants = slot_instants(dataset_id, round_period.date, agreement)
         opens = instants.claim_opens_at
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,

@@ -213,15 +213,28 @@ def view(dataset_id: str, on: date, agreement=None) -> View:
     values = []
     for key, label in LABELS:
         source = resolved.sources.get(key, (agreement_mod.FALLBACK, None))
+        no_calendar_version = None
         if key == "claim_window" and source[0] == agreement_mod.FALLBACK:
             # THE CALENDAR IS A LEVEL TOO (delivery-critic on 181, F7): its
             # version's date, and a later version changing the window.
-            source = (agreement_mod.FALLBACK, schedule.version_in_force_or_first(cal, on).effective_from)
+            try:
+                source = (agreement_mod.FALLBACK, cal.version_in_force(on).effective_from)
+            except schedule.ScheduleConfigError:
+                # BEFORE THE CALENDAR'S FIRST VERSION (REQ-PIPE-378 criterion
+                # 9): no calendar version states the window on this date, so
+                # none is borrowed and no source date is shown.
+                no_calendar_version = cal.versions[0].effective_from
+                source = (agreement_mod.FALLBACK, None)
         words = agreement_mod.describe_source(source, collection_name=name,
                                               calendar_name=cal_name, key=key)
         if words == "no level states this":
             words += _fallback(key)
-        text = _text(key, resolved, dataset_id, on, agr)
+        if no_calendar_version is not None:
+            text = (f"stated by no calendar version on {on.isoformat()} - {cal.name}'s "
+                    f"earliest takes effect {no_calendar_version.isoformat()}")
+            words = "no calendar version is in force on this date"
+        else:
+            text = _text(key, resolved, dataset_id, on, agr)
         changes = None
         if source[0] == agreement_mod.COLLECTION:
             for when in later:

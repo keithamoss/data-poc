@@ -196,6 +196,20 @@ class CannotGenerate(ValueError):
     criteria 5 and 6)."""
 
 
+def _release_window(dataset_id: str, on, release: str):
+    """The claim window a release is timed against: the dataset's in force
+    on `on`. BEFORE ITS CALENDAR'S FIRST VERSION the provider refuses,
+    naming the release and the date (REQ-PIPE-378 criterion 10), rather
+    than timing it against a borrowed window."""
+    from asset_model import schedule
+
+    try:
+        return schedule.claim_window(dataset_id, on=on)
+    except schedule.ScheduleConfigError as exc:
+        raise CannotGenerate(f"{release} cannot be timed on {on.isoformat()}: {exc} - "
+                             f"nothing was written") from exc
+
+
 def linked() -> tuple:
     """(dataset id, code, id columns) for every dataset linkage-keys links."""
     from asset_model import hierarchy
@@ -1906,7 +1920,7 @@ def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
     naming the quarter, the release and the effective instant."""
     from datetime import timedelta
 
-    from asset_model import asset_time, hierarchy, schedule, slots
+    from asset_model import asset_time, hierarchy, slots
     from scenarios import promotion_lag
 
     # ONLY THE DATASETS THE LINKAGE RELEASE READS: a source only the
@@ -1945,7 +1959,8 @@ def _refuse_unschedulable(jobs, sources, arrivals, injected) -> None:
             took = promotion_lag.effective_at(
                 first, seed=f"{hierarchy.dataset(did).table}__{asset_time.arrival_key(first)}",
                 before=min(caps) if caps else None,
-                within=schedule.claim_window(did, on=asset_time.local_date(first)))
+                within=_release_window(did, asset_time.local_date(first),
+                                       f"the {job.period.name} linkage release"))
             if first >= at or took >= at or at > slot.late_after:
                 raise CannotGenerate(
                     f"the {job.period.name} linkage release ({at.isoformat()}) cannot be "
@@ -1965,7 +1980,7 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
     of either stream reading the period. Refused naming the quarter."""
     from datetime import timedelta
 
-    from asset_model import asset_time, hierarchy, schedule, slots
+    from asset_model import asset_time, hierarchy, slots
     from scenarios import promotion_lag
 
     instants = {asset_time.parse_instant(s.received_at, did): f"{did} {s.received_at}"
@@ -2001,7 +2016,8 @@ def _refuse_geocoding_unschedulable(jobs, sources, state, linkage_arrivals,
                 took = promotion_lag.effective_at(
                     first, seed=f"{hierarchy.dataset(src).table}__{asset_time.arrival_key(first)}",
                     before=min(caps) if caps else None,
-                    within=schedule.claim_window(src, on=asset_time.local_date(first)))
+                    within=_release_window(src, asset_time.local_date(first),
+                                           f"the {job.period.name} geocoding release"))
             if first >= at or took >= at or at > slot.late_after:
                 raise CannotGenerate(
                     f"the {job.period.name} geocoding release ({at.isoformat()}) cannot be "

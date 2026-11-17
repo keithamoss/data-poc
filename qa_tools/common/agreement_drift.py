@@ -125,8 +125,14 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
         pass
     try:
         cal = schedule.calendar_for_dataset(dataset_id, agreement)
-        cal_version = schedule.version_in_force_or_first(cal, period_date)
-        keys.add(f"calendar {cal.name} version {cal_version.effective_from.isoformat()}")
+        try:
+            cal_version = cal.version_in_force(period_date)
+            keys.add(f"calendar {cal.name} version {cal_version.effective_from.isoformat()}")
+        except schedule.ScheduleConfigError:
+            # NO CALENDAR VERSION GOVERNED THE PERIOD (REQ-PIPE-378 criterion
+            # 8): before the calendar's first, so there is no version key -
+            # but its period key still stands.
+            pass
         keys.add(f"calendar {cal.name} period {slot}")
     except Exception:  # noqa: BLE001
         pass

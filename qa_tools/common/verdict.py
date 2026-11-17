@@ -91,7 +91,7 @@ def resolved(dataset_id: str, period_date: date, agreement=None, *,
     offset = agreement.files_go_to_period_for(dataset_id, period_date) or 0
     window = schedule.claim_window(dataset_id, on=period_date, agreement=agreement)
     cal = schedule.calendar_for_dataset(dataset_id, agreement)
-    cal_version = schedule.version_in_force_or_first(cal, period_date)
+    cal_version = cal.version_in_force(period_date)
     due_date = period_date - timedelta(days=version.days_before)
     zone = in_force.version_on(asset_time.timezone_versions(), due_date)
     inputs = {
