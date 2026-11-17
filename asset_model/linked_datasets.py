@@ -40,13 +40,21 @@ def walk(asset: dict):
 
 
 def _calendar_of(cal: dict, coll_id: str, ds_id: str) -> str | None:
-    """The calendar a dataset is on: its asset's baseline, the first calendar
-    declared (REQ-PIPE-345 - nothing names one); None where the dataset
-    declares no calendar (REQ-PIPE-106) or the asset declares none."""
-    entry = next((d for d in cal.get("datasets") or [] if d.get("id") == ds_id), {}) or {}
-    if entry.get("no_calendar"):
+    """The calendar a dataset is on: its asset's baseline (REQ-PIPE-345 -
+    nothing names one); None where the dataset declares no calendar
+    (REQ-PIPE-106) or the asset declares none. READ THROUGH THE ONE LOADER
+    (REQ-PIPE-379 criterion 1): the agreement built from the document, never
+    the document's own keys walked a second time."""
+    from asset_model import agreement, schedule
+
+    try:
+        agr = agreement.from_doc(cal)
+    except schedule.ScheduleConfigError:
+        return None  # the schedule gate reports a calendar that cannot be read
+    entry = agr.dataset(ds_id)
+    if entry is not None and entry.no_calendar:
         return None
-    return next(((c or {}).get("name") for c in cal.get("calendars") or []), None)
+    return agr.calendar_name_for(ds_id)
 
 
 def table_columns(root: Path, contract: str, table: str) -> list[str]:

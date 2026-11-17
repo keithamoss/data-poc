@@ -161,7 +161,7 @@ def _cp_delay():
 # project's real data never extends past - see civil_registration.py's
 # identical BDM-side convention). Ratio/shape below (first run clean,
 # last run red, ~25% amber in between) is unchanged from the calendar-
-# quarter version - only N_QUARTERS and _quarter_start()'s anchor month
+# quarter version - only N_QUARTERS and the quarterly calendar's anchor month
 # moved.
 _RUN_PLAN_SEED = 5900  # distinct range from generation seeds (BASE_SEED+...)
 N_QUARTERS = 15
@@ -235,43 +235,6 @@ def __getattr__(name: str):
         return _cp_delay()[1]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 _CASE_WORKERS = "cp-case-workers"
-
-
-def _quarter_start(d: date) -> date:
-    """The first day of the Feb/May/Aug/Nov-anchored quarter containing
-    `d` - Keith's own explicit anchor (2026-09-17): "1 February being
-    the expected date of supply, then working forwards in three month
-    increments." NOT calendar quarters (Jan/Apr/Jul/Oct), which this
-    replaced. Computed on a continuous months-since-year-0 index rather
-    than per-case month arithmetic, so the year boundary (a January or
-    December date's quarter actually starts the PRIOR November) falls
-    out of the same formula instead of needing special-casing - verified
-    against both a January date (2026-01-15 -> 2025-11-01, the Nov-Jan
-    quarter it's really in) and the exact anchor month (2026-09-17 ->
-    2026-08-01) before trusting it."""
-    total_months = d.year * 12 + (d.month - 1)  # 0 = Jan of year 0
-    feb_offset = 1  # February = month index 1 within a year (Jan=0)
-    quarter_index = (total_months - feb_offset) // 3
-    start_total_months = quarter_index * 3 + feb_offset
-    year, month = start_total_months // 12, start_total_months % 12 + 1
-    return date(year, month, 1)
-
-
-def _add_quarters(d: date, n: int) -> date:
-    total_months = (d.month - 1) + n * 3
-    year = d.year + total_months // 12
-    month = total_months % 12 + 1
-    return date(year, month, 1)
-
-
-# THE ANCHOR IS READ AT CALL TIME (REQ-GEN-404 criterion 2): this used to be a
-# module-level `_anchor = get_anchor_date()` and START_DATE, read once at
-# import, so a provider imported before a generation installed its anchor
-# generated for the wrong date. A function now, as every other provider's.
-def start_date() -> date:
-    """The first quarter of the 15-quarter run plan's window, ending on the
-    anchor's quarter."""
-    return _add_quarters(_quarter_start(get_anchor_date()), -(N_QUARTERS - 1))
 
 
 def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str | None, seed: int) -> pd.DataFrame:

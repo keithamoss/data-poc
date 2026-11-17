@@ -137,11 +137,11 @@ GEO_ROW_FAULTS = {
                         "until the drift check's PSI against the file's reference reaches the "
                         "middle of its warn band",
 }
-#: The verdict each fault is built to; the share faults' is the share's own,
-#: banded by the check (planned_verdict).
-GEO_FAULT_VERDICT = {"missing_year": "red", "duplicate_year": "red", "unexpected_year": "red",
-                     "left_out_amber": "amber", "left_out_red": "red",
-                     "orphan_record": "red", "empty_file": "red", "placed_mix_shift": "amber"}
+#: EACH FAULT'S VERDICT IS DERIVED, never written down (REQ-GEN-391
+#: criterion 2): from the check it is aimed at (GEO_FAULT_AIMS) and that
+#: check's warn and fail bands in check_bands' catalogue, at the size the fault
+#: plants (fault_verdict). The share faults' is the share's own, banded by the
+#: check (planned_verdict); the placed-mix shift's the drift check's.
 #: THE CHECK EACH FAULT IS AIMED AT (criterion 7), by the end of its check id
 #: - "{source}" the source dataset's id - so a named scenario's trial refuses
 #: when any other check of its file moves.
@@ -531,6 +531,38 @@ def parse_geo_fault(fault: str, where: str, dataset_id: str) -> str:
     return name
 
 
+def aimed_check(dataset_id: str, source: str, name: str, catalogue):
+    """The one check of `dataset_id` a geocoding row fault is aimed at
+    (GEO_FAULT_AIMS, criterion 7) - refused where there is not exactly one."""
+    end = GEO_FAULT_AIMS[name].format(source=source)
+    found = [c for c in catalogue.checks
+             if c.dataset_id == dataset_id and c.check_id.endswith("." + end)]
+    if len(found) != 1:
+        raise CannotGenerate(f"{dataset_id}: the {name} fault is aimed at {end}, and "
+                             f"{len(found)} of its checks end so - one is needed to derive "
+                             f"its verdict; nothing was written")
+    return found[0]
+
+
+def fault_verdict(dataset_id: str, source: str, name: str, bad: float, rows: int,
+                  catalogue) -> str:
+    """A geocoding row fault's planned verdict, DERIVED from the check it is
+    aimed at and that check's bands at the size it planted - `bad` of `rows`
+    (REQ-GEN-391 criterion 2): red where the check fails, amber where it only
+    warns, green where neither."""
+    check = aimed_check(dataset_id, source, name, catalogue)
+    if all(b.op in ("<", "<=") for b in (*check.warn, *check.fail)):
+        # A CHECK BOUNDING WHAT IS GOOD - coverage's share of the source
+        # covered (`< 98%` fails) - measures the rows the fault left, not
+        # the ones it took.
+        bad = rows - bad
+    if check.fails(bad, rows):
+        return "red"
+    if check.warns(bad, rows):
+        return "amber"
+    return "green"
+
+
 def _share_check(dataset_id: str, catalogue):
     checks = [c for c in catalogue.checks if c.dataset_id == dataset_id
               and c.check_id.endswith(".value_share_soda")]
@@ -562,10 +594,17 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
     which only `placed_mix_shift` reads (TS-113)."""
     import pandas as pd
 
+    from asset_model import hierarchy
     from generator import dirty, synthetic_inputs
 
     placing = synthetic_inputs.placings()[dataset_id]
     member_col, _setting = member_setting_of(dataset_id)
+    src = hierarchy.dataset(dataset_id).linked[0][0]
+
+    def derived(name: str, bad: float, total: int) -> str:
+        # THE VERDICT FROM THE AIMED CHECK'S BANDS AT THE SIZE PLANTED
+        # (REQ-GEN-391 criterion 2).
+        return fault_verdict(dataset_id, src, name, bad, total, catalogue)
     ids = [c for c in rows.columns if c.startswith("id_")][:len(id_columns)]
     level = placing.placed_column
     unplaced = placing.unplaced_value
@@ -617,7 +656,9 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
                         extra.at[k2, "sa2_code"], extra.at[k2, "lga_code"] = area_codes(
                             dataset_id, rec, UNEXPECTED_YEAR)
                 rows = pd.concat([rows, extra], ignore_index=True)
-            built.append(GEO_FAULT_VERDICT[name])
+            # THE SIZE PLANTED: the records the fault touched, of the file's
+            # records (the set-member checks count records).
+            built.append(derived(name, len(chosen), len(order)))
         elif name in ("not_geocoded_amber", "not_geocoded_red"):
             band = name.rsplit("_", 1)[1]
             check = _share_check(dataset_id, catalogue)
@@ -676,7 +717,7 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
             # WHOLE RECORDS, every year (criterion 6): the missing-year check
             # counts only records present, so it does not catch it.
             rows = rows[~key.isin(out)]
-            built.append(GEO_FAULT_VERDICT[name])
+            built.append(derived(name, gone, len(source)))
         elif name == "orphan_record":
             source = ({_joined(r) for r in _records(source_rows, id_columns)}
                       if source_rows is not None else set())
@@ -696,20 +737,22 @@ def apply_geo_faults(dataset_id: str, rows, faults, *, source_rows, id_columns, 
                     extra.at[k2, "sa2_code"], extra.at[k2, "lga_code"] = area_codes(
                         dataset_id, _joined(tuple(new)), extra.at[k2, member_col])
             rows = pd.concat([rows, extra], ignore_index=True)
-            built.append(GEO_FAULT_VERDICT[name])
+            built.append(derived(name, len(extra), len(rows)))
         elif name == "empty_file":
             if source_rows is None or not len(source_rows):
                 raise CannotGenerate(f"{where}: an empty {dataset_id} file needs a source "
                                      f"supply holding rows (REQ-QAC-340 criterion 4); nothing "
                                      f"was written")
             rows = rows.iloc[0:0]
-            built.append(GEO_FAULT_VERDICT[name])
+            built.append(derived(name, len(source_rows), len(source_rows)))
         elif name == "placed_mix_shift":
             # WHOLE RECORDS, every year, codes kept (TS-113): a postcode
             # placement still carries its areas, so only the drift check moves.
             rows = _shift_placed_mix(dataset_id, rows, key, order, reference_rows, rng, where,
                                      catalogue)
-            built.append(GEO_FAULT_VERDICT[name])
+            # THE DRIFT CHECK'S OWN VERDICT on the shifted file - a PSI, which
+            # check_bands bounds as the drift check's own rule (drift_verdict).
+            built.append(drift_verdict(dataset_id, rows, reference_rows))
     rows = rows.reset_index(drop=True)
     return rows, worst(planned_verdict(dataset_id, rows, catalogue), *built)
 

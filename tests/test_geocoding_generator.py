@@ -307,3 +307,49 @@ def test_an_sa2_sits_inside_one_lga():
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]
+
+
+class TestAFaultsVerdictIsDerivedFromItsChecksBands:
+    """REQ-GEN-391 criteria 2 and 3: a geocoding row fault's planned verdict
+    is derived from the check it is aimed at and that check's warn and fail
+    bands, at the size it plants - never a hand-written table - so a changed
+    band moves the derived verdict."""
+
+    def _catalogue_with(self, check_id_end, warn, fail):
+        import dataclasses
+
+        from asset_model import check_bands
+
+        real = check_bands.catalogue()
+        moved = [dataclasses.replace(c, warn=warn, fail=fail)
+                 if c.check_id.endswith(check_id_end) else c for c in real.checks]
+        return check_bands.Catalogue(moved)
+
+    def test_a_changed_band_moves_the_verdict(self):
+        from asset_model import check_bands
+
+        import collection_modules
+
+        lp = collection_modules.provider_module("linkage-products")
+        dataset, source = "geo-cp-clients", "cp-clients"
+        end = lp.GEO_FAULT_AIMS["left_out_amber"].format(source=source)
+        pct = check_bands.PERCENT
+        wide = self._catalogue_with(end, (check_bands.Bound(">", 1.0, pct),),
+                                    (check_bands.Bound(">", 50.0, pct),))
+        narrow = self._catalogue_with(end, (check_bands.Bound(">", 0.5, pct),),
+                                      (check_bands.Bound(">", 1.0, pct),))
+        # Three records of a hundred left out: amber under the wide bands,
+        # red once the fail band narrows to one percent.
+        assert lp.fault_verdict(dataset, source, "left_out_amber", 3, 100, wide) == "amber"
+        assert lp.fault_verdict(dataset, source, "left_out_amber", 3, 100, narrow) == "red"
+
+    def test_every_fault_has_an_aimed_check(self):
+        from asset_model import check_bands
+
+        import collection_modules
+
+        lp = collection_modules.provider_module("linkage-products")
+        catalogue = check_bands.catalogue()
+        for name in lp.GEO_FAULT_AIMS:
+            check = lp.aimed_check("geo-cp-clients", "cp-clients", name, catalogue)
+            assert check.fail or check.warn, name
