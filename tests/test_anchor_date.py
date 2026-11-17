@@ -43,10 +43,10 @@ def test_the_installed_anchor_is_read_at_call_time():
 
     provider = collections.provider("child-protection")
     module = sys.modules[type(provider).__module__]
-    fixed_start = module.start_date()
+    fixed_start = module.generated_periods()[0].round.date
     with history_anchor.anchored(LATER):
         assert get_anchor_date() == LATER
-        assert module.start_date() > fixed_start
+        assert module.generated_periods()[0].round.date > fixed_start
     assert get_anchor_date() == FIXED_TEST_ANCHOR
 
 
@@ -111,6 +111,11 @@ class TestTheAnchorFile:
             self, monkeypatch, tmp_path):
         """REQ-GEN-404 criterion 12."""
         monkeypatch.setattr(history_anchor, "path", lambda: tmp_path / "absent")
+        # A HISTORY WAS GENERATED HERE, whatever this checkout holds: with no
+        # delivery tree the fixed anchor is the answer everywhere (#431), so
+        # the refusal below is only reachable where one exists - which a
+        # fresh clone, a worktree and CI do not have (post-build-review #471).
+        monkeypatch.setattr(history_anchor, "_generated", lambda: True)
         for env in ("test", "ci"):
             monkeypatch.setenv("MOTHMAN_ENVIRONMENT", env)
             assert history_anchor.for_offsets() == FIXED_TEST_ANCHOR

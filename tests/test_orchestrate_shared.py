@@ -9,7 +9,7 @@ from __future__ import annotations
 import collection_modules
 
 import dataclasses
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import duckdb
@@ -119,8 +119,11 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
     def test_the_claim_window_of_a_birth_registrations_arrival_is_its_datasets(self):
         from asset_model import schedule
 
-        on = date(2026, 1, 1)
-        bdm = SimpleNamespace(received_at="2026-01-01T01:00:00+08:00",
+        # A DAY THE DAILY CALENDAR COVERS: before its first version there is
+        # no window to read, and the schedule now says so (REQ-PIPE-378).
+        cal = schedule.calendar_for_dataset("birth-registrations", schedule.agreement_to_read(None))
+        on = cal.versions[0].effective_from + timedelta(days=10)
+        bdm = SimpleNamespace(received_at=f"{on.isoformat()}T01:00:00+08:00",
                               files_by_dataset={"birth-registrations": "x"})
         assert orchestrate._claim_window("civil-registration", bdm) == \
             schedule.claim_window("birth-registrations", on=on)

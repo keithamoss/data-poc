@@ -136,11 +136,17 @@ class TestWithinTheClaimWindowInAReplay:
         # takes the window from the files carried (REQ-PIPE-243 criterion 2),
         # and only the adapter's claim-window dataset where none are named.
         dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
-        arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
+        # A RECEIPT THE DATASET'S CALENDAR COVERS: before its first version
+        # there is no window to read, and the schedule says so (REQ-PIPE-378).
+        cal = schedule.calendar_for_dataset(dataset, schedule.agreement_to_read(None))
+        first = cal.versions[0].effective_from
+        received = (RECEIVED if RECEIVED.date() >= first else
+                    datetime.combine(first + timedelta(days=10), RECEIVED.timetz()))
+        arrival = SimpleNamespace(received_at=received, run_id="run_x",
                                   files_by_dataset={dataset: "x"})
         with replay_clock.replaying() if replaying else contextlib.nullcontext():
             orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
-        expected = schedule.claim_window(dataset, on=RECEIVED.date())
+        expected = schedule.claim_window(dataset, on=received.date())
         assert seen["claim_window"] == expected
 
 
