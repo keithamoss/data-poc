@@ -687,7 +687,6 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
 def compute_periods_for_dataset(dataset_id: str, until: date | None,
                                 agreement) -> list[DatasetPeriod]:
     """periods_for_dataset, worked out - what the memo calls."""
-    from asset_model.agreement import TURNED_OFF
 
     cal = calendar_for_dataset(dataset_id, agreement)
     months = delivery_months(dataset_id, agreement=agreement)
@@ -701,28 +700,7 @@ def compute_periods_for_dataset(dataset_id: str, until: date | None,
                 for r, p in pairs]
 
     def _participates(r) -> bool:
-        """Whether the dataset supplies in a ROUND - decided on the round's own
-        calendar date (REQ-PIPE-179 criterion 8, REQ-PIPE-321 criterion 6),
-        never the date of the period its files fill."""
-        if begins is not None and r.date < begins:
-            # NOT YET OWING before the first participation version (criterion 30).
-            return False
-        # TURNED OFF ON THE ROUND'S DATE (REQ-PIPE-179 criteria 4, 8 and 13):
-        # owes nothing, so no period and no slot.
-        if agreement.standing_on(dataset_id, r.date).state == TURNED_OFF:
-            return False
-        on = delivery_months(dataset_id, r.date, agreement)
-        if on is not None and version_in_force_or_first(cal, r.date).is_cadence_rule:
-            # CRITERION 7 PER VERSION: months mean nothing against a
-            # cadence rule, and dropping the period would leave the
-            # dataset silently owing nothing for it.
-            raise ScheduleConfigError(
-                f"dataset {dataset_id!r}'s participation in force on {r.date.isoformat()} "
-                f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
-                f"Rejected rather than ignored.")
-        # THE MONTH OF THE ROUND'S CALENDAR DATE (REQ-PIPE-110 criterion 5 as
-        # REQ-PIPE-321 amends it), whatever period its files fill.
-        return on is None or r.date.month in on
+        return supplies_in_round(dataset_id, r.date, agreement, cal=cal, begins=begins)
 
     def _owed(rounds, sequence):
         """Each round the dataset supplies in, paired with the period its
@@ -737,9 +715,8 @@ def compute_periods_for_dataset(dataset_id: str, until: date | None,
         for r in rounds:
             if not _participates(r):
                 continue
-            n = agreement.files_go_to_period_for(dataset_id, r.date) or 0
-            j = index[r.name] + n
-            if j >= len(sequence):
+            j = filled_index(dataset_id, sequence, index[r.name], agreement)
+            if j is None:
                 continue
             target = sequence[j]
             if target.name in taken:
@@ -801,19 +778,16 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
     # A PARTICIPATION VERSION MAY OVERRIDE IT (REQ-PIPE-110 criterion 4).
     agreement = agreement_to_read(agreement)
-    entry = agreement.dataset(dataset_id)
     if on is not None:
-        # A period before the first version takes that first version's
-        # inputs - all of them, this override included (REQ-PIPE-113's
-        # PROVISIONAL rule, as slots.participation_for applies it).
-        standing = agreement.standing_on(dataset_id, on)
-        # INSIDE A TURNED-OFF GAP, as if every effective_to were absent
-        # (REQ-PIPE-179 criterion 14) - the window this period would have had.
-        version = ((agreement.timing_on(dataset_id, on)
-                    if standing.turned_off is not None else standing.values)
-                   or (agreement.participation_on(
-                       dataset_id, entry.participation[0].effective_from)
-                       if entry and entry.participation else None))
+        # THE SLOT'S VERSION, ANSWERED ONCE (REQ-PIPE-377 criterion 3): the
+        # first version before it begins, this override included, and
+        # inside a turned-off gap the window this period would have had.
+        # Its own copy tested `turned_off is not None` where the slot code
+        # tested the TURNED_OFF state; criterion 5's walk found no date of
+        # either asset where the two differ (2026-11-18).
+        from asset_model import slots
+
+        version = slots.slot_version(dataset_id, on, agreement)
     else:
         resolved = agreement.resolved_versions(dataset_id)
         version = resolved[-1] if resolved else None
@@ -954,12 +928,15 @@ def round_of(period_name: str, dataset_id: str, agreement=None) -> date | None:
     # from a May round it owes nothing in). Where it takes part in none of
     # them, the calendar's earliest - the round a not-owed reason names.
     reaching = [i for i in range(max(0, index - 12), index + 1)
-                if i + (agr.files_go_to_period_for(dataset_id, sequence[i].date) or 0) == index]
+                if filled_index(dataset_id, sequence, i, agr) == index]
     if not reaching:
         return None
     for i in reaching:
-        months = delivery_months(dataset_id, sequence[i].date, agr)
-        if months is None or sequence[i].date.month in months:
+        # THE ONE ANSWER TO 'DOES IT SUPPLY IN THIS ROUND' (REQ-PIPE-377
+        # criterion 4) - its month test alone ignored the not-yet-owing and
+        # turned-off rules; folded once criterion 5's walk found no round of
+        # either asset where the two answered differently (2026-11-18).
+        if supplies_in_round(dataset_id, sequence[i].date, agr):
             return sequence[i].date
     return sequence[reaching[0]].date
 
@@ -970,11 +947,60 @@ def period_filled_by(dataset_id: str, round_period: Period, agreement=None) -> P
     None where the calendar gives that period no date (criterion 8). The one
     place a round is turned into the name a person reads."""
     agr = agreement_to_read(agreement)
-    n = agr.files_go_to_period_for(dataset_id, round_period.date) or 0
-    if n == 0:
+    if (agr.files_go_to_period_for(dataset_id, round_period.date) or 0) == 0:
         return round_period
     sequence = periods_for_calendar(calendar_for_dataset(dataset_id, agr).name, agreement=agr)
     index = next((i for i, p in enumerate(sequence) if p.name == round_period.name), None)
-    if index is None or index + n >= len(sequence):
+    if index is None:
         return None
-    return sequence[index + n]
+    j = filled_index(dataset_id, sequence, index, agr)
+    return None if j is None else sequence[j]
+
+
+def filled_index(dataset_id: str, sequence, i: int, agreement=None) -> int | None:
+    """period_filled_by's INDEX FORM, for a caller walking a sequence
+    (REQ-PIPE-377 criterion 1; REQ-PIPE-321 NFR 1): the index of the period
+    the round at `sequence[i]` fills - `i` plus the collection's
+    files_go_to_period on the round's own date - or None where that is past
+    the sequence's end (criterion 2). Every site that turns a round into the
+    period it fills calls this or period_filled_by."""
+    agr = agreement_to_read(agreement)
+    j = i + (agr.files_go_to_period_for(dataset_id, sequence[i].date) or 0)
+    return j if j < len(sequence) else None
+
+
+def supplies_in_round(dataset_id: str, on: date, agreement=None, *, cal=None,
+                      begins=...) -> bool:
+    """Whether the dataset supplies in the ROUND dated `on` (REQ-PIPE-377
+    criterion 4) - decided on the round's own calendar date (REQ-PIPE-179
+    criterion 8, REQ-PIPE-321 criterion 6), never the date of the period its
+    files fill: not before its first participation version, not while it is
+    turned off, and only in the months its participation in force names.
+    The one place this is answered; `cal` and `begins` are the caller's own
+    where it has them already."""
+    from asset_model.agreement import TURNED_OFF
+
+    agr = agreement_to_read(agreement)
+    if begins is ...:
+        begins = owes_from(dataset_id, agr)
+    if begins is not None and on < begins:
+        # NOT YET OWING before the first participation version (criterion 30).
+        return False
+    # TURNED OFF ON THE ROUND'S DATE (REQ-PIPE-179 criteria 4, 8 and 13):
+    # owes nothing, so no period and no slot.
+    if agr.standing_on(dataset_id, on).state == TURNED_OFF:
+        return False
+    months = delivery_months(dataset_id, on, agr)
+    if months is not None:
+        cal = cal if cal is not None else calendar_for_dataset(dataset_id, agr)
+        if version_in_force_or_first(cal, on).is_cadence_rule:
+            # CRITERION 7 PER VERSION: months mean nothing against a cadence
+            # rule, and dropping the period would leave the dataset silently
+            # owing nothing for it.
+            raise ScheduleConfigError(
+                f"dataset {dataset_id!r}'s participation in force on {on.isoformat()} "
+                f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
+                f"Rejected rather than ignored.")
+    # THE MONTH OF THE ROUND'S CALENDAR DATE (REQ-PIPE-110 criterion 5 as
+    # REQ-PIPE-321 amends it), whatever period its files fill.
+    return months is None or on.month in months

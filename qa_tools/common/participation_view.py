@@ -72,7 +72,7 @@ def _turn_off_lines(dataset_id: str, on: date,
     """REQ-PIPE-179 criteria 28 and 29 - from configuration alone. The third
     value says whether an owed slot is still open on the date."""
     from qa_tools.common import agreement_freeze, turned_off
-    from asset_model import asset_time, slots
+    from asset_model import asset_time, schedule, slots
 
     if not agr.ever_turned_off(dataset_id):
         return None, (), False
@@ -115,8 +115,8 @@ def _turn_off_lines(dataset_id: str, on: date,
     gap, gap_rounds = [], []
     for p in sequence:
         if p.date > turn.effective_to and (turn.until is None or p.date < turn.until):
-            j = index[p.name] + (agr.files_go_to_period_for(dataset_id, p.date) or 0)
-            if j < len(sequence):
+            j = schedule.filled_index(dataset_id, sequence, index[p.name], agr)
+            if j is not None:
                 gap.append(sequence[j])
                 gap_rounds.append(p)
     if gap and turn.until is not None:

@@ -903,3 +903,21 @@ class TestTheContestedClientRegisterPairs:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestARoundPastTheCalendarsEndIsRefused:
+    """REQ-PIPE-377 criterion 2: a round whose files would fill a period past
+    the end of the sequence fills none (filled_index answers None), and the
+    Child Protection provider refuses naming the round rather than raising an
+    IndexError, which it did with no bounds check of its own."""
+
+    def test_the_provider_names_the_round(self, monkeypatch):
+        from asset_model import schedule
+
+        agr = schedule.agreement_to_read(None)
+        monkeypatch.setattr(type(agr), "files_go_to_period_for",
+                            lambda self, dataset_id, on: 10_000)
+        with pytest.raises(cp_provider.RoundFillsNoPeriod) as refused:
+            cp_provider.drawn_grown_periods()
+        said = str(refused.value)
+        assert "round" in said and "fills no period" in said, said

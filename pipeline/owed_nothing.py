@@ -50,8 +50,8 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
         if rnd.date > until and asset_time.local_date(
                 slots.slot_instants(dataset_id, rnd.date, agr).claim_opens_at) > until:
             continue
-        j = index[rnd.name] + (agr.files_go_to_period_for(dataset_id, rnd.date) or 0)
-        if j >= len(sequence):
+        j = schedule.filled_index(dataset_id, sequence, index[rnd.name], agr)
+        if j is None:
             continue
         period = sequence[j]
         row = {"period": period.name, "date": period.date.isoformat()}

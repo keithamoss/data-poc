@@ -313,10 +313,10 @@ def fall_hold(dataset_id: str, at: datetime, agreement=None) -> dict | None:
     if k is None:
         return None
     rnd = rounds[k]
-    n = agr.files_go_to_period_for(dataset_id, rnd.date) or 0
-    if k + n >= len(rounds):
+    j = schedule.filled_index(dataset_id, rounds, k, agr)
+    if j is None:
         return None
-    target = rounds[k + n]
+    target = rounds[j]
     filler = schedule.round_of(target.name, dataset_id, agr)
     if filler is None or filler == rnd.date:
         return None

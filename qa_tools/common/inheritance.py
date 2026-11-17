@@ -707,10 +707,10 @@ def groups_due(collection_id: str, at, *, recorded: set) -> list[tuple[str, int]
             # group by time, and the two modes record the same history.
             if slots.slot_instants(did, rnd.date, agr).due_at >= at:
                 break
-            n = agr.files_go_to_period_for(did, rnd.date) or 0
-            if i + n >= len(rounds):
+            j = schedule.filled_index(did, rounds, i, agr)
+            if j is None:
                 continue
-            key = (rounds[i + n].name, n)
+            key = (rounds[j].name, j - i)
             if key not in recorded and key not in due:
                 due.append(key)
     return due

@@ -58,8 +58,8 @@ def for_dataset(dataset_id: str, now=None) -> dict | None:
     for i, rnd in enumerate(sequence):
         if begins is not None and rnd.date < begins:
             continue
-        j = i + (agr.files_go_to_period_for(dataset_id, rnd.date) or 0)
-        if j >= len(sequence):
+        j = schedule.filled_index(dataset_id, sequence, i, agr)
+        if j is None:
             continue
         period = sequence[j]
         slot = owed.get(period.name)

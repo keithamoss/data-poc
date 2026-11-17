@@ -106,6 +106,30 @@ class SlotInstants:
     claim_opens_at: datetime
 
 
+def slot_version(dataset_id: str, on: date, agreement):
+    """THE ONE ANSWER to which participation version gives a slot its inputs
+    (REQ-PIPE-377 criterion 3): the version in force on the date asked (the
+    round's own), resolved value by value from the dataset or its collection
+    (REQ-PIPE-181); inside a turned-off gap, every input as if each
+    effective_to were absent (REQ-PIPE-179 criterion 14); before the first
+    version, the first (REQ-PIPE-113's PROVISIONAL rule). None where the
+    dataset has no participation at all. participation_for checks what it
+    returns is complete; schedule.claim_window reads it as it is."""
+    from asset_model import agreement as agreement_mod
+
+    entry = agreement.dataset(dataset_id)
+    if entry is None or not entry.participation:
+        return None
+    standing = agreement.standing_on(dataset_id, on)
+    if standing.state == agreement_mod.TURNED_OFF:
+        # A PERIOD INSIDE A TURNED-OFF GAP has no slot, but the last owed
+        # slot before the gap closes at the claim-opening instant this one
+        # would have had.
+        return agreement.timing_on(dataset_id, on)
+    return (standing.values
+            or agreement.participation_on(dataset_id, entry.participation[0].effective_from))
+
+
 def participation_for(dataset_id: str, period_date: date, agreement):
     """The participation version that governs a period: the one in force on
     the period's OWN date (REQ-PIPE-113 criterion 2).
@@ -115,25 +139,13 @@ def participation_for(dataset_id: str, period_date: date, agreement):
     after a slot is what that slot closes against (REQ-PIPE-131) - so it
     takes the first version, the only one that could describe it.
     """
-    from asset_model import agreement as agreement_mod
 
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r} has no participation version in {_assets.config_dir()}/calendar.yaml, "
             f"so none of its slots has a due instant.")
-    # RESOLVED, value by value, from the dataset or its collection
-    # (REQ-PIPE-181, amending REQ-PIPE-113 criterion 2).
-    standing = agreement.standing_on(dataset_id, period_date)
-    if standing.state == agreement_mod.TURNED_OFF:
-        # A PERIOD INSIDE A TURNED-OFF GAP has no slot, but the last owed
-        # slot before the gap closes at the claim-opening instant this one
-        # would have had - every input resolved as if each effective_to
-        # were absent (REQ-PIPE-179 criterion 14).
-        version = agreement.timing_on(dataset_id, period_date)
-    else:
-        version = (standing.values
-                   or agreement.participation_on(dataset_id, entry.participation[0].effective_from))
+    version = slot_version(dataset_id, period_date, agreement)
     if version.expected_time is None or version.grace is None:
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r}'s participation version effective "

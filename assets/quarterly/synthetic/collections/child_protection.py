@@ -753,9 +753,22 @@ def drawn_grown_periods() -> list:
     rounds = schedule.periods_for_calendar(baseline, until=get_anchor_date())[-n:-len(run_plan())]
     out = []
     for r in rounds:
-        offset = schedule.agreement_to_read(None).files_go_to_period_for(DATASET_ID, r.date) or 0
-        out.append(schedule.DatasetPeriod(period=sequence[index[r.name] + offset], round=r))
+        # THE ONE RULE (REQ-PIPE-377 criteria 1 and 2): a round whose files
+        # would fill a period past the calendar's end fills none, and is
+        # refused here by name rather than raising an IndexError.
+        j = schedule.filled_index(DATASET_ID, sequence, index[r.name])
+        if j is None:
+            raise RoundFillsNoPeriod(
+                f"Child Protection's round {r.name} ({r.date.isoformat()}) fills no period: "
+                f"its files would go past the end of the {baseline} calendar. Extend the "
+                f"calendar, or correct the collection's files_go_to_period.")
+        out.append(schedule.DatasetPeriod(period=sequence[j], round=r))
     return out
+
+
+class RoundFillsNoPeriod(ValueError):
+    """A generated round whose files would fill a period the calendar does
+    not name (REQ-PIPE-377 criterion 2)."""
 
 
 def original_periods() -> list:
