@@ -722,7 +722,9 @@ def parse_contract_check_metadata(contract_yaml_path: Path | str, *,
 
 # ---- File checks (REQ-QAC-096) ---------------------------------------
 
-def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMetadata]:
+def parse_file_check_metadata(file_checks_yaml_path: Path | str, *,
+                              shared_text: str | None = None,
+                              at_ref: bool = False) -> list[CheckMetadata]:
     """One CheckMetadata per file check PER DATASET, from the one committed
     definition of each (criterion 4) - so the lifecycle gate holds a file
     check to exactly the rules every other check is held to (criterion 5):
@@ -737,13 +739,20 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
     The datasets come from the CURRENT hierarchy even when this parses an
     older ref's file: an id derived for a dataset that has since been
     removed is a disappearance the hierarchy gate already reports.
+
+    `file_checks_yaml_path` is the ASSET'S OWN file, merged with the shared
+    default (REQ-QAC-387) - the working tree's, or at a git ref `shared_text`,
+    that ref's shared default (None where it held none). Each check's
+    source_file is the file its entry came from, so an override is held to
+    the changelog rule in the asset's file (criterion 8). A ref before the
+    shared default existed reads its asset files' six checks as the same
+    checks (criterion 9), since ids and definitions are unchanged.
     """
     from asset_model import file_check_definitions, hierarchy
 
-    doc = config_yaml.load(file_checks_yaml_path) or {}
-    source = str(file_checks_yaml_path)
     out: list[CheckMetadata] = []
-    for meta in doc.get("checks") or []:
+    for meta, source in file_check_definitions.merged(
+            file_checks_yaml_path, shared_text=shared_text, from_text=at_ref):
         name = meta.get("check")
         if not name:
             raise MissingCheckIdError(f"{source}: a file check has no `check` name")

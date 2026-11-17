@@ -11,7 +11,8 @@ questions are asked of the bytes, before the load, and nothing else is
 (criterion 2).
 
 DEFINED ONCE, IDS DERIVED PER DATASET (criterion 4). The definitions and
-their prose are `contract/file-checks.yaml`; each dataset gets each check
+their prose are the root `file-checks.yaml`, merged with an asset's own
+(REQ-QAC-387, asset_model/file_check_definitions.merged); each dataset gets each check
 under `<asset>.<agency>.<collection>.<dataset>.<name>_file`, the existing
 grammar with a fifth tool suffix. Six checks on thirty datasets is 180
 entries nobody should have to keep in step by hand.

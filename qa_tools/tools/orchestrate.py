@@ -210,6 +210,10 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
                    run_by: str, reference_run_id: str | None,
                    on_step: Callable[[str], None] | None) -> list[dict]:
     coll = declared_collections.by_id(collection_id)
+    # EACH COUNTED COLUMN'S ALLOWED VALUES, FROM THE CONTRACT, BEFORE ANYTHING
+    # (REQ-QAC-389 criterion 4): a column without a list is a named refusal
+    # before any tool runs, never an empty list counting every value invalid.
+    allowed = dataset_stats.allowed_lists(coll.id)
     # BEFORE ANY TOOL WRITES, so the run exists with the identity only this
     # layer knows (REQ-PIPE-089 criterion 6).
     # AN ARRIVAL'S DATASET, DELIVERY AND RECEIPT come from its arrival
@@ -312,7 +316,7 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     _announce(on_step, RUN_STEPS[4])
     conn = supply_db.connect(read_only=True)
     conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
-    stats = dataset_stats.compute_dataset_stats(coll.id, conn, entry)
+    stats = dataset_stats.compute_dataset_stats(coll.id, conn, entry, lists=allowed)
     resolution = supply_db.resolution_for(conn, run_id)
     tables_read = resolution.as_record()
     conn.close()

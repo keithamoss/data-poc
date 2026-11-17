@@ -16,9 +16,8 @@ when it is taken: every *.yaml and *.yml file of the selected asset's folder
 configuration) and assets/environments.yaml. So its digest is one value, and
 every process a pinned run starts is handed exactly those contents
 (assets.handoff) rather than reading afresh whatever the parent had not yet
-read. There is no separate shared file-checks default in this tree: each
-asset's own file-checks.yaml is in its folder, so in the set (PROVISIONAL
-(2026-11-16): the criterion names one; none exists to add).
+read - plus the shared file-checks default at the repository root
+(REQ-QAC-387), which every asset's file checks merge with.
 
 THROUGH THE SEAM, NOT A FLAG (the architect, separation v5 reviews): the pin
 acts inside config_yaml.read() - and so inside load() and every Built store -
@@ -70,15 +69,15 @@ def declared_files() -> list[Path]:
     """The snapshot set of the selected asset, as found now: every *.yaml and
     *.yml under its configuration folder - following the links the suite's
     asset folders are made of - outside dbt_packages/, plus
-    assets/environments.yaml."""
+    assets/environments.yaml and the shared file-checks default."""
     folder = assets.selected().folder
     found = []
     for root, dirs, files in os.walk(folder, followlinks=True):
         dirs[:] = sorted(d for d in dirs if d not in PRUNED and not d.startswith("."))
         found += [Path(root) / f for f in sorted(files) if f.endswith(SUFFIXES)]
-    environments = assets.ROOT / "assets" / "environments.yaml"
-    if environments.is_file():
-        found.append(environments)
+    for shared in (assets.ROOT / "assets" / "environments.yaml", assets.ROOT / "file-checks.yaml"):
+        if shared.is_file():
+            found.append(shared)
     return found
 
 

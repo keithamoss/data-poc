@@ -5,9 +5,8 @@ criterion 1) - served here by extending only the declarations. Nothing in the
 shared modules names this collection (criterion 2)."""
 from qa_tools.collections.base import CollectionAdapter, DbtSpec, SodaSpec, StatsSpec
 
-#: The geocoding tables, and the allowed match levels in display order.
+#: The geocoding tables.
 GEO_TABLES = ("geo_cp_clients", "geo_ed_presentations")
-MATCH_LEVELS = ("address", "postcode", "suburb", "not geocoded")
 
 ADAPTER = CollectionAdapter(
     collection_id="linkage-products",
@@ -38,7 +37,8 @@ ADAPTER = CollectionAdapter(
     ),
     # match_level's value counts only - read by the drift reference and the
     # page's value bars; never an area code or an identifier (REQ-QAC-297
-    # criteria 11 and 15).
-    stats=StatsSpec(value_counts={(t, "match_level"): MATCH_LEVELS for t in GEO_TABLES}),
+    # criteria 11 and 15). Its allowed levels are the contract's `enum:`,
+    # read at run time (REQ-QAC-389).
+    stats=StatsSpec(value_counts=tuple((t, "match_level") for t in GEO_TABLES)),
     claim_window_dataset="linkage-keys",
 )

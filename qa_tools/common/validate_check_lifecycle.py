@@ -48,7 +48,8 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     for the YAML tools and `[path]` for Evidently - derived from THAT ref's
     own hierarchy (REQ-QAC-241 criteria 7 and 8): each collection's
     contract, Soda, Evidently and dbt schema files with their retired
-    siblings, plus contract/file-checks.yaml. A new collection's files are
+    siblings, plus the file checks - the shared default merged with the asset's
+    own (REQ-QAC-387). A new collection's files are
     found without a line here.
 
     Grouped by tool in a fixed order - dbt, Soda, contracts, file checks,
@@ -95,8 +96,12 @@ def sources_fingerprint() -> str:
     from asset_model import collections
 
     digest = hashlib.sha256(str(ROOT).encode())
+    from asset_model import file_check_definitions
+
     yaml_sources, evidently = _sources(None)
     paths = [ROOT / rel for rel, _parser in yaml_sources]
+    # The shared file-checks default (REQ-QAC-387), merged into every asset's.
+    paths.append(file_check_definitions.shared_path())
     paths += [ROOT / rel for rel in evidently]
     dirs = list(collections.SHARED_DBT_DIRS)
     for c in collections.all_collections():
@@ -193,6 +198,12 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     checks: list[cl.CheckMetadata] = []
     for rel_path, parser in yaml_sources:
         content = _old_file_content(rel_path, ref)
+        if parser is cl.parse_file_check_metadata:
+            # THE SHARED DEFAULT AS IT STOOD AT THE SAME REF, merged with the
+            # asset's own file there (REQ-QAC-387 criterion 9): before the
+            # default existed, the asset's file held all six.
+            checks.extend(_file_checks_at(content, ref))
+            continue
         if content is None:
             continue
         with tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False) as f:
@@ -210,6 +221,19 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
             cl.evidently_checks_from_text(source, rel_path), source=rel_path))
 
     return checks
+
+
+def _file_checks_at(own_content: str | None, ref: str) -> list[cl.CheckMetadata]:
+    """The file checks at `ref`: the shared default there merged with the
+    asset's own file there, either of which may be absent."""
+    from asset_model import file_check_definitions
+
+    shared = _old_file_content(file_check_definitions.FILE, ref)
+    with tempfile.TemporaryDirectory() as scratch:
+        own = Path(scratch) / file_check_definitions.FILE
+        if own_content is not None:
+            own.write_text(own_content)
+        return cl.parse_file_check_metadata(own, shared_text=shared, at_ref=True)
 
 
 def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:

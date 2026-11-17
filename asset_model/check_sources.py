@@ -142,7 +142,9 @@ def collect_working_tree(yaml_sources, evidently, root: Path = ROOT) -> list[cl.
                                  f"{assets.dbt_on_disk()}/tests")
     checks: list[cl.CheckMetadata] = []
     for rel_path, parser in yaml_sources:
-        if not (Path(root) / rel_path).exists():
+        # AN ASSET WITH NO FILE CHECKS OF ITS OWN still runs the shared
+        # default (REQ-QAC-387 criterion 5), so that source is read either way.
+        if not (Path(root) / rel_path).exists() and parser is not cl.parse_file_check_metadata:
             continue
         kwargs = {"definition": definition} if parser is cl.parse_dbt_check_metadata else {}
         checks.extend(parser(Path(root) / rel_path, **kwargs))

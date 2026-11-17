@@ -50,6 +50,8 @@ on:
       # package (the asset split moved contract/ and dbt_project/).
       - "assets/**"
       - "dbt_shared/**"
+      # The shared file-checks default (REQ-QAC-387 criterion 12).
+      - "file-checks.yaml"
       - "qa_tools/**"
       # Every directory the imports gate reads (REQ-TEST-384 criterion 12),
       # and its allowlist, so a push changing only one of them still runs it.

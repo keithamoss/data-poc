@@ -54,6 +54,10 @@ schema:
         physicalType: varchar(10)
         required: true
         description: "The widget's colour, one of red, green or blue."
+        enum:
+          - value: red
+          - value: green
+          - value: blue
         quality:
           - id: quarterly:widget-agency:widget-register:widgets:colour:nullValues_datacontract
             metric: nullValues

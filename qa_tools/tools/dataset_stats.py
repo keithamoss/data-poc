@@ -31,7 +31,7 @@ from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggreg
 from qa_tools import collections
 from asset_model import collections as declared_collections
 
-__all__ = ["arrival_record", "compute_dataset_stats"]
+__all__ = ["allowed_lists", "arrival_record", "compute_dataset_stats"]
 
 _ARRIVAL_KEYS = ("run_id", "run_index", "received_at", "delivery")
 
@@ -48,9 +48,36 @@ def _readable(conn) -> frozenset[str]:
         "WHERE table_schema = current_schema()").fetchall())
 
 
-def _aggregate(conn, table: str, column: str, spec: dict) -> dict:
+def allowed_lists(collection_id: str) -> dict[tuple[str, str], list]:
+    """Each counted column's allowed values, read from the collection's ODCS
+    contract once (REQ-QAC-389 criterion 1 and NFR PERFORMANCE). Raises
+    contract_values.AllowedValuesError, naming the contract, the column and
+    the fix, where a column has none or two that disagree - which the
+    orchestrator asks before any tool runs (criterion 4)."""
+    from asset_model import contract_values
+
+    coll = declared_collections.by_id(collection_id)
+    return contract_values.lists_for(coll.check_file("contract"),
+                                     collections.adapter(coll).stats.counted_columns())
+
+
+def _sql_literal(value) -> str:
+    if isinstance(value, str):
+        return "'" + value.replace("'", "''") + "'"
+    return str(value)
+
+
+def _invalid_condition(column: str, spec: dict, allowed: list | None) -> str:
+    """A categorical column's values outside its contract list, or null; a
+    numeric_date column's own declared condition."""
+    if spec["kind"] != "categorical":
+        return spec["invalid_condition"]
+    return f"{column} NOT IN ({','.join(_sql_literal(v) for v in allowed)}) OR {column} IS NULL"
+
+
+def _aggregate(conn, table: str, column: str, spec: dict, allowed: list | None) -> dict:
     run = categorical_aggregate if spec["kind"] == "categorical" else numeric_date_aggregate
-    return run(conn, table, column, spec["invalid_condition"], spec["classification"])
+    return run(conn, table, column, _invalid_condition(column, spec, allowed), spec["classification"])
 
 
 def _value_counts(conn, table: str, column: str, known: list[str]) -> list[list]:
@@ -83,12 +110,17 @@ def _own_table(entry: dict) -> str | None:
     return owner[1] if owner else None
 
 
-def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, Any]:
+def compute_dataset_stats(collection_id: str, conn, entry: dict,
+                          lists: dict | None = None) -> dict[str, Any]:
     """`conn` has this run's own view schema on its search path, which holds
     exactly the arrival's rows - so nothing here scopes by a row column. A
-    re-check's view resolves to the same supply (REQ-PIPE-140)."""
+    re-check's view resolves to the same supply (REQ-PIPE-140). `lists` is
+    allowed_lists(), as the orchestrator read it before any tool ran; read
+    here where a caller passes none."""
     coll = declared_collections.by_id(collection_id)
     spec = collections.adapter(coll).stats
+    if lists is None:
+        lists = allowed_lists(collection_id)
     tables = [d.table for d in coll.datasets]
     readable = _readable(conn)
 
@@ -102,13 +134,13 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, An
     shared: dict[str, set] = {}
     for (t, col) in spec.value_counts:
         shared.setdefault(col, set()).add(t)
-    declared = [((t, col), known) for (t, col), known in spec.value_counts.items()
+    declared = [((t, col), lists[(t, col)]) for (t, col) in spec.value_counts
                 if len(shared[col]) == 1 or t == own]
     return {
         "arrival_record": arrival_record(entry),
         "row_counts": {t: _count(conn, t) for t in tables if t in readable},
         "value_counts": {col: _value_counts(conn, t, col, known)
                          for (t, col), known in declared if t in readable},
-        "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s)
+        "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s, lists.get((t, col)))
                              for (t, col), s in spec.aggregates.items() if t in readable},
     }

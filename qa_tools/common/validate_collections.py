@@ -649,11 +649,38 @@ def line_report(adapters: Path | None = None, providers: Path | None = None) -> 
     return out
 
 
+def allowed_value_problems() -> list[str]:
+    """Every column an adapter's statistics count has one allowed-value list
+    in its collection's contract (REQ-QAC-389 criterion 4) - the refusal a run
+    would meet before any tool runs, found here without a database. An
+    adapter that cannot be loaded is config_problems()' to report."""
+    from asset_model import collections as declared_collections
+    from asset_model.contract_values import AllowedValuesError
+    from qa_tools.tools import dataset_stats
+
+    problems: list[str] = []
+    try:
+        declared = declared_collections.all_collections()
+    except ValueError:
+        return []
+    for coll in declared:
+        try:
+            dataset_stats.allowed_lists(coll.id)
+        except AllowedValuesError as exc:
+            problems.append(str(exc))
+        except Exception:  # noqa: BLE001 - an unloadable adapter is reported elsewhere
+            continue
+    return problems
+
+
 def main() -> int:
     from asset_model import linked_datasets, set_member_checks
     from qa_tools.common import run_reads
 
-    problems = (config_problems() + check_file_problems() + literal_problems()
+    from asset_model import file_check_definitions
+
+    problems = (config_problems() + check_file_problems() + allowed_value_problems()
+                + file_check_definitions.problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
                 + set_member_checks.problems())
     for line in line_report():  # reported whether or not the gate passes

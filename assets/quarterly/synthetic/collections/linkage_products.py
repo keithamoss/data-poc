@@ -368,13 +368,15 @@ def worst(*verdicts: str) -> str:
 
 def known_values(dataset_id: str, column: str) -> list:
     """The values the collection's recorded stats count `column` by for the
-    dataset's table (its adapter's stats spec), in declared order."""
-    from qa_tools import collections
+    dataset's table, in declared order - read from the collection's contract
+    through the reader the statistics use (REQ-QAC-389 criterion 9), so a
+    planned reference folds as the recorded one does."""
     from asset_model import collections as declared_collections
-    from asset_model import hierarchy
+    from asset_model import contract_values, hierarchy
 
-    spec = collections.adapter(declared_collections.by_id(COLLECTION_ID)).stats
-    return list(spec.value_counts.get((hierarchy.dataset(dataset_id).table, column)) or [])
+    return contract_values.allowed_values(
+        declared_collections.by_id(COLLECTION_ID).check_file("contract"),
+        hierarchy.dataset(dataset_id).table, column)
 
 
 def value_counts(rows, column: str, dataset_id: str) -> list[list]:

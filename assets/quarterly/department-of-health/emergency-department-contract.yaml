@@ -110,6 +110,27 @@ schema:
         physicalType: varchar(10)
         required: true
         description: "The patient's age band on arrival."
+        quality:
+          - id: quarterly:department-of-health:emergency-department:ed-presentations:age_group:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["0-4", "5-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75-84", "85+"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: quarterly.department-of-health.emergency-department.ed-presentations.age_group.invalidValues_datacontract
+              - property: introduced_date
+                value: "2013-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new age banding introduced upstream without notice.
       - name: sex
         logicalType: string
         physicalType: varchar(1)

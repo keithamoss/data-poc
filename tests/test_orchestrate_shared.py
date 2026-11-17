@@ -9,11 +9,13 @@ from __future__ import annotations
 import collection_modules
 
 import dataclasses
+from pathlib import Path
 from datetime import date, timedelta
 from types import SimpleNamespace
 
 import duckdb
 import pytest
+import yaml
 
 from qa_tools import collections
 from qa_tools.collections.base import StatsSpec
@@ -81,9 +83,18 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
         adapter = collection_modules.installed("adapter", "fake_collection")
         adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, stats=StatsSpec(
             aggregates={(FAKE_TABLE, "things"): {
-                "kind": "categorical", "invalid_condition": "things NOT IN ('a', 'b')",
+                "kind": "categorical",
                 "classification": "invalid code", "check_names": ["things.accepted_values"]}},
-            value_counts={(FAKE_TABLE, "things"): ["a", "b"]}))
+            value_counts=((FAKE_TABLE, "things"),)))
+        # ITS ALLOWED VALUES ARE ITS CONTRACT'S (REQ-QAC-389): the copied
+        # contract gains the column, with its list as an `enum:`.
+        from asset_model import collections as declared_collections
+
+        contract = Path(declared_collections.by_id(FAKE_ID).check_file("contract"))
+        doc = yaml.safe_load(contract.read_text())
+        doc["schema"].append({"name": FAKE_TABLE, "properties": [
+            {"name": "things", "enum": [{"value": "a"}, {"value": "b"}]}]})
+        contract.write_text(yaml.safe_dump(doc, sort_keys=False))
         conn = duckdb.connect(":memory:")
         conn.execute(f"CREATE TABLE {FAKE_TABLE} (fake_id VARCHAR, things VARCHAR, "
                      f"extract_timestamp TIMESTAMP)")

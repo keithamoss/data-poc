@@ -216,26 +216,29 @@ class TestRealChecks:
 
     def test_changing_a_file_checks_definition_moves_it_for_every_dataset_and_no_other(
             self, tmp_path):
-        from asset_model import assets
+        from asset_model import file_check_definitions
 
-        rel = f"{assets.folder_rel()}/file-checks.yaml"
-        before = cl.parse_file_check_metadata(ROOT / rel)
+        # THE SHARED DEFAULT (REQ-QAC-387), with the asset adding nothing.
+        none = tmp_path / "no-file-of-its-own.yaml"
+        before = cl.parse_file_check_metadata(none)
         name = before[0].check_kind
-        text = (ROOT / rel).read_text()
+        text = file_check_definitions.shared_path().read_text()
         doc_line = f"check: {name}"
         assert doc_line in text
-        edited = tmp_path / "file-checks.yaml"
-        # A setting added to that one definition (criterion 22).
-        edited.write_text(text.replace(doc_line, f"{doc_line}\n    tightened: true", 1))
-        after = {c.check_id: c.config_hash for c in cl.parse_file_check_metadata(edited)}
+        head, tail = text.split(doc_line, 1)
+        assert "formats: [csv]" in tail
+        # A setting changed in that one definition (criterion 22).
+        edited = head + doc_line + tail.replace("formats: [csv]", "formats: [csv, parquet]", 1)
+        after = {c.check_id: c.config_hash for c in cl.parse_file_check_metadata(
+            none, shared_text=edited, at_ref=True)}
         moved = {c.check_id for c in before if after[c.check_id] != c.config_hash}
         assert moved == {c.check_id for c in before if c.check_kind == name}
         assert len(moved) > 1, "every dataset's copy of the one definition moves together"
 
     def test_one_file_check_definition_gives_every_dataset_one_fingerprint(self):
-        from asset_model import assets
+        from asset_model import file_check_definitions
 
-        checks = cl.parse_file_check_metadata(assets.selected().file("file-checks.yaml"))
+        checks = cl.parse_file_check_metadata(file_check_definitions.definitions_path())
         by_kind: dict = {}
         for c in checks:
             by_kind.setdefault(c.check_kind, set()).add(c.config_hash)

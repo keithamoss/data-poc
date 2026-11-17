@@ -25,21 +25,6 @@ BUSINESS_RULE_HOME_TABLE = {
     "placement_carer_approval": "cp_placements",
 }
 
-#: The valid values the real checks enforce, moved from
-#: the old qa_tools/cp/dataset_stats.py (REQ-PIPE-243).
-_POSTCODE_VALID = ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056",
-                    "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148",
-                    "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225",
-                    "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721",
-                    "6725"]
-_CONCERN_TYPE_VALID = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
-                        "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
-
-
-def _sql_list(values: list[str]) -> str:
-    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
-
-
 ADAPTER = CollectionAdapter(
     collection_id="child-protection",
     label="Child Protection",
@@ -81,7 +66,6 @@ ADAPTER = CollectionAdapter(
         aggregates={
             ("cp_clients", "postcode"): {
                 "kind": "categorical",
-                "invalid_condition": f"postcode NOT IN ({_sql_list(_POSTCODE_VALID)}) OR postcode IS NULL",
                 "classification": None,
                 "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
             },
@@ -93,13 +77,13 @@ ADAPTER = CollectionAdapter(
             },
             ("cp_notifications", "concern_type"): {
                 "kind": "categorical",
-                "invalid_condition": (f"concern_type NOT IN ({_sql_list(_CONCERN_TYPE_VALID)}) "
-                                      f"OR concern_type IS NULL"),
                 "classification": None,
                 "check_names": {"datacontract:invalid_count"},
             },
         },
-        value_counts={("cp_notifications", "concern_type"): _CONCERN_TYPE_VALID},
+        # Each categorical column's allowed values are its contract's, read at
+        # run time (REQ-QAC-389).
+        value_counts=(("cp_notifications", "concern_type"),),
     ),
     # An arrival naming no dataset of its own is claimed under Client
     # Records' window, as the copied orchestrator did.

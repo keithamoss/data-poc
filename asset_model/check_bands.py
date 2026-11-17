@@ -426,11 +426,11 @@ def file_bounds(metadata, doc=None) -> dict[str, tuple]:
     """A file check fails (severity failure) or only warns (warning) on any
     problem with the file - it has no band of its own. One file-checks.yaml
     does not name, or names with another severity, is refused."""
-    from asset_model import collections
+    from asset_model import collections, file_check_definitions
 
-    if doc is None:
-        doc = config_yaml.load(ROOT / collections.file_checks()) or {}
-    severity = {str(c.get("check")): str(c.get("severity")) for c in doc.get("checks") or []}
+    entries = (doc.get("checks") or [] if doc is not None
+               else [e for e, _source in file_check_definitions.merged()])
+    severity = {str(c.get("check")): str(c.get("severity")) for c in entries}
     out = {}
     for m in metadata:
         if m.tool != "file":

@@ -4,24 +4,6 @@ from qa_tools.collections.base import (
     CollectionAdapter, DatacontractSpec, DbtSpec, SodaSpec, StatsSpec,
 )
 
-#: The valid values the real checks enforce (dbt_project/models/
-#: civil-registration/schema.yml), so the statistics' notion of "invalid"
-#: cannot drift from what the checks flag (REQ-PIPE-243, moved from
-#: the old qa_tools/bdm/dataset_stats.py).
-_SEX_VALID = ["M", "F", "X"]
-_SUBURB_VALID = ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington",
-                 "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton",
-                 "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance",
-                 "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook",
-                 "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill",
-                 "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine",
-                 "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
-
-
-def _sql_list(values: list[str]) -> str:
-    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
-
-
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
     label="Birth Registrations",
@@ -83,14 +65,11 @@ ADAPTER = CollectionAdapter(
         aggregates={
             ("birth_registrations", "sex"): {
                 "kind": "categorical",
-                "invalid_condition": f"sex NOT IN ({_sql_list(_SEX_VALID)}) OR sex IS NULL",
                 "classification": None,
                 "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
             },
             ("birth_registrations", "place_of_birth_suburb"): {
                 "kind": "categorical",
-                "invalid_condition": (f"place_of_birth_suburb NOT IN ({_sql_list(_SUBURB_VALID)}) "
-                                      f"OR place_of_birth_suburb IS NULL"),
                 "classification": None,
                 "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
             },
@@ -101,7 +80,9 @@ ADAPTER = CollectionAdapter(
                 "check_names": {"datacontract:custom_sql"},
             },
         },
-        value_counts={("birth_registrations", "sex"): _SEX_VALID},
+        # Each categorical column's allowed values are its contract's, read at
+        # run time (REQ-QAC-389).
+        value_counts=(("birth_registrations", "sex"),),
     ),
     claim_window_dataset="birth-registrations",
 )

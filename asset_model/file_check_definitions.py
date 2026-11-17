@@ -1,7 +1,15 @@
 """The file checks' DEFINITIONS (REQ-QAC-096, split by REQ-PIPE-380
-criterion 2): which file checks the selected asset's file-checks.yaml
-declares, their severities and names, and the check id each gets per
-dataset.
+criterion 2): which file checks the selected asset runs, their severities and
+names, and the check id each gets per dataset.
+
+ONE SHARED DEFAULT, BESIDE dbt_shared/ (REQ-QAC-387, SPLIT D2): the checks
+every asset runs are the repository root's file-checks.yaml, read from the
+code's own checkout so an asset folder outside the repository still gets them
+(criterion 11). An asset's own file-checks.yaml, where it has one, ADDS a
+check (a name the default does not hold), OVERRIDES one WHOLE by its `check:`
+name - no field of the shared entry is inherited (Q3, Keith 2026-11-14) - or
+retires one for itself with `retired_as_of` on its override. merged() is the
+one reader every file-check reader goes through (criterion 6).
 
 THE OTHER HALF IS qa_tools/common/file_checks.py, which evaluates a
 delivered file's bytes and records the findings. The cut sits there because
@@ -16,10 +24,95 @@ from pathlib import Path
 from asset_model import assets, config_yaml
 
 
+#: The file's name, the shared default's at the repository root and an
+#: asset's own in its folder alike.
+FILE = "file-checks.yaml"
+
+#: What a file check's entry may say (criterion 10): what it does, how it
+#: reads and its lifecycle.
+KEYS = frozenset({"check", "name", "severity", "formats", "category", "introduced_date",
+                  "description", "failure_indicates", "technical_note", "changelog",
+                  "retired_as_of", "retired_reason"})
+
+
+class FileChecksError(ValueError):
+    """A file-checks.yaml naming a key no file check allows, or one check
+    twice - named by its file and entry."""
+
+
+def shared_path() -> Path:
+    """The shared default, in the code's own checkout (criterion 11)."""
+    return assets.ROOT / FILE
+
+
 def definitions_path() -> Path:
-    """The selected asset's file-checks.yaml, resolved now (REQ-PIPE-342 criterion
-    6; it was the import-time constant DEFINITIONS_PATH)."""
-    return assets.selected().file("file-checks.yaml")
+    """The selected asset's own file-checks.yaml, resolved now (REQ-PIPE-342
+    criterion 6) - which may not exist: an asset with none runs the shared
+    default unchanged (REQ-QAC-387 criterion 5)."""
+    return assets.selected().file(FILE)
+
+
+def _entries(doc, source: str) -> list[dict]:
+    """A file's entries, each checked for its keys and its name once."""
+    seen: set[str] = set()
+    out = []
+    for i, raw in enumerate((doc or {}).get("checks") or []):
+        name = raw.get("check") if isinstance(raw, dict) else None
+        where = f"{source}: checks[{i}]" + (f" ({name})" if name else "")
+        if not name:
+            raise FileChecksError(f"{where} names no `check:`")
+        unknown = sorted(set(raw) - KEYS)
+        if unknown:
+            raise FileChecksError(f"{where} names {', '.join(unknown)}, which no file check "
+                                  f"allows - allowed: {', '.join(sorted(KEYS))}")
+        if name in seen:
+            raise FileChecksError(f"{where} names {name!r} a second time - one entry per check")
+        seen.add(name)
+        out.append(dict(raw))
+    return out
+
+
+def merged_entries(*, shared=None, own=None, shared_source: str | None = None,
+                   own_source: str | None = None) -> list[tuple[dict, str]]:
+    """Every check the asset runs, `(entry, source file)`: the shared
+    default's in its order, each replaced WHOLE by the asset's entry of the
+    same name, then the asset's additions in its order. `shared` and `own`
+    are parsed documents (None for a file that does not exist)."""
+    shared_source = shared_source or str(shared_path())
+    own_source = own_source or str(definitions_path())
+    mine = {e["check"]: e for e in _entries(own, own_source)}
+    out = []
+    for entry in _entries(shared, shared_source):
+        override = mine.pop(entry["check"], None)
+        out.append((override, own_source) if override is not None else (entry, shared_source))
+    return out + [(e, own_source) for e in mine.values()]
+
+
+def _load_if_present(path):
+    path = Path(path)
+    return config_yaml.load(path) if path.is_file() else None
+
+
+def merged(own_path: Path | str | None = None, *, shared_text: str | None = None,
+           from_text: bool = False) -> list[tuple[dict, str]]:
+    """The selected asset's file checks as the working tree defines them -
+    or, where `from_text` is set, the shared default from `shared_text` (a
+    git ref's, which may be None) beside the asset's own at `own_path`."""
+    own_path = Path(own_path) if own_path is not None else definitions_path()
+    shared = (config_yaml.parse(shared_text, name=FILE) if shared_text else None) if from_text \
+        else _load_if_present(shared_path())
+    return merged_entries(shared=shared, own=_load_if_present(own_path), own_source=str(own_path))
+
+
+def problems() -> list[str]:
+    """What the collections gate reports (criterion 10): a key no file check
+    allows or a check named twice, in the shared default or the selected
+    asset's own file."""
+    try:
+        merged()
+    except FileChecksError as exc:
+        return [str(exc)]
+    return []
 
 
 #: The fifth tool suffix (check_id.TOOLS) and the value of `qa.check_result.tool`.
@@ -50,13 +143,14 @@ class Definition:
 
 
 def definitions(path: Path | str | None = None) -> list[Definition]:
-    """Every file check in the committed configuration, in NAMES order."""
-    doc = config_yaml.load(path or definitions_path()) or {}
+    """Every file check the selected asset runs - the shared default merged
+    with its own file (`path`, else the asset folder's) - in NAMES order,
+    additions after."""
     out = [Definition(check=str(raw["check"]), severity=str(raw["severity"]),
                       formats=tuple(raw.get("formats") or ("csv",)),
                       name=str(raw.get("name") or raw["check"]).strip(),
                       retired=bool(raw.get("retired_as_of")))
-           for raw in doc.get("checks") or []]
+           for raw, _source in merged(path)]
     order = {n: i for i, n in enumerate(NAMES)}
     return sorted(out, key=lambda d: order.get(d.check, len(order)))
 

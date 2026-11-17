@@ -146,9 +146,11 @@ SHARED_DBT_DIRS = (f"{assets.DBT_SHARED}/macros", f"{assets.DBT_SHARED}/tests/ge
 
 
 def file_checks() -> str:
-    """The selected asset's file checks, by repository path where the
+    """The selected asset's OWN file checks, by repository path where the
     repository holds them, asked at call time (REQ-PIPE-342 criterion 6) -
-    it was the FILE_CHECKS constant."""
+    it was the FILE_CHECKS constant. It may not exist; what the asset runs
+    is file_check_definitions.merged(), the shared default with this file's
+    additions and overrides (REQ-QAC-387)."""
     return f"{assets.folder_on_disk()}/file-checks.yaml"
 
 

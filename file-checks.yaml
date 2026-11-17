@@ -1,6 +1,15 @@
 # File checks (REQ-QAC-096): the questions only the file as delivered can
 # answer, asked of its bytes before a row of it is loaded.
 #
+# THE SHARED DEFAULT EVERY ASSET RUNS (REQ-QAC-387), beside dbt_shared/ and
+# read from the code's own checkout. An asset's own
+# assets/<asset>/file-checks.yaml, where it has one, may ADD a check (a
+# `check:` this file does not hold), OVERRIDE one by its `check:` name - the
+# asset's entry replaces this one WHOLE, nothing of it inherited - or RETIRE
+# one for itself with `retired_as_of` on that override. Each addition,
+# override and retirement is held to the same lifecycle gate, authoring rules
+# and changelog rule as an entry here.
+#
 # WRITTEN ONCE, IDS DERIVED PER DATASET (criterion 4). Each entry here is
 # one check for EVERY dataset; its check_id for a dataset is
 # `<asset>.<agency>.<collection>.<dataset>.<check>_file`, the existing

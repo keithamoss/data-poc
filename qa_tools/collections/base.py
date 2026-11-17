@@ -73,13 +73,24 @@ class StatsSpec:
     Pure data, so an adapter stays importable without a QA tool library
     (criterion 5): the SQL is a condition string, run by
     qa_tools/tools/dataset_stats.py."""
-    #: Per (table, column): `kind` (categorical or numeric_date), the
-    #: `invalid_condition` the real checks flag, a `classification`, and the
-    #: `check_names` the dashboard attaches the aggregate to.
+    #: Per (table, column): `kind` (categorical or numeric_date), a
+    #: `classification`, the `check_names` the dashboard attaches the
+    #: aggregate to and, for numeric_date only, the `invalid_condition` the
+    #: real checks flag. A categorical column's invalid values are those
+    #: outside its contract's allowed-value list, read at run time
+    #: (REQ-QAC-389) - an adapter names the column, never the list.
     aggregates: dict = field(default_factory=dict)
-    #: Per (table, column): the known values of a value-count distribution,
-    #: in display order; anything else counts as "(invalid code)".
-    value_counts: dict = field(default_factory=dict)
+    #: The (table, column) pairs a value-count distribution is recorded for;
+    #: the known values, in the contract's declared order, are read from the
+    #: collection's contract at run time (REQ-QAC-389), and anything else
+    #: counts as "(invalid code)".
+    value_counts: tuple = ()
+
+    def counted_columns(self) -> tuple:
+        """Every (table, column) whose allowed values the statistics read
+        from the contract, each once."""
+        return tuple(dict.fromkeys([*self.value_counts, *(
+            key for key, spec in self.aggregates.items() if spec["kind"] == "categorical")]))
 
 
 @dataclass(frozen=True)

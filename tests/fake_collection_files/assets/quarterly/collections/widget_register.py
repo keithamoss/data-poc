@@ -13,6 +13,7 @@ ADAPTER = CollectionAdapter(
     soda=SodaSpec(
         data_source="widget_register",
     ),
-    # Evidently's drift reference is rebuilt from these recorded counts.
-    stats=StatsSpec(value_counts={("widgets", "colour"): ["red", "green", "blue"]}),
+    # Evidently's drift reference is rebuilt from these recorded counts; the
+    # colours are the contract's, read at run time (REQ-QAC-389).
+    stats=StatsSpec(value_counts=(("widgets", "colour"),)),
 )

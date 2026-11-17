@@ -54,7 +54,10 @@ ROOT = Path(__file__).resolve().parent.parent
 INPUTS = ("asset_model/**", "bootstrap/**", "scenarios/**", "generator/**",
           "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
           "dbt_shared/**", "pyproject.toml", "uv.lock",
-          ".github/workflows/test.yml", "assets/environments.yaml")
+          ".github/workflows/test.yml", "assets/environments.yaml",
+          # The shared file-checks default every asset merges (REQ-QAC-387
+          # criterion 12).
+          "file-checks.yaml")
 
 #: The selected asset's own folder, the one input that differs by asset.
 ASSET_FOLDER = "assets/{asset}/**"
@@ -73,8 +76,9 @@ REPLAY_INPUTS = tuple(p for p in INPUTS if p not in GENERATORS)
 #: matches a new meaning (v3: assets/ and dbt_shared/ since the split; v4: one
 #: key per asset, the asset named in it; v5: asset_model/, the shared reading
 #: code REQ-PIPE-380 moved out of qa_tools/; v6: bootstrap/ and scenarios/, and
-#: no cli/ file, REQ-GEN-381 criterion 7).
-KEY_PREFIX = "bootstrap-v6-"
+#: no cli/ file, REQ-GEN-381 criterion 7; v7: the shared file-checks default,
+#: REQ-QAC-387 criterion 12).
+KEY_PREFIX = "bootstrap-v7-"
 
 
 def _asset(asset: str | None) -> str:

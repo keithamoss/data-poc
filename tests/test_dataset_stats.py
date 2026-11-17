@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-import collection_modules
-
 import duckdb
 
 from asset_model import collections
@@ -92,9 +90,11 @@ def test_cp_compute_dataset_stats_shape():
                                         "received_at": "2020-01-05T06:00:00+00:00"}
     # EVERY KNOWN VALUE, ZEROS INCLUDED (REQ-QAC-247, Keith 2026-10-18): a
     # category that falls to zero shows as a 0 rather than vanishing.
-    _CONCERN_TYPE_VALID = collection_modules.adapter_module("child-protection")._CONCERN_TYPE_VALID
+    # The known values are the contract's, in its declared order (REQ-QAC-389).
+    known = dataset_stats.allowed_lists(CP)[("cp_notifications", "concern_type")]
+    assert known[0] == "Neglect" and len(known) == 7
     assert stats["value_counts"]["concern_type"] == (
-        [[k, 1 if k == "Neglect" else 0] for k in _CONCERN_TYPE_VALID] + [["(invalid code)", 1]])
+        [[k, 1 if k == "Neglect" else 0] for k in known] + [["(invalid code)", 1]])
     assert stats["check_aggregates"]["cp_clients.postcode"]["total_invalid"] == 1  # the '9999' row
 
 
