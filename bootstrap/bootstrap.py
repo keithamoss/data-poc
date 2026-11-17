@@ -378,11 +378,25 @@ def _populate(*, dated, names, groups, collection, sequential, say, held, lock, 
         started = time.monotonic()
         generating = 0.0
 
+        trialling = 0.0
+
+        def timed_trial(collection_id: str):
+            # THE TARGET TRIALS' OWN TIME (REQ-PIPE-403 criterion 1): inside
+            # generation's, and reported beside it as 'of it target trials'.
+            nonlocal trialling
+            began = time.monotonic()
+            try:
+                return try_targets(collection_id)
+            finally:
+                trialling += time.monotonic() - began
+
+        trying = timed_trial if try_targets is not None else None
+
         def generate(name: str) -> None:
             nonlocal generating
             say(f"Generating synthetic data ({_label(name)})")
             began = time.monotonic()
-            _generate(name, trial=not skip_target_trial, try_targets=try_targets, say=say)
+            _generate(name, trial=not skip_target_trial, try_targets=trying, say=say)
             generating += time.monotonic() - began
 
         if checkpoint_before is not None or len(names) < 2:
@@ -444,11 +458,20 @@ def _populate(*, dated, names, groups, collection, sequential, say, held, lock, 
             # (Keith, 2026-10-11, (n)): asset-wide, so after both - and only
             # then, as a one-collection bootstrap has not replayed the other's
             # supplies a correction can move (PROVISIONAL).
+            began = time.monotonic()
             _confirm_corrections(say)
+            confirming = time.monotonic() - began
+        else:
+            confirming = None
         tree.release()
         # GENERATION IS AN ENTRY OF THE ONE 'Took' LINE (REQ-GEN-398 criterion
-        # 3; CLI finding 4), first, as it ran first.
-        timings = {GENERATION: generating, **timings,
+        # 3; CLI finding 4), first, as it ran first - and the target trials
+        # beside it, the confirmations after the streams (REQ-PIPE-403
+        # criterion 1), so every stage it measures is on the line.
+        trials = ({TRIALS: trialling}
+                  if try_targets is not None and not skip_target_trial else {})
+        confirmations = {CONFIRMATIONS: confirming} if confirming is not None else {}
+        timings = {GENERATION: generating, **trials, **timings, **confirmations,
                    "total": time.monotonic() - started}
         say(took_line(timings))
     finally:
@@ -515,6 +538,54 @@ def tree_changed_message(changes) -> str | None:
 
 #: The 'Took' line's entry for generation (REQ-GEN-398 criterion 3).
 GENERATION = "generation"
+
+
+@dataclass(frozen=True)
+class Measured:
+    """A from-empty bootstrap's measured wall clock on the development
+    sandbox (REQ-PIPE-403 criterion 6), as recorded with the measurement."""
+
+    seconds: float
+    on: date
+    commit: str
+
+
+#: Each asset's measured bootstrap, beside its other synthetic-only
+#: configuration (REQ-GEN-370): read by the bootstrap and nothing else.
+MEASURED_FILE = "bootstrap.yaml"
+
+
+def measured_bootstrap() -> Measured | None:
+    """The selected asset's measured from-empty bootstrap, or None where
+    none is recorded - the first-run promise is the measured one, never a
+    guess (REQ-PIPE-403 criterion 6; CLI finding 4)."""
+    from asset_model import assets, config_yaml
+
+    path = assets.selected().synthetic / MEASURED_FILE
+    if not path.exists():
+        return None
+    got = (config_yaml.load(path) or {}).get("measured") or {}
+    if not got:
+        return None
+    on = got["date"]
+    return Measured(seconds=float(got["seconds"]),
+                    on=on if isinstance(on, date) else date.fromisoformat(str(on)),
+                    commit=str(got.get("commit", "")))
+
+
+def first_run_prompt() -> str:
+    """What the menu asks before a bootstrap: the measured figure for the
+    selected asset where one is recorded, and says so where none is."""
+    from qa_tools.common.display_time import format_elapsed
+
+    measured = measured_bootstrap()
+    if measured is None:
+        return ("This has not been measured for this asset - it can take a long "
+                "while. Continue?")
+    return (f"This takes about {format_elapsed(measured.seconds)} from empty "
+            f"(measured on the development sandbox, {measured.on.isoformat()}). Continue?")
+TRIALS = "of it target trials"
+CONFIRMATIONS = "confirmations"
 
 
 def took_line(timings: dict[str, float]) -> str:
@@ -727,8 +798,8 @@ def _label(key: str) -> str:
     each of its collections (REQ-PIPE-262 criterion 10) - or the total."""
     if key == "total":
         return "in total"
-    if key == GENERATION:
-        return GENERATION
+    if key in (GENERATION, TRIALS, CONFIRMATIONS):
+        return key
     return " and ".join(_adapter(k).label for k in key.split(STREAM_JOIN))
 
 

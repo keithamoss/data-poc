@@ -39480,8 +39480,14 @@ requirements:
       - "WHEN a speed-up changes pipeline code, THE SYSTEM SHALL show by REQ-TEST-239's compare that it changed nothing a bootstrap records."
       - "THE SYSTEM SHALL record each asset's cache-miss bootstrap time in the CI deployment half alongside, without a budget of its own. AMENDED 2026-11-15 by REQ-TEST-353."
     non_functional_requirements:
-      - "BEHAVIOUR-PRESERVING: a speed-up is a refactor in item 6's sense - byte-identical or not shipped as a speed-up."
       - "NOT A CI GATE: timing varies by runner; the budget is an acceptance measurement on this sandbox, as CLAUDE.md's runtime log is."
+    retired_criteria:
+      - criterion: 4
+        date: "2026-11-14"
+        by: Keith
+        replaced_by:
+          - REQ-TEST-393
+        reason: "Retired by Keith, 2026-11-14, with REQ-TEST-239: the synthetic demo history may move whenever a change needs it, and the test suite is the proof that a refactor is sound. A speed-up is no longer shown byte-identical by REQ-TEST-239's compare, which REQ-TEST-393 deleted. Its BEHAVIOUR-PRESERVING NFR went with it (REQ-PIPE-403 criterion 8, APPROVED AS WORDED 2026-11-14)."
     dependencies:
       - REQ-GEN-238
       - REQ-PIPE-233

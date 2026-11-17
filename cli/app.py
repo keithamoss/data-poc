@@ -225,7 +225,7 @@ def _bootstrap_menu() -> None:
                    "running the real checks over it.", style="dim")
     console.print("Safe to run more than once: if there is already data here it "
                    "will say so and stop.", style="dim")
-    if not common.confirm("This takes a few minutes. Continue?", yes=False, default=True):
+    if not common.confirm(boot.first_run_prompt(), yes=False, default=True):
         console.print("Not run.", style="yellow")
         return
     def step(msg: str) -> None:

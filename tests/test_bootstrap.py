@@ -273,6 +273,27 @@ class TestCollectionsRunSideBySide:
         (took,) = [s for s in steps if s.startswith("Took ")]
         assert "1m 04s" in took and "64s" not in took
 
+    def test_the_took_line_names_the_trials_and_the_confirmations(self, spy, monkeypatch):
+        """REQ-PIPE-403 criterion 1: the stages it measures are the generation
+        step, the target trials, each stream's replay and the confirmations -
+        so the trials and the confirmations each have an entry of their own,
+        the trials' time inside generation's, and nothing is left untimed."""
+        import itertools
+
+        from bootstrap import correction_replay
+
+        clock = itertools.count(0, 5)
+        monkeypatch.setattr(boot.time, "monotonic", lambda: float(next(clock)))
+        monkeypatch.setattr(correction_replay, "confirm_due", lambda **k: [])
+        steps: list[str] = []
+        boot.bootstrap(collection="all", on_step=steps.append,
+                       try_targets=lambda collection_id: None)
+        (took,) = [s for s in steps if s.startswith("Took ")]
+        parts = took[len("Took "):].rstrip(".").split(", ")
+        assert parts[0].startswith("generation ") and parts[1].startswith("of it target trials "), took
+        assert any(p.startswith("confirmations ") for p in parts), took
+        assert parts[-1].startswith("in total "), took
+
     def test_the_unclaimed_deliveries_are_recorded_once_after_both_run(self, spy):
         """REQ-TEST-159 reversed REQ-TEST-116's record-everything-first: each
         collection records a delivery at its first arrival (one transaction,
@@ -301,7 +322,7 @@ class TestCollectionsRunSideBySide:
     def test_the_wall_clock_is_reported(self, spy):
         """Criterion 6: the gain is measured rather than estimated."""
         result = boot.bootstrap(collection="all")
-        assert set(result.timings) == {boot.GENERATION, *STREAMS, "total"}
+        assert set(result.timings) == {boot.GENERATION, *STREAMS, boot.CONFIRMATIONS, "total"}
         assert all(isinstance(v, float) for v in result.timings.values())
 
 
@@ -357,6 +378,38 @@ class TestTheBudgetLine:
         app._bootstrap_menu()
         assert ("Generating synthetic data...", "dim") in said
         assert (line, style) in said, said
+
+
+class TestTheFirstRunPromiseIsMeasured:
+    """REQ-PIPE-403 criterion 6 (CLI finding 4): the menu said 'This takes a
+    few minutes', while a quarterly bootstrap takes about twenty. It now says
+    the measured figure for the selected asset, read from that asset's
+    synthetic/bootstrap.yaml."""
+
+    def _asked(self, monkeypatch):
+        from cli import app, common
+
+        asked = []
+        monkeypatch.setattr(common, "confirm",
+                            lambda message, **k: asked.append(message) or False)
+        monkeypatch.setattr(app.console, "print", lambda *a, **k: None)
+        app._bootstrap_menu()
+        return asked[0]
+
+    def test_it_says_the_selected_assets_measured_figure(self, monkeypatch):
+        from qa_tools.common.display_time import format_elapsed
+
+        measured = boot.measured_bootstrap()
+        assert measured is not None, "the quarterly asset records its measured bootstrap"
+        asked = self._asked(monkeypatch)
+        assert "a few minutes" not in asked
+        assert format_elapsed(measured.seconds) in asked, asked
+        assert measured.on.isoformat() in asked, asked
+
+    def test_an_asset_with_no_measurement_says_so(self, monkeypatch):
+        monkeypatch.setattr(boot, "measured_bootstrap", lambda: None)
+        asked = self._asked(monkeypatch)
+        assert "not been measured" in asked and "a few minutes" not in asked, asked
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

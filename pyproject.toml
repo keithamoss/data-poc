@@ -92,6 +92,7 @@ dev = [
     # needed because questionary/rich redraw in place via cursor-movement ANSI codes) -
     # used to show real CLI/TUI screenshots during mothman development, never imported
     # by the shipped pipeline/CLI itself.
+    "py-spy>=0.4.3",
 ]
 
 # soda-core-duckdb declares duckdb<1.1.0, but datacontract-cli[duckdb] needs
