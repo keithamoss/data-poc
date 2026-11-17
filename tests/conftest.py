@@ -724,10 +724,14 @@ def _no_test_files_a_real_delivery():
     import inspect
     from pathlib import Path
 
+    from generator import delivery_writer
     from qa_tools.common import delivery
     from asset_model import delivery as delivery_tree
 
     real = delivery.write_delivery
+    # THE GENERATOR'S OWN WRITER TOO (REQ-GEN-386 criterion 7): the same
+    # guard, so a test reaching the real driver is stopped at either writer.
+    real_generator_write = delivery_writer.write_delivery
     # THE REAL PATH IS CAPTURED HERE, once, BEFORE any test has run - and
     # that is the whole correctness of this guard rather than a detail.
     # The first version compared the target against the LIVE
@@ -769,7 +773,7 @@ def _no_test_files_a_real_delivery():
     # what it wrote last time BEFORE it writes, so a test that reached the
     # real driver deleted the whole real history and only then hit the write
     # guard above - every delivery and receipt in data/ gone, on a gate run.
-    real_remove = delivery.remove_deliveries
+    real_remove = delivery_writer.remove_deliveries
     remove_signature = inspect.signature(real_remove)
 
     real_receipts = Path(delivery_tree.default_receipts_dir()).resolve()
@@ -795,13 +799,30 @@ def _no_test_files_a_real_delivery():
                 f"_no_test_files_a_real_delivery)")
         return real_remove(*args, **kwargs)
 
+    generator_signature = inspect.signature(real_generator_write)
+
+    @functools.wraps(real_generator_write)
+    def guarded_generator_write(*args, **kwargs):
+        bound = generator_signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        named = bound.arguments.get("deliveries_dir")
+        target = Path(named or delivery_tree.default_deliveries_dir()).resolve()
+        if target in real_trees:
+            raise AssertionError(
+                f"a test tried to write generated delivery {bound.arguments.get('name')!r} into "
+                f"this repo's real {real_tree} - redirect the generator (generator/output.py's "
+                f"redirect()) or point deliveries_dir and receipts_dir at tmp_path")
+        return real_generator_write(*args, **kwargs)
+
     delivery.write_delivery = guarded
-    delivery.remove_deliveries = guarded_remove
+    delivery_writer.write_delivery = guarded_generator_write
+    delivery_writer.remove_deliveries = guarded_remove
     try:
         yield
     finally:
         delivery.write_delivery = real
-        delivery.remove_deliveries = real_remove
+        delivery_writer.write_delivery = real_generator_write
+        delivery_writer.remove_deliveries = real_remove
 
 
 @pytest.fixture(scope="session", autouse=True)

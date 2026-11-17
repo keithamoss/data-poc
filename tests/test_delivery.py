@@ -21,6 +21,7 @@ import pytest
 
 from asset_model import asset_time, delivery as delivery_tree
 from qa_tools.common import delivery
+from generator import delivery_writer
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -276,10 +277,10 @@ class TestTwoArrivalsCanNeverShareADirectory:
         to whatever produced it, so a second writer has to be able to
         see what a first one already wrote."""
         d, _ = dirs
-        assert delivery.existing_delivery_names(d) == set()
+        assert delivery_writer.existing_delivery_names(d) == set()
         _write(dirs, "one")
         _write(dirs, "two", {"cp_clients.csv": "a\n"})
-        assert delivery.existing_delivery_names(d) == {"one", "two"}
+        assert delivery_writer.existing_delivery_names(d) == {"one", "two"}
 
 
 class TestWhichClockStampedTheReceipt:

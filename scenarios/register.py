@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parent.parent
 
 REGISTER_PATH = ROOT / "plans" / "supply-model.md"
 REGISTER_HEADING = "## Test scenario register"

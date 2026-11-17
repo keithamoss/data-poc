@@ -373,9 +373,9 @@ def _real_data_files() -> tuple[Path, Path]:
     generator's call-time getters, which a module fixture may have redirected
     (post-build-review #468)."""
     from asset_model import assets, history_anchor
-    from qa_tools.common import scenario_map
+    from scenarios import placements as scenario_placements
 
-    real = (assets.data_path(scenario_map.PLACEMENTS_FILE), assets.data_path(history_anchor.FILE))
+    real = (assets.data_path(scenario_placements.PLACEMENTS_FILE), assets.data_path(history_anchor.FILE))
     for path in real:
         assert generator_isolation.DATA_DIR.resolve() in path.resolve().parents, path
     return real
@@ -391,7 +391,8 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     rather than reading the shared one (REQ-TEST-402 criterion 7)."""
     import hashlib
 
-    from qa_tools.common import delivery
+
+    from generator import delivery_writer
     from asset_model import delivery as delivery_tree
 
     def _fingerprint(root):
@@ -406,8 +407,8 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     before = {name: _fingerprint(path)
               for name, path in (("deliveries", delivery_tree.default_deliveries_dir()),
                                   ("receipts", delivery_tree.default_receipts_dir()))}
-    book_before = (delivery.bookkeeping_path().read_bytes()
-                   if delivery.bookkeeping_path().exists() else None)
+    book_before = (delivery_writer.bookkeeping_path().read_bytes()
+                   if delivery_writer.bookkeeping_path().exists() else None)
     # THE SCENARIO PLACEMENTS TOO (post-build-review #225): Child
     # Protection's injected scenarios are written there on every
     # generation, and the redirects below once missed it.
@@ -449,8 +450,8 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
     for name, path in (("deliveries", delivery_tree.default_deliveries_dir()), ("receipts", delivery_tree.default_receipts_dir())):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
-    assert (delivery.bookkeeping_path().read_bytes()
-            if delivery.bookkeeping_path().exists() else None) == book_before
+    assert (delivery_writer.bookkeeping_path().read_bytes()
+            if delivery_writer.bookkeeping_path().exists() else None) == book_before
     assert ((real_placements.stat().st_mtime_ns, real_placements.read_bytes())
             if real_placements.exists() else None) == placements_before, \
         "the real scenario placements file was written to by a test run"

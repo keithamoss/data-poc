@@ -114,7 +114,7 @@ def test_the_driver_refuses_before_it_writes(monkeypatch, tmp_path):
     def refuse(*_a, **_k):
         raise si.CannotPlace("claimed twice")
     monkeypatch.setattr(cc, "check_all", refuse)
-    monkeypatch.setattr(driver.delivery, "remove_deliveries",
+    monkeypatch.setattr(driver.delivery_writer, "remove_deliveries",
                         lambda *a, **k: pytest.fail("cleared before the claim check"))
     with pytest.raises(si.CannotPlace, match="claimed twice"):
         driver.generate("emergency-department")

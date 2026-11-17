@@ -4153,9 +4153,9 @@ class TestScenariosTab:
         a fixed count would have to be edited every time and would
         eventually be edited to whatever the page happened to render.
         """
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placed = {sid for sid, p in scenario_map.read_placements().items()
+        placed = {sid for sid, p in scenario_placements.read_placements().items()
                   if p.is_complete}
         _goto(clean_page, built_dashboard_html)
         clean_page.locator("#scenarios-btn").click()
@@ -4214,9 +4214,9 @@ class TestScenariosTabOnTheDailyAsset:
         """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
         TS-47 is planted, so its entry leads somewhere: the Birth
         Registrations page, at the in-place-on date its placement records."""
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-47")
+        placement = scenario_placements.read_placements().get("TS-47")
         if placement is None or not placement.is_complete:
             pytest.skip("TS-47 is not placed in this history")
         _goto(clean_page, built_dashboard_html)
@@ -4234,9 +4234,9 @@ class TestScenariosTabOnTheDailyAsset:
         silently moved the whole dashboard to a past date, and Back did not
         put it back. It now shows a bar naming the scenario and the date,
         with a way back to today, and Back restores the date it left."""
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-47")
+        placement = scenario_placements.read_placements().get("TS-47")
         if placement is None or not placement.is_complete:
             pytest.skip("TS-47 is not placed in this history")
         _goto(clean_page, built_dashboard_html)
@@ -5143,9 +5143,9 @@ class TestFileChecksOnThePage:
     CP = "child-protection-family-support"
 
     def _placement(self, scenario):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get(scenario)
+        placement = scenario_placements.read_placements().get(scenario)
         if placement is None or not placement.is_complete:
             pytest.skip(f"{scenario} is not placed in this history")
         return placement
@@ -6064,9 +6064,9 @@ class TestThePlantedPairsOnTheBuiltDashboard:
     def _text_on(self, page, html, sid, days_after):
         from datetime import date, timedelta
 
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placed = scenario_map.read_placements()[sid]
+        placed = scenario_placements.read_placements()[sid]
         on = date.fromisoformat(placed.period) + timedelta(days=days_after)
         _goto(page, html, state=TestASettledPairOnThePage()._where(placed.dataset),
               in_place_on=str(on))
@@ -6090,9 +6090,9 @@ class TestThePlantedPairsOnTheBuiltDashboardOnTheDailyAsset:
                                                                 sid):
         from datetime import date, timedelta
 
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placed = scenario_map.read_placements().get(sid)
+        placed = scenario_placements.read_placements().get(sid)
         assert placed is not None, f"{sid} is not in the generated history"
         ds, day = placed.dataset, date.fromisoformat(placed.period)
         assert placed.in_place_on == str(day), "its link opens on the arrival day"
@@ -6205,9 +6205,9 @@ class TestInPlaceInTheWarehouse:
         assert not _IN_PLACE_ALONE.search(found["whole"]), f"{where}: across nodes"
 
     def test_no_visible_text_says_in_place_alone(self, clean_page, built_dashboard_html):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-78b")
+        placement = scenario_placements.read_placements().get("TS-78b")
         assert placement is not None and placement.in_place_on, "TS-78b is not placed"
         _goto(clean_page, built_dashboard_html)
         clean_page.locator("#scenarios-btn").click()
@@ -6256,9 +6256,9 @@ class TestTheAsAtScenarioChips:
         if sid not in _DAILY_CHIPS])
     def test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
             self, clean_page, built_dashboard_html, sid, where, text):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get(sid)
+        placement = scenario_placements.read_placements().get(sid)
         assert placement is not None and placement.in_place_on, f"{sid} is not placed"
         clean_page.set_viewport_size({"width": 1280, "height": 800})
         _goto(clean_page, built_dashboard_html)
@@ -6571,9 +6571,10 @@ class TestThePeriodComposition:
         criterion 4): one period - TS-55's 2023-Q1 at the history's end -
         holding a promoted, an inherited and a substituted table at once, its
         rows compared with its _manifest both ways."""
-        from qa_tools.common import period_schema, scenario_map, supply_db
+        from qa_tools.common import period_schema, supply_db
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-55")
+        placement = scenario_placements.read_placements().get("TS-55")
         assert placement is not None and placement.in_place_on, "TS-55 is not placed"
         schema = period_schema.period_schema(placement.period)
         with supply_db.connect(read_only=True, label="test-composition") as conn:
@@ -6609,9 +6610,10 @@ class TestThePeriodComposition:
     def test_an_earlier_date_agrees_with_the_decision_log_then(
             self, clean_page, built_dashboard_html, deployment_history):
         from asset_model import asset_time
-        from qa_tools.common import qa_store, scenario_map, supply_db
+        from qa_tools.common import qa_store, supply_db
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-76")
+        placement = scenario_placements.read_placements().get("TS-76")
         assert placement is not None and placement.in_place_on
         on, period = placement.in_place_on, placement.period
         self._open(clean_page, built_dashboard_html, period, on=on)
@@ -6660,9 +6662,9 @@ class TestTheAsAtReadingsOnTheRealHistory:
 
     @staticmethod
     def _on(sid):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get(sid)
+        placement = scenario_placements.read_placements().get(sid)
         assert placement is not None, f"{sid} is not placed in this history"
         return placement.in_place_on
 

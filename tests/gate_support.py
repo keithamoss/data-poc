@@ -333,13 +333,13 @@ def _iso(value) -> str:
 def install_fake_tools(monkeypatch, scenario: Scenario) -> None:
     """Stand in for the four tools' evaluation - see the module docstring -
     and point every reader of the delivery tree at the scenario's own."""
-    from qa_tools.common import delivery
+    from generator import delivery_writer
     from asset_model import delivery as delivery_tree
     from qa_tools.tools import run_datacontract, run_dbt, run_evidently, run_soda
 
     monkeypatch.setattr(delivery_tree, "default_deliveries_dir", fixed(scenario.deliveries))
     monkeypatch.setattr(delivery_tree, "default_receipts_dir", fixed(scenario.receipts))
-    monkeypatch.setattr(delivery, "bookkeeping_path", fixed(scenario.root / "bookkeeping.json"))
+    monkeypatch.setattr(delivery_writer, "bookkeeping_path", fixed(scenario.root / "bookkeeping.json"))
 
     for module, tool in ((run_dbt, "dbt"), (run_soda, "soda"),
                          (run_datacontract, "datacontract"), (run_evidently, "evidently")):

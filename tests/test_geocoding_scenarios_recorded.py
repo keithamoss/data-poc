@@ -24,11 +24,11 @@ def _named_geocoding_supplies():
     """Every supply a geocoding injection (REQ-GEN-298) names, from the
     asset's recorded placements - so a scenario that moves is followed."""
     from generator import scenario_injection
-    from qa_tools.common import scenario_map
+    from scenarios import placements as scenario_placements
 
     planted = {i.scenario_id for i in scenario_injection.INJECTIONS
                if i.dataset_id.startswith("geo-")}
-    raw = json.loads(scenario_map.placements_path().read_text())
+    raw = json.loads(scenario_placements.placements_path().read_text())
     records = raw.get("placements") if isinstance(raw, dict) else raw
     return {(r["scenario_id"], s) for r in records if r["scenario_id"] in planted
             for s in r["supplies"]}

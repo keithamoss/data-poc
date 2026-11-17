@@ -371,20 +371,20 @@ class TestNoTestClearsTheRealDeliveryTree:
     refused the first write. The guard now refuses the clear too."""
 
     def test_clearing_the_real_tree_from_a_test_is_refused(self):
-        from qa_tools.common import delivery
+        from generator import delivery_writer
 
         with pytest.raises(AssertionError, match="real"):
-            delivery.remove_deliveries(["no-such-delivery"])
+            delivery_writer.remove_deliveries(["no-such-delivery"])
 
     def test_redirecting_only_the_deliveries_still_refuses_the_real_receipts(self, tmp_path):
         """post-build-review #232 (the REQ-GEN-246 critic's T4): the guard read
         only `deliveries_dir`, so a clear that redirected the deliveries and
         left the receipts at their default would delete real receipts. The
         delivery named does not exist, so nothing real is at risk here."""
-        from qa_tools.common import delivery
+        from generator import delivery_writer
 
         with pytest.raises(AssertionError, match="receipts"):
-            delivery.remove_deliveries(["no-such-delivery"], tmp_path / "deliveries")
+            delivery_writer.remove_deliveries(["no-such-delivery"], tmp_path / "deliveries")
 
 
 class TestTheProvidersGateKnowsWhatAProviderMayDeclare:

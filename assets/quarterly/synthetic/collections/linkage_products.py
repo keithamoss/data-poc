@@ -1589,8 +1589,7 @@ def _replay_reference(table: str, src: str, earlier_jobs, state, resupply, at, s
 def marked_quarters(periods) -> list[tuple[str, str]]:
     """(dataset id, period) for every generated quarter whose linked dataset a
     scripted ordinary-chain entry marks not supplied, oldest first."""
-    from qa_tools.common import scripted_decisions
-
+    from scenarios import scripted_decisions
     names = [p.name for p in periods]
     linked_ids = {d for d, _c, _cols in linked()}
     found = {(s.dataset_id, s.period) for s in scripted_decisions.load()
@@ -1679,9 +1678,7 @@ def in_warehouse(dataset_id: str, period: str, at, supplies):
     (_refuse_geocoding_unschedulable). Refused, naming the supply, where a
     scripted decision's instant cannot be said."""
     from asset_model import amber_setting, asset_time
-    from qa_tools.common import scripted_decisions
-
-    # ONLY A SUPPLY WHOSE FILE ARRIVES (GeneratedSupply.carried): a delivery
+    from scenarios import scripted_decisions
     # its scenario's file shape leaves the table out of is no supply of the
     # dataset, and takes no supply index (scenario_injection.carries).
     quarter = [s for s in supplies if s.period == period and s.carried]
@@ -1732,8 +1729,7 @@ def rejected_pairs() -> list[tuple[str, str, str]]:
     """(scenario id, source dataset, period) for every scripted settlement
     that rejects every file of a pair of a dataset this provider reads - the
     quarters left with no supply of it (REQ-GEN-206 criterion 22, TS-112)."""
-    from qa_tools.common import scripted_decisions
-
+    from scenarios import scripted_decisions
     read = {d for d, _c, _cols in linked()} | {src for _d, src, _cols in geocoded()}
     out = []
     for script in scripted_decisions.load():

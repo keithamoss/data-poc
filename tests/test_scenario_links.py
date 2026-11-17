@@ -20,7 +20,8 @@ from click.testing import CliRunner
 from cli import scenarios as scenarios_cli
 from generator import scenario_injection as si
 from asset_model import asset_time
-from qa_tools.common import scripted_decisions as sd
+from scenarios import scripted_decisions as sd
+from bootstrap import scripted_decision_checks
 from bootstrap import decision_player
 
 DS = "cp-carers"
@@ -89,7 +90,7 @@ class TestALinkIsDatedFromItsFirstEvent:
 
     def test_a_period_scoped_decision_is_timed_from_the_period_due(self, monkeypatch):
         due = _at(ANCHOR, "12:00")
-        monkeypatch.setattr(sd, "_due_at", lambda ds, period: due)
+        monkeypatch.setattr(sd, "due_at", lambda ds, period: due)
         inj = _injection(si.Link("TS-75b", 2, "sub", 1))
         script = _script(name="sub", operation="substitute", supply_index=None,
                          scope=sd.PERIOD, stands_on=-1, after_hours=3)
@@ -153,12 +154,12 @@ class TestADecisionNameIsUniqueWithinItsScenario:
         assert sd.load(path)[0].name == "reject-it"
 
     def test_two_decisions_of_one_scenario_with_one_name_are_refused_naming_both(self):
-        found = sd.problems([_script(), _script(operation="promote")],
+        found = scripted_decision_checks.problems([_script(), _script(operation="promote")],
                             registered={"TS-75a"})
         assert any("decisions 1 and 2" in p and "'reject-it'" in p for p in found)
 
     def test_the_same_name_in_two_scenarios_is_fine(self):
-        assert sd.problems([_script(), _script(scenario="TS-75b")],
+        assert scripted_decision_checks.problems([_script(), _script(scenario="TS-75b")],
                            registered={"TS-75a", "TS-75b"}) == []
 
 
@@ -189,20 +190,20 @@ class TestThePlacementFileCarriesEachLinkedDate:
 
     def test_the_scenario_map_shows_each_siblings_date(self, tmp_path, monkeypatch):
         """Criterion 10: the map and the panel read each id's own record."""
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
+        from generator import scenario_map_writer
 
         monkeypatch.setitem(si._ALSO, "TS-75a", ("TS-75b",))
         inj = _injection(si.Link("TS-75b", 1, 0, "reject-it"))
         placed = si.resolve(inj, _periods(), scripts=[_script()])
-        back = scenario_map.read_placements(si.write_placements([placed], tmp_path / "p.json"))
+        back = scenario_placements.read_placements(si.write_placements([placed], tmp_path / "p.json"))
         assert back["TS-75b"].in_place_on == (ANCHOR + timedelta(days=1)).isoformat()
         assert back["TS-75a"].in_place_on == (ANCHOR + timedelta(days=5)).isoformat()
         # The panel's feed is the map's data block, one entry per id.
-        from qa_tools.common import scenarios as scenarios_mod
-
+        from scenarios import register as scenarios_mod
         register = [s for s in scenarios_mod.parse_register() if s.id in ("TS-1", "TS-4")]
         back = {"TS-1": back["TS-75b"], "TS-4": back["TS-75a"]}
-        block = json.loads(scenario_map._data_block(register, back)
+        block = json.loads(scenario_map_writer._data_block(register, back)
                            .split("\n", 1)[1].rsplit("\n", 1)[0])
         dates = {e["id"]: e["coordinates"]["inPlaceOn"] for e in block["scenarios"]}
         assert dates == {"TS-1": (ANCHOR + timedelta(days=1)).isoformat(),
@@ -269,7 +270,7 @@ class TestANameIsUniqueAcrossAPlacement:
     on two siblings' decisions rather than letting a link find two."""
 
     def test_two_siblings_with_one_name_are_refused_naming_both(self):
-        found = sd.problems([_script(), _script(scenario="TS-75b")],
+        found = scripted_decision_checks.problems([_script(), _script(scenario="TS-75b")],
                             registered={"TS-75a", "TS-75b"},
                             placement_of={"TS-75a": "TS-75a", "TS-75b": "TS-75a"})
         assert any("decisions 1 and 2" in p and "'reject-it'" in p
@@ -307,7 +308,7 @@ class TestALinkIsWellFormed:
         assert "move the link's date" in d.problem
 
     def test_a_decision_that_cannot_be_timed_is_refused(self, monkeypatch):
-        monkeypatch.setattr(sd, "_due_at", lambda ds, period: None)
+        monkeypatch.setattr(sd, "due_at", lambda ds, period: None)
         inj = _injection(si.Link("TS-75b", 0, 0, "sub"))
         script = _script(name="sub", operation="substitute", supply_index=None,
                          scope=sd.PERIOD, stands_on=-1)
@@ -350,7 +351,7 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         from types import SimpleNamespace
 
         due = _at(ANCHOR, "12:00")
-        monkeypatch.setattr(sd, "_due_at", lambda ds, period: due)
+        monkeypatch.setattr(sd, "due_at", lambda ds, period: due)
         monkeypatch.setattr("asset_model.slots.relative_period", lambda *a, **k: "P-1")
         script = _script(name="sub", operation="substitute", supply_index=None,
                          scope=sd.PERIOD, stands_on=-1, after_hours=7)
@@ -373,7 +374,7 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         placed = si.resolve(_injection(), _periods())
         [d] = si.link_dates(_injection(si.Link("TS-75a", 0, 0, "settle")), placed,
                             scripts=[script])
-        assert d.second[1] == sd._wall_clock_after(script, placed.period)
+        assert d.second[1] == sd.wall_clock_after(script, placed.period)
         assert d.second[1] == _at(ANCHOR + timedelta(days=1), "11:00")
         assert d.problem is None
 

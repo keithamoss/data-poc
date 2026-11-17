@@ -160,7 +160,8 @@ class CollectionCLI:
         from cli import target_trial
         from generator import collections as providers
         from generator import driver, targets
-        from qa_tools.common import delivery, run_reads
+        from generator import public as generator_public
+        from qa_tools.common import run_reads
         from bootstrap import target_agreement
 
         provider = providers.provider(collection_id or self.collection_id)
@@ -172,7 +173,7 @@ class CollectionCLI:
         except ValueError as exc:
             # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not
             # as a traceback (post-build-review #157 finding 7).
-            delivery.remove_deliveries(driver.provider_delivery_names(provider),
+            generator_public.remove_deliveries(driver.provider_delivery_names(provider),
                                        driver.deliveries_dir(), driver.receipts_dir())
             raise self.TargetTrialFailed(f"what the generator built could not be read, so the "
                                          f"deliveries just written were removed: {exc}") from exc
@@ -216,8 +217,8 @@ class CollectionCLI:
                 if disagreement:
                     found.append(disagreement)
         if found:
-            removed = delivery.remove_deliveries(driver.provider_delivery_names(provider),
-                                                 written_to, driver.receipts_dir())
+            removed = generator_public.remove_deliveries(driver.provider_delivery_names(provider),
+                                                         written_to, driver.receipts_dir())
             raise self.TargetTrialFailed(
                 f"{len(found)} disagreement(s) among {len(tried)} tried supplies: they did not "
                 f"read as built, so the {removed} {self.label} deliveries just written were "

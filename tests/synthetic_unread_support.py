@@ -226,8 +226,9 @@ def run_and_build(collection_id: str, tree: Path, folder: Path, out: Path,
     database; the snapshot of what it recorded, with what was seen."""
     from cli import dashboard as dash
     from asset_model import assets
-    from qa_tools.common import build_output, scripted_decisions
+    from qa_tools.common import build_output
 
+    from scenarios import scripted_decisions
     the_scripts = scripted_decisions.script_path
     seen: dict = {}
 

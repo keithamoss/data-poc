@@ -242,7 +242,7 @@ class TestTheRecordTheScenarioMapReads:
 
     @pytest.mark.asset("daily")
     def test_it_round_trips_through_the_scenario_map(self, tmp_path):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
         placed = si.resolve(si.Injection(
             "TS-1", "birth-registrations", -8, "daily, due 14:00",
@@ -251,7 +251,7 @@ class TestTheRecordTheScenarioMapReads:
         si.resolve_run_ids([placed], [_Recognised("run_028", "d")])
         path = si.write_placements([placed], tmp_path / "placements.json")
 
-        back = scenario_map.read_placements(path)
+        back = scenario_placements.read_placements(path)
         assert back["TS-1"].dataset == "birth-registrations"
         assert back["TS-1"].supplies == ("run_028",)
         assert back["TS-1"].is_complete
@@ -305,8 +305,7 @@ class TestTheInjectedSetItself:
     """What is actually wired up, held against the register."""
 
     def test_every_injection_names_a_scenario_the_register_marks_for_injection(self):
-        from qa_tools.common import scenarios
-
+        from scenarios import register as scenarios
         marked = {s.id for s in scenarios.injected()}
         for injection in si.INJECTIONS:
             assert injection.scenario_id in marked, injection.scenario_id
@@ -360,8 +359,7 @@ class TestNothingSaysScenarioOnTheDashboard:
     def test_no_supply_or_dataset_record_carries_a_scenario_id(self):
         import re
 
-        from qa_tools.common import scenarios
-
+        from scenarios import register as scenarios
         from asset_model import collections
 
         ids = {s.id for s in scenarios.parse_register()}
@@ -415,9 +413,9 @@ class TestTheChildProtectionScenariosAreReallyThere:
     @staticmethod
     def _files_of(scenario_id: str, tree):
         from asset_model import arrivals
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get(scenario_id)
+        placement = scenario_placements.read_placements().get(scenario_id)
         if placement is None or not placement.supplies:
             pytest.skip(f"{scenario_id} is not placed in this history")
         by_run = {a.run_id: a for a in arrivals.arrivals_for("child-protection", "cp_run_")}
@@ -693,9 +691,10 @@ class TestTheEarlyEmergencyDepartmentSupplies:
             self, deployment_history, scenario_id, period, classification):
         """On the bootstrapped history: what the assignment rule and the
         verdict made of each planted arrival."""
-        from qa_tools.common import scenario_map, supply_db
+        from qa_tools.common import supply_db
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get(scenario_id)
+        placement = scenario_placements.read_placements().get(scenario_id)
         assert placement is not None and placement.supplies, f"{scenario_id} is not placed"
         (run,) = placement.supplies
         key = run.split("__", 1)[1]
@@ -713,9 +712,10 @@ class TestTheEarlyEmergencyDepartmentSupplies:
         The rule's filing stays 2023-Q3 and its promotion there is refused; the
         move to 2023-Q4 is a person's decision - one, of its one file
         (REQ-GEN-235 criterion 2)."""
-        from qa_tools.common import scenario_map, supply_db
+        from qa_tools.common import supply_db
+        from scenarios import placements as scenario_placements
 
-        placement = scenario_map.read_placements().get("TS-67")
+        placement = scenario_placements.read_placements().get("TS-67")
         assert placement is not None and placement.supplies, "TS-67 is not placed"
         key = placement.supplies[0].split("__", 1)[1]
         with supply_db.connect(read_only=True, label="test-early-ed") as conn:
@@ -737,8 +737,7 @@ def test_a_pair_targets_only_the_files_its_script_makes_supplies(asset):
     verdict to compare - and a file it makes a supply is. Each asset's pairs
     against its own scripted decisions (the asset split)."""
     from generator import scenario_injection as si
-    from qa_tools.common import scripted_decisions as sd
-
+    from scenarios import scripted_decisions as sd
     scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
     pairs = [i for i in si.this_assets_injections() if any(a.files for a in i.arrivals)]
     assert pairs
@@ -856,8 +855,7 @@ class TestTheChildProtectionPairsArePlacedAsDecided:
                     assert not claimed & theirs, (sid, other.scenario_id)
 
     def test_ts80_is_settled_by_one_scripted_choose_file_the_next_day(self):
-        from qa_tools.common import scripted_decisions
-
+        from scenarios import scripted_decisions
         [script] = [s for s in scripted_decisions.load() if s.scenario == "TS-80"]
         assert (script.operation, script.dataset_id, script.supply_index) == (
             "choose-file", "cp-clients", 0)

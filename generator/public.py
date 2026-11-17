@@ -142,3 +142,35 @@ def written_delivery_names(bookkeeping) -> set[str]:
     book = json.loads(path.read_text(encoding="utf-8"))
     return {e["delivery"] for k in driver.dataset_keys(book) for e in book[k]
             if isinstance(e, dict) and e.get("delivery")}
+
+
+# ---- the scenario map and the delivery tree (REQ-GEN-386 criteria 5 and 7) ----
+
+#: The generator's bookkeeping file's name, which a reset deletes and keeps
+#: (bootstrap/synthetic_reset.py).
+from generator.delivery_writer import BOOKKEEPING_FILE  # noqa: E402,F401 - re-exported
+
+
+def remove_deliveries(names, deliveries_dir=None, receipts_dir=None) -> int:
+    """Clear the named deliveries the generator wrote, and their receipts -
+    the generator's own writer's, looked up at call time."""
+    from generator import delivery_writer
+
+    return delivery_writer.remove_deliveries(names, deliveries_dir, receipts_dir)
+
+
+def write_map(*, map_path):
+    """Rebuild the selected asset's committed scenario map at `map_path` -
+    the pipeline's scenario_map.map_path(), which the caller passes - naming
+    this asset's scenarios (REQ-PIPE-352 criterion 3). Returns the path."""
+    from generator import scenario_map_writer
+
+    return scenario_map_writer.write_map(naming_mine=this_assets_scenarios(), map_path=map_path)
+
+
+def build_map_for_selected() -> str:
+    """The selected asset's scenario map as it would be written now."""
+    from generator import scenario_map_writer
+
+    return scenario_map_writer.build_for_selected(naming_mine=this_assets_scenarios())
+

@@ -914,7 +914,7 @@ def _run_what_the_confirmations_owe(say) -> None:
     does not complete stops the bootstrap, as a refused scripted decision
     does; one the backstop froze stays owed and is not a failure."""
     from qa_tools.common import recheck
-    from qa_tools.common.scripted_decisions import ScriptRefused
+    from scenarios.scripted_decisions import ScriptRefused
 
     with supply_db.connect(label="mothman:bootstrap") as conn:
         n = len([o for o in recheck.owed(conn)
@@ -1077,8 +1077,9 @@ def _resume_at(name, cp, sequential: bool, say) -> ResumeResult:
     import os
 
     from bootstrap import checkpoints, decision_player, replay_inputs
-    from qa_tools.common import processing_pass, scripted_decisions
+    from qa_tools.common import processing_pass
 
+    from scenarios import scripted_decisions
     say("Regenerating the deliveries to compare them with the checkpoint's")
     first = replay_inputs.first_affected(cp.recorded)
     if first.arrival is None:

@@ -105,7 +105,7 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
     proposed moves - never confirmed without the keep."""
     from qa_tools.common import people, supply_db
     from bootstrap import scripted_corrections
-    from qa_tools.common.scripted_decisions import ScriptRefused
+    from scenarios.scripted_decisions import ScriptRefused
 
     scripted = scripted_corrections.by_reference(
         scripted_corrections.load() if scripts is None else scripts)

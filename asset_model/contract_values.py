@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+from asset_model import config_yaml
 
 __all__ = ["AllowedValuesError", "allowed_values", "declared_lists", "lists_for"]
 
@@ -76,7 +76,9 @@ def _one(found: dict, path, table: str, column: str) -> list:
 
 
 def _load(path) -> dict:
-    return yaml.safe_load(Path(path).read_text()) or {}
+    # THROUGH config_yaml (REQ-PIPE-397 criterion 8), so a pinned run answers
+    # it from its snapshot.
+    return config_yaml.load(Path(path)) or {}
 
 
 def allowed_values(path, table: str, column: str) -> list:

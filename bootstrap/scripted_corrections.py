@@ -48,8 +48,7 @@ class Confirmation:
 
 
 def _path(path):
-    from qa_tools.common import scripted_decisions
-
+    from scenarios import scripted_decisions
     return Path(path or scripted_decisions.script_path())
 
 
@@ -151,9 +150,10 @@ def resolve(c: Confirmation, placements=None) -> dict[tuple[str, str], Keep]:
     """Each kept supply's (dataset, supply id), from where the generator
     recorded the scenario - as scripted decisions resolve theirs."""
     from bootstrap import decision_player
-    from qa_tools.common import scenario_map, scripted_decisions
+    from scenarios import placements as scenario_placements
 
-    placements = scenario_map.read_placements() if placements is None else placements
+    from scenarios import scripted_decisions
+    placements = scenario_placements.read_placements() if placements is None else placements
     out: dict[tuple[str, str], Keep] = {}
     for k in c.keep:
         placement = placements.get(k.scenario)
@@ -172,9 +172,10 @@ def describe_moves(moves, placements=None) -> list[str]:
     """A correction's proposed moves, each by scenario, dataset and supply
     index where a scenario names it (criterion 7), else by supply id."""
     from bootstrap import decision_player
-    from qa_tools.common import scenario_map, scripted_decisions
+    from scenarios import placements as scenario_placements
+    from scenarios import scripted_decisions
 
-    placements = scenario_map.read_placements() if placements is None else placements
+    placements = scenario_placements.read_placements() if placements is None else placements
     named: dict[tuple[str, str], str] = {}
     datasets = {m.dataset_id for m in moves}
     for sid, placement in sorted(placements.items()):

@@ -10,7 +10,9 @@ from datetime import timedelta, timezone
 
 import pytest
 
-from qa_tools.common import correction_apply, decision_log, scenario_map, scripted_decisions
+from qa_tools.common import correction_apply, decision_log
+from scenarios import placements as scenario_placements
+from scenarios import scripted_decisions
 from bootstrap import decision_player
 from bootstrap import correction_replay, scripted_corrections
 from asset_model import declared_corrections
@@ -114,8 +116,8 @@ def _say():
 @pytest.fixture
 def placed(monkeypatch):
     """TS-X's supply 0 is the fixture's replay-s."""
-    monkeypatch.setattr(scenario_map, "read_placements", lambda *a, **k: {
-        "TS-X": scenario_map.Placement(scenario_id="TS-X", dataset="cp-clients",
+    monkeypatch.setattr(scenario_placements, "read_placements", lambda *a, **k: {
+        "TS-X": scenario_placements.Placement(scenario_id="TS-X", dataset="cp-clients",
                                        supplies=("replay-s",), period="2023-Q3",
                                        in_place_on="2023-08-01")})
     monkeypatch.setattr(decision_player, "_supply_of", lambda d, r: r)
@@ -155,11 +157,11 @@ class TestTheReplayConfirmsAsScripted:
 
     def test_a_keep_of_a_supply_not_proposed_stops_the_replay_naming_it(
             self, two, conn, placed, monkeypatch):
-        monkeypatch.setattr(scenario_map, "read_placements", lambda *a, **k: {
-            "TS-X": scenario_map.Placement(scenario_id="TS-X", dataset="cp-clients",
+        monkeypatch.setattr(scenario_placements, "read_placements", lambda *a, **k: {
+            "TS-X": scenario_placements.Placement(scenario_id="TS-X", dataset="cp-clients",
                                            supplies=("replay-s",), period="2023-Q3",
                                            in_place_on="2023-08-01"),
-            "TS-Y": scenario_map.Placement(scenario_id="TS-Y", dataset="cp-clients",
+            "TS-Y": scenario_placements.Placement(scenario_id="TS-Y", dataset="cp-clients",
                                            supplies=("never-filed",), period="2023-Q4",
                                            in_place_on="2023-11-01")})
         script = [SC("CAB-1", keep=(KEEP("TS-Y", "cp-clients", 0),), keep_reason="w")]

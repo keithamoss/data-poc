@@ -518,10 +518,10 @@ class TestAnInjectedTargetEndToEnd:
         assert "verdict" not in {k for m in target["moved"] for k in m}
 
     def test_the_scenario_map_says_what_it_was_built_to(self, generated):
-        from qa_tools.common import scenario_map
+        from generator import scenario_map_writer
 
         [target] = self._record(generated[1])["targets"]
-        text = scenario_map._target_text(target)
+        text = scenario_map_writer._target_text(target)
         assert text.startswith(f"Warn on {self.KEY} (") and "14:00 arrival" in text
 
 
@@ -1009,7 +1009,7 @@ class TestEachPlantedScenarioSitsInItsEra:
         from generator import scenario_injection as si
         civil_registration = collection_modules.provider_module("civil-registration")
         from asset_model import schedule
-        from qa_tools.common import scripted_decisions
+        from scenarios import scripted_decisions
         periods = civil_registration.generated_periods()
         day = {i.scenario_id: date.fromisoformat(
                    si.resolve(dataclasses.replace(i, links=()), periods).period)

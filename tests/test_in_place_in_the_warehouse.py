@@ -16,7 +16,9 @@ from types import SimpleNamespace
 
 from cli import filing_tui
 from cli import scenarios as scenarios_cli
-from qa_tools.common import filing_queue, scenario_map, slot_state
+from qa_tools.common import filing_queue, slot_state
+from scenarios import placements as scenario_placements
+from generator import scenario_map_writer
 
 
 def _words(state: str, reason: str | None = None, verdict: str | None = None) -> str:
@@ -71,7 +73,7 @@ class TestTheTerminalSaysWhere:
         from rich.console import Console
 
         injected = next(s for s in scenarios_cli.scenarios.parse_register() if s.is_injected)
-        placement = scenario_map.Placement.of({
+        placement = scenario_placements.Placement.of({
             "dataset": "cp-investigations", "period": "2024-Q3", "in_place_on": "2024-08-14",
             "supplies": ["cp-investigations@1"]})
         monkeypatch.setattr(scenarios_cli.scenario_map, "read_placements",
@@ -86,10 +88,10 @@ class TestTheTerminalSaysWhere:
     def test_the_scenario_register_says_in_the_warehouse_on(self):
         scenario = SimpleNamespace(id="TS-1", title="t", expect="e.", body="", breaks_as="",
                                    config="", is_injected=True)
-        placement = scenario_map.Placement.of({
+        placement = scenario_placements.Placement.of({
             "dataset": "cp-clients", "period": "2024-Q3", "in_place_on": "2024-08-14",
             "supplies": ["cp-clients@1"]})
-        text = "\n".join(scenario_map._entry(scenario, placement))
+        text = "\n".join(scenario_map_writer._entry(scenario, placement))
         assert '| Set "in the warehouse on" to | 2024-08-14 |' in text
         assert "in-place-on" not in text and "In place on" not in text
 

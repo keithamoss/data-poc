@@ -43,10 +43,9 @@ def generate_collection(collection_id: str, *, trial: bool,
     target trial's processes (handed it through assets.handoff) and the map
     writer all read the configuration as it stood when this began.
 
-    PROVISIONAL (2026-11-16): the scenario map writer (qa_tools/common/
-    scenario_map.write_map) is pinned by this caller rather than installing a
-    pin itself - it is a pipeline module, and only the synthetic side installs
-    one (REQ-PIPE-397 criterion 4)."""
+    The scenario map's writer is the generator's (REQ-GEN-386 criterion 5),
+    reached through generator.public and pinned by this caller; its path is
+    the pipeline's scenario_map.map_path(), passed in."""
     from asset_model import config_pin
 
     with config_pin.pinned():
@@ -73,7 +72,7 @@ def _generate_collection(collection_id: str, *, trial: bool, try_targets, say) -
         try_targets(collection_id)
     elif declared:
         say(SKIPPED)
-    scenario_map.write_map(naming_mine=public.this_assets_scenarios())
+    public.write_map(map_path=scenario_map.map_path())
 
 
 def generate_on_its_own(collection_id: str, *, trial: bool,

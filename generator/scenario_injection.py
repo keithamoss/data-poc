@@ -43,7 +43,8 @@ from typing import Sequence
 
 from generator.targeting import Target
 from asset_model import assets
-from qa_tools.common import scenario_map
+from scenarios import placements as scenario_placements
+from scenarios import vocabulary as scenario_vocabulary
 from asset_model import assets as _assets
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,7 +56,7 @@ ROOT = Path(__file__).resolve().parent.parent
 #: resolver at call time (REQ-PIPE-342 criterion 6); generator/output.py's
 #: redirect() points this one, and not the scenario map's reader, elsewhere.
 def placements_path() -> Path:
-    return assets.data_path(scenario_map.PLACEMENTS_FILE)
+    return assets.data_path(scenario_placements.PLACEMENTS_FILE)
 
 
 class CannotPlace(RuntimeError):
@@ -210,8 +211,8 @@ class Link:
     first: int | str
     second: int | str
     #: WHAT THE LINK LANDS ON (REQ-DASH-208 criterion 2), by name from
-    #: scenario_map.SUBJECTS - never a selector.
-    subject: str = scenario_map.SUPPLY_HISTORY_ROW
+    #: scenario_vocabulary.SUBJECTS - never a selector.
+    subject: str = scenario_vocabulary.SUPPLY_HISTORY_ROW
 
 
 #: THE HISTORY'S END as a link's bounding event (REQ-GEN-205 criterion 12):
@@ -429,7 +430,7 @@ class Placement:
     def subject_for(self, scenario_id: str) -> str:
         """What this id's link lands on (REQ-DASH-208 criterion 2); its first
         supply's row where no link names one."""
-        return dict(self.subjects).get(scenario_id, scenario_map.SUPPLY_HISTORY_ROW)
+        return dict(self.subjects).get(scenario_id, scenario_vocabulary.SUPPLY_HISTORY_ROW)
 
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
@@ -888,8 +889,7 @@ def link_dates(injection: Injection, placement: Placement,
     clock, its `at` on the day `day_offset` after the placement's.
     """
     from asset_model import asset_time
-    from qa_tools.common import scripted_decisions
-
+    from scenarios import scripted_decisions
     if scripts is None:
         scripts = scripted_decisions.load()
     ours = (injection.scenario_id, *injection.also_demonstrates)
@@ -937,12 +937,12 @@ def link_dates(injection: Injection, placement: Placement,
         if s.at is not None and s.scope != scripted_decisions.PERIOD and s.period is None:
             # AT A WALL CLOCK, as the replay times it (Player._timed): `at` on
             # the day `day_offset` after the placement period's date.
-            at = scripted_decisions._wall_clock_after(s, placement.period)
+            at = scripted_decisions.wall_clock_after(s, placement.period)
             return label, at, (None if at is not None else
                                f"{label} cannot be timed: {s.dataset_id} has no date for "
                                f"{placement.period}")
         if s.scope == scripted_decisions.PERIOD:
-            base = scripted_decisions._due_at(s.dataset_id, placement.period)
+            base = scripted_decisions.due_at(s.dataset_id, placement.period)
             why = f"{s.dataset_id} has no slot for {placement.period}"
         else:
             base = arrival_at(s.supply_index if s.supply_index is not None else -1)
@@ -1136,8 +1136,7 @@ def check_every_index_has_its_supply(placements: Sequence[Placement],
     link_dates(). Checked once run ids are read back, because recognition
     is not configuration and validate cannot see it.
     """
-    from qa_tools.common import scripted_decisions
-
+    from scenarios import scripted_decisions
     if scripts is None:
         scripts = scripted_decisions.load()
     by_id = {i.scenario_id: i for i in (injections if injections is not None else INJECTIONS)}
@@ -1331,7 +1330,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
                     f"{_assets.config_dir()}/calendar.yaml's participation names, so {p.name} - {why} - "
                     f"inherits {source}'s supply. Nothing generated for it."),
             in_place_on=((sid, middle.isoformat()),),
-            subjects=((sid, scenario_map.STANDING_IN_PILL),)))
+            subjects=((sid, scenario_vocabulary.STANDING_IN_PILL),)))
     return out
 
 
@@ -1404,7 +1403,7 @@ def held_case_workers_placement(recognised, injected_deliveries) -> Placement:
         arrivals=({"date": day.isoformat(), "at": hhmm,
                    "delivery": arrival.delivery_name, "run_id": arrival.run_id},),
         in_place_on=((HELD_CASE_WORKERS, (day + timedelta(days=1)).isoformat()),),
-        subjects=((HELD_CASE_WORKERS, scenario_map.VERDICT_LINE),))
+        subjects=((HELD_CASE_WORKERS, scenario_vocabulary.VERDICT_LINE),))
 
 
 def resolve_run_ids(placements: Sequence[Placement], recognised) -> None:
@@ -2302,8 +2301,8 @@ INJECTIONS: tuple[Injection, ...] = (
         # held beside the red cp_clients and promoted with the corrected one in
         # one gate application.
         also_demonstrates=("TS-75b", "TS-48"),
-        links=(Link("TS-75a", 7, 0, "TS-75 reject", scenario_map.AS_AT_PANEL),
-               Link("TS-75b", 3, "TS-75 reject", 1, scenario_map.AS_AT_PANEL),
+        links=(Link("TS-75a", 7, 0, "TS-75 reject", scenario_vocabulary.AS_AT_PANEL),
+               Link("TS-75b", 3, "TS-75 reject", 1, scenario_vocabulary.AS_AT_PANEL),
                Link("TS-48", 12, 1, HISTORY_END)),
     ),
     # A DATASET TURNED OFF FOR A WHILE (REQ-GEN-218; TS-63): Carer Register
@@ -2357,11 +2356,11 @@ INJECTIONS: tuple[Injection, ...] = (
                          file_shape="one_table_missing"),
         ),
         links=(Link("TS-76", 14, "TS-76 substitute", "TS-76 de-substitute",
-                    scenario_map.SUBSTITUTION_DRILL_DOWN),
+                    scenario_vocabulary.SUBSTITUTION_DRILL_DOWN),
                # TS-54 (Keith, 2026-10-14, Q13): a period substituted onto an
                # earlier PROMOTED supply - TS-76's own, while it stands.
                Link("TS-54", 14, "TS-76 substitute", "TS-76 de-substitute",
-                    scenario_map.SUBSTITUTION_DRILL_DOWN)),
+                    scenario_vocabulary.SUBSTITUTION_DRILL_DOWN)),
         also_demonstrates=("TS-54",),
         keeps_drawn_severity=True,
     ),
@@ -2390,8 +2389,8 @@ INJECTIONS: tuple[Injection, ...] = (
         # `0` IS THE LATE FILE: the first delivery carries no cp_placements,
         # so it takes no supply index (carries()).
         links=(Link("TS-77a", 14, "TS-77 substitute", 0,
-                    scenario_map.SUBSTITUTION_DRILL_DOWN),
-               Link("TS-77b", 0, 0, "TS-77 promote", scenario_map.AS_AT_PANEL)),
+                    scenario_vocabulary.SUBSTITUTION_DRILL_DOWN),
+               Link("TS-77b", 0, 0, "TS-77 promote", scenario_vocabulary.AS_AT_PANEL)),
         keeps_drawn_severity=True,
     ),
     # A PERIOD WHOSE _manifest LISTS ALL THREE KINDS (REQ-GEN-206 criterion 4;
@@ -2415,7 +2414,7 @@ INJECTIONS: tuple[Injection, ...] = (
                          file_shape="one_table_missing"),
         ),
         links=(Link("TS-55", LAST_DAY, "TS-55 substitute", HISTORY_END,
-                    scenario_map.PERIOD_COMPOSITION),),
+                    scenario_vocabulary.PERIOD_COMPOSITION),),
     ),
     # A CHILD PROTECTION PAIR WITH BOTH FILES REJECTED (REQ-GEN-206 criteria 18
     # to 21; Keith, 2026-10-14, F8, and 2026-11-15, Q3 = a): 2017-Q2, the one
@@ -2675,8 +2674,8 @@ INJECTIONS: tuple[Injection, ...] = (
                          target=Target("amber", ("registering_parent_2_name.completeness",))),
         ),
         also_demonstrates=("TS-78b",),
-        links=(Link("TS-78a", 0, "TS-78 promote D", 2, scenario_map.AS_AT_PANEL),
-               Link("TS-78b", 0, 2, "TS-78 promote D+2", scenario_map.VERDICT_LINE)),
+        links=(Link("TS-78a", 0, "TS-78 promote D", 2, scenario_vocabulary.AS_AT_PANEL),
+               Link("TS-78b", 0, 2, "TS-78 promote D+2", scenario_vocabulary.VERDICT_LINE)),
     ),
     # THE LINKAGE HISTORY'S FAULTS (REQ-GEN-335), each in a quarter of its own
     # holding no Child Protection or Emergency Department scenario (criterion

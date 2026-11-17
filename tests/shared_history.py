@@ -409,6 +409,7 @@ def guard_writers():
     from asset_model import delivery as delivery_tree
     from asset_model import history_anchor
     from generator import driver, scenario_injection
+    from generator import delivery_writer
     from qa_tools.common import delivery
 
     shared = CACHE_DIR.resolve()
@@ -451,7 +452,11 @@ def guard_writers():
     originals = [
         wrap(delivery, "write_delivery", named_delivery),
         wrap(delivery, "write_receipts", receipts),
-        wrap(delivery, "remove_deliveries", named_delivery),
+        # The generator's own writer (REQ-GEN-386 criterion 7) clears and
+        # writes the generated history; the pipeline's writes a hand filing.
+        wrap(delivery_writer, "write_delivery", named_delivery),
+        wrap(delivery_writer, "write_receipts", receipts),
+        wrap(delivery_writer, "remove_deliveries", named_delivery),
         wrap(driver, "write_bookkeeping", lambda a: [driver.bookkeeping_path()]),
         wrap(driver, "record_anchor", lambda a: [driver.bookkeeping_path(), driver.anchor_path()]),
         wrap(scenario_injection, "write_placements",

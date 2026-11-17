@@ -674,8 +674,7 @@ class TestAScriptedSettlement:
     clock on a day after it."""
 
     def _script(self, **kw):
-        from qa_tools.common import scripted_decisions as sd
-
+        from scenarios import scripted_decisions as sd
         base = dict(scenario="TS-69", operation="choose-file", dataset_id=DS,
                     reason="the next day's file came early", supply_index=0,
                     after_hours=0, files=("supply", "refile:+1"), at="11:00",
@@ -693,24 +692,22 @@ class TestAScriptedSettlement:
         (("supply", "reject:+1"), "takes no period"),
     ])
     def test_validate_refuses_from_configuration_alone(self, files, says):
-        from qa_tools.common import scripted_decisions as sd
-
-        found = sd.problems([self._script(files=files)], registered={"TS-69"})
+        from bootstrap import scripted_decision_checks
+        found = scripted_decision_checks.problems([self._script(files=files)], registered={"TS-69"})
         assert any(says in p for p in found), found
 
     def test_validate_refuses_at_beside_after_hours(self):
-        from qa_tools.common import scripted_decisions as sd
-
-        found = sd.problems([self._script(after_hours_given=True)], registered={"TS-69"})
+        from bootstrap import scripted_decision_checks
+        found = scripted_decision_checks.problems([self._script(after_hours_given=True)], registered={"TS-69"})
         assert any("not both" in p for p in found)
 
     def test_it_plays_by_position_at_eleven_the_next_day(self, conn, day, monkeypatch):
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
         nxt = day + timedelta(days=1)
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
                               (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
-        placements = {"TS-69": scenario_map.Placement(
+        placements = {"TS-69": scenario_placements.Placement(
             scenario_id="TS-69", dataset=DS, period=p.period, in_place_on=p.period,
             supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
         player = decision_player.Player("civil-registration", scripts=[self._script()],
@@ -728,13 +725,15 @@ class TestAScriptedSettlement:
         """Criterion 16 (REQ-PIPE-193 criterion 7): TS-72's script giving the
         file the load refused anything but 'reject' stops the replay, naming
         the scenario - its settlement is never recorded."""
-        from qa_tools.common import load_log, scenario_map, scripted_decisions as sd
+        from qa_tools.common import load_log
+        from scenarios import placements as scenario_placements
+        from scenarios import scripted_decisions as sd
 
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
                               (f"birth_registrations_{day}-test.csv", _at(day, "13:35"))])
         load_log.record(p.delivery, DS, p.table[p.files[1][0]], load_log.FAILED,
                         _at(day, "13:35").isoformat(), reason="ragged")
-        placements = {"TS-72": scenario_map.Placement(
+        placements = {"TS-72": scenario_placements.Placement(
             scenario_id="TS-72", dataset=DS, period=p.period, in_place_on=p.period,
             supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
         player = decision_player.Player("civil-registration", placements=placements, scripts=[

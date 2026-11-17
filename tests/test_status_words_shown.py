@@ -160,12 +160,12 @@ def test_the_ticket_wording(value, monkeypatch):
 
 
 def test_the_scenario_maps_built_to():
-    from qa_tools.common import scenario_map
+    from generator import scenario_map_writer
 
     for value in VERDICTS:
-        text = scenario_map._target_text({"built_to": value, "rules": ["x.completeness"],
+        text = scenario_map_writer._target_text({"built_to": value, "rules": ["x.completeness"],
                                           "date": "2026-07-18", "at": "14:00"})
-        _clean(text, "scenario_map._target_text")
+        _clean(text, "scenario_map_writer._target_text")
 
 
 def test_a_replacement_settings_value_is_said_in_words():

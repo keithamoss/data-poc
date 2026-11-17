@@ -98,11 +98,12 @@ def generated_paths() -> list:
     """What the reset deletes beside the database, in the order it lists them
     (criterion 1)."""
     from asset_model import history_anchor
-    from qa_tools.common import delivery, scenario_map
+    from generator import public as generator
+    from scenarios import placements as scenario_placements
 
     root = data_dir()
-    return [root / "deliveries", root / "receipts", root / delivery.BOOKKEEPING_FILE,
-            root / scenario_map.PLACEMENTS_FILE, root / history_anchor.FILE]
+    return [root / "deliveries", root / "receipts", root / generator.BOOKKEEPING_FILE,
+            root / scenario_placements.PLACEMENTS_FILE, root / history_anchor.FILE]
 
 
 def file_count(path) -> int:
@@ -153,12 +154,11 @@ def hand_filed() -> list[str]:
     - a handfiled-* folder from `mothman <collection> qa --commit`, or any
     other."""
     from generator import public as generator
-    from qa_tools.common import delivery
 
     tree = data_dir() / "deliveries"
     if not tree.is_dir():
         return []
-    book = data_dir() / delivery.BOOKKEEPING_FILE
+    book = data_dir() / generator.BOOKKEEPING_FILE
     try:
         written = generator.written_delivery_names(book)
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
@@ -208,11 +208,11 @@ def delete_generated() -> tuple[list[str], list[str]]:
     'running again finishes it'."""
     import shutil
 
-    from qa_tools.common import delivery
+    from generator import public as generator
 
     deleted, remains = [], []
     root = data_dir()
-    book = root / delivery.BOOKKEEPING_FILE
+    book = root / generator.BOOKKEEPING_FILE
     vouched = (root / "deliveries", root / "receipts")
     for path in [p for p in generated_paths() if p != book] + [book]:
         if not path.exists():

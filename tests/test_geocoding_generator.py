@@ -125,8 +125,7 @@ class TestWhenAndFromWhat:
     def test_no_client_register_geocode_where_child_protection_is_suppressed(self, plan):
         written = {j.period.name for j in _geo_jobs(plan) if "geo_cp_clients" in _files(plan, j)}
         assert not written & {"2015-Q2", "2015-Q3", "2015-Q4"}
-        from qa_tools.common import scripted_decisions
-
+        from scenarios import scripted_decisions
         marks = {s.period for s in scripted_decisions.load()
                  if s.dataset_id == "geo-cp-clients" and s.operation == "mark-not-supplied"}
         assert marks == {"2015-Q2", "2015-Q3", "2015-Q4"}

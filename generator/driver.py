@@ -36,7 +36,7 @@ import json
 import os
 
 from asset_model import assets, delivery as delivery_tree
-from qa_tools.common import delivery
+from generator import delivery_writer
 
 
 # WHERE THE GENERATOR WRITES, asked of the resolver at CALL TIME (REQ-PIPE-342
@@ -54,7 +54,7 @@ def receipts_dir():
 
 
 def bookkeeping_path():
-    return assets.data_path(delivery.BOOKKEEPING_FILE)
+    return assets.data_path(delivery_writer.BOOKKEEPING_FILE)
 
 
 def anchor_path():
@@ -262,7 +262,7 @@ def _generate(collection_id: str) -> list[dict]:
     # Delivery names are arbitrary BY DESIGN, which means they can collide -
     # and a collision would write two arrivals into one directory, silently
     # merging deliveries that never arrived together.
-    taken_names: set[str] = delivery.existing_delivery_names(deliveries_dir()) - set(previous)
+    taken_names: set[str] = delivery_writer.existing_delivery_names(deliveries_dir()) - set(previous)
     manifest: list[dict] = []
     by_stream: dict[str, list[dict]] = {st.name: [] for st in streams}
     writes: list[tuple] = []
@@ -299,9 +299,9 @@ def _generate(collection_id: str) -> list[dict]:
     no_instant_shared_with_another_collection(keys, manifest)
 
     # 2. Only then is the last history cleared, and the new one written.
-    delivery.remove_deliveries(previous, deliveries_dir(), receipts_dir())
+    delivery_writer.remove_deliveries(previous, deliveries_dir(), receipts_dir())
     for name, files, received, entry, delivery_obj, n in writes:
-        delivery.write_delivery(
+        delivery_writer.write_delivery(
             name, files, received_at=received,
             deliveries_dir=deliveries_dir(), receipts_dir=receipts_dir(),
             # STORAGE, because in this PoC the generator IS storage

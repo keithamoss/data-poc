@@ -1,7 +1,9 @@
 """The on-disk delivery format's WRITER (REQ-GEN-043; split by REQ-PIPE-380
 criterion 2, v6 Q1 SETTLED by Keith 2026-11-14): writing a delivery and its
-receipts, the next receipt sequence, removing deliveries, and the names a
-person's filing records.
+receipts, the next receipt sequence, and the names a person's filing
+records. Clearing a generator's deliveries, the names already taken and the
+generator's bookkeeping moved to the generator's own writer,
+generator/delivery_writer.py (REQ-GEN-386 criterion 7).
 
 READ docs/delivery-format.md FIRST - it is the normative specification.
 
@@ -12,9 +14,6 @@ the tree is the real pipeline's (hand filing calls this; the generator has a
 writer of its own, REQ-GEN-386 criterion 7), so asset_model/ reads the tree
 and writes it nowhere (REQ-PIPE-380 criterion 18).
 
-THE GENERATOR'S BOOKKEEPING IS NAMED HERE because this module defines the
-one name the generator writes to (REQ-GEN-043 criterion 7,
-tests/test_arrivals.py), and defining it is not reading it.
 """
 from __future__ import annotations
 
@@ -24,18 +23,9 @@ from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 
-from asset_model import asset_time, assets
+from asset_model import asset_time
 from asset_model import delivery as tree
 
-
-#: The generator's bookkeeping file's name - named here and only here among
-#: the QA modules (REQ-GEN-043 criterion 7, tests/test_arrivals.py).
-BOOKKEEPING_FILE = "generator_bookkeeping.json"
-
-
-def bookkeeping_path() -> Path:
-    """The selected asset's generator bookkeeping, at call time."""
-    return assets.data_path(BOOKKEEPING_FILE)
 
 # Characters that are illegal or awkward in a path on Windows and
 # macOS. A delivery name is arbitrary, not unconstrained - this repo
@@ -59,67 +49,6 @@ def filed_by_person(route: str, who: str) -> dict:
     if not who:
         raise tree.DeliveryFormatError("a delivery a person filed must say who filed it.")
     return {"kind": "person", "route": route, "who": who}
-
-
-def remove_deliveries(names, deliveries_dir: Path | None = None,
-                       receipts_dir: Path | None = None) -> int:
-    """Deletes the named deliveries and their receipts. Returns the
-    count removed.
-
-    WHY A GENERATOR NEEDS THIS. Two guarantees pull against each other:
-    delivery names must be unique across the whole directory (or two
-    arrivals silently merge), and a regeneration must OVERWRITE its own
-    history rather than accumulate beside it (REQ-GEN-042). Seeding
-    uniqueness from what is on disk satisfies the first and breaks the
-    second - a re-run simply avoids its own previous names and writes a
-    whole second history. Measured: 42 Birth Registrations deliveries
-    became 84.
-
-    So a generator clears what IT wrote, from its own bookkeeping,
-    before writing again. Each one owns its own output, and neither
-    needs to know which deliveries belong to the other.
-    """
-    deliveries_dir = Path(deliveries_dir or tree.default_deliveries_dir())
-    receipts_dir = Path(receipts_dir or tree.default_receipts_dir())
-    removed = 0
-    for name in names:
-        path = deliveries_dir / name
-        if path.is_dir():
-            for child in path.iterdir():
-                child.unlink()
-            path.rmdir()
-            removed += 1
-        # ONE RECEIPT PER FILE now, in a directory per delivery
-        # (REQ-GEN-044 criterion 12) - and the single per-delivery file
-        # an older tree may still carry, so a regenerate over it leaves
-        # nothing behind.
-        receipt_dir = receipts_dir / name
-        if receipt_dir.is_dir():
-            for child in receipt_dir.iterdir():
-                child.unlink()
-            receipt_dir.rmdir()
-        legacy = receipts_dir / f"{name}.json"
-        if legacy.exists():
-            legacy.unlink()
-    return removed
-
-
-def existing_delivery_names(deliveries_dir: Path | None = None) -> set[str]:
-    """Every delivery name already on disk.
-
-    THE UNIQUENESS OF A DELIVERY NAME IS GLOBAL TO THE DIRECTORY, not
-    to whatever produced it. Found the hard way, 2026-09-23: the two
-    generators each kept their own set of taken names and wrote into
-    one shared directory, so a Birth Registrations drop and a Child
-    Protection drop both landed as `2026-08-corrected` - 60 arrivals
-    became 59 directories, and two unrelated deliveries were silently
-    merged into one. Seeding from disk is what makes the guarantee hold
-    across every writer rather than within each one.
-    """
-    deliveries_dir = Path(deliveries_dir or tree.default_deliveries_dir())
-    if not deliveries_dir.is_dir():
-        return set()
-    return {p.name for p in deliveries_dir.iterdir() if p.is_dir()}
 
 
 def validate_delivery_name(name: str) -> str:

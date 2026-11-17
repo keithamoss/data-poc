@@ -15,9 +15,9 @@ import pytest
 
 from asset_model import assets
 from qa_tools.common import scenario_map as sm
-from qa_tools.common import scenarios as sc
-
-
+from scenarios import placements as scenario_placements
+from generator import scenario_map_writer
+from scenarios import register as sc
 class TestTheRegisterReadsAsData:
     """The register stays prose in plans/supply-model.md - it was
     reviewed by Keith as prose, and that review is what makes it
@@ -86,12 +86,12 @@ class TestWhereEachScenarioLanded:
     anything a person maintains."""
 
     def test_an_absent_record_is_the_ordinary_state_not_an_error(self, tmp_path):
-        assert sm.read_placements(tmp_path / "nothing.json") == {}
+        assert scenario_placements.read_placements(tmp_path / "nothing.json") == {}
 
     def test_a_malformed_record_does_not_stop_the_map_being_built(self, tmp_path):
         path = tmp_path / "broken.json"
         path.write_text("{not json")
-        assert sm.read_placements(path) == {}
+        assert scenario_placements.read_placements(path) == {}
 
     def test_a_recorded_placement_is_read_back_whole(self, tmp_path):
         path = tmp_path / "placements.json"
@@ -100,7 +100,7 @@ class TestWhereEachScenarioLanded:
             "supplies": ["run_047", "run_048"], "period": "2026-07-14",
             "in_place_on": "2026-07-15"}]}))
 
-        placement = sm.read_placements(path)["TS-1"]
+        placement = scenario_placements.read_placements(path)["TS-1"]
 
         assert placement.dataset == "birth-registrations"
         assert placement.supplies == ("run_047", "run_048")
@@ -112,16 +112,16 @@ class TestWhereEachScenarioLanded:
         path = tmp_path / "placements.json"
         path.write_text(json.dumps([{"scenario_id": "TS-1",
                                       "dataset": "birth-registrations"}]))
-        assert not sm.read_placements(path)["TS-1"].is_complete
+        assert not scenario_placements.read_placements(path)["TS-1"].is_complete
 
 
 class TestTheMapItself:
     def _map(self, placements=None):
-        return sm.build_map(sc.parse_register(), placements or {})
+        return scenario_map_writer.build_map(sc.parse_register(), placements or {})
 
     def test_it_names_the_dataset_supplies_period_and_in_place_on_date(self):
         """Criterion 1."""
-        text = sm.build_map(sc.parse_register(), {"TS-1": sm.Placement(
+        text = scenario_map_writer.build_map(sc.parse_register(), {"TS-1": scenario_placements.Placement(
             scenario_id="TS-1", dataset="Birth Registrations",
             supplies=("run_047", "run_048"), period="2026-07-14",
             in_place_on="2026-07-15")})
@@ -135,7 +135,7 @@ class TestTheMapItself:
         """Criterion 5. The generator does not know the dashboard's
         routing scheme, and a URL written here would break silently
         the next time a route changed."""
-        text = self._map({"TS-1": sm.Placement(
+        text = self._map({"TS-1": scenario_placements.Placement(
             scenario_id="TS-1", dataset="d", supplies=("s",),
             period="p", in_place_on="2026-01-01")})
 
@@ -183,7 +183,7 @@ class TestTheMapItself:
         "the rest are unit tests" names a rest that is not there."""
         injected = [s for s in sc.parse_register() if s.is_injected]
         assert injected, "test precondition - the register has injected scenarios"
-        text = sm.build_map(injected, {})
+        text = scenario_map_writer.build_map(injected, {})
         assert "the rest are unit tests" not in text
         assert f"{len(injected)} scenarios are registered" in text
 
@@ -219,7 +219,7 @@ class TestTheCommittedMap:
         source = Path(sm.__file__).read_text()
         # ASKED OF THE RESOLVER AT CALL TIME (REQ-PIPE-342 criterion 6): the
         # selected asset's data/, today's data/ while there is one asset.
-        assert sm.placements_path() == assets.data_path("scenario_placements.json")
+        assert scenario_placements.placements_path() == assets.data_path("scenario_placements.json")
         assert "duckdb" not in source
         assert "supply_db" not in source
 
@@ -235,7 +235,7 @@ class TestItIsRebuiltWithTheHistory:
 
         done = []
         monkeypatch.setattr(driver, "generate", lambda cid: done.append(("generate", cid)))
-        monkeypatch.setattr(sm, "write_map", lambda **_: done.append(("map", None)))
+        monkeypatch.setattr(scenario_map_writer, "write_map", lambda **_: done.append(("map", None)))
         from generator import public
 
         collections = public.generated_collections()
@@ -265,7 +265,7 @@ class TestTheMapCanBeCheckedWithoutWriting:
         stale = tmp_path / "SCENARIOS-daily.md"
         stale.write_text("stale\n")
         monkeypatch.setattr(sm, "map_path", fixed(stale))
-        monkeypatch.setattr(sm, "placements_path", fixed(tmp_path / "placements.json"))
+        monkeypatch.setattr(scenario_placements, "placements_path", fixed(tmp_path / "placements.json"))
         (tmp_path / "placements.json").write_text('{"placements": []}')
         result = CliRunner().invoke(scenarios_group, ["map", "--check"])
         assert result.exit_code == 1, result.output
@@ -293,7 +293,7 @@ class TestEachAssetHasItsOwnMap:
     def test_each_committed_map_is_current_for_its_own_history(self, asset):
         from generator import scenario_injection
 
-        built = sm.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios())
+        built = scenario_map_writer.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios())
         assert sm.map_path().read_text() == built, (
             f"SCENARIOS-{asset}.md is stale - run `mothman scenarios map`")
 
@@ -305,7 +305,7 @@ class TestEachAssetHasItsOwnMap:
         """TS-78a is Birth Registrations', TS-80 the Client Register's."""
         from generator import scenario_injection
 
-        text = sm.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios(),
+        text = scenario_map_writer.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios(),
                                      placements_path="/nonexistent/placements.json")
         assert f"### {mine} " in text, f"{asset}'s map leaves out its own {mine}"
         assert f"### {theirs} " not in text, f"{asset}'s map carries {theirs}"
@@ -317,8 +317,7 @@ class TestEachAssetHasItsOwnMap:
         OWN asset placed, plus those whose injections name one of its
         datasets; an unplaced scenario naming no dataset is in neither map."""
         from generator import scenario_injection as si
-        from qa_tools.common import scenarios
-
+        from scenarios import register as scenarios
         register = scenarios.parse_register()
         named = {sid for i in si.INJECTIONS for sid in (i.scenario_id, *i.also_demonstrates)}
         nowhere = [s.id for s in register if s.id not in named]
@@ -330,7 +329,7 @@ class TestEachAssetHasItsOwnMap:
         path.write_text(json.dumps({"placements": [{
             "scenario_id": placed, "dataset": "d", "supplies": ["s"], "period": "p",
             "in_place_on": "2026-01-01"}]}))
-        text = sm.build_for_selected(naming_mine=mine, placements_path=path)
+        text = scenario_map_writer.build_for_selected(naming_mine=mine, placements_path=path)
         assert f"### {placed} " in text, f"{asset}'s map leaves out {placed}, which it placed"
         assert f"### {unplaced} " not in text, f"{asset}'s map carries {unplaced}, placed by no one"
         missing = [sid for sid in mine if sid in {s.id for s in register} and f"### {sid} " not in text]

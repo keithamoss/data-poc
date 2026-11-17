@@ -333,9 +333,9 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     #: reads what the generator built.
     WALLED = ("asset_model", "qa_tools", "pipeline", "dashboard", "cli")
 
-    # delivery.py DEFINES the constant so the generator has one name to
-    # write to, and defining it is not reading it.
-    DEFINES_THE_NAME = "qa_tools/common/delivery.py"
+    # THE NAME IS DEFINED OUTSIDE THE WALL since REQ-GEN-386 criterion 7, in
+    # the generator's own writer (generator/delivery_writer.py), so no walled
+    # module is excused.
     # The modules whose job is to RUN the generator - `mothman bdm
     # generate-synthetic-data` and `mothman cp generate-synthetic-data`.
     # Invoking the generator is not reading its bookkeeping, and a rule
@@ -375,8 +375,6 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
         offenders = []
         for path in self._modules():
             rel = str(path.relative_to(self.ROOT))
-            if rel == self.DEFINES_THE_NAME:
-                continue
             tree = ast.parse(path.read_text())
             docstrings = self._docstring_nodes(tree)
             for node in ast.walk(tree):

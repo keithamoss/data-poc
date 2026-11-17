@@ -19,7 +19,10 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.common import scenario_map, scenarios
+from generator import public as generator
+from qa_tools.common import scenario_map
+from scenarios import placements as scenario_placements
+from scenarios import register as scenarios
 
 console = Console()
 
@@ -44,17 +47,15 @@ def map_command(out_path: str | None, check: bool) -> None:
     if check:
         _check_map()
         return
-    from generator import scenario_injection
-
     # THIS ASSET'S SCENARIOS, as its map carries them (REQ-PIPE-352 criterion
     # 3; Keith 2026-11-03, Q5): its own placements, and those naming its datasets.
-    naming_mine = scenario_injection.this_assets_scenarios()
-    path = scenario_map.write_map(naming_mine=naming_mine, map_path=out_path)
-    placements = scenario_map.read_placements()
+    naming_mine = generator.this_assets_scenarios()
+    path = generator.write_map(map_path=out_path or scenario_map.map_path())
+    placements = scenario_placements.read_placements()
     entries = [s for s in scenarios.parse_register() if s.id in naming_mine or s.id in placements]
     injected = [s for s in entries if s.is_injected]
     placed = [s for s in injected
-               if (placements.get(s.id) or scenario_map.Placement.of({})).is_complete]
+               if (placements.get(s.id) or scenario_placements.Placement.of({})).is_complete]
     console.print(f"Wrote {path}")
     console.print(f"  {len(entries)} scenario(s), {len(injected)} marked for injection, "
                    f"{len(placed)} with data behind them.")
@@ -81,7 +82,7 @@ def list_command(injected_only: bool) -> None:
     entries = scenarios.parse_register()
     if injected_only:
         entries = [s for s in entries if s.is_injected]
-    placements = scenario_map.read_placements()
+    placements = scenario_placements.read_placements()
 
     table = Table(title="Test scenario register")
     table.add_column("Scenario")
@@ -106,14 +107,14 @@ def validate_command() -> None:
     (REQ-GEN-135 criterion 13) - every scenario registered, every decision
     a filing decision, every reason present, every dataset real - and every
     scenario link's date falls between its two events (REQ-GEN-201)."""
-    from qa_tools.common import scripted_decisions
-
+    from bootstrap import scripted_decision_checks
     from generator import scenario_injection
+    from scenarios import scripted_decisions
 
     registered = {s.id for s in scenarios.parse_register()}
     script = scripted_decisions.load()
-    found = scripted_decisions.problems(script, registered=registered,
-                                        placement_of=scenario_injection.placement_of())
+    found = scripted_decision_checks.problems(script, registered=registered,
+                                              placement_of=scenario_injection.placement_of())
     # EACH SCENARIO LINK'S DATE BETWEEN ITS EVENTS (REQ-GEN-201), from
     # configuration and the calendar alone.
     found += scenario_injection.link_problems(scripts=script)
@@ -252,17 +253,15 @@ def _check_map() -> None:
     judged, which is said as a warning rather than passed as current."""
     import os
 
-    if not scenario_map.placements_path().is_file():
+    if not scenario_placements.placements_path().is_file():
         console.print(f"Cannot check {scenario_map.map_path().name}: no "
-                      f"{scenario_map.placements_path().name} on "
+                      f"{scenario_placements.placements_path().name} on "
                       f"this machine (run `mothman pipeline bootstrap`).", style="yellow")
         if os.environ.get("MOTHMAN_GATE_WARNING_EXIT"):
             raise SystemExit(int(os.environ["MOTHMAN_GATE_WARNING_EXIT"]))
         return
     path = scenario_map.map_path()
-    from generator import scenario_injection
-
-    built = scenario_map.build_for_selected(naming_mine=scenario_injection.this_assets_scenarios())
+    built = generator.build_map_for_selected()
     if not path.is_file() or path.read_text() != built:
         console.print(f"{path.name} is stale - run `mothman scenarios map`.", style="red")
         raise SystemExit(1)

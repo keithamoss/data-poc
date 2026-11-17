@@ -24,6 +24,7 @@ from asset_model import history_anchor
 from bootstrap import replay_inputs
 from generator import driver, scenario_injection
 from qa_tools.common import delivery
+from generator import delivery_writer
 
 pytestmark = pytest.mark.asset("daily")
 
@@ -148,7 +149,7 @@ class TestNoTestCanWriteIt:
     def test_remove_deliveries_refuses(self, shared):
         some = next(shared.deliveries.iterdir()).name
         with pytest.raises(shared_history.SharedHistoryWritten, match=f"remove_deliveries.*{some}"):
-            delivery.remove_deliveries([some], shared.deliveries, shared.receipts)
+            delivery_writer.remove_deliveries([some], shared.deliveries, shared.receipts)
         assert (shared.deliveries / some).is_dir()
 
     def test_the_bookkeeping_and_anchor_writers_refuse(self, shared):
@@ -190,7 +191,7 @@ class TestATestThatMustChangeItTakesACopy:
         copy = daily_history.copy_to(tmp_path / "mine")
         assert shared_history.digest(copy.root) == shared_history.digest(daily_history.root)
         some = next(copy.deliveries.iterdir()).name
-        delivery.remove_deliveries([some], copy.deliveries, copy.receipts)
+        delivery_writer.remove_deliveries([some], copy.deliveries, copy.receipts)
         assert not (copy.deliveries / some).exists()
         assert (daily_history.deliveries / some).is_dir()
 

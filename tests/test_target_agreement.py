@@ -267,10 +267,10 @@ class TestSkippingTheTrial:
     def test_the_generate_command_says_it_skipped(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
-        from qa_tools.common import scenario_map
+        from generator import scenario_map_writer
 
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda **_: None)
+        monkeypatch.setattr(scenario_map_writer, "write_map", lambda **_: None)
         monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: pytest.fail("the trial ran"))
         out = CliRunner().invoke(bdm.generate_synthetic_data_command, ["--skip-target-trial"])
@@ -280,11 +280,11 @@ class TestSkippingTheTrial:
     def test_by_default_the_trial_runs(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
-        from qa_tools.common import scenario_map
+        from generator import scenario_map_writer
 
         ran = []
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda **_: None)
+        monkeypatch.setattr(scenario_map_writer, "write_map", lambda **_: None)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: ran.append(True))
         bdm.generate_synthetic_data()
         assert ran == [True]
@@ -388,8 +388,8 @@ class TestAfterAReplay:
         # planned, not injected), a planned supply a scenario names counts.
         import json
 
-        from qa_tools.common import scenario_map
-        raw = json.loads(scenario_map.placements_path().read_text())
+        from scenarios import placements as scenario_placements
+        raw = json.loads(scenario_placements.placements_path().read_text())
         trialled = {r["dataset"] for r in (raw.get("placements") if isinstance(raw, dict) else raw)
                     if r.get("targets") and r.get("dataset")
                     and collections.for_dataset(r["dataset"]).target_trial}
@@ -530,11 +530,11 @@ class TestARecordThatDoesNotAddUp:
     def test_the_scenario_map_is_written_only_once_the_trial_agrees(self, monkeypatch):
         from cli.collection_cli import of as _cli_of
         bdm = _cli_of('bdm')
-        from qa_tools.common import scenario_map
+        from generator import scenario_map_writer
 
         wrote = []
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
-        monkeypatch.setattr(scenario_map, "write_map", lambda **_: wrote.append(True))
+        monkeypatch.setattr(scenario_map_writer, "write_map", lambda **_: wrote.append(True))
 
         def disagree(**k):
             raise bdm.TargetTrialFailed("TS-43 did not read as built")

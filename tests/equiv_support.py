@@ -28,16 +28,18 @@ def apply_redirects(root: Path) -> dict:
     process can restore them; a spawned child simply exits.
     """
     from asset_model import delivery as delivery_tree
-    from qa_tools.common import (delivery, in_flight_log, scenario_map, scripted_decisions,
-                                 supply_db)
+    from generator import delivery_writer
+    from qa_tools.common import in_flight_log, supply_db
+    from scenarios import placements as scenario_placements
+    from scenarios import scripted_decisions
     from qa_tools.tools import results_history
 
     root = Path(root)
     targets = {
         (delivery_tree, "default_deliveries_dir"): fixed(root / "deliveries"),
         (delivery_tree, "default_receipts_dir"): fixed(root / "receipts"),
-        (delivery, "bookkeeping_path"): fixed(root / "generator_bookkeeping.json"),
-        (scenario_map, "placements_path"): fixed(root / "scenario_placements.json"),
+        (delivery_writer, "bookkeeping_path"): fixed(root / "generator_bookkeeping.json"),
+        (scenario_placements, "placements_path"): fixed(root / "scenario_placements.json"),
         (in_flight_log, "OBSERVATIONS_DIR"): root / "observations" / "in_flight",
         # A CUT-DOWN CORPUS CANNOT CARRY THE REAL SCRIPTS: they name supplies
         # it does not have, and the player refuses rather than finish a

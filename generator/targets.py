@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from asset_model import asset_time, delivery as delivery_tree
-from qa_tools.common import delivery
+from generator import delivery_writer
 
 
 @dataclass(frozen=True)
@@ -79,13 +79,13 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
     """Every supply the last generation built to a target, oldest first
     within each collection."""
     from generator import collections
-    from qa_tools.common import scenario_map
+    from scenarios import placements as scenario_placements
 
     # READ AT CALL TIME, from the modules whose paths a test or a corpus
     # redirects (tests/equiv_support.apply_redirects) - the same two the
     # scenario map reads.
-    book = _read(bookkeeping or delivery.bookkeeping_path())
-    placed = (_read(placements or scenario_map.placements_path()).get("placements") or [])
+    book = _read(bookkeeping or delivery_writer.bookkeeping_path())
+    placed = (_read(placements or scenario_placements.placements_path()).get("placements") or [])
     out: list[Built] = []
     # WHOSE BOOKKEEPING IS WHOSE, from the providers (REQ-GEN-246 criterion
     # 6): a key no provider makes is refused by name, where it used to be
@@ -331,9 +331,9 @@ class DeclaredGateOutcome:
 
 def gate_outcomes(placements: Path | None = None) -> list[DeclaredGateOutcome]:
     """Every gate outcome the last generation's placements declare."""
-    from qa_tools.common import scenario_map
+    from scenarios import placements as scenario_placements
 
-    placed = (_read(placements or scenario_map.placements_path()).get("placements") or [])
+    placed = (_read(placements or scenario_placements.placements_path()).get("placements") or [])
     return [DeclaredGateOutcome(scenario=p["scenario_id"], dataset_id=g["dataset_id"],
                                 delivery=g["delivery"], outcome=g["outcome"],
                                 because=g.get("because"), rechecked=bool(g.get("rechecked")))

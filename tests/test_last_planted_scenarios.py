@@ -19,8 +19,9 @@ import pytest
 import collection_modules
 from asset_model import asset_time
 from generator import scenario_injection as si
-from qa_tools.common import scenario_map, scripted_decisions
+from scenarios import vocabulary as scenario_vocabulary
 
+from scenarios import scripted_decisions
 pytestmark = [pytest.mark.filterwarnings("ignore::UserWarning"), pytest.mark.asset("quarterly")]
 
 
@@ -73,7 +74,7 @@ class TestTS52IsChosenFromTheDeliveries:
         assert placement.arrivals[0]["delivery"] == "may26"
         assert placement.arrivals[0]["run_id"] == "cp_case_workers__20260527"
         assert dict(placement.in_place_on) == {"TS-52": "2026-05-28"}
-        assert placement.subject_for("TS-52") == scenario_map.VERDICT_LINE
+        assert placement.subject_for("TS-52") == scenario_vocabulary.VERDICT_LINE
         assert placement.as_record()["supplies"] == ["cp_case_workers__20260527"]
 
     def test_never_one_an_injection_places(self):
@@ -156,7 +157,7 @@ class TestTS52IsChosenFromTheDeliveries:
         assert {"TS-52", "TS-79a", "TS-79b"} <= set(placements), sorted(placements)
         ts52 = placements["TS-52"]
         assert ts52["dataset"] == "cp-case-workers" and len(ts52["supplies"]) == 1
-        assert ts52["subject"] == scenario_map.VERDICT_LINE
+        assert ts52["subject"] == scenario_vocabulary.VERDICT_LINE
 
 
 @pytest.mark.asset("daily")
@@ -223,7 +224,7 @@ class TestTheQuarterlyPlacements:
         assert placement.period == "2023-Q1"
         assert si.stood_on(ts55, periods) == "2022-Q4"
         assert placement.arrivals[0]["file_shape"] == "one_table_missing"
-        assert placement.subject_for("TS-55") == scenario_map.PERIOD_COMPOSITION
+        assert placement.subject_for("TS-55") == scenario_vocabulary.PERIOD_COMPOSITION
         assert si.link_problems([ts55]) == []
 
     def test_ts55_stands_where_case_workers_inherits(self):

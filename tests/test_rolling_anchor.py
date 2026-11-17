@@ -260,9 +260,9 @@ class TestTheResetDeletesTheGeneratedFiles:
             (root / "receipts" / name / "f.csv.json").write_text("{}")
         (root / "generator_bookkeeping.json").write_text(json.dumps(
             {"cp-clients": [{"delivery": n} for n in written], "_anchor": "2026-09-25"}))
-        from qa_tools.common import scenario_map
+        from scenarios import placements as scenario_placements
 
-        (root / scenario_map.PLACEMENTS_FILE).write_text("{}")
+        (root / scenario_placements.PLACEMENTS_FILE).write_text("{}")
         history_anchor.write(FIXED, root / history_anchor.FILE)
         return root
 

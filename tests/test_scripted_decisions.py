@@ -14,7 +14,10 @@ import pytest
 import baseline_periods
 
 import test_supersession as _base
-from qa_tools.common import decision_log as dl, people, scenario_map, scripted_decisions as sd
+from qa_tools.common import decision_log as dl, people
+from scenarios import placements as scenario_placements
+from scenarios import scripted_decisions as sd
+from bootstrap import scripted_decision_checks
 from bootstrap import decision_player
 from qa_tools.common import validate_people
 from test_supersession import DS, _filed
@@ -37,10 +40,10 @@ class TestTheScriptIsValidatedAgainstConfiguration:
     """Criterion 13."""
 
     def test_a_good_script_has_no_problems(self):
-        assert sd.problems([_script()], registered={"TS-1"}) == []
+        assert scripted_decision_checks.problems([_script()], registered={"TS-1"}) == []
 
     def test_each_kind_of_problem_is_named(self):
-        found = sd.problems([_script(scenario="TS-NOPE", operation="bless", reason=" ",
+        found = scripted_decision_checks.problems([_script(scenario="TS-NOPE", operation="bless", reason=" ",
                                      dataset_id="no-such")], registered={"TS-1"})
         assert len(found) == 4
         assert any("not in the register" in f for f in found)
@@ -49,10 +52,9 @@ class TestTheScriptIsValidatedAgainstConfiguration:
         assert any("no dataset" in f for f in found)
 
     def test_the_committed_script_holds(self):
-        from qa_tools.common import scenarios
-
+        from scenarios import register as scenarios
         registered = {s.id for s in scenarios.parse_register()}
-        assert sd.problems(sd.load(), registered=registered) == []
+        assert scripted_decision_checks.problems(sd.load(), registered=registered) == []
 
 
 class TestTheSyntheticActor:
@@ -91,7 +93,7 @@ class TestPlayback:
     """Criteria 2 to 6 and 8, against a real database."""
 
     def _player(self, scripts, supply_table):
-        placements = {"TS-1": scenario_map.Placement(
+        placements = {"TS-1": scenario_placements.Placement(
             scenario_id="TS-1", dataset=DS, supplies=(supply_table,), period="p",
             in_place_on="2026-05-01")}
         return decision_player.Player("child-protection", scripts=scripts, placements=placements)
@@ -172,7 +174,7 @@ class TestASupplyNotYetFiled:
     on the very first arrival, taking the whole replay down."""
 
     def test_it_waits_and_only_the_end_of_the_replay_refuses(self, conn):
-        placements = {"TS-1": scenario_map.Placement(
+        placements = {"TS-1": scenario_placements.Placement(
             scenario_id="TS-1", dataset=DS, supplies=("cp_carers__999999999999999999",),
             period="p", in_place_on="2026-05-01")}
         player = decision_player.Player("child-protection", scripts=[_script()], placements=placements)
@@ -302,7 +304,7 @@ class TestAPeriodScopedScriptIsValidated:
     """Criteria 8 and 9, from configuration alone."""
 
     def test_a_good_period_scoped_substitution_has_no_problems(self):
-        assert sd.problems([_period_script()], registered={"TS-1"}) == []
+        assert scripted_decision_checks.problems([_period_script()], registered={"TS-1"}) == []
 
     @pytest.mark.parametrize("kw,says", [
         (dict(scope=None, stands_on=None, operation="promote"), "names neither a supply nor a period"),
@@ -323,7 +325,7 @@ class TestAPeriodScopedScriptIsValidated:
         (dict(names_supply=False), "`names_supply:` means nothing on a period-scoped"),
     ])
     def test_each_refusal_names_the_entry_and_what_to_change(self, kw, says):
-        found = sd.problems([_period_script(**kw)], registered={"TS-1"})
+        found = scripted_decision_checks.problems([_period_script(**kw)], registered={"TS-1"})
         assert any(says in f and "decision 1 (TS-1)" in f for f in found), found
 
     def test_an_absent_supply_is_not_read_as_supply_zero(self, tmp_path):
@@ -332,7 +334,7 @@ class TestAPeriodScopedScriptIsValidated:
                           f"dataset: {DS}, reason: r, after_hours: 1}}\n")
         loaded = sd.load(script)
         assert loaded[0].supply_index is None
-        assert any("names neither" in f for f in sd.problems(loaded, registered={"TS-1"}))
+        assert any("names neither" in f for f in scripted_decision_checks.problems(loaded, registered={"TS-1"}))
 
     def test_every_existing_script_still_names_its_supply(self):
         """Criterion 10: the nine committed scripts play unedited - every script
@@ -349,7 +351,7 @@ class TestAPeriodScopedScriptIsValidated:
 
 class TestThePeriodsDueInstantIsTheCalendars:
     """Criterion 1 against the REAL calendar (post-build-review #168): every
-    playback test pins _due_at, so nothing computed it. Child Protection's
+    playback test pins due_at, so nothing computed it. Child Protection's
     files go into the next period (REQ-GEN-325), so 2024-Q4's slot is due on
     the 1 August 2024 round."""
 
@@ -357,7 +359,7 @@ class TestThePeriodsDueInstantIsTheCalendars:
         from asset_model import schedule, slots
 
         on = schedule.round_of("2024-Q4", "cp-placements")
-        due = sd._due_at("cp-placements", "2024-Q4")
+        due = sd.due_at("cp-placements", "2024-Q4")
         assert due == slots.slot_instants("cp-placements", on).due_at
         assert due.isoformat() == "2024-08-01T09:00:00+08:00"
 
@@ -430,7 +432,7 @@ class TestAPeriodScopedDecisionIsPlayed:
     def pinned(self, monkeypatch, period):
         earlier = period + "-before"
         baseline_periods.declare(earlier)
-        monkeypatch.setattr(sd, "_due_at", lambda ds, p: self.DUE if p == period else None)
+        monkeypatch.setattr(sd, "due_at", lambda ds, p: self.DUE if p == period else None)
         monkeypatch.setattr("asset_model.slots.relative_period",
                             lambda ds, p, off: earlier if (p, off) == (period, -1) else None)
         return period, earlier
@@ -444,7 +446,7 @@ class TestAPeriodScopedDecisionIsPlayed:
         return supply
 
     def _player(self, scripts, period):
-        placements = {"TS-1": scenario_map.Placement(
+        placements = {"TS-1": scenario_placements.Placement(
             scenario_id="TS-1", dataset=DS, supplies=(), period=period,
             in_place_on="2026-05-02")}
         return decision_player.Player("child-protection", scripts=scripts, placements=placements)
@@ -539,7 +541,7 @@ class TestThePlantedPairsAreSettled:
 
         from qa_tools.common import supply_db
 
-        placed = scenario_map.read_placements()
+        placed = scenario_placements.read_placements()
         missing = sorted(set(self.EXPECTED) - set(placed))
         assert not missing, f"not placed in the generated history: {missing}"
         with supply_db.connect(read_only=True, label="test-196") as conn:
@@ -583,18 +585,18 @@ class TestAnOrdinaryChainIsSettledByPeriod:
                           "after_hours": 24, **kw})
 
     def test_a_chain_entry_validates(self):
-        assert sd.problems([self._chain("2013-Q3")], registered=set()) == []
+        assert scripted_decision_checks.problems([self._chain("2013-Q3")], registered=set()) == []
 
     def test_it_names_a_scenario_or_a_period_not_both(self):
-        found = sd.problems([self._chain("2013-Q3", scenario="TS-1")], registered={"TS-1"})
+        found = scripted_decision_checks.problems([self._chain("2013-Q3", scenario="TS-1")], registered={"TS-1"})
         assert any("not both" in f for f in found), found
 
     def test_it_names_a_supply(self):
-        found = sd.problems([self._chain("2013-Q3", supply_index=None)], registered=set())
+        found = scripted_decision_checks.problems([self._chain("2013-Q3", supply_index=None)], registered=set())
         assert any("supply: <index>" in f for f in found), found
 
     def test_only_promote_or_reject(self):
-        found = sd.problems([self._chain("2013-Q3", operation="refile", to_period="2013-Q4")],
+        found = scripted_decision_checks.problems([self._chain("2013-Q3", operation="refile", to_period="2013-Q4")],
                             registered=set())
         assert any("promote or reject" in f for f in found), found
 
@@ -636,11 +638,11 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
                           "operation": "mark-not-supplied", "after_hours": 24, **kw})
 
     def test_a_mark_entry_validates_without_a_supply(self):
-        assert sd.problems([self._mark("2013-Q1", dataset_id="cp-clients")],
+        assert scripted_decision_checks.problems([self._mark("2013-Q1", dataset_id="cp-clients")],
                            registered=set()) == []
 
     def test_a_mark_entry_names_no_supply(self):
-        found = sd.problems([self._mark("2013-Q1", dataset_id="cp-clients", supply_index=0)],
+        found = scripted_decision_checks.problems([self._mark("2013-Q1", dataset_id="cp-clients", supply_index=0)],
                             registered=set())
         assert any("names no supply" in f for f in found), found
 

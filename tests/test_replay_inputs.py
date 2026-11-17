@@ -48,12 +48,13 @@ class TestOneInputList:
         # assets/environments.yaml, never another asset's.
         # asset_model/ joined with REQ-PIPE-380 criterion 17 (the shared
         # reading code moved out of qa_tools/); bootstrap/ and scenarios/ with
-        # REQ-GEN-381 criterion 7, which dropped cli/pipeline.py.
+        # REQ-GEN-381 criterion 7, which dropped cli/pipeline.py; the shared
+        # file-checks default with REQ-QAC-387 criterion 12.
         assert set(ri.INPUTS) == {"asset_model/**", "bootstrap/**", "scenarios/**",
                                   "generator/**", "synthetic_data_generator/**", "pipeline/**",
                                   "qa_tools/**", "dbt_shared/**",
                                   "pyproject.toml", "uv.lock", ".github/workflows/test.yml",
-                                  "assets/environments.yaml"}
+                                  "assets/environments.yaml", "file-checks.yaml"}
         assert set(ri.inputs("daily")) == set(ri.INPUTS) | {"assets/daily/**"}
         assert set(ri.replay_patterns("daily")) == (
             set(ri.REPLAY_INPUTS) | {"assets/daily/**", "!assets/daily/synthetic/collections/**"})

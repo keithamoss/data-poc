@@ -27,8 +27,7 @@ class TestOnePackageOutsideQaTools:
 
     def test_the_player_half_moved_and_the_reader_half_stayed(self):
         from bootstrap import decision_player
-        from qa_tools.common import scripted_decisions
-
+        from scenarios import scripted_decisions
         assert hasattr(decision_player, "Player") and hasattr(decision_player, "StreamPlayer")
         assert not hasattr(scripted_decisions, "Player")
         assert hasattr(scripted_decisions, "load") and hasattr(scripted_decisions, "Script")
@@ -129,7 +128,7 @@ class TestTheGeneratorThroughItsPublicModule:
         monkeypatch.setattr(public, "has_target_trial", lambda cid: True)
         monkeypatch.setattr(public, "generate", lambda cid: did.append(("generate", cid)))
         monkeypatch.setattr(public, "this_assets_scenarios", lambda: set())
-        monkeypatch.setattr("qa_tools.common.scenario_map.write_map",
+        monkeypatch.setattr("generator.scenario_map_writer.write_map",
                             lambda **k: did.append("map"))
         generation.generate_collection("x", trial=True,
                                        try_targets=lambda cid: did.append(("trial", cid)))
@@ -152,8 +151,9 @@ class TestTheCacheKeyFollowsTheCode:
     def test_the_key_is_the_bumped_prefix(self):
         from bootstrap import replay_inputs
 
-        assert replay_inputs.KEY_PREFIX == "bootstrap-v6-"
-        assert replay_inputs.cache_key("quarterly").startswith("bootstrap-v6-")
+        # v7: the shared file-checks default joined the key (REQ-QAC-387).
+        assert replay_inputs.KEY_PREFIX == "bootstrap-v7-"
+        assert replay_inputs.cache_key("quarterly").startswith("bootstrap-v7-")
 
     @pytest.mark.parametrize("package", ["bootstrap", "scenarios", "asset_model"])
     def test_a_change_to_a_moved_package_moves_the_key(self, package, monkeypatch):

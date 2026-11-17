@@ -324,9 +324,10 @@ class TestOnlyThePlantedAmbersWaitUnderHold:
     @staticmethod
     def _held_and_planted():
         from qa_tools.common import decision_log as dl
-        from qa_tools.common import scenario_map, supply_db
+        from qa_tools.common import supply_db
+        from scenarios import placements as scenario_placements
 
-        placements = scenario_map.read_placements()
+        placements = scenario_placements.read_placements()
         planted = set()
         for sid, index in (("TS-43", 0), ("TS-78a", 0), ("TS-78a", 2), ("TS-47", 0)):
             run = placements[sid].supplies[index]

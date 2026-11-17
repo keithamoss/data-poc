@@ -14,13 +14,14 @@ WORKFLOW = ROOT / ".github" / "workflows" / "test.yml"
 
 #: Criterion 1, as amended 2026-10-06 (cli/pipeline.py and nothing else
 #: under cli/), and by REQ-GEN-381 criterion 7 (bootstrap/ and scenarios/, and
-#: no cli/ file at all).
+#: no cli/ file at all), and by REQ-QAC-387 criterion 12 (the shared
+#: file-checks default).
 #: The shared inputs; each asset's key adds that asset's own folder
 #: (REQ-PIPE-365 criterion 3).
 INPUTS = ("asset_model/**", "bootstrap/**", "scenarios/**", "generator/**",
           "synthetic_data_generator/**", "pipeline/**", "qa_tools/**",
           "dbt_shared/**", "pyproject.toml", "uv.lock",
-          ".github/workflows/test.yml", "assets/environments.yaml")
+          ".github/workflows/test.yml", "assets/environments.yaml", "file-checks.yaml")
 #: What each asset's cache must carry beside its dump - the generated inputs
 #: the tests and the dashboard build read (Keith's 2026-10-06 decision). The
 #: placements file is the fifth; it is not named here because this module

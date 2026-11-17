@@ -7,7 +7,8 @@ import pytest
 from datetime import date
 
 from generator import scenario_injection as si
-from qa_tools.common import scenario_map
+from scenarios import vocabulary as scenario_vocabulary
+from scenarios import placements as scenario_placements
 
 
 def _placement(**kw):
@@ -18,20 +19,20 @@ def _placement(**kw):
 class TestThePlacementRecordNamesItsSubject:
 
     def test_a_linked_scenario_carries_its_links_subject(self):
-        record = _placement(subjects=(("TS-75a", scenario_map.AS_AT_PANEL),)).as_record()
-        assert record["subject"] == scenario_map.AS_AT_PANEL
+        record = _placement(subjects=(("TS-75a", scenario_vocabulary.AS_AT_PANEL),)).as_record()
+        assert record["subject"] == scenario_vocabulary.AS_AT_PANEL
 
     def test_one_with_no_named_subject_lands_on_its_supply_row(self):
-        assert _placement().as_record()["subject"] == scenario_map.SUPPLY_HISTORY_ROW
+        assert _placement().as_record()["subject"] == scenario_vocabulary.SUPPLY_HISTORY_ROW
 
     def test_the_map_reads_it_and_an_older_record_defaults(self):
-        got = scenario_map.Placement.of({"scenario_id": "TS-1", "dataset": "d",
+        got = scenario_placements.Placement.of({"scenario_id": "TS-1", "dataset": "d",
                                          "period": "p", "in_place_on": "2025-01-01",
-                                         "subject": scenario_map.VERDICT_LINE})
-        assert got.subject == scenario_map.VERDICT_LINE
-        older = scenario_map.Placement.of({"scenario_id": "TS-1", "dataset": "d",
+                                         "subject": scenario_vocabulary.VERDICT_LINE})
+        assert got.subject == scenario_vocabulary.VERDICT_LINE
+        older = scenario_placements.Placement.of({"scenario_id": "TS-1", "dataset": "d",
                                            "period": "p", "in_place_on": "2025-01-01"})
-        assert older.subject == scenario_map.SUPPLY_HISTORY_ROW
+        assert older.subject == scenario_vocabulary.SUPPLY_HISTORY_ROW
 
 
 class TestEveryLinkNamesASubjectFromTheVocabulary:
@@ -40,16 +41,16 @@ class TestEveryLinkNamesASubjectFromTheVocabulary:
         links = [link for inj in si.INJECTIONS for link in inj.links]
         assert links, "no links to check"
         for link in links:
-            assert link.subject in scenario_map.SUBJECTS, link
+            assert link.subject in scenario_vocabulary.SUBJECTS, link
             assert not any(ch in link.subject for ch in "[].#=\"'"), link
 
     def test_the_as_at_scenarios_land_on_what_their_expect_quotes(self):
         """TS-75 to TS-78's Expects quote the as-at panel, the substitution
         detail or the verdict line (REQ-GEN-199 criterion 36)."""
         subject = {link.scenario_id: link.subject for inj in si.INJECTIONS for link in inj.links}
-        assert subject["TS-75a"] == subject["TS-75b"] == scenario_map.AS_AT_PANEL
-        assert subject["TS-76"] == subject["TS-77a"] == scenario_map.SUBSTITUTION_DRILL_DOWN
-        assert subject["TS-78b"] == scenario_map.VERDICT_LINE
+        assert subject["TS-75a"] == subject["TS-75b"] == scenario_vocabulary.AS_AT_PANEL
+        assert subject["TS-76"] == subject["TS-77a"] == scenario_vocabulary.SUBSTITUTION_DRILL_DOWN
+        assert subject["TS-78b"] == scenario_vocabulary.VERDICT_LINE
 
 
 class TestALetteredSiblingCarriesItsOwnSubject:
@@ -63,12 +64,12 @@ class TestALetteredSiblingCarriesItsOwnSubject:
         placement = si.Placement(
             scenario_id="TS-77a", dataset="cp-placements", period="2023-Q2",
             period_date=date(2023, 5, 1), config="c",
-            subjects=(("TS-77a", scenario_map.SUBSTITUTION_DRILL_DOWN),
-                      ("TS-77b", scenario_map.AS_AT_PANEL)))
+            subjects=(("TS-77a", scenario_vocabulary.SUBSTITUTION_DRILL_DOWN),
+                      ("TS-77b", scenario_vocabulary.AS_AT_PANEL)))
         out = si.write_placements([placement], path=tmp_path / "p.json")
         records = {r["scenario_id"]: r for r in json.loads(out.read_text())["placements"]}
-        assert records["TS-77a"]["subject"] == scenario_map.SUBSTITUTION_DRILL_DOWN
-        assert records["TS-77b"]["subject"] == scenario_map.AS_AT_PANEL
+        assert records["TS-77a"]["subject"] == scenario_vocabulary.SUBSTITUTION_DRILL_DOWN
+        assert records["TS-77b"]["subject"] == scenario_vocabulary.AS_AT_PANEL
 
 
 class TestAnUnknownSubjectIsRefused:
@@ -79,7 +80,7 @@ class TestAnUnknownSubjectIsRefused:
         import pytest
 
         with pytest.raises(ValueError, match="no-such-thing"):
-            scenario_map.Placement.of({"scenario_id": "TS-1", "dataset": "d", "period": "p",
+            scenario_placements.Placement.of({"scenario_id": "TS-1", "dataset": "d", "period": "p",
                                        "in_place_on": "2025-01-01", "subject": "no-such-thing"})
 
 
