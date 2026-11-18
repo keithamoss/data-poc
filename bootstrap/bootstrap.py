@@ -584,6 +584,8 @@ def first_run_prompt() -> str:
                 "while. Continue?")
     return (f"This takes about {format_elapsed(measured.seconds)} from empty "
             f"(measured on the development sandbox, {measured.on.isoformat()}). Continue?")
+
+
 TRIALS = "of it target trials"
 CONFIRMATIONS = "confirmations"
 

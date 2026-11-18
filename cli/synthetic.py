@@ -60,15 +60,28 @@ def available() -> bool:
 
 def refusal(command: str) -> str:
     """The one sentence a synthetic command is refused with, naming what is
-    missing (criterion 6)."""
+    missing (criterion 6) and what to do instead (wording amended by Keith,
+    2026-11-18: most refused commands do not generate anything, and a refusal
+    with no next step left a reader at a dead end)."""
     gone = missing_components()
     if gone:
-        return (f"`{command}` generates synthetic data, and this deployment does not have "
-                f"{_listed(gone)} - it processes real supplies only.")
-    asset = _asset()
-    return (f"`{command}` generates synthetic data, and asset {asset.name} has no synthetic/ "
-            f"folder (assets/{asset.name}/synthetic/) - this deployment processes real "
-            f"supplies only.")
+        why = (f"`{command}` is for synthetic data, and this deployment does not have "
+               f"{_listed(gone)} - it processes real supplies only.")
+    else:
+        asset = _asset()
+        why = (f"`{command}` is for synthetic data, and asset {asset.name} has no synthetic/ "
+               f"folder (assets/{asset.name}/synthetic/) - this deployment processes real "
+               f"supplies only.")
+    return f"{why} {_instead(command)}"
+
+
+def _instead(command: str) -> str:
+    """The next step: a refused qa flag points at the flags that check a file
+    of one's own; anything else at the commands that process what arrived."""
+    if " --" in command:
+        return "To check a file of your own, give --file or --s3-key instead."
+    return ("To process what has arrived, run `mothman pipeline run` (first time) or "
+            "`mothman pipeline process`.")
 
 
 def _listed(names: list[str]) -> str:

@@ -19,7 +19,13 @@ import pytest
 import equiv_support
 import real_asset as ea
 
-SCRATCH_DB = "real_deployment"
+import os as _os
+
+# TAGGED AS THE WORKER DATABASES ARE (the post-build critic, 2026-11-18): it is
+# dropped WITH (FORCE), so two sessions on one server sharing the bare name
+# killed each other's run - CLAUDE.md's MOTHMAN_TEST_DB_TAG incident.
+_TAG = "".join(c for c in _os.environ.get("MOTHMAN_TEST_DB_TAG", "") if c.isalnum())[:12]
+SCRATCH_DB = f"real_deployment{'_' + _TAG if _TAG else ''}"
 
 
 
@@ -105,7 +111,7 @@ class TestItRunsWithTheSyntheticSideAbsent:
         assert got.returncode == 1, out
         # A synthetic GROUP is refused by its own name, whatever follows it.
         named = argv[:1] if argv[0] == "scenarios" else argv[:2]
-        assert f"`mothman {' '.join(named)}` generates synthetic data" in out, out
+        assert f"`mothman {' '.join(named)}` is for synthetic data" in out, out
 
 
 #: The asset this module acts for is the fixture's, in its own copy; the
@@ -149,6 +155,8 @@ class TestThePageOfARealDeployment:
     def test_no_scenario_surface_on_any_page(self, page, built_page):
         page.goto(built_page.as_uri())
         assert page.locator("#scenarios-btn").is_hidden()
+        # No Demo tab either (criterion 15 as amended by Keith, 2026-11-18).
+        assert page.locator("#demo-btn").is_hidden()
         footer = " ".join(page.locator("footer").inner_text().split())
         assert "against each agency's supplies" in footer and "synthetic" not in footer.lower()
         for route in ("#/", f"#/agency/{ea.AGENCY}", DS_PATH):
@@ -163,8 +171,8 @@ class TestThePageOfARealDeployment:
         assert _scenario_words(page) == []
 
     @pytest.mark.parametrize("address, param", [
-        ("#/scenarios", None), ("?panel=scenarios" + DS_PATH, "panel"),
-        ("?scenario=ts-1" + DS_PATH, "scenario")], ids=["route", "panel", "scenario"])
+        ("#/scenarios", None), ("#/demo", None), ("?panel=scenarios" + DS_PATH, "panel"),
+        ("?scenario=ts-1" + DS_PATH, "scenario")], ids=["route", "demo", "panel", "scenario"])
     def test_an_old_scenario_address_is_not_found(self, page, built_page, address, param):
         page.goto(built_page.as_uri() + address)
         assert page.locator("#view h2").first.inner_text() == "Page not found"

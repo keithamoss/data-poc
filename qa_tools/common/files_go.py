@@ -131,9 +131,14 @@ def rounds_fill(dataset_id: str, months, on: date, agreement=None) -> str | None
     sequence = slots.period_sequence(dataset_id, None, agr)
     names = []
     for i, rnd in enumerate(sequence):
-        if rnd.date < on or rnd.date.month not in months or i + value >= len(sequence):
+        if rnd.date < on or rnd.date.month not in months:
             continue
-        tail = sequence[i + value].name.split("-")[-1]
+        # THE ONE RULE (REQ-PIPE-377 criterion 1; the post-build critic,
+        # 2026-11-18): this site kept its own `i + value`.
+        j = schedule.filled_index(dataset_id, sequence, i, agr)
+        if j is None:
+            continue
+        tail = sequence[j].name.split("-")[-1]
         if tail not in names:
             names.append(tail)
         if len(names) == len(months):
@@ -159,11 +164,15 @@ def fall_rounds(dataset_id: str, agreement=None) -> list[tuple[date, str]]:
         return []
     out, furthest = [], -1
     for i, rnd in enumerate(sequence):
-        value = agr.files_go_to_period_for(dataset_id, rnd.date)
-        if value is None:
+        if agr.files_go_to_period_for(dataset_id, rnd.date) is None:
             continue
-        j = i + value
-        if j <= furthest and j < len(sequence):
+        # THE ONE RULE (REQ-PIPE-377 criterion 1), as rounds_fill. A round
+        # whose files go past the calendar's end fills nothing, so it cannot
+        # feed a period twice.
+        j = schedule.filled_index(dataset_id, sequence, i, agr)
+        if j is None:
+            continue
+        if j <= furthest:
             out.append((rnd.date, sequence[j].name))
         furthest = max(furthest, j)
     return out

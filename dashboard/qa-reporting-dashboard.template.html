@@ -462,9 +462,12 @@ button{font:inherit; color:inherit;}
 .legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
 /* MoSCoW priority - one hue at four weights, deliberately NOT the
    status palette (post-build-review #56). A scale, not a verdict. */
-a.snapshots-btn{text-decoration:none; color:inherit;}
+/* A LINK STYLED AS A PILL CENTRES ITS LABEL as a <button> does (the visual
+   post-build critic, 2026-11-18): at the phone width's 44px min-height the
+   Feedback link's label sat 8px high beside its button neighbours. */
+a.snapshots-btn{text-decoration:none; color:inherit; display:inline-flex; align-items:center; justify-content:center;}
 /* REQ-PIPE-385 criterion 11: a page with no scenario map shows no Scenarios button. */
-#scenarios-btn[hidden]{display:none;}
+#scenarios-btn[hidden], #demo-btn[hidden]{display:none;}
 .fb-summary{font-size:13.5px; color:var(--ink); margin:4px 0 16px;}
 .fb-list{list-style:none; padding:0; margin:0 0 24px; display:grid; gap:12px; max-width:760px;}
 .fb-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px;}
@@ -1025,7 +1028,11 @@ table.file-history th, table.file-history td{text-align:left; padding:6px 6px; b
    (post-build-review #54). MEASURE ONLY - the footer's contrast
    (3.03:1 light / 4.16:1 dark) is the --ink-faint question Keith
    declined in #49, and this does not touch it. */
-footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-top:1px solid var(--line); margin-top:20px; max-width:90ch;}
+.footer-codename{color:var(--ink-faint);}
+/* --ink-muted, not --ink-faint (Keith, 2026-11-18): 12px text at --ink-faint
+   measured 3.03:1 on paper, under WCAG AA's 4.5:1; the codename line keeps
+   the fainter ink, being decorative. */
+footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-top:1px solid var(--line); margin-top:20px; max-width:90ch;}
 
 @media (max-width:480px){
   .compare-grid{grid-template-columns:1fr;}
@@ -1129,7 +1136,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every dataset on this page is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against <span id="footer-supplies">generated synthetic supplies</span>, including cross-table foreign-key and business-rule checks where a collection has more than one table.
     <span id="footer-generated-up-to" hidden></span>
     <br><br>
-    <em>Internal project codename: Mothman.</em>
+    <em class="footer-codename">Internal project codename: Mothman.</em>
   </footer>
 </div>
 
@@ -7599,7 +7606,10 @@ function render(){
 function renderTier(view, done){
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
-  if(STATE.tier==="demo") return done(renderDemo(view));
+  // NO DEMO IN A REAL DEPLOYMENT (Keith, 2026-11-18): its recording is of a
+  // synthetic-mode session, so the address lands on the plain not-found page.
+  if(STATE.tier==="demo") return done(ASSET_SYNTHETIC ? renderDemo(view)
+                                                      : renderNotFound(view, "Page", "demo"));
   // NO MAP, NO SCENARIOS PAGE (REQ-PIPE-385 criterion 13): the plain
   // not-found page, naming the address's word back.
   if(STATE.tier==="scenarios") return done(SCENARIO_MAP.length ? renderScenarios(view)
@@ -10778,7 +10788,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="view-head">
       <div>
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
-        <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
+        <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${datasetProvenanceNote(ds)}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${amberPromotedTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
@@ -12690,6 +12700,14 @@ function renderScenariosPanel(body){
 // markup, so a page with no scenario map never flashes it.
 document.getElementById("scenarios-btn").hidden = !SCENARIO_MAP.length;
 if(!ASSET_SYNTHETIC) document.getElementById("footer-supplies").textContent = "each agency's supplies";
+// THE DATASET PAGE'S NOTE FOLLOWS THE FOOTER'S SWITCH (the post-build UX
+// critic, 2026-11-18): a real deployment's figures are computed against the
+// agency's supplies, never "generated runs" (REQ-PIPE-385 criterion 12).
+function datasetProvenanceNote(ds){
+  if(!ds || !ds.realRunCount) return "";
+  const against = ASSET_SYNTHETIC ? "real generated runs" : "this agency's supplies";
+  return ` · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against ${against} — not fabricated in the browser.`;
+}
 document.getElementById("scenarios-btn").addEventListener("click", ()=> navigate({tier:"scenarios"}));
 document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
@@ -13232,6 +13250,7 @@ function renderDemo(view){
     {cols: 100, rows: 28, fit: "width", controls: true, speed: 1, terminalFontFamily: "'IBM Plex Mono', monospace"}
   );
 }
+document.getElementById("demo-btn").hidden = !ASSET_SYNTHETIC;
 document.getElementById("demo-btn").addEventListener("click", ()=> navigate({tier:"demo"}));
 // NO DEMO BUTTON IN A SNAPSHOT (Keith, 2026-10-25, post-build-review #268
 // (h)): an archived copy carries the recording and not the player, so the

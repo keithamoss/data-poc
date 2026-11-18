@@ -16913,3 +16913,89 @@ twice. It deliberately did not re-find the `TypeError`.
        quiet machine the whole browser chunk passed (439). Not changed - its
        docstring already calls the budget generous, and this is a load
        sighting rather than a slower page.
+
+481. **[done, 2026-11-18]** **[Pipeline & publishing]** **Post-build functional critic on groups A and B (29822d45): no false green, three gaps worth acting on.**
+     The critic re-ran every linked module of both groups at 29822d45 (22
+     modules, 616 passed) and checked every `implemented_by` symbol exists.
+     Each finding, verified against the code before it was acted on:
+     - **REQ-QAC-387 criterion 3 (medium), FIXED test-first**: an asset's own
+       file check naming a check with no evaluator passed `mothman check`,
+       then failed every file ("no evaluator for this check") - reproduced.
+       Keith (2026-11-18): the gate refuses it. `_entries` now refuses a name
+       outside NAMES, naming the entry and the checks there are;
+       tests/test_shared_file_checks.py seen failing first.
+     - **REQ-PIPE-377 criterion 1 (low-medium), FIXED**: files_go.rounds_fill
+       and fall_rounds kept their own `i + value`. Both call filled_index.
+     - **REQ-PIPE-377 criterion 6's test (medium), FIXED**: most of it compared
+       schedule's functions with themselves. It now drives four folded sites
+       with filled_index recorded; seen failing first on files_go's two.
+     - **The untagged `real_deployment` scratch database (low-medium), FIXED**:
+       it is named with MOTHMAN_TEST_DB_TAG now, as the worker databases are.
+     - **REQ-PIPE-378 criterion 9 (low)**: its real-calendar example cannot be
+       reached. Keith (2026-11-18): amended to the fixture it was proved on.
+     - **REQ-PIPE-403 criterion 1 (low)**: the after figures were taken under
+       load and under py-spy, not "nothing else running". Keith (2026-11-18):
+       keep them as an upper bound and say so; bootstrap.yaml's headers and a
+       decision do; the next quiet bootstrap replaces them.
+     - **The identical evidence on all eight group B requirements (low)**:
+       rewritten to the runs that happened - the gate on 29822d45 and this
+       critic's re-run.
+     - **REQ-PIPE-385 criteria 5 and 7 untested (low)**: tests/
+       test_synthetic_refusal.py drives the refusal and the flag refusal.
+     - **REQ-PIPE-432's stale deferral reason, the TRIALS constant's spacing,
+       a comment naming the wrong requirement (trivial)**: fixed.
+     - **Logged, not changed**: linked_datasets reads a calendar it cannot
+       parse as "names no calendar" (the schedule gate reports the real
+       problem beside it); scenario_map.read_map_data returns an empty map for
+       a corrupt file, which now hides every scenario surface; REQ-PIPE-385
+       criteria 1 and 15's tests are narrower than the criteria (promotion and
+       re-check not asserted; collection, period and check pages not visited).
+     - **Not verified by the critic**: the py-spy profile figures, the
+       seen-failing-first claims, REQ-PIPE-377 criterion 5's comparison.
+
+482. **[done, 2026-11-18]** **[Testing & dev tooling]** **Post-build CLI critic on REQ-PIPE-385: the real deployment's CLI reads as finished; one regression on the synthetic side.**
+     Driven live in a real-deployment copy and in the synthetic checkout.
+     - **The Tools panel lost `scenarios` to a third panel (regression),
+       FIXED test-first**: built from cli.commands, which holds no
+       lazily-loaded command, the panel left `scenarios` to rich-click's
+       default "Commands" panel, against REQ-TEST-252 criterion 2. A lazy
+       command is listed where synthetic data can be made; tests/
+       test_cli_at_thirty_collections.py seen failing first.
+     - **The refusal's wording and next step**: Keith (2026-11-18) - "is for
+       synthetic data", then what to run instead (criterion 6 amended).
+     - **"Re-embedded SCENARIO_MAP = 0 scenario(s)" in a real build's output
+       (trivial), FIXED**: said only where there is a map.
+     - **Logged, not changed**: Click's typo suggestions still name hidden
+       synthetic commands and flags ("Did you mean 'bootstrap'?"), which then
+       refuse; an over-wide name column in the real deployment's Tools panel
+       and in three group helps; the not-applicable log lines lack the
+       `[asset]` prefix. Seen in passing, for road-testing: the Calendar flow
+       shows raw dataset ids where the QA wizard shows names; `qa --file X
+       --trial` prints "Running the real check chain" before refusing.
+
+483. **[done, 2026-11-18]** **[Dashboard UI]** **Post-build dashboard UX critic on REQ-PIPE-385 criterion 15: met; two synthetic words left in a real deployment.**
+     - **"real generated runs" on every dataset page (medium), FIXED
+       test-first**: the provenance note follows the footer's switch
+       (tests-js/scenario-panel.test.js).
+     - **The Demo tab in a real deployment (medium)**: Keith (2026-11-18) -
+       hidden, and /demo lands on the not-found page (criterion 15 amended;
+       tests-js and the real-browser test).
+     - **A dead ?scenario= link strands the reader on a valid dataset
+       address (low-medium)**: Keith (2026-11-18) - left as settled (v6 Q3).
+     - **Logged, not changed**: focus stays on BODY after a cold load of the
+       not-found page (the announcer still speaks); on the map page at 1440px
+       a promotion badge overlaps "0 days since previous".
+     - The critic's copy recipe missed BUILD_PROVENANCE's own synthetic flag;
+       a real build sets all three together, so not a product fault.
+
+484. **[done, 2026-11-18]** **[Dashboard UI]** **Post-build visual critic on REQ-PIPE-385's page states: the header closes up cleanly.**
+     No orphan gap, separator or overflow at any width or scheme; focus
+     order unbroken; 44px tap targets.
+     - **The Feedback pill's label 8px high on phone (medium), FIXED**: a
+       link styled as a pill centres its label as a button does.
+     - **Footer contrast 3.03:1 in light mode (low)**: Keith (2026-11-18) -
+       the footer's text is --ink-muted; the codename line keeps --ink-faint.
+     - **Logged, not changed (low, pre-existing)**: the not-found page's
+       `code` chip nearly vanishes in dark mode (1.07:1); hover on header
+       pills changes only the border; closed drawers' shadows bleed in at the
+       right edge.

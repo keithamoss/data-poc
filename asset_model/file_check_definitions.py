@@ -65,6 +65,13 @@ def _entries(doc, source: str) -> list[dict]:
         if unknown:
             raise FileChecksError(f"{where} names {', '.join(unknown)}, which no file check "
                                   f"allows - allowed: {', '.join(sorted(KEYS))}")
+        if name not in NAMES:
+            # ONLY A CHECK THE CODE CAN EVALUATE (REQ-QAC-387 criterion 3; Keith,
+            # 2026-11-18): an unknown name passed this gate and then failed every
+            # file at the file-check step with 'no evaluator for this check'.
+            raise FileChecksError(f"{where} names {name!r}, and no file check of that name "
+                                  f"exists - an asset adds, overrides or retires one of: "
+                                  f"{', '.join(NAMES)}")
         if name in seen:
             raise FileChecksError(f"{where} names {name!r} a second time - one entry per check")
         seen.add(name)

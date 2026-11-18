@@ -6737,6 +6737,53 @@ class TestTheRetiredPeriodRoute:
         assert clean_page.url == "about:blank"
 
 
+class TestALinkageVerdictUnderAChosenPeriod:
+    """REQ-DASH-356 criterion 9 (post-build-review #289 J1): a linkage verdict
+    about a Client Register supply is recorded a quarter after the supply, by
+    which time a newer supply is on show - so with no period chosen the page
+    shows "no data" for it. With the supply's period chosen, at a date after
+    the verdict, the Client Register page shows that verdict. Seen failing
+    against the build of the commit before the period control."""
+
+    CLIENTS = {"tier": "dataset", "agencyId": "child-protection-family-support",
+               "collectionId": "child-protection", "datasetId": "cp-clients"}
+    CHECK = "linkage-keys.cp-clients.coverage_soda"
+
+    def _shown(self, page):
+        return page.evaluate("""(key) => {
+          const ctx = resolveContext(STATE);
+          const k = ctx.ds.columns.flatMap(c=> c.checks || []).find(k=> k.key === key);
+          return k ? k.current : undefined; }""", self.CHECK)
+
+    def test_the_verdict_about_the_periods_supply_shows_only_with_the_period(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.CLIENTS)
+        case = clean_page.evaluate("""(key) => {
+          const raw = rawRealDatasetById('cp-clients');
+          const k = raw.columns.flatMap(c=> c.checks || []).find(k=> k.key === key);
+          if(!k) return {missing: 'check'};
+          const periods = baselinePeriods().map(p=> p.period || p);
+          for(const h of [...(k.history || [])].reverse()){
+            if(h.value == null || !h.recorded_at) continue;
+            const on = new Date(Date.parse(h.recorded_at) + 14 * 86400000).toISOString().slice(0, 10);
+            for(const p of periods){
+              const row = compositionRow(raw, p, on);
+              if(row && row.entry && row.entry.holder_run_id === h.read_run)
+                return {on, period: p, value: h.value, read_run: h.read_run,
+                        newest: (raw.runs || []).filter(r=> (r.received_at || '').slice(0, 10) <= on).slice(-1)[0]?.run_id};
+            }
+          }
+          return {missing: 'case'};
+        }""", self.CHECK)
+        assert "missing" not in case, f"precondition: a linkage verdict in the recorded results - {case}"
+        assert case["newest"] != case["read_run"], \
+            f"precondition: a newer supply is on show by {case['on']} - {case}"
+        _goto(clean_page, built_dashboard_html, state=self.CLIENTS, in_place_on=case["on"])
+        assert self._shown(clean_page) != case["value"], "with no period the verdict is not on show"
+        clean_page.evaluate("(p) => applyPeriod(p)", case["period"])
+        assert self._shown(clean_page) == case["value"], case
+
+
 @pytest.mark.asset("daily")  # Mental Health is the daily asset's
 class TestAWeeklyDatasetUnderAChosenDay:
     """REQ-DASH-356 criterion 8: on the daily dashboard, with a day chosen that

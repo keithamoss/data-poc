@@ -313,7 +313,7 @@ ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "file-checks.ya
 ASSET_PARTS = ("dbt", "collections", "synthetic")
 #: The only files at the top of an asset's synthetic/ folder, beside its
 #: providers in synthetic/collections/ (REQ-GEN-370 criterion 1), and the
-#: bootstrap's measured time from empty (REQ-PIPE-250 criterion 1), which only
+#: bootstrap's measured time from empty (REQ-PIPE-403 criterion 6), which only
 #: the bootstrap reads.
 SYNTHETIC = ("scripted_decisions.yaml", "synthetic_inputs.yaml", "eras.yaml", "bootstrap.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")

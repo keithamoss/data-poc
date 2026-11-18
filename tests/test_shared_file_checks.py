@@ -57,6 +57,20 @@ class TestTheSharedDefault:
         assert [d.check for d in fcd.definitions(tmp_path / "none.yaml")] == SIX[:-1]
         assert [d.check for d in fcd.definitions(own)] == SIX
 
+    def test_an_added_name_with_no_evaluator_is_refused_by_the_gate(self, tmp_path, monkeypatch):
+        """Criterion 3, the gap the post-build critic reproduced: an asset's
+        own entry may only name a check the code can evaluate. Accepted, it
+        passed `mothman check` and then failed every file with 'no evaluator
+        for this check'; the gate now refuses it, naming the entry and the
+        names there are (Keith, 2026-11-18)."""
+        own = _write(tmp_path / "own.yaml", [{"check": "bom_absent", "severity": "failure"}])
+        monkeypatch.setattr(fcd, "definitions_path", lambda: own)
+        found = fcd.problems()
+        assert len(found) == 1 and "bom_absent" in found[0], found
+        assert "no file check of that name exists" in found[0], found
+        for name in fcd.NAMES:
+            assert name in found[0], (name, found)
+
     def test_an_override_is_taken_whole(self, tmp_path):
         """Criterion 2 (Q3, Keith 2026-11-14): a field the override leaves
         out is not taken from the shared entry."""

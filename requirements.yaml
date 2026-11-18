@@ -48135,7 +48135,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever would take this to a real deployment, I want the setting versions that exist only to shape the fake history kept apart from the asset's real settings, so that deleting the synthetic folder leaves a data-asset.yaml that says only what a real asset was configured to do.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48156,10 +48156,29 @@ requirements:
     - REQ-PIPE-112
     - REQ-PIPE-123
     - REQ-TEST-366
+    linked_tests:
+    - tests/test_eras.py
+    - tests/test_agreement_freeze.py
+    implemented_by:
+    - asset_model/eras.py::merged
+    - asset_model/eras.py::merged_for
+    - asset_model/eras.py::is_synthetic
+    - asset_model/amber_setting.py::load_doc
+    - qa_tools/common/validate_schedule.py::_settings_now
+    - qa_tools/common/validate_schedule.py::_settings_at
+    - qa_tools/common/validate_schedule.py::_eras_errors
+    - qa_tools/common/validate_schedule.py::_version_added_on
+    - assets/quarterly/synthetic/eras.yaml
+    - assets/daily/synthetic/eras.yaml
+    evidence:
+    - '2026-11-18: tests/test_eras.py written first and seen failing (13 failed) before asset_model/eras.py existed, then 17 passed; criterion 4''s comparison is that module''s test of every dataset''s resolved setting on every date against fixtures captured before any version moved. Every module that reads the setting files (1601 tests) was run after the move; its 13 failures were test premises the new collections changed (post-build-review #479), fixed and passing.'
     decisions:
     - 'BACK-DATED OR NAMED A SYNTHETIC ERA, WITH ITS ''era ends'' VERSION - Q6 CLOSED (Keith, 2026-10-31, v3 Q6 (a), widened 2026-11-01 on architect v3 BLOCKING 5): the 2026-09-01, 09-10 and 09-18 versions (contract/data-asset.yaml lines 172-189 today) were re-dated by REQ-PIPE-112 so their changelog dates equal their effective_from, and ''back-dated'' alone caught only 2013-01-01 and 2026-08-30. Keith''s intent was the named eras and the history-growth versions alike. REJECTED back-dated only; REJECTED named eras only; REJECTED deferring to #134.'
     - 'MERGED AGAINST MERGED (architect v3 SHOULD 2): the extraction may land in a later push than the move, by when the map is gone; comparing merged timelines needs no map. REJECTED going through the map unconditionally.'
     - 'AN EMPTIED LEVEL IS REMOVED (delivery-scoper''s choice, signed with v4): a real deployment then falls back to the asset default there, which is what a level declaring nothing means.'
+    - 'ONLY THE AMBER AND REPLACEMENT SETTINGS MOVE; census_years STAYS (Keith, 2026-11-18): a list setting records the real world, its versions back-dated only because they were written late.'
+    - 'A FIXTURE OF EVERY RESOLVED SETTING, CAPTURED BEFORE THE MOVE (built 2026-11-18): tests/fixtures/settings_timelines_{daily,quarterly}.json hold every dataset''s resolved setting on every date before any version moved, and the test compares the merged timeline against them - criterion 4''s comparison kept as a standing test.'
+    - 'tests/before_growth.py MERGES BEFORE IT STRIPS (built 2026-11-18): it removes the grown history''s 2013 versions to rebuild the pre-growth asset, and those versions now live in eras.yaml, so it reads the merged document first; without that, 53 tests read a timeline missing its grown-history versions.'
     open_questions: []
   - id: REQ-PIPE-343
     title: Each asset's database carries that asset's own identity, and a checkout refuses a database belonging to the other asset on every route
@@ -48525,7 +48544,7 @@ requirements:
     date_written: '2026-10-31'
     story: As Keith designing the period control, I want a real dataset on the quarterly asset that is owed only once a year, so that the period view is designed and seen working against an off-baseline cadence from the start, not retrofitted to one.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48548,17 +48567,34 @@ requirements:
     - REQ-PIPE-240
     - REQ-QAC-368
     - REQ-PIPE-369
+    linked_tests:
+    - tests/test_annual_participation.py
+    - tests/test_singular_home_gate.py
+    implemented_by:
+    - assets/quarterly/data-asset.yaml
+    - assets/quarterly/calendar.yaml
+    - assets/quarterly/presentation.yaml
+    - assets/quarterly/department-of-health/cancer-contract.yaml
+    - assets/quarterly/department-of-health/cancer-soda-checks.yml
+    - assets/quarterly/department-of-health/cancer-evidently-checks.yml
+    - assets/quarterly/dbt/tests/cancer/notified_before_diagnosed.sql
+    - assets/quarterly/collections/cancer.py::ADAPTER
+    - qa_tools/common/validate_collections.py::singular_home_problems
+    evidence:
+    - '2026-11-18, built in group C: a scratch bootstrap of the quarterly asset from empty into its own database (supply_quarterly_c) staged, checked and promoted fourteen Cancer arrivals, one a year in the August round, with results from all four tools on its own rows (datacontract 5 checks, dbt 3, Soda 2, Evidently 2, plus the 6 file checks). tests/test_annual_participation.py passes. Criterion 6''s `mothman check` result is in the commit that carries it.'
     decisions:
     - 'AN ANNUAL DATASET IN THE QUARTERLY ASSET, USING participates AS BUILT (Keith, 2026-10-31, (a)). REJECTED #109''s monthly dataset, now refused by design (REQ-PIPE-345). Annual rather than twice-yearly because cp-case-workers already participates [February, August].'
     - 'ITS OWN ONE-DATASET COLLECTION WITH ITS OWN PROVIDER, NAMED ''Cancer'' (Keith, 2026-10-31, draft Q3 (a)): no existing collection''s generated bytes change. REPLACES v1''s School Census. REJECTED (b), a new dataset inside an existing collection.'
     - UNDER DEPARTMENT OF HEALTH, OWED IN AUGUST (SETTLED by Keith 2026-11-01).
+    - 'A SINGULAR dbt TEST NEEDS A HOME, AND A GATE NOW SAYS SO (built 2026-11-18, post-build-review #477): the first bootstrap with Cancer stopped with UnknownCheck because its singular test named no dataset to land on. The adapter declares singular_home, and `mothman check`''s collections gate fails a singular test without one, naming the file, rather than leaving it to the first run.'
+    - 'OWED FROM 2015-01-01 WITH THE FIRST AUGUST IN 2015-Q3, AND THAT SUPPLY RIDES THE REQ-GEN-205 CORRECTION (Keith, 2026-11-18): the correction''s window covers 2015-Q3, so cancer-notifications joined its riders rather than being placed around it.'
     open_questions: []
   - id: REQ-GEN-349
     title: The Cancer collection's provider writes one supply a year in its August round, the ordinary severity mix, and scenarios for an arrival in a quarter not owed and an inherited quarter
     date_written: '2026-10-31'
     story: As Keith planting scenarios, I want the annual dataset's synthetic history to hold ordinary supplies and the awkward cases an annual cadence invites, so that the period view can be seen on a quarter it is owed in and on the three it is not.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48568,7 +48604,7 @@ requirements:
     - THE SYSTEM SHALL write one delivery for each round the dataset owes across the quarterly history, received inside its claim window and before its due time, never sharing a receipt instant with another delivery (REQ-GEN-334 criterion 13's refusal applied).
     - THE SYSTEM SHALL draw the ordinary severities from its own seed with the collections' mix - about a quarter warning, at least one failing with a passing resupply five to twenty days later, the oldest supply passing - and SHALL have the real tools confirm every planned verdict (REQ-GEN-186).
     - 'THE SYSTEM SHALL plant, each as a named scenario in plans/supply-model.md''s register: a supply received in a round the dataset owes nothing in; and a quarter it owes nothing in standing on the previous August''s supply, to be seen with the period control set to that quarter.'
-    - WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no byte any other collection writes (REQ-TEST-239's compare).
+    - 'WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no file''s contents that any other collection writes, apart from the asset-wide receipt sequence and a delivery name redrawn to stay unique, shown by a one-off comparison recorded in evidence (amended by Keith 2026-11-18: both exceptions are rules of the delivery format that every new collection meets, so no provider can meet the criterion as first written).'
     non_functional_requirements:
     - 'SYNTHETIC ONLY: names and values from a synthetic pool.'
     - 'BOOTSTRAP COST: measured by REQ-PIPE-352.'
@@ -48577,15 +48613,29 @@ requirements:
     - REQ-GEN-246
     - REQ-GEN-186
     - REQ-GEN-370
+    linked_tests:
+    - tests/test_new_providers.py
+    - tests/test_annual_participation.py
+    implemented_by:
+    - assets/quarterly/synthetic/collections/cancer.py::Rows
+    - assets/quarterly/synthetic/collections/cancer.py::run_plan
+    - generator/scenario_injection.py::INJECTIONS
+    - generator/scenario_injection.py::CORRECTION_RIDERS
+    - plans/supply-model.md
+    evidence:
+    - '2026-11-18: tests/test_new_providers.py''s Cancer class, 4 passed - two generations byte-identical, every first arrival inside its claim window and before its due time, no shared receipt instant, and the mix (3 of 12 owed rounds amber, one red with a passing resupply 13 days later, the oldest passing). The scratch bootstrap''s real tools agreed with every planned verdict (no disagreement reported) and held TS-114''s November arrival with no period. Criterion 5''s one-off comparison, the quarterly asset generated with and without the provider: every other collection''s delivery file contents byte-identical; receipts differ only in the asset-wide sequence; one Linkage delivery folder redrew its name (daily_extract_aug2023 to monthly_extract_aug2023), the two exceptions the amended criterion names.'
     decisions:
     - 'SCENARIOS AS NEEDED, NOT A CATALOGUE (brief): two, each one a period-control reader needs to see.'
+    - 'C5 AMENDED, NOT BENT (Keith, 2026-11-18): measured, every other collection''s deliveries were byte-identical, but every receipt''s asset-wide sequence moved and one Linkage folder redrew its name (daily_extract_aug2023 to monthly_extract_aug2023) because Cancer drew it first. REJECTED fixing the draw so an existing collection keeps its name (more code, every name changes once) and making the sequence per collection (a delivery-format change).'
+    - 'RUN PLAN SEED 73952, NOT THE FIRST DRAW (built 2026-11-18): the first seed put six reds in one resupply chain, against criterion 3''s mix; the seed was redrawn rather than the plan hand-edited, so it stays a draw.'
+    - 'RECEIPTS ON THE ASSET''S WALL CLOCK (built 2026-11-18): naive receipt times were read as UTC and landed eight hours early; the provider writes asset_time.wall_clock instants.'
     open_questions: []
   - id: REQ-QAC-350
     title: The daily asset gains Department of Health's Mental Health collection, one weekly dataset owed on Mondays through weekday participation, with its contract and checks
     date_written: '2026-10-31'
     story: As Keith designing the period control, I want a real dataset on the daily asset that is owed once a week, so that choosing a day on the daily dashboard shows a dataset that is quiet by agreement on most days.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48607,16 +48657,31 @@ requirements:
     - REQ-PIPE-364
     - REQ-QAC-368
     - REQ-PIPE-369
+    linked_tests:
+    - tests/test_weekly_participation.py
+    - tests/test_singular_home_gate.py
+    implemented_by:
+    - assets/daily/data-asset.yaml
+    - assets/daily/calendar.yaml
+    - assets/daily/presentation.yaml
+    - assets/daily/department-of-health/mental-health-contract.yaml
+    - assets/daily/department-of-health/mental-health-soda-checks.yml
+    - assets/daily/department-of-health/mental-health-evidently-checks.yml
+    - assets/daily/dbt/tests/mental-health/contact_in_its_week.sql
+    - assets/daily/collections/mental_health.py::ADAPTER
+    evidence:
+    - '2026-11-18, built in group C: a scratch bootstrap of the daily asset from empty (supply_daily_c, 529s, within budget) staged and checked Mental Health''s thirteen Mondays from 2026-06-22, one resupply and TS-117''s Tuesday, with results from all four tools (datacontract 5 checks, dbt 3, Soda 2, Evidently 2, plus the 6 file checks). tests/test_weekly_participation.py passes. Criterion 6''s `mothman check` result is in the commit that carries it.'
     decisions:
     - A WEEKLY DATASET IN THE DAILY ASSET (Keith, 2026-10-31, (a)), needing new participation by weekday (REQ-PIPE-346).
     - ITS OWN COLLECTION, NAMED 'Mental Health', UNDER DEPARTMENT OF HEALTH (Keith, 2026-10-31, draft Q3 (a); the agency SETTLED by Keith 2026-11-01). REPLACES v1's Celebrant Register under Registry Services. It puts Department of Health in both assets, the first agency to span two; each asset holds its own folder for it and nothing compares them (REQ-PIPE-364 decision 1).
+    - 'OWED FROM ITS FIRST MONDAY AT !anchor -99, AT 10:00 WITH TWO HOURS'' GRACE (built 2026-11-18): the start rides the anchor as Birth Registrations'' history does, so the two histories begin together whatever day the anchor falls on.'
     open_questions: []
   - id: REQ-GEN-351
     title: The Mental Health collection's provider writes one supply each Monday, the ordinary severity mix, and scenarios for a missed Monday and a supply on a day not owed
     date_written: '2026-10-31'
     story: As Keith planting scenarios, I want the weekly dataset's history to hold an ordinary run of Mondays and the cases a weekly cadence invites, so that the daily dashboard's period view can be seen on an owed day, a quiet day and a missed one.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48626,7 +48691,7 @@ requirements:
     - THE SYSTEM SHALL write one delivery for each Monday the dataset owes across the daily history, received inside its claim window and before its due time, never sharing a receipt instant with another delivery.
     - THE SYSTEM SHALL draw the ordinary severities from its own seed with the collections' mix, and SHALL have the real tools confirm every planned verdict (REQ-GEN-186).
     - 'THE SYSTEM SHALL plant, each as a named scenario in the register: a Monday with no supply, reading ''No supply'' that day until a person decides; and a supply received on a Tuesday, a day it owes nothing.'
-    - WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no byte any other collection writes.
+    - WHEN its generator runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times, and adding the provider SHALL change no file's contents that any other collection writes, apart from the asset-wide receipt sequence and a delivery name redrawn to stay unique, shown by a one-off comparison recorded in evidence (amended by Keith 2026-11-18, as REQ-GEN-349 criterion 5).
     non_functional_requirements:
     - SYNTHETIC ONLY.
     - 'NO FLICKERING FAILURES (plans/running-thoughts.md #113): the missed Monday is one a notified person would need to act on, not one that clears by itself minutes later.'
@@ -48635,8 +48700,20 @@ requirements:
     - REQ-GEN-246
     - REQ-GEN-186
     - REQ-GEN-370
+    linked_tests:
+    - tests/test_new_providers.py
+    - tests/test_weekly_participation.py
+    implemented_by:
+    - assets/daily/synthetic/collections/mental_health.py::Rows
+    - assets/daily/synthetic/collections/mental_health.py::run_plan
+    - generator/scenario_injection.py::INJECTIONS
+    - plans/supply-model.md
+    evidence:
+    - '2026-11-18: tests/test_new_providers.py''s Mental Health class, 4 passed (byte-identical twice, windows, receipt instants, the mix with same-day resupplies). The daily scratch bootstrap''s real tools agreed with every planned verdict; TS-116''s Monday, 2026-09-21, has no supply, and TS-117''s Tuesday arrival (2026-09-08) is held for a person with no period. Criterion 5''s one-off comparison on the daily asset: every other collection''s deliveries and receipts byte-identical, sequence included, and no folder renamed.'
     decisions:
     - 'SCENARIOS AS NEEDED (brief): a missed owed day and a supply on a day not owed, the two a weekly cadence invites.'
+    - 'RESUPPLIES THE SAME DAY, AS BIRTH REGISTRATIONS'' ARE (built 2026-11-18): criterion 3 asks for the collections'' mix, and on the daily asset a red''s resupply comes the same day, 90 minutes after the last, rather than the quarterly asset''s five to twenty days.'
+    - 'TS-116 ON THE LAST MONDAY (built 2026-11-18): planted earlier, the clean Monday after it read red by the reference-gap rule - an honest verdict about a gap, but not the scenario''s point - so the missed Monday is the newest one, with nothing after it to misread.'
     open_questions: []
   - id: REQ-PIPE-352
     title: Each asset is bootstrapped into its own database from its own configuration, within 12 minutes each, and the two bootstraps' cost is measured against today's single one
@@ -49890,7 +49967,7 @@ requirements:
     - THE SYSTEM SHALL decide whether a component is present with importlib.util.find_spec, never by importing it, and criterion 14's blocker SHALL act at the same step, so that what the CLI detects and what the test blocks agree (B5).
     - WHEN `mothman pipeline run` runs, on any asset, THE SYSTEM SHALL generate nothing, process what has arrived and build the dashboard, compare no targets and confirm no correction (cli/pipeline.py's generate_synthetic_data calls, lines 35-61, targets_agree and _confirm_corrections, lines 135 and 146, go), and its help and `mothman pipeline --help` SHALL say nothing of synthetic data, manifests, regeneration or targets (CLI A, SETTLED by Keith 2026-11-14).
     - WHERE criterion 2 leaves the synthetic commands out, THE SYSTEM SHALL offer in the main menu neither 'Generate synthetic data' nor 'Set up this environment', and its flag hint (cli/app.py lines 86-91) SHALL name neither command.
-    - IF a synthetic command is invoked by name where criterion 2 leaves it out, at whatever level it sits (`mothman pipeline bootstrap`, `mothman <short> generate-synthetic-data` and `mothman env reset-synthetic` included), THEN THE SYSTEM SHALL exit 1 as a refusal, in one sentence of the form '`mothman pipeline bootstrap` generates synthetic data, and asset <asset> has no synthetic/ folder (assets/<asset>/synthetic/) - this deployment processes real supplies only.', or naming the missing component, never an ImportError or 'No such command' (REQ-GEN-370 criterion 8's refusal by name, kept).
+    - IF a synthetic command is invoked by name where criterion 2 leaves it out, at whatever level it sits (`mothman pipeline bootstrap`, `mothman <short> generate-synthetic-data` and `mothman env reset-synthetic` included), THEN THE SYSTEM SHALL exit 1 as a refusal, in a sentence of the form '`mothman pipeline bootstrap` is for synthetic data, and asset <asset> has no synthetic/ folder (assets/<asset>/synthetic/) - this deployment processes real supplies only.', or naming the missing component, followed by what to do instead - 'To process what has arrived, run `mothman pipeline run` (first time) or `mothman pipeline process`.', or for a refused qa flag 'To check a file of your own, give --file or --s3-key instead.' (wording amended by Keith 2026-11-18), never an ImportError or 'No such command' (REQ-GEN-370 criterion 8's refusal by name, kept).
     - WHERE criterion 2 leaves the synthetic commands out, THE SYSTEM SHALL NOT offer the QA wizard's 'Synthetic - pick or generate a run' source (cli/one_table.py line 30, cli/many_tables.py line 31), SHALL NOT list --run-id or --reference-run-id in `<short> qa --help` or the qa usage line (cli/collection_cli.py lines 422-423), and SHALL refuse either flag by name as criterion 6 does (CLI B, SETTLED by Keith 2026-11-14).
     - WHERE the selected asset has no synthetic/ folder, `mothman check` SHALL show the providers, scenarios and scenario map gates (cli/check.py lines 87, 139 and 144) each as one row reading 'not applicable (no synthetic/ folder)', and its closing line and paste-into-commit line SHALL say 'every gate that applies passed', naming the three (CLI C, SETTLED by Keith 2026-11-14).
     - THE SYSTEM SHALL delete `mothman scenarios bands` (cli/scenarios.py lines 142-168) with the helpers only it uses (_say, _short, _band_text, _bounds_text, lines 205-235) and its tests (tests/test_check_bands.py's TestTheCommand and TestTheListing, tests/test_status_words_shown.py lines 200-210), keep check_bands for the generator and REQ-GEN-392, and remove REQ-GEN-183's claims naming the command in the same change (CLI D, SETTLED by Keith 2026-11-14; the register edit's wording approved by Keith 2026-11-14).
@@ -49899,7 +49976,7 @@ requirements:
     - 'WHERE the asset does not declare `synthetic: true`, read through REQ-PIPE-382''s one reader and embedded with the build, THE SYSTEM SHALL drop the footer''s ''against generated synthetic supplies'' (template line 1121) and read ''against each agency''s supplies'' in its place; the Demo tab stays as it is, labelled as a recording (Dash C, SETTLED by Keith 2026-11-14).'
     - WHILE the embedded scenario map is empty, a cold load of /scenarios SHALL render the dashboard's plain not-found page (renderNotFound, template line 8784) naming the address's word back to the reader, with the document title and the route announcement reading as not found and never as 'Scenarios' (Dash D, SETTLED by Keith 2026-11-14); a cold load carrying ?panel=scenarios or ?scenario=<any id> SHALL land on the same not-found page, even WHERE the rest of the address is a real page, with the parameter removed from the address by replaceState so that a reload does not repeat it (v6 Q3, SETTLED by Keith 2026-11-14).
     - THE SYSTEM SHALL have a test, seen failing first, that in a subprocess where importing the generator, synthetic_data_generator, scenarios/ or the bootstrap package fails at find_spec, runs a fixture asset with no synthetic/ folder through `mothman pipeline run`, `mothman dashboard rebuild` and `mothman check --no-pytest`, shows `mothman --help`, `mothman pipeline --help` and `mothman <short> --help` exiting 0 and listing no synthetic command, and shows bare `mothman` without a terminal giving its existing flag-hint refusal (NotInteractive), never an ImportError (Q8 of 2026-11-02, SETTLED by Keith 2026-11-02).
-    - THE SYSTEM SHALL have a real-browser test, seen failing first, that builds the dashboard for a fixture asset with no synthetic/ folder and finds no scenario control, tab, link, count, jump bar or label in the header, the drill-down pages (exec, agency, collection, period, dataset, column, check) or their accessible names, no synthetic wording in the footer, and that a cold load of /scenarios, ?panel=scenarios and ?scenario=<any id> each lands on the not-found page of criterion 13, the parameter removed from the address; authored text in the Requirements, Plans, Feedback and Release notes tabs is excluded; and that the same page built with a non-empty map shows the button, the tab and a working jump.
+    - 'THE SYSTEM SHALL have a real-browser test, seen failing first, that builds the dashboard for a fixture asset with no synthetic/ folder and finds no scenario control, tab, link, count, jump bar or label in the header, the drill-down pages (exec, agency, collection, period, dataset, column, check) or their accessible names, no synthetic wording in the footer, no Demo tab (amended by Keith 2026-11-18: its recording is of a synthetic-mode session, so a real deployment hides it and /demo lands on the not-found page), and that a cold load of /scenarios, ?panel=scenarios and ?scenario=<any id> each lands on the not-found page of criterion 13, the parameter removed from the address; authored text in the Requirements, Plans, Feedback and Release notes tabs is excluded; and that the same page built with a non-empty map shows the button, the tab and a working jump.'
     non_functional_requirements:
     - 'PRIVACY AT REAL SCALE: a real deployment can show that no code able to invent a record''s time or play a scripted person is present.'
     - 'PORTABILITY: works from a plain checkout through `uv run`, with no extra install step to leave a component out.'
@@ -49916,6 +49993,7 @@ requirements:
     - REQ-TEST-384
     - REQ-GEN-183
     linked_tests:
+    - tests/test_synthetic_refusal.py
     - 'tests/test_real_deployment.py'
     - 'tests-js/scenario-panel.test.js'
     - 'tests/test_cli_pipeline.py'
@@ -49931,7 +50009,7 @@ requirements:
     - 'qa_tools/common/scenario_map.py::read_map_data'
     - 'dashboard/embed_dashboard_data.py::embed'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'ONE mothman, SYNTHETIC COMMANDS PRESENT ONLY WHERE THEY CAN RUN (Q3, SETTLED by Keith 2026-11-02): REJECTED a second entry point, and REJECTED listing them always and refusing at run time.'
     - 'pipeline run NEVER GENERATES, ON ANY ASSET (CLI A, SETTLED by Keith 2026-11-14): one meaning per command name - it processes what has arrived, then builds; generation is generate-synthetic-data and the bootstrap. REJECTED generating on synthetic assets only (the command would mean two things, and its target comparison could fail on a target that needs a scripted decision), and making it synthetic-only (a real asset''s first run is `pipeline run`, REQ-GEN-381 criterion 2).'
@@ -49953,6 +50031,11 @@ requirements:
     - 'ONE GROUP CLASS HIDES AND REFUSES (2026-11-18): cli/synthetic.Group lists a synthetic command only where find_spec finds the generator, synthetic_data_generator, scenarios/ and the bootstrap and the selected asset has a synthetic/ folder, and otherwise answers its name with a hidden stand-in that refuses in one sentence, exit 1; cli.scenarios is loaded lazily, since it imports the generator.'
     - 'THE BLOCK REACHES EVERY PROCESS (2026-11-18): the real-deployment test blocks the four packages through a sitecustomize.py on PYTHONPATH, so `mothman check`''s gates, started as their own processes, meet the same absence the CLI detects.'
     - 'AN OLD SCENARIO LINK IS ANSWERED ONCE (2026-11-18): ?panel=scenarios and ?scenario= render the not-found page on the cold load while the address keeps the rest of the link, so a reload opens the real page.'
+    - 'THE REFUSAL SAYS WHAT THE COMMAND IS FOR AND WHAT TO DO INSTEAD (Keith, 2026-11-18, the CLI post-build critic): ''generates synthetic data'' was untrue of most refused commands (cache-key prints a digest, checkpoint lists, reset-synthetic deletes, scenarios lists, --run-id picks a run), and the sentence gave no next step. REJECTED rewording only, and leaving it as agreed.'
+    - 'NO DEMO TAB IN A REAL DEPLOYMENT (Keith, 2026-11-18, the dashboard UX post-build critic): the tab plays a recording of a synthetic-mode session made with a dev-only script and says it ran against synthetic data. REJECTED keeping it with reworded text.'
+    - 'THE DATASET PAGE''S PROVENANCE NOTE FOLLOWS THE FOOTER''S SWITCH (the dashboard UX post-build critic, 2026-11-18): every dataset page of a real deployment said its figures were computed ''against real generated runs''; it says ''this agency''s supplies'' there now (tests-js/scenario-panel.test.js).'
+    - 'A LAZILY LOADED TOOL SITS IN THE TOOLS PANEL (the CLI post-build critic, 2026-11-18): `scenarios`, loaded on first use, was not in cli.commands when the panel was built and fell into a third ''Commands'' panel, against REQ-TEST-252 criterion 2. The panel names a lazy command only where synthetic data can be made here, so a real deployment''s help still names none.'
+    - 'NOT CHANGED, AS SETTLED (Keith, 2026-11-18): an old ?scenario= link on a real deployment''s valid dataset address lands on the not-found page with no link onward, as v6 Q3 settled.'
     open_questions: []
   - id: REQ-GEN-386
     title: The generator side - generator/, synthetic_data_generator/ and each asset's providers - imports from outside itself only asset_model/ and scenarios/, which holds the register parser, the placements reader, the map vocabulary and the scripted_decisions.yaml reader; the generator keeps the map writer and offers the bootstrap and cli/ one public module
@@ -50006,7 +50089,7 @@ requirements:
     - 'bootstrap/scripted_decision_checks.py::problems'
     - 'bootstrap/scripted_decision_checks.py::answers_for'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'NARROWED TO THE SHARED READING CODE (Keith, 2026-10-31, #134''s code half). REJECTED (b) and (c) of #134 as in REQ-PIPE-380.'
     - 'ALL FOUR SCENARIO READERS INTO scenarios/ (B3, SETTLED by Keith 2026-11-14): the architect found v5''s split contradicting itself - the map writer moved to the generator imports parse_register, which v5 sent to bootstrap/ (an edge the gate forbids), and status_words from the pipeline; the placements reader had no home; and the vocabulary sits in scenario_map.py, not scripted_decisions. Now the register parser, the placements reader, the vocabulary and the scripted_decisions.yaml reader are in scenarios/, the generator keeps the writer, status_words moves with the status order (REQ-PIPE-390) and the dashboard keeps only read_map_data. SUPERSEDES the split overview''s ''the TS register''s parser goes to bootstrap/''. REJECTED the writer moving to the bootstrap.'
@@ -50127,7 +50210,7 @@ requirements:
     - 'pipeline/period_slots.py::for_dataset'
     - 'pipeline/owed_nothing.py::for_dataset'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'ONE FUNCTION PER RULE, IN asset_model/ (SPLIT D4''s fold for #137''s first risk, SETTLED by Keith 2026-11-03: ''one helper per rule'').'
     - 'period_filled_by IS THE ONE (delivery-scoper): its own docstring already calls it ''the one place a round is turned into the name a person reads''.'
@@ -50137,6 +50220,8 @@ requirements:
     - 'ONE FUNCTION PER RULE, INDEX FORM BESIDE THE NAMED FORM (2026-11-18, build): filled_index answers the period a round fills by position in the round sequence, period_filled_by by name; the sites that walked the sequence themselves (assignment''s fall_hold, participation_view, inheritance, period_slots, owed_nothing, the CP provider''s drawn_grown_periods) call filled_index. supplies_in_round carries not-yet-owing, turned-off, months and the cadence refusal that _participates and round_of each held a copy of. slots.slot_version is the one answer to which participation version gives a slot its inputs, read by slot instants, the claim window and verdict inputs.'
     - 'CRITERION 5''s COMPARISON WAS RUN, NOT ASKED (2026-11-18): scratchpad probes walked 594 quarterly and 519 daily periods and 9,617 dates before and after the switch and found no difference, so nothing came to Keith.'
     - 'A ROUND PAST THE CALENDAR''S END IS REFUSED BY NAME (2026-11-18): the CP provider''s drawn_grown_periods raises RoundFillsNoPeriod naming the round, where it used to index past the sequence.'
+    - 'TWO SITES THE INVENTORY MISSED, FOLDED (the post-build functional critic, 2026-11-18): files_go.rounds_fill and files_go.fall_rounds kept their own `i + value`; both call filled_index now. rounds_fill used the value in force on the line''s date for every round, and now reads each round''s own; fall_rounds skips a round whose files go past the calendar''s end, which fills nothing and so cannot feed a period twice.'
+    - 'CRITERION 6''S TEST NOW DRIVES THE SITES (the same critic): most of the walk compared schedule''s own functions with each other, which a site''s copy would never disturb. tests/test_one_schedule_rule.py now drives rounds_fill, fall_rounds, period_slots.for_dataset and owed_nothing.for_dataset with filled_index recorded, and each records a call; participation_view, inheritance''s grouping and assignment.fall_hold reach the rule only on a turned-off gap, a merged arrival stream and a changed files_go_to_period, which their own tests drive.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50157,7 +50242,7 @@ requirements:
     - WHEN orchestrate._claim_window (qa_tools/tools/orchestrate.py line 461) meets criterion 1's error for a dataset on an arrival's receipt date, THE SYSTEM SHALL leave that dataset out of the shortest-window minimum, answering none if none remain - its docstring's own 'never a borrowed one' rule (REQ-PIPE-243 criterion 2) standing (378 Q2 (a), SETTLED by Keith 2026-11-14).
     - 'WHEN verdict.resolved (verdict.py lines 92 and 94) meets criterion 1''s error, THE SYSTEM SHALL keep its callers'' existing handling of a slot that cannot be built: verdict.judge records the classification with no inputs and no fingerprint (its never-raises rule), and verdict.compared reports the slot as one that cannot be built now, naming the error.'
     - WHEN agreement_drift's keys for a period (agreement_drift.py line 132) meet criterion 1's error, THE SYSTEM SHALL leave out the calendar-version key, because no calendar version governed the period, and SHALL still add the calendar-period key; every other exception there is handled as today.
-    - WHEN participation_view.view (participation_view.py lines 183 and 218) meets criterion 1's error, THE SYSTEM SHALL show the claim window as stated by no calendar version on that date, naming the calendar's earliest version, and show no source date for it, rather than raise; `mothman schedule show --dataset cp-clients --on 2012-06-01` SHALL exit 0 showing exactly that, naming 2013-01-01, with no traceback (CLI review finding 9).
+    - 'WHEN participation_view.view (participation_view.py lines 183 and 218) meets criterion 1''s error, THE SYSTEM SHALL show the claim window as stated by no calendar version on that date, naming the calendar''s earliest version, and show no source date for it, rather than raise, with no traceback (CLI review finding 9) - shown on a fixture calendar whose versions begin after the date asked about (amended by Keith 2026-11-18: no real calendar reaches it today, `schedule show --dataset cp-clients --on 2012-06-01` exiting 0 with a claim window).'
     - WHEN the Linkage Products provider's release timing (linkage_products.py lines 1745 and 1800) meets criterion 1's error, THE SYSTEM SHALL refuse to generate, naming the release and the date (its CannotGenerate), rather than time a release against a borrowed window.
     - THE SYSTEM SHALL keep files_go.py line 57 and pipeline/period_slots.py line 40, which already call Calendar.version_in_force and so already raise, as they are.
     - THE SYSTEM SHALL keep only the per-round cadence check - months named by a participation in force on a round whose calendar version is a cadence rule, judged on the round's date (schedule.py line 691) - and SHALL remove the check against the calendar's current version (lines 732-738, cal.current); the refusal of an unbounded ask of a cadence-rule calendar (line 739) is not a months check and stays (Q7 of 2026-11-14, SETTLED by Keith 2026-11-14).
@@ -50208,7 +50293,7 @@ requirements:
     - 'cli/lifecycle_report.py::stage_failure'
     - 'assets/quarterly/synthetic/collections/linkage_products.py::_release_window'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - A DATE BEFORE A CALENDAR'S FIRST VERSION RAISES, FOR EVERY CALLER (Q6 of 2026-11-14, SETTLED by Keith 2026-11-14, option (b), NOT the recommendation). REJECTED (a) falling back to the first version everywhere (the recommendation), and (c) keeping both policies, renamed.
     - 'CALENDAR VERSIONS ONLY (378 Q1, SETTLED by Keith 2026-11-14): explained first that under (b) the Child Protection build would likely refuse (Dash A) over a dataset that merely starts later than its calendar. REJECTED participation versions too.'
@@ -50282,7 +50367,7 @@ requirements:
     - 'asset_model/linked_datasets.py::_calendar_of'
     - 'asset_model/agreement.py::from_doc'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'ONE MECHANISM, PER-ASSET DATES (SPLIT D1b, SETTLED by Keith 2026-11-03): named calendars, each dataset picking one; a project extraction has no slots. REJECTED a per-asset calendar plug-in.'
     - 'ONE MECHANISM MEANS TODAY''S MECHANISM (Q2 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)). REJECTED (b) authored dates only, which would write the daily calendar out date by date and lose ''not yet agreed'' against ''never''; and (c) an extraction naming an empty calendar instead of `no_calendar: never`.'
@@ -50346,7 +50431,7 @@ requirements:
     - 'asset_model/config_pin.py::declared_files'
     - 'bootstrap/replay_inputs.py::cache_key'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - ONE SHARED DEFAULT, BESIDE dbt_shared/ (SPLIT D2, SETTLED by Keith 2026-11-03). REJECTED a copy per asset, with or without a gate.
     - OVERRIDE BY CHECK NAME (Q3 of 2026-11-14, SETTLED by Keith 2026-11-14, option (a)). REJECTED (b) field-by-field inheritance, and (c) additions only, which does not meet D2's 'or override'.
@@ -50358,6 +50443,7 @@ requirements:
     - 'THE MERGE IS ONE FUNCTION, ENTRIES CARRY THEIR SOURCE (2026-11-18): merged() returns (entry, file) pairs - the shared default in its order, each replaced whole by the asset''s entry of that name, then the asset''s additions - so the lifecycle gate holds an override to the changelog rule in the asset''s own file, and its ids (asset in the prefix) name the asset.'
     - 'THE MOVE READ AS NO NEW CHECK, MEASURED (2026-11-18): the lifecycle gate against the base that still held the two per-asset copies reported 87 checks (87 before) for daily and 292 (291 before, the one new age_group check of REQ-QAC-389) for quarterly - a ref with no shared file reads the asset file''s six as the same checks.'
     - 'KEYS ARE A CLOSED SET (2026-11-18): an asset entry naming any key outside KEYS is refused; the fingerprint test that added an invented `tightened:` key now changes `formats` instead.'
+    - 'AN ADDED CHECK MUST BE ONE THE CODE CAN EVALUATE, AND THE GATE SAYS SO (Keith, 2026-11-18, the post-build functional critic): an asset''s entry naming a check with no evaluator passed `mothman check` and then failed every file with ''no evaluator for this check''. The definitions refuse it now, naming the entry and the checks there are, so the collections gate fails before anything runs. REJECTED amending criterion 3 to say so without enforcing it.'
     open_questions: []
     signed_off:
       by: Keith
@@ -50457,7 +50543,7 @@ requirements:
     - 'qa_tools/common/validate_collections.py::allowed_value_problems'
     - 'assets/quarterly/synthetic/collections/linkage_products.py::known_values'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'THE THREE PER-TOOL COPIES STAY (SPLIT D3, SETTLED by Keith 2026-11-03): the tool comparison is still running and one or more checks, or a whole tool, will go. REJECTED declaring once with every tool reading, an agreement gate, and one check per rule.'
     - 'THE ADAPTER READS THE CONTRACT AT RUN TIME (SPLIT D3, SETTLED by Keith 2026-11-03): the contract is the copy that survives whichever tool is dropped. Applies to every collection.'
@@ -50551,7 +50637,7 @@ requirements:
     - 'assets/quarterly/synthetic/collections/linkage_products.py::fault_verdict'
     - 'assets/quarterly/synthetic/collections/linkage_products.py::apply_geo_faults'
     evidence:
-    - '2026-11-18, built on wip/groupA (checkpoints 0166d65d to 6a08afb2): tests/test_real_deployment.py 17 passed (pipeline run, dashboard rebuild and mothman check --no-pytest in a copy with the synthetic side blocked at find_spec, plus the real-browser page checks); the affected-module runs of each requirement green after their fixes (scratchpad logs run389b, runB, rd3); the tests named in linked_tests seen failing first except where a decision says otherwise. The full chunked gate''s result is in the commit that pushes this.'
+    - '2026-11-18, built on wip/groupA and pushed in 29822d45, whose full chunked gate ran this requirement''s linked tests among 8515 passed, 0 failed. The post-build functional critic then re-ran every linked module of groups A and B at 29822d45 (22 modules, 616 passed, 0 failed). Rewritten 2026-11-18 from one paragraph shared by all eight group B requirements, which cited scratchpad logs and a test that does not touch every one of them (post-build-review #481).'
     decisions:
     - 'THE NEAR-COPIES JOIN #134 (SPLIT D4, SETTLED by Keith 2026-11-03). REJECTED status order only, and waiting.'
     - 'THE CHILD PROTECTION RESTATEMENT IS DEAD (delivery-scoper, re-checked 2026-11-14): no reader of START_DATE, _quarter_start or _add_quarters outside the provider''s own definitions; a removal, not a rewire. Its round-to-period step is folded by REQ-PIPE-377.'
@@ -51422,6 +51508,7 @@ requirements:
     - 'REQ-PIPE-250 OWNS THE 720s BUDGET (SR7, SETTLED by Keith 2026-11-14): this requirement records the before and after and is cited as evidence for REQ-PIPE-250 criteria 2 and 5; v1''s restated ''three runs against 720s'' and CI-figure criteria are dropped, so one requirement owns one claim. REJECTED keeping both.'
     - 'REQ-PIPE-250''s TITLE IS STALE (architect, non-blocking): it says ''all three collections'', which predates the asset split; a retitle to ''each asset''s bootstrap from empty'' is a register edit to an in-progress requirement and goes to Keith as wording before it is made - not made by this requirement.'
     - 'BUILT WITH CRITERION 3 OPEN (2026-11-18): the measurement this requirement owns is the sandbox''s; criterion 3 cites CI''s, which a push does not produce since REQ-TEST-375. Left unmet rather than starting a 145-minute run for one number.'
+    - 'THE AFTER FIGURES WERE TAKEN UNDER LOAD, AND SAY SO (Keith, 2026-11-18, the post-build functional critic): another worktree was running tests and py-spy was profiling the run, so criterion 1''s ''nothing else running'' did not hold. The figures stay as an upper bound, bootstrap.yaml''s header says how they were taken, and the next quiet from-empty bootstrap replaces them. Criterion 1''s per-tool shares are given as thread-seconds and ''negligible'' rather than shares of the replay. REJECTED re-measuring before anything else moved.'
     open_questions: []
     signed_off:
       by: Keith
@@ -51969,7 +52056,7 @@ requirements:
     - 'THE 3.8s FIGURE IS STALE (builder, from the measurement): a run''s dbt step measured about 1.1s on one thread here, so the profile''s 49% waiting on dbt (REQ-PIPE-250, 2026-10-26) may now overstate dbt''s share; REQ-PIPE-403''s profile is what will say.'
     unmet_criteria:
     - criterion: 'Criterion 6''s second half: the share of the stream''s samples spent waiting on the dbt worker, against the profile''s 49%.'
-      why: 'It is a profile of a bootstrap''s replay, which is REQ-PIPE-403''s after measurement: a from-empty bootstrap on a quiet machine, which waits on #134 step 3. The dbt time per run before and after is recorded above.'
+      why: 'It is a profile of a bootstrap''s replay, which is REQ-PIPE-403''s after measurement: a from-empty bootstrap on a quiet machine, which REQ-PIPE-403 built on 2026-11-18 under load, recording dbt as thread-seconds rather than a share of the stream''s samples; the share waits on a quiet profiled run. The dbt time per run before and after is recorded above.'
       owner: REQ-PIPE-403
       blocked_by:
         requirements:

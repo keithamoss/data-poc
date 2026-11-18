@@ -7,7 +7,10 @@ filled_index), whether a dataset supplies in a round (supplies_in_round) and
 which participation version gives a slot its inputs (slots.slot_version). The
 sites that used to carry their own copies now call those; this walks every
 round of every dataset of each asset and holds what the schedule produces to
-the one answer, so a site that drifts back to a copy of its own is caught.
+the one answer. That walk compares schedule's own functions with each other,
+so the sites outside it are driven at the bottom with filled_index recorded:
+a site answering from a copy of its own records no call (the post-build
+critic, 2026-11-18, found two in files_go).
 """
 from __future__ import annotations
 
@@ -75,6 +78,53 @@ def test_every_quarterly_round_answers_each_rule_once():
 @pytest.mark.asset("daily")
 def test_every_daily_round_answers_each_rule_once():
     _every_rule_is_answered_once()
+
+
+# EACH FOLDED SITE GOES THROUGH THE ONE RULE (the post-build critic,
+# 2026-11-18): the walk above compares schedule's own functions with each
+# other, which a site keeping a copy of `i + files_go_to_period` would never
+# disturb. Each site below is driven through its real entry point while
+# filled_index records the calls; a site answering from a copy of its own
+# records none. An architecture rule observed by behaviour, so it names the
+# function rather than reading any source.
+DATASET = "cp-case-workers"   # owes February and August at files_go_to_period 1
+
+
+@pytest.fixture
+def recorded(monkeypatch):
+    calls = []
+    real = schedule.filled_index
+
+    def recording(dataset_id, sequence, i, agreement=None):
+        calls.append(dataset_id)
+        return real(dataset_id, sequence, i, agreement)
+
+    monkeypatch.setattr(schedule, "filled_index", recording)
+    return calls
+
+
+def _sites():
+    from pipeline import owed_nothing, period_slots
+    from qa_tools.common import files_go
+
+    on = asset_time.now().date()
+    yield "files_go.rounds_fill", lambda: files_go.rounds_fill(DATASET, {2, 8}, on - timedelta(days=900))
+    yield "files_go.fall_rounds", lambda: files_go.fall_rounds(DATASET)
+    yield "period_slots.for_dataset", lambda: period_slots.for_dataset(DATASET)
+    yield "owed_nothing.for_dataset", lambda: owed_nothing.for_dataset(DATASET, on)
+    # participation_view, inheritance's grouping and assignment.fall_hold read
+    # the rule too, but only on a turned-off gap, a merged arrival stream and a
+    # collection whose files_go_to_period has changed - driven by
+    # tests/test_turn_off.py, the period-opening tests and the fall tests
+    # (REQ-PIPE-322), not by a plain call on today's configuration.
+
+
+@pytest.mark.asset("quarterly")
+@pytest.mark.parametrize("name", [n for n, _ in _sites()])
+def test_each_folded_site_goes_through_the_one_rule(recorded, name):
+    call = dict(_sites())[name]
+    call()
+    assert recorded, f"{name} answered which period a round fills without schedule.filled_index"
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

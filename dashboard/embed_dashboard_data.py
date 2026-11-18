@@ -757,8 +757,11 @@ def embed() -> None:
     scenario_entries = scenario_map.read_map_data()
     html = _replace_const(html, "SCENARIO_MAP",
                            json.dumps(scenario_entries, separators=(",", ":")))
-    print(f"Re-embedded SCENARIO_MAP = {len(scenario_entries)} scenario(s), "
-          f"{sum(1 for e in scenario_entries if e.get('coordinates'))} with coordinates")
+    # SAID ONLY WHERE THERE IS A MAP (the CLI post-build critic, 2026-11-18): a
+    # real deployment's build output named scenarios on its one line.
+    if scenario_entries:
+        print(f"Re-embedded SCENARIO_MAP = {len(scenario_entries)} scenario(s), "
+              f"{sum(1 for e in scenario_entries if e.get('coordinates'))} with coordinates")
     # THE FOOTER SAYS GENERATED ONLY OF A SYNTHETIC ASSET (REQ-PIPE-385
     # criterion 12), through the one reader of `synthetic: true`.
     html = _replace_const(html, "ASSET_SYNTHETIC",

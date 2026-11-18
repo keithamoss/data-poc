@@ -223,3 +223,58 @@ describe("a page with no scenario map", () => {
     expect(w.stateFromLocation().tier).not.toBe("scenarios");
   });
 });
+
+// The post-build UX critic (2026-11-18): every dataset page of a real
+// deployment said its figures were computed "against real generated runs" -
+// the word criterion 12 took out of the footer. The note follows the same
+// switch the footer does.
+describe("the dataset page's provenance note", () => {
+  const realPage = () => require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "..", "dashboard", "qa-reporting-dashboard.template.html"),
+    "utf-8").replace("const ASSET_SYNTHETIC = true;", "const ASSET_SYNTHETIC = false;");
+
+  it("says generated runs on a synthetic asset", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.datasetProvenanceNote({ realRunCount: 3 })).toContain("real generated runs");
+  });
+
+  it("says nothing synthetic in a real deployment", () => {
+    const html = realPage();
+    expect(html).toContain("const ASSET_SYNTHETIC = false;");
+    dashboard = loadDashboard({ html });
+    const note = dashboard.window.datasetProvenanceNote({ realRunCount: 3 });
+    expect(note).toContain("this agency's supplies");
+    expect(note).not.toMatch(/generated|synthetic/i);
+  });
+
+  it("is empty with no real runs", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.datasetProvenanceNote({ realRunCount: 0 })).toBe("");
+  });
+});
+
+// Keith, 2026-11-18 (the post-build UX critic's finding): the Demo tab plays
+// a recording of a synthetic-mode session, so a real deployment shows no Demo
+// tab and an old /demo address lands on the not-found page.
+describe("the Demo tab", () => {
+  const page = (synthetic) => require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "..", "dashboard", "qa-reporting-dashboard.template.html"),
+    "utf-8").replace("const ASSET_SYNTHETIC = true;", `const ASSET_SYNTHETIC = ${synthetic};`);
+
+  it("shows on a synthetic asset", () => {
+    dashboard = loadDashboard({ html: page(true), hierarchy: HIERARCHY });
+    expect(dashboard.window.document.getElementById("demo-btn").hidden).toBe(false);
+  });
+
+  it("is hidden in a real deployment", () => {
+    dashboard = loadDashboard({ html: page(false), hierarchy: HIERARCHY });
+    expect(dashboard.window.document.getElementById("demo-btn").hidden).toBe(true);
+  });
+
+  it("answers /demo in a real deployment with the not-found page", () => {
+    dashboard = loadDashboard({ html: page(false), hierarchy: HIERARCHY, url: "http://localhost/#/demo" });
+    const w = dashboard.window;
+    expect(w.document.querySelector("#view h2")?.textContent).toBe("Page not found");
+    expect(w.document.querySelector("#view code").textContent).toBe("demo");
+  });
+});

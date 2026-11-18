@@ -115,6 +115,17 @@ class TestHelpAtThirty:
             assert c["agency_name"] in joined, (columns, c["agency_name"])
         assert "collections" in {row.split()[0] for row in tools_panel if row}
 
+    def test_a_lazily_loaded_tool_sits_in_the_tools_panel(self, thirty):
+        """Criterion 2's two panels, held for a command loaded on first use
+        (REQ-PIPE-385's `scenarios`): built from `cli.commands`, which holds
+        no lazy name, the Tools panel left `scenarios` to a third, default
+        'Commands' panel (the CLI post-build critic, 2026-11-18)."""
+        out = _run(thirty, "--help", columns=120)
+        assert out.returncode == 0, out.stderr
+        titles = re.findall(r"╭─ ([A-Za-z]+) ", out.stdout)
+        assert [t for t in titles if t != "Options"] == ["Collections", "Tools"], titles
+        assert "scenarios" in {row.split()[0] for row in _panel(out.stdout, "Tools") if row}
+
     @pytest.mark.parametrize("argv", [["--help"], ["edp", "--help"], ["edw", "qa", "--help"],
                                       # A real collection of the tree's asset
                                       # (the quarterly one since the split).
@@ -177,8 +188,9 @@ class TestTheThresholdAtTwo:
     @pytest.mark.parametrize("typo, closest, known", [
         # Each asset's own collections (the asset split).
         pytest.param("cq", "cp", "cp (child-protection), ed (emergency-department), "
-                     "lp (linkage-products)", marks=pytest.mark.asset("quarterly")),
-        pytest.param("bmd", "bdm", "bdm (civil-registration)", marks=pytest.mark.asset("daily"))])
+                     "can (cancer), lp (linkage-products)", marks=pytest.mark.asset("quarterly")),
+        pytest.param("bmd", "bdm", "bdm (civil-registration), mh (mental-health)",
+                     marks=pytest.mark.asset("daily"))])
     def test_the_refusal_still_lists_every_collection(self, typo, closest, known):
         said = common.unknown_collection_message(typo)
         assert f"Closest: {closest}" in said and f"Known: {known}" in said
@@ -322,7 +334,8 @@ class TestTheFilingMenuAtTwo:
         filed = {d.collection_id for d in hierarchy.all_datasets()}
         expected = [c.label for c in collections.all_collections() if c.id in filed]
         # The quarterly asset's hierarchy order (the asset split).
-        assert expected == ["Child Protection", "ED Presentations", "Linkage Products"]
+        assert expected == ["Child Protection", "ED Presentations", "Cancer Notifications",
+                            "Linkage Products"]
         assert asked["groups"] == [("", expected)]
 
 

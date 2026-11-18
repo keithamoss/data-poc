@@ -407,7 +407,12 @@ cli.add_panel(RichCommandPanel(
     "Collections", commands=_COLLECTION_NAMES,
     help=None if _ASSET is not None
     else f"Set {_assets.ASSET_ENV} to one of: {', '.join(_assets.names()) or '(no asset folders found)'}"))
-cli.add_panel(RichCommandPanel("Tools", commands=[n for n in sorted(cli.commands)
+# A LAZILY LOADED TOOL TOO (the CLI post-build critic, 2026-11-18): `scenarios`
+# is not in cli.commands until first use, and left out here rich-click put it
+# in a third, default panel. Listed only where it can run - a real deployment
+# names no synthetic command in its help (REQ-PIPE-385 criterion 3).
+_LAZY_SHOWN = set(getattr(cli, "lazy", {})) if synthetic.available() else set()
+cli.add_panel(RichCommandPanel("Tools", commands=[n for n in sorted(set(cli.commands) | _LAZY_SHOWN)
                                                   if n not in _COLLECTION_NAMES]))
 
 
