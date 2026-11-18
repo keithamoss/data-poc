@@ -52,7 +52,7 @@ class TestTheSharedHistoryIsTheGeneratorsOwn:
         book = quarterly_history.book()
         providers = collections.providers()
         assert [p.collection_id for p in providers] == [
-            "child-protection", "emergency-department", "linkage-products"]
+            "child-protection", "emergency-department", "cancer", "linkage-products"]
         for p in providers:
             ids = [d for st in p.streams() for d in st.dataset_ids]
             assert any(book.get(d) for d in ids), p.collection_id
