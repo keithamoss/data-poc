@@ -347,12 +347,21 @@ def test_this_repository_passes_through_the_real_command():
     assert "no forbidden edge outside imports-allowlist.yaml" in result.output
 
 
-def test_the_landing_allowlist_names_only_the_requirements_that_remove_its_entries():
-    entries = vi.load_allowlist(ROOT)
-    assert entries, "the allowlist is empty - nothing to check"
-    removers = {"REQ-PIPE-380", "REQ-GEN-381", "REQ-PIPE-382", "REQ-PIPE-383", "REQ-PIPE-385",
-                "REQ-GEN-386", "REQ-QAC-389", "REQ-PIPE-390"}
-    assert {e.removed_by for e in entries} <= removers
+def _scan_counting(monkeypatch):
+    """vi.scan over the real tree, and how many files it read - the proof it
+    read the tree, now the allowlist is empty and the tree has no finding to
+    show for it (REQ-GEN-386 and REQ-QAC-389 removed the last, 2026-11-18)."""
+    read = []
+    real = vi.syntax_walk.files
+
+    def counting(*a, **k):
+        for item in real(*a, **k):
+            read.append(item[0])
+            yield item
+    monkeypatch.setattr(vi.syntax_walk, "files", counting)
+    findings, problems = vi.scan(ROOT)
+    assert read, "the scan read no file"
+    return findings, problems
 
 
 def test_every_python_file_here_has_a_side_or_is_exempt():
@@ -719,12 +728,11 @@ def test_asset_models_ranking_and_words_that_rank_nothing_pass(repo, capsys):
     assert code == 0, out
 
 
-def test_the_two_rules_find_nothing_in_this_repository():
+def test_the_two_rules_find_nothing_in_this_repository(monkeypatch):
     """Both rules over the real tree: every former ranking copy reads
     asset_model.statuses, and no underscore-led asset_model name is used
     outside it. Asserts the tree was read, so an empty scan cannot pass."""
-    findings, problems = vi.scan(ROOT)
-    assert findings, "the scan read nothing - the allowlist's findings are missing"
+    findings, problems = _scan_counting(monkeypatch)
     said = [str(p) for p in problems if "REQ-PIPE-376" in str(p) or "REQ-PIPE-390" in str(p)]
     assert said == []
 
@@ -770,7 +778,6 @@ def test_a_parse_of_text_from_elsewhere_passes(repo, capsys):
     assert code == 0, out
 
 
-def test_the_real_tree_reads_its_configuration_through_config_yaml():
-    findings, problems = vi.scan(ROOT)
-    assert findings, "the scan read nothing"
+def test_the_real_tree_reads_its_configuration_through_config_yaml(monkeypatch):
+    findings, problems = _scan_counting(monkeypatch)
     assert [str(p) for p in problems if "outside config_yaml" in str(p)] == []

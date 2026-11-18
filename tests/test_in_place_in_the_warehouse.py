@@ -76,7 +76,7 @@ class TestTheTerminalSaysWhere:
         placement = scenario_placements.Placement.of({
             "dataset": "cp-investigations", "period": "2024-Q3", "in_place_on": "2024-08-14",
             "supplies": ["cp-investigations@1"]})
-        monkeypatch.setattr(scenarios_cli.scenario_map, "read_placements",
+        monkeypatch.setattr(scenarios_cli.scenario_placements, "read_placements",
                             lambda: {injected.id: placement})
         printer = Console(width=80, record=True, file=io.StringIO())
         monkeypatch.setattr(scenarios_cli, "console", printer)

@@ -553,7 +553,9 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
     #: half against an empty deployment is the real check; this is the
     #: cheap one that catches the known shapes before a push.
     GENERATED = (r'["\']reports["\']\s*/', r"reports/[\w-]+\.json",
-                 r"scenario_placements",
+                 # The placements file itself, not the module alias
+                 # scenario_placements that reads it (REQ-GEN-386).
+                 r"scenario_placements\.json",
                  # THROUGH THE RESOLVER (REQ-PIPE-342 criterion 6), the same
                  # artefacts by their call-time lookups.
                  r"\breports_(?:path|dir)\(", r"\bplacements_path\(")
