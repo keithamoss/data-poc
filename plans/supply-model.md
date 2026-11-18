@@ -4456,11 +4456,11 @@ place in the warehouse.
 
 **TS-79a `[INJECT]` An inherited quarter - the newest.** cp-case-workers,
 the newest quarter before the build's own in which it is not delivered
-(2026-Q2 today), so it inherits the quarter before. Nothing generated; the
+(2026-Q3 at the fixed anchor), so it inherits the quarter before. Nothing generated; the
 placement is written after generation from the calendar's participation,
 in place on the middle of the quarter. *Config: quarterly; cp-case-workers
 participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill
-"Inherited from 2026-Q1" beside the dataset's title. The same page also shows
+"Inherited from 2026-Q2" beside the dataset's title. The same page also shows
 an as-at panel and an "Awaiting a decision" verdict line about a May supply
 that is "not filed to any period": ordinary deliveries carry cp_case_workers
 in months it does not take part in, and each is held (TS-52's shape; that
