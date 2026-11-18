@@ -399,6 +399,20 @@ class TestThePointerMatchesTheMenus:
     settle pointer names them, and the pointer names a menu item that
     exists."""
 
+    @pytest.fixture(autouse=True)
+    def _a_one_collection_asset(self, monkeypatch):
+        """THE PREMISE, STATED: these are a one-collection asset's menus. The
+        daily asset was one until Mental Health joined it (REQ-QAC-350,
+        2026-11-18), so it is read here with Birth Registrations' collection
+        alone, through the one function every reader of the registry calls."""
+        from asset_model import assets, collections
+
+        if assets.selected().name != "daily":
+            return      # the class's several-collections case, on the quarterly asset
+        real = collections.all_collections
+        monkeypatch.setattr(collections, "all_collections",
+                            lambda *a, **k: [c for c in real(*a, **k) if c.id == "civil-registration"])
+
     def test_the_collection_picker_shows_names_and_the_pointer_walks_it(self, monkeypatch):
         from cli import filing_tui
         from qa_tools.common import supply_files

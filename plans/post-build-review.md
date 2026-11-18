@@ -16897,6 +16897,14 @@ twice. It deliberately did not re-find the `TypeError`.
        existed; it agrees once that database is bootstrapped with them.
      - Seen: the 11 failing tests of the first three passed after the
        change (with the rest of their modules, 183 passed).
+     - **Found later the same day, by the full gate on e94fdb72**: the CLI's
+       thirty-collections module listed each asset's collections by hand
+       (updated); tests/test_settle_tui.py's pointer tests used the daily
+       asset as their one-collection asset - now stated by a class fixture
+       reading it with Birth Registrations' collection alone (35 passed);
+       and the cache gate had no entry for the two new providers'
+       `_postcodes`, a copy of Emergency Department's allowlisted one
+       (added; 46 passed).
 
 480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
      `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`
