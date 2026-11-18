@@ -1,12 +1,12 @@
 # The measured from-empty bootstrap of this asset on the development sandbox
 # (REQ-PIPE-403 criterion 6): `mothman env reset-synthetic` then `mothman
-# pipeline bootstrap`. THIS ONE WAS TAKEN UNDER LOAD (Keith, 2026-11-18):
-# another worktree was running tests and py-spy was profiling the run, so it
-# is an upper bound until a quiet run replaces it. The menu's first-run promise
+# pipeline bootstrap`, nothing else running and no profiler - the quiet run
+# that replaced 2026-11-18's under-load figure (Keith, 2026-11-18). The
+# menu's first-run promise
 # says this figure rather than a guess (CLI finding 4). Read by the bootstrap
 # alone; replace it with each new measurement, which is logged in
 # docs/suite-timings.md.
 measured:
-  seconds: 375
+  seconds: 419
   date: 2026-11-18
-  commit: 1127e1a4
+  commit: 427ee38c

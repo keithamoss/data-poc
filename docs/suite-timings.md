@@ -400,3 +400,23 @@ is busy - once per run. Also running: a session building in another worktree ran
 short test files, single gates, one `mothman check --no-pytest` and a few synthetic
 generations into a scratch folder; no other bootstrap and no full gate.
 
+
+-> **2026-11-18, the quiet re-measure (REQ-PIPE-403, Keith 2026-11-18: the figures above
+were taken under load and under py-spy, so a quiet run replaces them).** Each asset
+reset and bootstrapped from empty on this sandbox with nothing else running and no
+profiler, quarterly (commit 5235b8a4) then daily (427ee38c). Both now carry group C's
+new collections - Cancer on the quarterly asset, Mental Health on the daily - so the
+work is not the same as the 1413s/375s run's.
+
+```
+quarterly  1620s  OVER the 720s budget by 897s   load 1.62 -> 1.09
+  generation 2m 16s (of it target trials 37s), the one stream (Child Protection,
+  Emergency Department, Cancer, Linkage Products) 24m, confirmations 23s
+daily       419s  within budget                  load 1.17 -> 1.35
+  generation 1m 00s (of it target trials 47s), Birth Registrations and Mental
+  Health 5m 54s, confirmations under 1s
+```
+
+The first attempt at this run was lost to a container restart (the disk had filled with
+test scratch folders), and the daily half of the second to a background task's own time
+limit; each was reset and rerun from empty, so the figures are whole runs.

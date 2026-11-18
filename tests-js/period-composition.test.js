@@ -110,7 +110,9 @@ describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
     const row = view(w).querySelector('tr[data-kind="substituted"]');
     const hrefs = [...row.querySelectorAll("a[href]")].map(a => a.getAttribute("href"));
     expect(hrefs.some(h => h.includes("/dataset/substituted"))).toBe(true);
-    expect(hrefs.some(h => h.includes("/period/2025-Q4"))).toBe(true);
+    // REQ-DASH-367 criterion 6: the agency page with the period set, never
+    // the retired period route.
+    expect(hrefs.some(h => h.includes("period=2025-Q4") && !h.includes("/period/"))).toBe(true);
   });
 
   it("captions the table with the collection, the period and the date (REQ-DASH-367 criterion 1)", () => {
@@ -175,15 +177,15 @@ describe("its address (criteria 6 and 13)", () => {
 });
 
 describe("a scenario about a whole period lands on it (criterion 7)", () => {
-  it("names the view as a subject, and its chip targets the period's route", () => {
+  it("names the view as a subject, and its chip targets the agency page with the period set", () => {
     page = loadDashboard({hierarchy: MINIMAL_HIERARCHY});
     const w = page.window;
     expect(w.eval("Object.keys(SCENARIO_SUBJECT)")).toContain("period-composition");
     const target = w.scenarioTarget({id: "TS-55", coordinates: {
       dataset: "cp-clients", period: "2026-Q1", inPlaceOn: "2026-03-01",
       subject: "period-composition"}});
-    expect(target.nav).toMatchObject({tier: "period", collectionId: "child-protection",
-                                      period: "2026-Q1"});
+    expect(target.nav).toMatchObject({tier: "agency", focusCollection: "child-protection",
+                                      setPeriod: "2026-Q1"});
   });
 });
 

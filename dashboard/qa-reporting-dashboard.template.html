@@ -7214,6 +7214,12 @@ function navUrl({dropArrival = true} = {}){
   // A NAVIGATION CARRIES ITS OWN SCENARIO JUMP OR NONE (REQ-DASH-208
   // criteria 5 and 8): a jump does not follow the reader to another page.
   withScenarioParam(url, STATE.scenarioJump && STATE.scenarioJump.id);
+  // THE PERIOD ON SHOW (REQ-DASH-355 criterion 3), from the one variable that
+  // holds it - so a navigation that set it carries it.
+  if(typeof CURRENT_PERIOD !== "undefined"){
+    if(CURRENT_PERIOD) url.searchParams.set(PERIOD_PARAM, CURRENT_PERIOD);
+    else url.searchParams.delete(PERIOD_PARAM);
+  }
   return url.pathname + url.search + stateToHash(STATE);
 }
 function hashToState(){
@@ -7284,8 +7290,17 @@ if(new URLSearchParams(location.search).has(PREVIOUS_DATE_PARAM)){
 
 function navigate(next, {scrollTop = true} = {}){
   // A jump's date belongs to the entry it was changed on (#202 F2).
-  const {jumpedFrom, ...rest} = next || {};
+  const {jumpedFrom, setPeriod, focusCollection, ...rest} = next || {};
   STATE = next ? rest : next;
+  // A PERIOD LINK SETS THE PERIOD WITH THE NAVIGATION (REQ-DASH-367 criterion
+  // 6), so the entry pushed below carries it and the one left keeps its own.
+  if(setPeriod !== undefined){
+    CURRENT_PERIOD = baselinePeriod(setPeriod) ? setPeriod : null;
+    DATA = buildData(CURRENT_IN_PLACE_ON);
+    updatePeriodButtonLabel();
+    updateInPlaceOnButtonLabel();
+    renderInPlaceOnPastNotice();
+  }
   // THE ARRIVAL CONTEXT BELONGS TO ONE PAGE (REQ-DASH-085 criterion 11,
   // REQ-DASH-100 criterion 10). Cleared BEFORE render(), or the banner
   // draws once more on the page the reader has just moved to - and
@@ -7310,6 +7325,14 @@ function navigate(next, {scrollTop = true} = {}){
   if(heading){
     heading.setAttribute("tabindex", "-1");
     heading.focus({preventScroll:true});
+  }
+  // ...OR THE COLLECTION'S TABLE A PERIOD LINK WAS FOR (REQ-DASH-367 criterion 6).
+  if(focusCollection){
+    const caption = document.getElementById(`composition-caption-${focusCollection}`);
+    const panel = document.querySelector(`#view [data-collection-panel="${CSS.escape(focusCollection)}"]`);
+    const target = caption || panel;
+    if(target && target.scrollIntoView) target.scrollIntoView({block: "start"});
+    if(caption) caption.focus({preventScroll: true});
   }
 }
 
@@ -10382,14 +10405,22 @@ function collectionPeriods(col){
   }));
   return [...seen.values()].sort((a, b)=> a.date.localeCompare(b.date));
 }
+// A LINK TO A PERIOD'S COMPOSITION GOES TO THE AGENCY PAGE WITH THE PERIOD SET
+// (REQ-DASH-367 criterion 6), not through the retired route: renderPeriod's
+// redirect replaced the entry the reader was on and dropped a scenario jump
+// riding the navigation. navigate() sets the period and focuses the
+// collection's caption.
 function periodNav(agencyId, collectionId, period){
-  return {tier:"period", agencyId, collectionId, period: String(period)};
+  return {tier:"agency", agencyId, setPeriod: String(period), focusCollection: collectionId};
 }
-// A REAL LINK TO A PERIOD'S COMPOSITION (criteria 5 and 6). It keeps the date
-// on show, because the href is the route alone and the query stays as it is.
+// A REAL LINK (criteria 5 and 6): its href is the agency page with the period
+// set and the date on show kept, so a middle-click opens the same thing.
 function periodLinkHtml(agencyId, collectionId, period, label){
   const nav = periodNav(agencyId, collectionId, period);
-  return `<a href="${escAttr(navHref(nav))}" data-nav='${escAttr(JSON.stringify(nav))}' data-period-link>${label}</a>`;
+  const url = new URL(location.href);
+  url.searchParams.set(PERIOD_PARAM, String(period));
+  const href = url.pathname + url.search + stateToHash({tier:"agency", agencyId});
+  return `<a href="${escAttr(href)}" data-nav='${escAttr(JSON.stringify(nav))}' data-period-link>${label}</a>`;
 }
 // The same link from a dataset's own pages, where only its id is to hand.
 function periodLinkFor(datasetId, period, label){
@@ -13596,7 +13627,7 @@ renderInPlaceOnRangeNotice();
    entry replaced rather than added - and with none chosen every page is as
    it was.
 ========================================================================= */
-const PERIOD_PARAM = "period";
+var PERIOD_PARAM = "period";  // a var: links built in the first render read it before this line runs
 // A var, hoisted: the date control's renderers read it at boot, before this
 // block runs, and a let read there throws.
 var CURRENT_PERIOD = null;
