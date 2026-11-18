@@ -6175,3 +6175,13 @@ could never have computed it), and it belongs with batch 5's check work.
      supply has no period is a design question, not a fix. REQ-PIPE-379
      criterion 5 stays unmet pointing here; REQ-PIPE-385's no-synthetic-folder
      test runs on an asset with a calendar instead. Not scoped yet.
+
+142. **[todo, 2026-11-18]** **[Testing & dev tooling]** **The session-start hook drops every leftover test database - including those of a test run still going.**
+     Seen 2026-11-18 evening: a context compaction re-ran the SessionStart
+     hook, which reported "Dropped 59 leftover test database(s)" while a
+     chunked full gate was mid-chunk under MOTHMAN_TEST_DB_TAG=gatec. That
+     chunk's tests then failed (no database) and the chunk had to be re-run.
+     The hook cannot tell a leftover from a live one. Possible fixes: skip a
+     database with a live connection (pg_stat_activity), or skip tagged ones
+     whose tag a running pytest carries. Not scoped.
+

@@ -17069,3 +17069,14 @@ twice. It deliberately did not re-find the `TypeError`.
        length of a gate chunk. Fixed the same way (one collection stated as its
        premise); the module passes in 6 seconds. Two cases found by a gate
        rather than by a guard is the argument for the guard above.
+
+486. **[done, 2026-11-18]** **[QA pipeline]** **Mental Health's dbt check `contact_in_its_week` named no measure, so its dashboard figure would read only 'Value (count)'.**
+     Found by the full gate on group C (tests/test_check_measures.py's
+     `test_every_declared_rule_kind_names_its_measure`, failing on
+     `dbt:contact_in_its_week`). REQ-QAC-350 added the singular test and its
+     check prose but no `measures:`, and its kind is the collection's own, so
+     MEASURES has no entry for it. Fixed in configuration, as REQ-DASH-299
+     criterion 1 puts a collection's own measure: `measures: Contacts outside
+     the week` on the check in assets/daily/dbt/models/mental-health/schema.yml.
+     The existing test was the failing-first test; it passes after the fix.
+     Minor (a label), so fixed without Keith under the amended standing rule.
