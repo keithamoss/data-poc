@@ -16561,7 +16561,7 @@ twice. It deliberately did not re-find the `TypeError`.
      form the guard already accepts as covered, with a comment saying what is
      read. The guard and the module pass.
 
-459. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **TestOweNothingQuarter still fails beside other modules, and still passes alone.**
+459. **[done, 2026-11-18]** **[Testing & dev tooling]** **TestOweNothingQuarter still fails beside other modules, and still passes alone.**
      244d7db0's gate, chunk 00 (twenty modules, `-n auto`):
      `tests/test_period_opening.py::TestOweNothingQuarter::test_readers_of_case_workers_promote_in_a_quarter_it_sits_out`
      failed promoting Case Workers into its made-up Q2 - refused, "it is
@@ -16583,6 +16583,27 @@ twice. It deliberately did not re-find the `TypeError`.
        (scratchpad/i459/list_00, log_00.txt). The chunk's per-worker order
        was not recorded (`-rfE` only); a run with `-v` would name the
        failing worker's preceding tests.
+     - **Failed a third time, dc1881c2's gate (2026-11-18)**, chunk 00 on gw1
+       (written up first as #476, folded in here).
+     - **Root cause, reproduced deterministically (2026-11-18)**: run
+       `tests/test_recheck.py::TestWhatIsOwed` - or any class using the
+       `cp_duckdb_dir` fixture - before the class, serially, and it fails
+       every time (1 failed, 4 passed); alone it passes. THE TEST'S PREMISE
+       WAS WRONG, NOT THE PRODUCT. Its made-up 2099 Q2 is a quarter Case
+       Workers' real participation ([February, August]) owes nothing in, and
+       the test patched only Q4 as sat out, leaving Q2 to the real schedule.
+       Alone, Case Workers had no earlier promoted supply, so there was
+       nothing to inherit and Q2 opened owed. After a module that stages and
+       promotes Case Workers fixture data, there is one, so Q2 opened
+       INHERITED - the right answer for the configuration it read - and the
+       test's own promotion into it was refused.
+     - **Fixed in the test**: it now states its premise, patching
+       `inheritance._does_not_participate` so Case Workers owes Q2 and sits
+       out Q4, whatever an earlier module left promoted. Seen failing before
+       (the order above, unpatched) and passing after (the same order, 5
+       passed; alone, 1 passed). No product change: an order-dependent
+       answer here was the schedule answering a question the test had not
+       meant to ask.
 
 460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
      Found building REQ-TEST-402, by its own writer guard rather than by
@@ -16822,24 +16843,4 @@ twice. It deliberately did not re-find the `TypeError`.
        `test` and `ci` that is the fixed anchor; a real deployment holds no
        synthetic asset folder, so it never reads one.
 
-476. **[investigate, 2026-11-18]** **[Testing & dev tooling]** **`test_readers_of_case_workers_promote_in_a_quarter_it_sits_out` failed once in a full gate and has not failed since.**
-     Seen in the chunked full gate on dc1881c2 (2026-11-18, chunk 00, four
-     workers, on gw1): Case Workers' Q2 opened as INHERITED - "nothing was
-     owed for this period" - so the test's own promotion of the Q2 supply was
-     refused (`DecisionRefused`, promotion.py `_refuse_what_the_slot_forbids`).
-     The test assigns Case Workers to a fake 2099 Q2 and expects that quarter
-     owed; it opened owed nothing instead.
-     - **Not reproduced**: alone (15 passed), after the eleven modules that
-       preceded it in its chunk run serially in the same order (429 passed),
-       and in 8 serial re-runs of the class (8 passed). Under xdist a module
-       shares its worker with others the scheduler picks, so the failing
-       run's neighbours are not known.
-     - **Where to look when it recurs**: whether Q2 is owed is
-       inheritance._does_not_participate's delivery-months branch - the round
-       that fills the fake Q2 (files_go_to_period) and whether that round's
-       month is one Case Workers owes, read through slots and periods that
-       are worked out once per agreement (REQ-PIPE-400's memo). A module run
-       earlier on the same worker that leaves a remembered value behind for
-       the same agreement would explain an order-dependent answer.
-     - **Not a flake**: left open until it is reproduced or explained. The
-       next full gate records whether it recurs.
+476. **[superseded, 2026-11-18]** **[Testing & dev tooling]** **`test_readers_of_case_workers_promote_in_a_quarter_it_sits_out` failed once in a full gate and has not failed since.** The same failure as #459, folded into it with its root cause and fix.

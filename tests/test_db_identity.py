@@ -402,7 +402,11 @@ class TestEveryPlaceMarksItsOwn:
                        env={"CLAUDE_ENV_FILE": str(env_file), "PATH": "/usr/bin:/bin"},
                        check=True)
         written = env_file.read_text()
-        assert "MOTHMAN_SUPPLY_DSN" not in written and "/supply" not in written
+        # It may UNSET one a parent left behind (#474); it never sets one.
+        assert not [line for line in written.splitlines()
+                    if "MOTHMAN_SUPPLY_DSN=" in line], written
+        assert "/supply" not in written
+        assert "unset MOTHMAN_ASSET MOTHMAN_SUPPLY_DSN" in written
         assert "export PG" not in written, "libpq's variables, rejected by Keith"
         assert 'export MOTHMAN_PG="postgresql://user:password@localhost:5432"' in written
         assert "export MOTHMAN_TEST_DSN=" in written
