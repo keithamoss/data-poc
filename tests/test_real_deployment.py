@@ -73,8 +73,11 @@ class TestItRunsWithTheSyntheticSideAbsent:
         check = deployment["check"]
         _ok(check)
         flat = " ".join(check.stdout.split())
-        assert "Every gate that applies passed except the Python suite, which was skipped - " \
-               "not applicable (no synthetic/ folder): providers, scenarios, scenario map." in flat, \
+        for gate in ("providers", "scenarios", "scenario map"):
+            assert f"{gate} │ not applicable (no synthetic/ folder)" in flat, gate
+        assert "FAILED" not in flat, check.stdout[-3000:]
+        assert "Every gate that applies passed" in flat and \
+            "not applicable (no synthetic/ folder): providers, scenarios, scenario map." in flat, \
             check.stdout[-3000:]
 
     @pytest.mark.parametrize("argv", [["--help"], ["pipeline", "--help"], [ea.SHORT, "--help"]],

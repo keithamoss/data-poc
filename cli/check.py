@@ -625,6 +625,11 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         console.print(f"Incomplete - no toolchain for: {', '.join(skipped)}. "
                       f"Everything that ran, passed. See CLAUDE.md's "
                       f"environment-setup bullet.", style="yellow")
+    elif warned and not_applicable:
+        # THE GATES THAT DO NOT APPLY ARE STILL NAMED (REQ-PIPE-385 criterion 8),
+        # under the warning rather than in place of it.
+        console.print(f"Every gate that applies passed - {NOT_APPLICABLE_TEXT}: "
+                      f"{', '.join(not_applicable)}.", style="green")
     elif warned:
         pass  # already said above; "Every gate passed" would talk over it
     elif only is not None and not_applicable:

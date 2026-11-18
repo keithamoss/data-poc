@@ -347,3 +347,31 @@ workers with it rather than running beside one busy worker.
 Whenever a full local run happens anyway (not a reason to run one
 that selective testing above would otherwise skip), note the real
 number here.
+
+-> **2026-11-18, the profile (Keith: profile first).** From the full chunked gate
+on dc1881c2 (both halves, run in 20 module chunks with 4 workers each plus the
+browser module; read from each chunk's junit file, so a module's time includes
+its fixtures' setup). 1 failed (an order-dependent test_period_opening case,
+post-build-review entry pending), coverage 95%. The slowest modules:
+
+```
+dc1881c2 chunked gate, 2026-11-18: 8452 tests, summed test time 164.7 min (wall 22:31-23:48 UTC, 77 min, 20 chunks + browser chunk)
+  47.8 min    439 tests  tests/test_dashboard_e2e.py
+  10.0 min     46 tests  tests/test_package_gate.py
+   8.4 min     50 tests  tests/test_cli_package_gate.py
+   7.3 min     66 tests  tests/test_door_flag_parity.py
+   3.3 min     14 tests  tests/test_strict_cross_table.py
+   3.1 min     12 tests  tests/test_settlement_rechecks_readers.py
+   3.0 min      7 tests  tests/test_queue_beneath.py
+   2.8 min     34 tests  tests/test_replay_inputs.py
+   2.8 min     31 tests  tests/test_embed_dashboard_data.py
+   2.7 min     23 tests  tests/test_config_pin.py
+   2.7 min      2 tests  tests/test_one_asset_beside_another.py
+   2.6 min     33 tests  tests/test_cli_cp.py
+   2.4 min     13 tests  tests/test_root_cause_shouts.py
+   2.3 min     24 tests  tests/test_last_planted_scenarios.py
+   2.2 min     56 tests  tests/test_choose_file.py
+```
+
+The browser module is over a quarter of all test time; the three gate-support
+modules (package gate, its CLI, door-flag parity) another sixth.
