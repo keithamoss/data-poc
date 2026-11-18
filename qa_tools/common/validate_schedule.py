@@ -214,7 +214,8 @@ _SHAPES: dict[str, str] = {
     "period": "the period's name, like 2027-Q1",
     "date": "the date the supply is expected, as YYYY-MM-DD",
     "delivery_months": "a list of full month names, like [February, August]",
-    "participates": "`all`, or a list of full month names, like [February, August]",
+    "participates": "`all`, or a list of full month names, like [February, August] - or, on a "
+                    "daily baseline, full weekday names, like [Monday, Thursday]",
     "expected_time": "a 24-hour time of day, like 09:00 or 14:00",
     "days_before": "a whole number of days, 0 or more, like 1",
     "grace": "a duration with its unit, like 1h or 8h",
@@ -666,20 +667,54 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
 
 
 def _month_errors(scope: str, calendar_name: str, calendar: dict, months, src: Source) -> list[ConfigError]:
+    """A written participates list against the calendar versions it overlaps
+    (REQ-PIPE-110 criteria 5 and 7, REQ-PIPE-346 criteria 2 and 3): one
+    vocabulary, the one each version takes - months for authored dates,
+    weekdays for a daily rule - and every name a real one."""
     if not months or not isinstance(months, list):
         return []
     out: list[ConfigError] = []
 
     versions = calendar.get("versions") or []
+    vocabulary = schedule.vocabulary_of(months)
+    if vocabulary == "both":
+        return [ConfigError(
+            src.name, scope,
+            f"names both months and weekdays under `participates:` ({months!r}).",
+            "Name the baseline's rounds in one vocabulary - full month names for an authored "
+            "calendar, full weekday names for a daily rule.")]
     rule_driven = any((v or {}).get("cadence") for v in versions)
-    if rule_driven:
+    authored = any((v or {}).get("dates") for v in versions)
+    if vocabulary == schedule.MONTHS and rule_driven:
         out.append(ConfigError(
             src.name, scope,
-            f"names delivery months under `participates:` against {calendar_name!r}, which is a cadence RULE "
-            f"rather than an authored date list.",
-            "Write `participates: all`. A rule-driven calendar has no months to pick from, and "
-            "a dataset that 'participates in February' of a daily feed is asking for "
-            "something the model cannot honour."))
+            f"names delivery months ({_month_list(_months_owed(months, calendar))[1:-1]}) under "
+            f"`participates:` against {calendar_name!r}, which is a cadence RULE "
+            f"rather than an authored date list - a daily rule takes weekdays.",
+            "Write `participates: all`, or the weekdays it supplies on in full, like [Monday]. A "
+            "rule-driven calendar has no months to pick from, and a dataset that 'participates in "
+            "February' of a daily feed is asking for something the model cannot honour."))
+        return out
+    if vocabulary == schedule.WEEKDAYS and authored:
+        out.append(ConfigError(
+            src.name, scope,
+            f"names weekdays ({_month_list(_months_owed(months, calendar))[1:-1]}) under "
+            f"`participates:` against {calendar_name!r}, which is an authored "
+            f"date list rather than a daily rule - an authored calendar takes months.",
+            "Write `participates: all`, or the months whose rounds it supplies in, in full, like "
+            "[February, August]. An authored calendar's rounds are named by month."))
+        return out
+
+    if vocabulary == schedule.WEEKDAYS or (vocabulary is None and rule_driven):
+        for value in months:
+            if not isinstance(value, str) or value.strip().lower() not in (
+                    n.lower() for n in schedule.WEEKDAY_NAMES):
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"names {value!r} under `participates:`, which is not a weekday.",
+                    f"Write the full English weekday name - one of: "
+                    f"{', '.join(schedule.WEEKDAY_NAMES)}. Abbreviations and numbers are not "
+                    f"accepted."))
         return out
 
     available = set()
@@ -740,6 +775,8 @@ def _expects_nothing_errors(raw: dict, src: Source) -> list[ConfigError]:
             continue  # a rule generates a period every day; it cannot be empty
 
         months = dataset.get("delivery_months")
+        if months and schedule.vocabulary_of(months) != schedule.MONTHS:
+            continue  # weekdays against authored dates: refused already, by name
         wanted = {n for n in (_month_number(m) for m in (months or [])) if n}
         periods = set()
         for version in versions:
@@ -1225,25 +1262,36 @@ def _governing(versions: list[dict], start: str, end: str | None) -> list[dict] 
     return hit
 
 
-def _months_owed(value, calendar: dict) -> set[int]:
-    """The months a raw participates value owes - every month the calendar
-    carries for `all` or a value nobody stated."""
+def _months_owed(value, calendar: dict) -> set[str]:
+    """The rounds a raw participates value owes, by full name - months or
+    weekdays (REQ-PIPE-346 criterion 4) - and for `all` or a value nobody
+    stated, every weekday on a daily rule or every month the calendar
+    carries."""
     if isinstance(value, list):
-        return {n for n in (_month_number(m) for m in value) if n is not None}
+        vocabulary = schedule.vocabulary_of(value)
+        if vocabulary == schedule.WEEKDAYS:
+            known = {n.lower(): n for n in schedule.WEEKDAY_NAMES}
+            return {known[v.strip().lower()] for v in value
+                    if isinstance(v, str) and v.strip().lower() in known}
+        return {_MONTHS[n - 1] for n in (_month_number(m) for m in value) if n is not None}
     carried = set()
     for version in (calendar.get("versions") or []):
         if (version or {}).get("cadence"):
-            return set(range(1, 13))
+            return set(schedule.WEEKDAY_NAMES)
         for entry in ((version or {}).get("dates") or []):
             try:
                 carried.add(date.fromisoformat(str((entry or {}).get("date"))).month)
             except (TypeError, ValueError):
                 continue
-    return carried or set(range(1, 13))
+    return {_MONTHS[m - 1] for m in (carried or set(range(1, 13)))}
 
 
-def _month_list(months) -> str:
-    return "[" + ", ".join(_MONTHS[m - 1] for m in sorted(months)) + "]"
+_ROUND_ORDER = {n: i for i, n in enumerate(_MONTHS + schedule.WEEKDAY_NAMES)}
+
+
+def _month_list(names) -> str:
+    """'[February, August]' or '[Monday, Thursday]', in calendar order."""
+    return "[" + ", ".join(sorted(names, key=lambda n: _ROUND_ORDER.get(n, 99))) + "]"
 
 
 def _since(iso: str) -> str:
@@ -2076,8 +2124,8 @@ def _days_before_errors(cal_raw: dict, src: Source) -> list[ConfigError]:
                 # ONLY ITS OWN ROUNDS (critic finding 4): a round it supplies
                 # nothing in has no slot of its to be due. Still measured
                 # against the calendar round just before (PROVISIONAL).
-                months = schedule.delivery_months(did, rnd.date, agr)
-                if months is not None and rnd.date.month not in months:
+                version = agr.participation_on(did, rnd.date)
+                if version is not None and not version.owes_round(rnd.date):
                     continue
                 if rnd.date - timedelta(days=days) >= rounds[i - 1].date:
                     continue
@@ -2132,8 +2180,8 @@ def _participates_in(did: str, rnd, agr) -> tuple[bool, str]:
     standing = agr.standing_on(did, rnd.date)
     if standing.state == agreement_mod.TURNED_OFF:
         return False, f"it is turned off on the {_day(rnd.date)} round"
-    months = schedule.delivery_months(did, rnd.date, agr)
-    if months is not None and rnd.date.month not in months:
+    version = agr.participation_on(did, rnd.date)
+    if version is not None and not version.owes_round(rnd.date):
         return False, f"it does not supply in the {_day(rnd.date)} round"
     return True, ""
 

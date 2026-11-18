@@ -194,10 +194,10 @@ def test_the_not_owed_reason_names_the_round(monkeypatch):
 
 def test_three_rounds_are_listed_with_commas(monkeypatch):
     """Critic finding 9: three months read 'February and May and August'."""
-    real = schedule.delivery_months
-    monkeypatch.setattr(schedule, "delivery_months",
-                        lambda did, on=None, agreement=None: [2, 5, 8]
-                        if did == "cp-case-workers" else real(did, on, agreement))
+    # The names a version owes are schedule.subset_names' (REQ-PIPE-346);
+    # three of them, whatever the real file says.
+    monkeypatch.setattr(schedule, "subset_names",
+                        lambda vocabulary, values: ["February", "May", "August"])
     _, reason = inheritance._does_not_participate("cp-case-workers", "2024-Q1")
     assert "supplies only in the February, May and August rounds" in reason
 

@@ -224,7 +224,7 @@ def _owes_nothing(dataset_id: str, period: str) -> str | None:
         first = schedule.owes_from(dataset_id)
         return (f"it is before {dataset_id} began owing supplies"
                 + (f" on {first.isoformat()}" if first else ""))
-    if version.participates is not None and on.month not in version.participates:
+    if not version.owes_round(on):
         return f"it does not participate in that period: {version.reason or 'no reason given'}"
     return "the participation configuration owes nothing there"
 

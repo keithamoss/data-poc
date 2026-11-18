@@ -60,11 +60,14 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
             out.append({**row, "kind": TURNED_OFF, "reason": standing.turned_off.reason,
                         "months": None})
             continue
-        months = schedule.delivery_months(dataset_id, rnd.date, agr)
-        if months is not None and rnd.date.month not in months:
-            version = agr.participation_on(dataset_id, rnd.date)
+        version = agr.participation_on(dataset_id, rnd.date)
+        if version is not None and not version.owes_round(rnd.date):
+            # BY MONTH OR BY WEEKDAY (REQ-PIPE-346 criterion 5), each in its
+            # own key so a weekday list is never read as months.
+            weekdays = version.vocabulary == schedule.WEEKDAYS
             out.append({**row, "kind": PARTICIPATION, "reason": (version.reason or "").strip(),
-                        "months": sorted(months)})
+                        "months": None if weekdays else sorted(version.participates),
+                        **({"weekdays": sorted(version.participates)} if weekdays else {})})
         elif period.name in skipped:
             out.append({**row, "kind": NOT_EXPECTED, "reason": skipped[period.name],
                         "months": None})

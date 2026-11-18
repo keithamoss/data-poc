@@ -217,10 +217,13 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     # into Q2 and Q4'.
     from qa_tools.common import files_go
     fill = files_go.rounds_fill(dataset, months, _at.local_date(_at.now())) if months else None
-    console.print(f"  participates: "
-                   f"{', '.join(schedule.MONTH_NAMES[m - 1] for m in months) if months else 'all'}"
+    # WEEKDAYS IN THE FORM MONTHS ARE SHOWN (REQ-PIPE-346 criterion 6) -
+    # from the version in force, as the reason is.
+    named = (in_force.names() if in_force is not None and in_force.vocabulary != schedule.MONTHS
+             else [schedule.MONTH_NAMES[m - 1] for m in months] if months else [])
+    console.print(f"  participates: {', '.join(named) if named else 'all'}"
                    + (f" - {fill}" if fill else "")
-                   + (f" [dim]- {in_force.reason}[/dim]" if months and in_force and in_force.reason
+                   + (f" [dim]- {in_force.reason}[/dim]" if named and in_force and in_force.reason
                       else ""), highlight=False)
     # Shown in the form the config authors it in - `14d`, not
     # `14 days, 0:00:00` (post-build-review #27).

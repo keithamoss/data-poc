@@ -175,8 +175,9 @@ def _text(key: str, version, dataset_id: str, on: date, agr) -> str:
     if key == "participates":
         if value is None:
             return "every period"
-        months = ", ".join(schedule.MONTH_NAMES[m - 1] for m in value)
-        return months + (f" - {version.reason}" if version.reason else "")
+        # MONTHS OR WEEKDAYS, in the same form (REQ-PIPE-346 criterion 6).
+        named = ", ".join(version.names())
+        return named + (f" - {version.reason}" if version.reason else "")
     if key in ("grace", "claim_window"):
         if value is None:
             if key == "claim_window":

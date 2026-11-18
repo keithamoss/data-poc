@@ -48442,7 +48442,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever maintains the delivery agreement, I want participates to name which of the baseline's periods a dataset owes in whatever terms that baseline has - months for a quarterly asset, weekdays for a daily one - so that a weekly dataset on the daily asset is stated as plainly as a twice-yearly one on the quarterly asset.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48464,10 +48464,33 @@ requirements:
     - REQ-PIPE-110
     - REQ-PIPE-181
     - REQ-PIPE-098
+    linked_tests:
+    - tests/test_weekday_participation.py
+    - tests/test_offset_group_inheritance.py
+    implemented_by:
+    - asset_model/schedule.py::parse_participates
+    - asset_model/schedule.py::parse_weekday_name
+    - asset_model/schedule.py::vocabulary_of
+    - asset_model/schedule.py::round_key
+    - asset_model/schedule.py::supplies_in_round
+    - asset_model/agreement.py::ParticipationVersion
+    - asset_model/agreement.py::resolve
+    - qa_tools/common/validate_schedule.py::_month_errors
+    - qa_tools/common/validate_schedule.py::_months_owed
+    - qa_tools/common/inheritance.py::_owed_nothing_by_participation
+    - qa_tools/common/participation_view.py::_text
+    - cli/schedule.py
+    - pipeline/owed_nothing.py
+    evidence:
+    - '2026-11-18, built on wip/groupA: tests/test_weekday_participation.py written first and seen failing (6 failed, 14 passed - the parse, the gate and inheritance - before any code), then 20 passed; the schedule, agreement, inheritance, slots, verdict, correction-trial, owed-nothing and CLI schedule modules 544 passed after one test that patched delivery_months was repointed. The full gate''s result is in the commit that carries it.'
     decisions:
     - 'WEEKDAY PARTICIPATION IS NEW AND NEEDED (Keith, 2026-10-31): participates names months only today, and REQ-PIPE-110 criterion 7 refuses months on a cadence-rule calendar.'
     - 'ONE KEY, ITS VOCABULARY SET BY THE BASELINE (delivery-scoper): criterion 1. REJECTED a second key (participates_weekdays), which every reader would have to learn and which two versions could both state.'
     - 'THE WEEKDAY OF THE ROUND''S CALENDAR DATE, NOT OF THE DUE INSTANT (delivery-scoper, following REQ-PIPE-110 criterion 5''s month rule): with days_before 1, a Monday supply due 22:00 on Sunday is still a Monday round.'
+    - 'ONE FIELD BESIDE THE LIST, NOT A SECOND LIST (built 2026-11-18): a resolved version carries participates as numbers and a vocabulary (months 1-12, weekdays Monday 0), set by the names written and travelling with the list when it resolves from a collection, as reason does. Every reader asks the version (owes_round, names) rather than testing a month, so a later vocabulary is one entry in asset_model/schedule.py.'
+    - 'DELIVERY_MONTHS STAYS MONTHS (built 2026-11-18): it answers None for a weekday list - every month owed in - so a caller that still reads months cannot take weekdays for them; whether a round is owed is owes_round''s to say. The owed-nothing rows carry a weekday list under its own key, weekdays, never under months.'
+    - 'A LIST OF NEITHER IS REFUSED NAMING BOTH (built 2026-11-18): Mon, 0 or a typo is neither a full month nor a full weekday name, and the refusal says so rather than guessing which vocabulary was meant.'
+    - 'INHERITANCE ON A DAILY RULE ASKS THE ROUND DIRECTLY (built 2026-11-18): an authored calendar''s periods are enumerated and compared with its slots as before; a daily rule has no end to enumerate to, so a day off a weekday list is decided by the round that fills it, owes_round on its date.'
     open_questions: []
   - id: REQ-DASH-347
     title: The dashboard words a dataset's participation in its baseline's own terms - 'Weekly (Monday)', 'Weekdays', 'Not owed — it supplies only on Mondays' - wherever it words months today

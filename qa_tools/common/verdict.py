@@ -120,6 +120,9 @@ def resolved(dataset_id: str, period_date: date, agreement=None, *,
             "grace": _seconds(version.grace),
             "claim_window": _seconds(version.claim_window),
             "days_before": version.days_before,
+            # Only where it names weekdays (REQ-PIPE-346), so every verdict
+            # recorded against months reads exactly as before.
+            **({"vocabulary": version.vocabulary} if version.vocabulary != "months" else {}),
         },
         # The calendar version's OWN settings, never its dates (B3).
         "calendar": {

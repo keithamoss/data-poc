@@ -87,6 +87,26 @@ class ParticipationVersion:
     #: The dates of this version's changelog entries carrying
     #: `turns_off: true`, oldest first (criteria 40 and 41).
     turns_off_logged: tuple[date, ...] = ()
+    #: What `participates` names - schedule.MONTHS (1-12) or schedule.WEEKDAYS
+    #: (Monday 0) - set by the names written, and travelling with the list
+    #: when it resolves from a level above (REQ-PIPE-346 criterion 4).
+    vocabulary: str = "months"
+
+    def owes_round(self, on: date) -> bool:
+        """Whether this version owes the round dated `on` - by the month, or
+        weekday, of its calendar date (REQ-PIPE-346 criterion 1)."""
+        from asset_model import schedule
+
+        return (self.participates is None
+                or schedule.round_key(self.vocabulary, on) in self.participates)
+
+    def names(self) -> list[str]:
+        """The rounds it owes, by full name in its own vocabulary - empty
+        for every round."""
+        from asset_model import schedule
+
+        return (schedule.subset_names(self.vocabulary, self.participates)
+                if self.participates else [])
 
     def off_after(self, on: date) -> bool:
         """Whether this version, as written, has stopped governing by `on`."""
@@ -360,7 +380,9 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
             sources[key] = (FALLBACK, None)
     level = sources[PARTICIPATES][0]
     reason = (mine.reason if level == DATASET else above.reason if level == COLLECTION else None)
-    return replace(mine, participates=picked[PARTICIPATES], reason=reason,
+    vocabulary = (mine.vocabulary if level == DATASET else above.vocabulary if level == COLLECTION
+                  else "months")
+    return replace(mine, participates=picked[PARTICIPATES], reason=reason, vocabulary=vocabulary,
                    expected_time=picked["expected_time"], grace=picked["grace"],
                    claim_window=picked["claim_window"], days_before=picked["days_before"],
                    sources=MappingProxyType(sources))
@@ -420,15 +442,18 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
                     if raw.get("effective_to") is not None else None)
     inherits = frozenset(k for k in VALUES if raw.get(k) == INHERIT)
     raw = {k: v for k, v in raw.items() if k not in inherits}
-    months = raw.get(PARTICIPATES)
-    if months is None or months == ALL:
+    written = raw.get(PARTICIPATES)
+    vocabulary = schedule.MONTHS
+    if written is None or written == ALL:
         participates = None
-    elif isinstance(months, list) and months:
-        participates = tuple(schedule.parse_month_name(m, f"{where} participates") for m in months)
+    elif isinstance(written, list) and written:
+        # MONTHS OR WEEKDAYS, by the names written (REQ-PIPE-346 criterion 1);
+        # which the baseline takes is checked against each calendar version.
+        vocabulary, participates = schedule.parse_participates(written, f"{where} participates")
     else:
         raise schedule.ScheduleConfigError(
-            f"{where}: participates is {months!r} - write `all`, or a list of full month names "
-            f"like [February, August].")
+            f"{where}: participates is {written!r} - write `all`, or a list of full month names "
+            f"like [February, August] (or, on a daily baseline, weekdays like [Monday]).")
     grace = raw.get("grace")
     window = raw.get("claim_window")
     days_before = raw.get("days_before", 0)
@@ -440,7 +465,7 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
             f"more, like 1 for a supply due the evening before its period's date.")
     return ParticipationVersion(
         effective_from=schedule.as_date(raw.get("effective_from"), f"{where} effective_from"),
-        participates=participates,
+        participates=participates, vocabulary=vocabulary,
         reason=(str(raw["reason"]).strip() if raw.get("reason") else None),
         expected_time=(str(raw["expected_time"]) if raw.get("expected_time") is not None else None),
         grace=schedule.parse_duration(grace, f"{where} grace") if grace is not None else None,

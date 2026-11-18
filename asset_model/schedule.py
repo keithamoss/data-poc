@@ -67,6 +67,14 @@ from asset_model import asset_time, derived, hierarchy, in_force
 # calendar is edited or reordered, where a name simply stops matching.
 MONTH_NAMES: tuple[str, ...] = tuple(_calendar.month_name[i] for i in range(1, 13))
 _MONTH_BY_LOWER = {name.lower(): i for i, name in enumerate(MONTH_NAMES, start=1)}
+# WEEKDAYS ON A DAILY BASELINE (REQ-PIPE-346): Monday is 0, as date.weekday()
+# numbers them, and full names only, for the reason months are.
+WEEKDAY_NAMES: tuple[str, ...] = tuple(_calendar.day_name[i] for i in range(7))
+_WEEKDAY_BY_LOWER = {name.lower(): i for i, name in enumerate(WEEKDAY_NAMES)}
+#: The vocabularies `participates` names a baseline's rounds in - the month of
+#: an authored calendar's round, the weekday of a daily rule's (REQ-PIPE-346
+#: criterion 1). A later one - days of the month, say - is one more entry here.
+MONTHS, WEEKDAYS = "months", "weekdays"
 
 # A duration carrying its own unit - `14d`, `4h`. One accepted form per
 # unit, validated rather than coerced: a new parser is a new thing to
@@ -268,6 +276,67 @@ def parse_month_name(value, where: str) -> int:
             f"{', '.join(MONTH_NAMES)} - abbreviations, numbers and positions are not accepted, "
             f"because an index breaks silently when a calendar is edited or reordered.")
     return number
+
+
+def parse_weekday_name(value, where: str) -> int:
+    """A full weekday NAME as its date.weekday() number (Monday 0),
+    case-insensitively - abbreviations, numbers and positions rejected, as
+    for months (REQ-PIPE-346 criterion 2)."""
+    number = _WEEKDAY_BY_LOWER.get(str(value).strip().lower()) if isinstance(value, str) else None
+    if number is None:
+        raise ScheduleConfigError(
+            f"{where}: {value!r} is not a full weekday name. Expected one of "
+            f"{', '.join(WEEKDAY_NAMES)} - abbreviations, numbers and positions are not accepted, "
+            f"because an index breaks silently when a calendar is edited or reordered.")
+    return number
+
+
+def vocabulary_of(values) -> str | None:
+    """MONTHS or WEEKDAYS for a written participates list - by the names it
+    holds - or None where it holds neither. A list of both is refused."""
+    lowered = {str(v).strip().lower() for v in values if isinstance(v, str)}
+    months, days = lowered & _MONTH_BY_LOWER.keys(), lowered & _WEEKDAY_BY_LOWER.keys()
+    if months and days:
+        return "both"
+    return MONTHS if months else WEEKDAYS if days else None
+
+
+def parse_participates(values, where: str) -> tuple[str, tuple[int, ...]]:
+    """(vocabulary, numbers) for a written participates list (REQ-PIPE-346
+    criteria 1 and 2): every value a full month name, or every one a full
+    weekday name."""
+    vocabulary = vocabulary_of(values)
+    if vocabulary == "both":
+        raise ScheduleConfigError(
+            f"{where}: {list(values)!r} names both months and weekdays. Name the baseline's "
+            f"rounds in one vocabulary - months for an authored calendar, weekdays for a "
+            f"daily rule.")
+    if vocabulary is None:
+        raise ScheduleConfigError(
+            f"{where}: {values[0]!r} is not a full month name, and not a full weekday name "
+            f"either. Expected months like February, or weekdays like Monday - abbreviations, "
+            f"numbers and positions are not accepted.")
+    parse = parse_weekday_name if vocabulary == WEEKDAYS else parse_month_name
+    return vocabulary, tuple(parse(v, where) for v in values)
+
+
+def round_key(vocabulary: str, on: date) -> int:
+    """What a round dated `on` is called in `vocabulary` - the month of its
+    calendar date, or its weekday (REQ-PIPE-346 criterion 1)."""
+    return on.weekday() if vocabulary == WEEKDAYS else on.month
+
+
+def subset_names(vocabulary: str, values) -> list[str]:
+    """Each value's full name, in the order the vocabulary runs."""
+    if vocabulary == WEEKDAYS:
+        return [WEEKDAY_NAMES[v] for v in sorted(values)]
+    return [MONTH_NAMES[v - 1] for v in sorted(values)]
+
+
+def said(names) -> str:
+    """'February', 'February and August', 'February, May and August'."""
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _parse_version(raw: dict, calendar_name: str, index: int) -> CalendarVersion:
@@ -580,10 +649,13 @@ def delivery_months(dataset_id: str, on: date | None = None,
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         return None
-    if on is None:
-        return agreement.resolved_versions(dataset_id)[-1].participates
-    version = agreement.participation_on(dataset_id, on)
-    return version.participates if version else None
+    version = (agreement.resolved_versions(dataset_id)[-1] if on is None
+               else agreement.participation_on(dataset_id, on))
+    if version is None or version.vocabulary != MONTHS:
+        # A WEEKDAY LIST IS NOT MONTHS (REQ-PIPE-346): every month is owed in.
+        # Whether a round is owed is version.owes_round's to say.
+        return None
+    return version.participates
 
 
 def not_expected_periods(dataset_id: str, agreement=None) -> dict[str, str]:
@@ -985,17 +1057,23 @@ def supplies_in_round(dataset_id: str, on: date, agreement=None, *, cal=None,
     # owes nothing, so no period and no slot.
     if agr.standing_on(dataset_id, on).state == TURNED_OFF:
         return False
-    months = delivery_months(dataset_id, on, agr)
-    if months is not None:
-        cal = cal if cal is not None else calendar_for_dataset(dataset_id, agr)
-        if cal.version_in_force(on).is_cadence_rule:
-            # CRITERION 7 PER VERSION: months mean nothing against a cadence
-            # rule, and dropping the period would leave the dataset silently
-            # owing nothing for it.
-            raise ScheduleConfigError(
-                f"dataset {dataset_id!r}'s participation in force on {on.isoformat()} "
-                f"names months, and calendar {cal.name!r} is a cadence rule on that date. "
-                f"Rejected rather than ignored.")
-    # THE MONTH OF THE ROUND'S CALENDAR DATE (REQ-PIPE-110 criterion 5 as
-    # REQ-PIPE-321 amends it), whatever period its files fill.
-    return months is None or on.month in months
+    version = agr.participation_on(dataset_id, on) if agr.dataset(dataset_id) else None
+    if version is None or version.participates is None:
+        return True
+    cal = cal if cal is not None else calendar_for_dataset(dataset_id, agr)
+    # CRITERION 7 PER VERSION, BOTH WAYS (REQ-PIPE-346 criterion 3): months
+    # mean nothing against a cadence rule, weekdays nothing against authored
+    # dates, and dropping the round would leave the dataset silently owing
+    # nothing for it.
+    rule = cal.version_in_force(on).is_cadence_rule
+    if rule != (version.vocabulary == WEEKDAYS):
+        takes = WEEKDAYS if rule else MONTHS
+        raise ScheduleConfigError(
+            f"dataset {dataset_id!r}'s participation in force on {on.isoformat()} "
+            f"names {version.vocabulary}, and calendar {cal.name!r} is "
+            f"{'a cadence rule' if rule else 'authored dates'} on that date, which takes "
+            f"{takes}. Rejected rather than ignored.")
+    # THE MONTH - OR WEEKDAY - OF THE ROUND'S CALENDAR DATE (REQ-PIPE-110
+    # criterion 5 as REQ-PIPE-321 amends it, REQ-PIPE-346 criterion 1),
+    # whatever period its files fill and whatever days_before says.
+    return version.owes_round(on)

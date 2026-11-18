@@ -661,8 +661,6 @@ class InForce:
 
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-_FULL_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
-                "September", "October", "November", "December")
 
 
 def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
@@ -695,8 +693,7 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
         # ROUNDS NAMED BY THEIR MONTH, NOT PERIODS BY THEIRS (REQ-PIPE-327
         # criterion 9): at files_go_to_period 1 a February round's files are
         # not February's period's.
-        months = [_FULL_MONTHS[m - 1] for m in version.participates]
-        said = months[0] if len(months) == 1 else ", ".join(months[:-1]) + " and " + months[-1]
+        said = schedule.said(version.names())
         owes = (f"the {said} rounds only"
                 + (f" - {version.reason}" if version.reason else ""))
     else:

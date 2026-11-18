@@ -127,16 +127,32 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
         on = schedule.round_of(period_name, dataset_id) or on
     except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
         pass
-    months = schedule.delivery_months(dataset_id, on=on) if on else None
-    if (months and period_name in _calendar_period_names(dataset_id)
-            and period_name not in _slot_names(dataset_id)):
-        import calendar
-
-        names = [calendar.month_name[m] for m in months]
-        said = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    # BY MONTH OR BY WEEKDAY (REQ-PIPE-346 criterion 5): a day a weekly
+    # dataset owes nothing in is inherited as a quarter is, with no rule of
+    # its own.
+    version = schedule.agreement_to_read(None).participation_on(dataset_id, on) if on else None
+    if version is not None and version.participates and _owed_nothing_by_participation(
+            dataset_id, period_name, on, version):
+        said = schedule.said(version.names())
         return True, (f"{dataset_id} supplies only in the {said} rounds "
                       f"(its participation in {_assets.config_dir()}/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
+
+
+def _owed_nothing_by_participation(dataset_id: str, period_name: str, on, version) -> bool:
+    """Whether a period of the dataset's own calendar is owed nothing because
+    its participation names a subset. An authored calendar's periods are
+    enumerated and its slots compared; a daily rule has no end to enumerate
+    to, so a weekday list (REQ-PIPE-346 criterion 5) is asked of the round
+    that fills the period directly."""
+    names = _calendar_period_names(dataset_id)
+    if names:
+        return period_name in names and period_name not in _slot_names(dataset_id)
+    try:
+        is_period = schedule.date_of(period_name, dataset_id) is not None
+    except (schedule.ScheduleConfigError, hierarchy.UnknownDatasetError, KeyError, ValueError):
+        return False
+    return is_period and not version.owes_round(on)
 
 
 def not_a_period(dataset_id: str, period_name: str) -> str | None:

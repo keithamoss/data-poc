@@ -180,8 +180,10 @@ collections:
 # carries the dataset's expected time of day and its grace allowance (how
 # long after the expected time a supply still counts as on time), and may
 # override the baseline's claim window. It may say which of the baseline's
-# periods the dataset owes, under `participates:` - delivery months by full
-# name, or `all` - with a `reason:` when it owes only some. Saying nothing
+# periods the dataset owes, under `participates:` - by full name in the
+# baseline's own terms, delivery months on authored dates and weekdays on a
+# daily rule (REQ-PIPE-346), or `all` - with a `reason:` when it owes only
+# some. Saying nothing
 # owes every period. The FIRST version's effective_from is the date the
 # dataset began owing supplies; there is no separate owes_from.
 #
