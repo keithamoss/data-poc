@@ -16821,3 +16821,25 @@ twice. It deliberately did not re-find the `TypeError`.
        is still the selected asset's (history_anchor.for_offsets). Under
        `test` and `ci` that is the fixed anchor; a real deployment holds no
        synthetic asset folder, so it never reads one.
+
+476. **[investigate, 2026-11-18]** **[Testing & dev tooling]** **`test_readers_of_case_workers_promote_in_a_quarter_it_sits_out` failed once in a full gate and has not failed since.**
+     Seen in the chunked full gate on dc1881c2 (2026-11-18, chunk 00, four
+     workers, on gw1): Case Workers' Q2 opened as INHERITED - "nothing was
+     owed for this period" - so the test's own promotion of the Q2 supply was
+     refused (`DecisionRefused`, promotion.py `_refuse_what_the_slot_forbids`).
+     The test assigns Case Workers to a fake 2099 Q2 and expects that quarter
+     owed; it opened owed nothing instead.
+     - **Not reproduced**: alone (15 passed), after the eleven modules that
+       preceded it in its chunk run serially in the same order (429 passed),
+       and in 8 serial re-runs of the class (8 passed). Under xdist a module
+       shares its worker with others the scheduler picks, so the failing
+       run's neighbours are not known.
+     - **Where to look when it recurs**: whether Q2 is owed is
+       inheritance._does_not_participate's delivery-months branch - the round
+       that fills the fake Q2 (files_go_to_period) and whether that round's
+       month is one Case Workers owes, read through slots and periods that
+       are worked out once per agreement (REQ-PIPE-400's memo). A module run
+       earlier on the same worker that leaves a remembered value behind for
+       the same agreement would explain an order-dependent answer.
+     - **Not a flake**: left open until it is reproduced or explained. The
+       next full gate records whether it recurs.

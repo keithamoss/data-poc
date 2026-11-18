@@ -375,3 +375,28 @@ dc1881c2 chunked gate, 2026-11-18: 8452 tests, summed test time 164.7 min (wall 
 
 The browser module is over a quarter of all test time; the three gate-support
 modules (package gate, its CLI, door-flag parity) another sixth.
+
+-> **2026-11-18, the speed batch's after measurement (REQ-PIPE-403 criteria 2, 4, 5
+and 7).** Each asset from empty on this sandbox, `mothman env reset-synthetic` then
+`mothman pipeline bootstrap`, quarterly then daily, at commit 1127e1a4, under py-spy
+(raw, 20 Hz, subprocesses and idle threads). The before is 2026-11-16's (quarterly
+2437s, daily 357s).
+
+```
+quarterly  1413s  OVER the 720s budget by 693s   load 2.42 -> 1.82
+  generation 1m 38s (of it target trials 33s), the one stream (Child Protection,
+  Emergency Department, Linkage Products) 21m, confirmations 17s
+daily       375s  within budget                  load 1.82 -> 1.62
+  generation 58s (of it target trials 45s), Birth Registrations 5m 16s,
+  confirmations under 1s
+```
+
+Where the quarterly stream's 1275s go, from the stream worker's main thread: 825s
+waiting on a run's four tools, which run side by side; the gate 152s; filing 112s;
+recording results 63s; staging 59s. Inside the four tools the dbt worker is the long
+pole (815 thread-seconds against datacontract-cli's 248; Soda and Evidently are
+negligible), and inside the dbt worker parsing the manifest takes 433s of the 695s it
+is busy - once per run. Also running: a session building in another worktree ran
+short test files, single gates, one `mothman check --no-pytest` and a few synthetic
+generations into a scratch folder; no other bootstrap and no full gate.
+

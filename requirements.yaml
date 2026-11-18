@@ -39511,6 +39511,7 @@ requirements:
       - "PROFILE AND MEASUREMENTS, IN PROGRESS - 2026-10-26: WHY CHILD PROTECTION'S PER-QUARTER COST ROSE FROM ABOUT 21s TO ABOUT 33s WITH THE GROWTH: per-run tool time does not grow with the history (2.5s a run in both the grown and original quarters on a quiet container), but recognition does - every arrival re-reads every delivery in the tree, and the ten-year growth roughly quadrupled Child Protection's share of it, so each arrival pays more for the same work. By quarter (qa.run_attempt per period, 2026-10-28): the original fifteen 23.8s of tool time a quarter, the grown ones 13.3s (fewer files where Case Workers owes nothing)."
       - "PROFILE AND MEASUREMENTS, IN PROGRESS - CRITERION 2, NOT MET: from-empty bootstraps on this sandbox, all three collections - 1528s (2026-10-26, Birth Registrations 529s, Child Protection and Emergency Department 1392s) and 1886s (2026-10-28, 652s and 1711s), against 720s. The last before the shrink was 1572s (a3_probe, 2026-10-25)."
       - "STILL UNMET (2026-10-28): Criterion 2 - within 12 minutes from empty, all three collections, in each of three consecutive runs. Measured 1528s and 1886s on this change's two bootstraps against 720s; the shrink removed little (see decisions), and no speed-up has shipped. Keith, 2026-10-18: if 12 minutes is not reached, leave this in progress with the time, the profile and the next speed-ups written up - done in evidence and decisions. Criterion 4 - a speed-up shown by REQ-TEST-239's compare to change nothing a bootstrap records. No speed-up has been made, so there is nothing to compare; each one needs two captures, which waits on Keith's call on bootstrap budget. Criterion 5 - the CI deployment half's cache-miss bootstrap time, recorded alongside. Not measured: this work was not pushed (local commits only, Keith's terms), and a cache-miss CI run is the only source of the figure."
+      - "MEASURED AFTER THE SPEED BATCH (2026-11-18, REQ-PIPE-403's evidence): from empty at commit 1127e1a4, quarterly 1413s (2437s before, 2026-11-16) and daily 375s (357s before). Criterion 2: daily within 720s on one run, quarterly 693s over; three consecutive runs are not claimed for either. The next speed-ups, ranked from the profile, are REQ-PIPE-403's criterion 7 evidence - first, parsing the dbt manifest once per stream rather than once per run (about 400s)."
     open_questions: []
   - id: REQ-PIPE-262
     title: A bootstrap replays the collections that share a calendar as one receipt-ordered stream, as the live pass does, so who
@@ -48676,22 +48677,19 @@ requirements:
     - 'STATUS PASS 2026-11-15 (split T0): met c1-c4, flipped to built with c5 and c6 unmet, blocked by the speed batch. C2 is met in effect only (one calendar per asset), as recorded in evidence.'
     unmet_criteria:
     - criterion: Criterion 5 - each asset's from-empty bootstrap within 12 minutes on this sandbox.
-      why: 'Measured 3 November: daily 11m24s, quarterly 111m09s (plans/morning-reports.md; post-build-review #318). The quarterly asset is about nine times over.'
-      owner: the signed speed batch
+      why: 'Measured 3 November: daily 11m24s, quarterly 111m09s (plans/morning-reports.md; post-build-review #318). Re-measured after the speed batch, 18 November (REQ-PIPE-403''s evidence): daily 375s, within; quarterly 1413s, 693s over. The next speed-ups are named in REQ-PIPE-403''s criterion 7 evidence and not yet scoped.'
+      owner: REQ-PIPE-250, which owns the budget
       blocked_by:
         requirements:
-        - REQ-PIPE-397
-        - REQ-GEN-398
-        - REQ-GEN-399
-        - REQ-PIPE-400
-        - REQ-TEST-402
-        - REQ-PIPE-403
+        - REQ-PIPE-250
     - criterion: Criterion 6 - each asset's bootstrap wall clock alone and side by side recorded in evidence beside the pre-split single bootstrap's figures, with and without the two test collections.
-      why: No side-by-side figures exist, and the measurement is only worth taking once criterion 5's run is within budget.
-      owner: the speed batch's measuring requirement
+      why: No side-by-side figures exist, and the measurement is only worth taking once criterion 5's run is within budget - and with the two test collections (REQ-QAC-348, REQ-QAC-350) built to measure with.
+      owner: REQ-PIPE-250, which owns the budget
       blocked_by:
         requirements:
-        - REQ-PIPE-403
+        - REQ-PIPE-250
+        - REQ-QAC-348
+        - REQ-QAC-350
     open_questions: []
   - id: REQ-TEST-353
     title: CI checks both assets on every push within 10 percent of today's billed minutes on a cache hit, each asset's bootstrapped database cached on its own key, and records the cache-miss cost
@@ -51342,7 +51340,7 @@ requirements:
     date_written: '2026-11-14'
     story: As Keith, I want to know what the speed work actually bought against the 12-minute budget, stage by stage, so that I can decide what comes next from a measurement rather than a hope.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, evidence walk-through [8] (2026-11-14: the bootstrap at about 9x its budget goes to the speed batch as its headline problem) and S4 (REQ-PIPE-352''s 12-minute budget); drafted by delivery-scoper 2026-11-14 (speed-anchor v1). v2 2026-11-14 with the architect''s, CLI and dashboard reviews (docs/drafts/speed-anchor-v1-reviews.md) and Keith''s SR1-SR9. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as speed-anchor v2 (docs/drafts/speed-anchor-v2.yaml), after the architect, CLI and dashboard UX reviews.'
     acceptance_criteria:
     - "THE SYSTEM SHALL record in this requirement's evidence the before as the 2026-11-16 from-empty bootstrap totals of each asset on this sandbox (quarterly 2437s, daily 357s), and SHALL take the stage split - the generation step, the target trials, each stream's replay, the confirmations and the budget line's total - and, within the replay, the shares the 2026-10-26 profile named (waiting on the dbt worker, recognising the delivery tree, datacontract-cli, Soda Core, recording results, filing, Evidently, staging and the gate) from the after run, a from-empty bootstrap of each asset (`mothman env reset-synthetic` then `mothman pipeline bootstrap`, the quarterly asset then the daily one, nothing else running, the load average noted) profiled with py-spy, so that REQ-PIPE-430 to REQ-PIPE-432 each have their own before. AMENDED 2026-11-18 (Keith): it asked for a fresh before run ahead of REQ-PIPE-397's first change."
@@ -51368,6 +51366,30 @@ requirements:
     - REQ-PIPE-430
     - REQ-PIPE-431
     - REQ-PIPE-432
+    linked_tests:
+    - tests/test_bootstrap.py
+    implemented_by:
+    - bootstrap/bootstrap.py::measured_bootstrap
+    - bootstrap/bootstrap.py::first_run_prompt
+    - bootstrap/bootstrap.py::budget_line
+    evidence:
+    - 'CRITERION 1 - THE BEFORE AND THE STAGE SPLIT (2026-11-18): the before is 2026-11-16''s from-empty totals, quarterly 2437s and daily 357s. The after run, at commit 1127e1a4 on this sandbox, `mothman env reset-synthetic` then `mothman pipeline bootstrap`, the quarterly asset then the daily, under py-spy (raw, 20 Hz, subprocesses and idle threads): QUARTERLY 1413s - generation 1m 38s, of it target trials 33s; the one stream (Child Protection, Emergency Department and Linkage Products) 21m; confirmations 17s; ''OVER BUDGET: this bootstrap took 1413s of wall clock against the 12-minute budget (720s) - 693s over.'' DAILY 375s - generation 58s, of it target trials 45s; Birth Registrations 5m 16s; confirmations under 1s; ''Within budget: this bootstrap took 375s''. Within the quarterly replay (the stream worker''s main thread, 1275s): waiting on a run''s four tools 825s (65%), the gate 152s (12%), filing 112s (9%), recording results 63s (5%), staging 59s (5%), recognising the delivery tree about 1s. Inside the tools, which run side by side, the dbt worker is the long pole - 815 thread-seconds against datacontract-cli''s 248, Soda Core and Evidently negligible.'
+    - 'CRITERION 2 - REPORTED TO KEITH 2026-11-18, AND CITED FOR REQ-PIPE-250 CRITERION 2: the daily asset is within 720s on this run (375s); the quarterly asset is not (1413s). One run per asset, so REQ-PIPE-250 criterion 2''s three consecutive runs are not claimed for either.'
+    - 'CRITERION 4: commit 1127e1a4; load average 2.42 at the quarterly start, 1.82 at its end and the daily start, 1.62 at the daily end. Also running: a session building in another worktree ran short test files, single `mothman check --only` gates, one `mothman check --no-pytest` and a few synthetic generations into a scratch folder; no other bootstrap and no full gate.'
+    - 'CRITERIA 5 AND 6: docs/suite-timings.md carries the after measurement; assets/quarterly/synthetic/bootstrap.yaml and assets/daily/synthetic/bootstrap.yaml carry 1413s and 375s, dated 2026-11-18, which the menu''s first-run prompt says (tests/test_bootstrap.py::TestTheFirstRunPromiseIsMeasured).'
+    - 'CRITERION 7 - WHERE THE QUARTERLY ASSET''S REMAINING TIME GOES, AND THE NEXT SPEED-UPS FROM THAT PROFILE: the dbt worker parses the manifest once per run, 433s of the 695s it is busy - it receives each run as a fresh `dbt build`, so the parse is repeated for a project that has not changed. Next, ranked by what the profile says each would take off the 693s: (1) parse the manifest once per stream and hand dbtRunner the parsed manifest for every run (about 400s); (2) the gate, 152s on the stream''s critical path; (3) filing, 112s; (4) generation, 94s, of it Linkage Products'' drift planning importing Evidently; (5) recording results 63s and staging 59s. The first alone would bring the quarterly asset near the budget; with the second it would be under.'
+    - 'CRITERION 8: REQ-PIPE-250 criterion 4 is under retired_criteria (2026-11-14, Keith, replaced_by REQ-TEST-393) and its BEHAVIOUR-PRESERVING NFR is gone - done when REQ-TEST-393 was built.'
+    unmet_criteria:
+      - criterion: >
+          Criterion 3 - the hand-started test.yml run's cache-miss bootstrap
+          step time for the same commit, cited for REQ-PIPE-250 criterion 5.
+        why: >
+          test.yml is started by hand, before a merge or at Keith's say-so
+          (REQ-TEST-375), and a cache-miss run costs about 145 billable
+          minutes, so it waits for the next merge-bound hand-started run.
+        owner: the next hand-started test.yml run on this branch
+        blocked_by:
+          unowned: true
     decisions:
     - 'THE HEADLINE PROBLEM (evidence walk-through [8], Keith 2026-11-14): record the ''after'' figures as evidence, retire the ''before'' halves of REQ-PIPE-296 c7, REQ-GEN-298 c13 and REQ-DASH-299 NFR 6, and send the bootstrap at about 9x its 720s budget here - not called met. REJECTED capturing befores, and retiring all three.'
     - 'A FRESH BASELINE HERE IS NOT A ''BEFORE'' FOR ITS OWN SAKE (delivery-scoper): Keith retired the befores nobody needs; this one is the denominator of what this batch buys, and #318''s fixes landed after the 6666s run, so without it the batch''s effect cannot be told from #318''s.'
@@ -51376,6 +51398,7 @@ requirements:
     - 'THE THREE PROFILED SPEED-UPS JOIN THIS BATCH (SA Q3, SETTLED by Keith 2026-11-14, option (b)): REQ-PIPE-250''s dbt, delivery-tree re-read and datacontract time sinks are REQ-PIPE-432, REQ-PIPE-430 and REQ-PIPE-431 here, beside S1-S3, so the batch aims at where the time actually goes. REJECTED (a) building S1-S3 only and reporting (the recommendation), and (c) revisiting the budget.'
     - 'REQ-PIPE-250 OWNS THE 720s BUDGET (SR7, SETTLED by Keith 2026-11-14): this requirement records the before and after and is cited as evidence for REQ-PIPE-250 criteria 2 and 5; v1''s restated ''three runs against 720s'' and CI-figure criteria are dropped, so one requirement owns one claim. REJECTED keeping both.'
     - 'REQ-PIPE-250''s TITLE IS STALE (architect, non-blocking): it says ''all three collections'', which predates the asset split; a retitle to ''each asset''s bootstrap from empty'' is a register edit to an in-progress requirement and goes to Keith as wording before it is made - not made by this requirement.'
+    - 'BUILT WITH CRITERION 3 OPEN (2026-11-18): the measurement this requirement owns is the sandbox''s; criterion 3 cites CI''s, which a push does not produce since REQ-TEST-375. Left unmet rather than starting a 145-minute run for one number.'
     open_questions: []
     signed_off:
       by: Keith
