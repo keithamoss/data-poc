@@ -16561,7 +16561,7 @@ twice. It deliberately did not re-find the `TypeError`.
      form the guard already accepts as covered, with a comment saying what is
      read. The guard and the module pass.
 
-459. **[investigate, 2026-11-16]** **[Testing & dev tooling]** **TestOweNothingQuarter still fails beside other modules, and still passes alone.**
+459. **[done, 2026-11-18]** **[Testing & dev tooling]** **TestOweNothingQuarter still fails beside other modules, and still passes alone.**
      244d7db0's gate, chunk 00 (twenty modules, `-n auto`):
      `tests/test_period_opening.py::TestOweNothingQuarter::test_readers_of_case_workers_promote_in_a_quarter_it_sits_out`
      failed promoting Case Workers into its made-up Q2 - refused, "it is
@@ -16583,6 +16583,27 @@ twice. It deliberately did not re-find the `TypeError`.
        (scratchpad/i459/list_00, log_00.txt). The chunk's per-worker order
        was not recorded (`-rfE` only); a run with `-v` would name the
        failing worker's preceding tests.
+     - **Failed a third time, dc1881c2's gate (2026-11-18)**, chunk 00 on gw1
+       (written up first as #476, folded in here).
+     - **Root cause, reproduced deterministically (2026-11-18)**: run
+       `tests/test_recheck.py::TestWhatIsOwed` - or any class using the
+       `cp_duckdb_dir` fixture - before the class, serially, and it fails
+       every time (1 failed, 4 passed); alone it passes. THE TEST'S PREMISE
+       WAS WRONG, NOT THE PRODUCT. Its made-up 2099 Q2 is a quarter Case
+       Workers' real participation ([February, August]) owes nothing in, and
+       the test patched only Q4 as sat out, leaving Q2 to the real schedule.
+       Alone, Case Workers had no earlier promoted supply, so there was
+       nothing to inherit and Q2 opened owed. After a module that stages and
+       promotes Case Workers fixture data, there is one, so Q2 opened
+       INHERITED - the right answer for the configuration it read - and the
+       test's own promotion into it was refused.
+     - **Fixed in the test**: it now states its premise, patching
+       `inheritance._does_not_participate` so Case Workers owes Q2 and sits
+       out Q4, whatever an earlier module left promoted. Seen failing before
+       (the order above, unpatched) and passing after (the same order, 5
+       passed; alone, 1 passed). No product change: an order-dependent
+       answer here was the schedule answering a question the test had not
+       meant to ask.
 
 460. **[done, 2026-11-16]** **[Testing & dev tooling]** **Two generator isolation tests rewrote the checkout's real anchor file when run alone.**
      Found building REQ-TEST-402, by its own writer guard rather than by
@@ -16822,6 +16843,8 @@ twice. It deliberately did not re-find the `TypeError`.
        `test` and `ci` that is the fixed anchor; a real deployment holds no
        synthetic asset folder, so it never reads one.
 
+476. **[superseded, 2026-11-18]** **[Testing & dev tooling]** **`test_readers_of_case_workers_promote_in_a_quarter_it_sits_out` failed once in a full gate and has not failed since.** The same failure as #459, folded into it with its root cause and fix.
+
 477. **[done, 2026-11-18]** **[QA checks & contract]** **A singular dbt test with no home table passed every gate and crashed its first run.**
      Found building REQ-QAC-350: Mental Health's schema declared the singular
      test `contact_in_its_week` under `data_tests:`, its adapter's
@@ -16874,3 +16897,19 @@ twice. It deliberately did not re-find the `TypeError`.
        existed; it agrees once that database is bootstrapped with them.
      - Seen: the 11 failing tests of the first three passed after the
        change (with the rest of their modules, 183 passed).
+
+480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
+     `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`
+     failed every time in group A+B's full gate (alone and in parallel):
+     it ran the `scenarios` gate over two fake assets, and since REQ-PIPE-385
+     criterion 8 a synthetic gate skips an asset with no synthetic/ folder,
+     so both passes were dropped and the gate returned 0. The test is about
+     naming each asset's lines in a side-by-side docs pass, not about
+     scenarios; it now uses `premise`, a docs gate that reads each asset and
+     is not synthetic, and asserts that is so first. No product change.
+     - **Also seen in the same gate**: `test_dashboard_e2e.py::TestTheDataFilesLoadFromDisk::test_the_first_view_answers_within_its_budget_of_navigation`
+       drew the agency trends in 5.3 to 6.4 seconds against its 6-second
+       budget while three other heavy jobs shared the machine; re-run on a
+       quiet machine the whole browser chunk passed (439). Not changed - its
+       docstring already calls the budget generous, and this is a load
+       sighting rather than a slower page.

@@ -463,7 +463,11 @@ class TestEveryFailureNamesItsAsset:
         assert "1 gate(s) failed: schedule (two)" in result.output
 
     def test_the_side_by_side_docs_passes_name_it_too(self, two_passes):
-        code, output, failed = check_cli._run_captured("scenarios", ["uv"], False)
+        # A docs gate that reads each asset's configuration and is NOT one of
+        # the synthetic gates, which skip an asset with no synthetic/ folder
+        # (REQ-PIPE-385 criterion 8) - and these fake assets have none.
+        assert "premise" in check_cli._DOCS_GATES and "premise" not in check_cli._SYNTHETIC_GATES
+        code, output, failed = check_cli._run_captured("premise", ["uv"], False)
         assert code == 1 and failed == ["two"]
         assert "[two] duplicate short 'x'\n" in output and "[one] checked one\n" in output
 
