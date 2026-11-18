@@ -403,7 +403,7 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 | Dataset | mental-health-contacts |
 | Supplies | — |
 | Period | 2026-09-21 |
-| Set "in the warehouse on" to | 2026-09-21 |
+| Set "in the warehouse on" to | 2026-09-25 |
 
 ### TS-117 - A weekly dataset's supply received on a day it owes nothing
 
@@ -1346,7 +1346,7 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
     "dataset": "mental-health-contacts",
     "supplies": [],
     "period": "2026-09-21",
-    "inPlaceOn": "2026-09-21",
+    "inPlaceOn": "2026-09-25",
     "subject": "supply-history-row"
    }
   },

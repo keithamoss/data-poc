@@ -17029,3 +17029,26 @@ twice. It deliberately did not re-find the `TypeError`.
        `code` chip nearly vanishes in dark mode (1.07:1); hover on header
        pills changes only the border; closed drawers' shadows bleed in at the
        right edge.
+
+485. **[todo, 2026-11-18]** **[Testing & dev tooling]** **A test's patches do not reach the bootstrap's stream processes, so a "stubbed" bootstrap of a two-collection asset ran for real.**
+     Found by the full gate on e94fdb72: tests/test_bootstrap_pin.py ran for
+     over two hours in one chunk, against 65 seconds that morning, until the
+     runner's own time limit stopped the gate. Its `stubbed` fixture replaces
+     the bootstrap's replay and points the delivery tree at an empty folder,
+     by monkeypatch. Once the daily asset held two collections (Mental
+     Health, REQ-QAC-350), `boot.bootstrap` ran its two streams in a process
+     pool (`stream_pool`), where none of the test process's patches exist: the
+     "stubbed" replay staged and checked the checkout's real data/daily
+     deliveries, one after another, into the test's scratch database (the
+     DSN travels in the environment, so it stayed off the real databases).
+     - **Fixed for these tests**: `stubbed` and `_replayed` state their
+       premise, one collection (tests/one_collection.py), so the bootstrap
+       runs one stream in-process; the module passes in 41 seconds (15).
+     - **Not fixed, the general hazard**: any test that stubs a part of the
+       bootstrap by monkeypatch and runs it over an asset of several
+       collections gets a real child process with none of its stubs, reading
+       the checkout's real trees. Nothing refuses that today - the shared-
+       history writer guard covers writes to the shared history, not reads of
+       data/. Worth a guard: a child stream process started under pytest
+       refusing the default delivery tree, or the pool running in-process
+       under a test. Logged for a decision; not changed.
