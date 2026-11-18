@@ -35,8 +35,9 @@ pinned arrivals. The procedure now, one asset at a time:
      with `arrivedAt` taken from `arrivalByRun[run_id]` (a history row
      carries no instant). Every key of the golden for a dataset the asset
      does not hold is left exactly as it was.
-  c. Write it back with `json.dumps(golden, indent=2, sort_keys=True)` and a
-     trailing newline, and read the diff: it should touch only that asset's
+  c. Write it back with `json.dumps(golden, indent=2)` - INSERTION ORDER, not
+     sort_keys, which is how the file is committed and which re-sorting would
+     churn (found 2026-11-18) - and a trailing newline, and read the diff: it should touch only that asset's
      datasets.
 
   1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
@@ -191,6 +192,13 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     out, 85 days): 117 deliveries, zero `handfiled-*`, rebuilt first; Child
     Protection identical, the 27 Birth Registrations arrivals in both
     unchanged, 98 -> 100.
+
+    EXTENDED 2026-11-18 FOR THE NEW COLLECTIONS (REQ-QAC-348, REQ-QAC-350):
+    239 quarterly and 133 daily deliveries, zero `handfiled-*`, both assets'
+    reports rebuilt from the real databases bootstrapped from empty that day.
+    Only cancer-notifications (14 arrivals) and mental-health-contacts (15)
+    were added; every existing entry was asserted unchanged before writing,
+    and the diff is additions only.
 
     RE-CAPTURED 2026-10-13 FOR REQ-GEN-196 (Birth Registrations' history 80
     days, seven two-file pairs settled by script). The procedure first: 115
@@ -608,8 +616,15 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # resend moved 02:11 -> 02:13 (early, both) - REQ-GEN-392's band-sized
         # truncation (12f06b34, 2026-11-15) cuts its earliest row; reproducible,
         # not drift (post-build-review #454).
-        assert counts == {"on_time": 342, "early": 198, "late": 54, "unfiled": 13}
-        assert sum(counts.values()) == 607
+        # 342 / 224 / 55 / 15 over 636 FOR THE NEW COLLECTIONS (2026-11-18,
+        # REQ-QAC-348, REQ-QAC-350; both assets bootstrapped from empty that
+        # day): the 607 already pinned unchanged, and 29 join. Cancer's 14 - 12
+        # early (each received about 06:00, before its 09:00 due), 1 late (the
+        # 2017 red's resupply, 13 days on) and 1 unfiled (TS-114's supply on
+        # the November round, held). Mental Health's 15 - 14 early (about 08:00
+        # against 10:00) and 1 unfiled (TS-117's Tuesday supply, held).
+        assert counts == {"on_time": 342, "early": 224, "late": 55, "unfiled": 15}
+        assert sum(counts.values()) == 636
 
 
 @pytest.mark.asset("daily")

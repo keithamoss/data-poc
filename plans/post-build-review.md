@@ -16927,6 +16927,17 @@ twice. It deliberately did not re-find the `TypeError`.
        existing link event fitted: a new one, SLOT_DUE (the placement
        period's due instant), lets its link land on the history's last day,
        where the missed Monday reads 'No supply'.
+     - **And the arrival-semantics golden** (tests/fixtures/
+       arrival_semantics_golden.json, a characterization pin): it must cover
+       every dataset that exists, and the two new ones were not in it. Extended
+       by the recorded procedure - deliveries counted first (239 quarterly, 133
+       daily, no `handfiled-*`), reports rebuilt from the databases
+       bootstrapped from empty that day - adding only cancer-notifications (14)
+       and mental-health-contacts (15), every existing entry asserted unchanged
+       and the diff additions only; the verdict mix 607 -> 636, each new one
+       accounted for in the test. The procedure's text said `sort_keys=True`,
+       which would have re-sorted the whole committed file; corrected to
+       insertion order.
 
 480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
      `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`
