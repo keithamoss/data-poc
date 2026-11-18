@@ -16,12 +16,13 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
-from cli import common
+from cli import common, synthetic
 
 console = Console()
 
 
-@click.group("pipeline")
+@click.group("pipeline", cls=synthetic.Group,
+             synthetic={"bootstrap", "resume", "checkpoint", "cache-key"})
 def pipeline_group() -> None:
     """Full real-tool batch pipeline run - Tier 2 (CI/automation, integration-test parity)."""
 

@@ -208,6 +208,26 @@ _REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "imports", "dbt pack
                               "layout", "npm test", "pytest"})
 
 
+#: Gates about synthetic configuration (REQ-PIPE-385 criterion 8): run only for
+#: an asset with a synthetic/ folder, and shown as one row reading 'not
+#: applicable' where none has one - never left out (did that gate run?) and
+#: never shown passed (a false green).
+_SYNTHETIC_GATES = ("providers", "scenarios", "scenario map")
+#: The result a gate that does not apply records in place of an exit code.
+NOT_APPLICABLE = -1
+NOT_APPLICABLE_TEXT = "not applicable (no synthetic/ folder)"
+
+
+def _has_synthetic(extra: dict) -> bool:
+    from asset_model import assets
+
+    name = _asset_of(extra)
+    if name is None:
+        return True
+    found = {a.name: a for a in assets.every()}
+    return name not in found or found[name].synthetic.is_dir()
+
+
 def _asset_passes(label: str) -> list[dict]:
     """The environment additions for each run of one gate. WITH NO ASSET
     SELECTED - a fresh clone (REQ-PIPE-363 criterion 5, NFR PORTABILITY) - a
@@ -220,9 +240,11 @@ def _asset_passes(label: str) -> list[dict]:
     if label in _REPOSITORY_WIDE:
         return [{}]
     stated = os.environ.get(assets.ASSET_ENV)
-    if stated:
-        return [{assets.ASSET_ENV: stated}]
-    return [{assets.ASSET_ENV: name} for name in assets.names()] or [{}]
+    passes = ([{assets.ASSET_ENV: stated}] if stated
+              else [{assets.ASSET_ENV: name} for name in assets.names()] or [{}])
+    if label in _SYNTHETIC_GATES:
+        passes = [extra for extra in passes if _has_synthetic(extra)]
+    return passes
 
 
 def _asset_of(extra: dict) -> str | None:
@@ -449,7 +471,8 @@ def _fail_under() -> float | None:
 
 
 def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed: float,
-                failed_gates: list[str], not_run: list[str] = ()) -> str:
+                failed_gates: list[str], not_run: list[str] = (),
+                not_applicable: list[str] = ()) -> str:
     """REQ-TEST-375 criterion 10: the full gate's result, on one line, fit to
     paste into a commit message. It never claims more than ran: a missing
     report says so, and a tree that changed mid-run is not a claim about
@@ -463,7 +486,8 @@ def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed:
     gates = "; ".join(filter(None, [
         f"FAILED: {', '.join(failed_gates)}" if failed_gates else "",
         f"not run (no toolchain): {', '.join(not_run)}" if not_run else ""])) \
-        or "every gate passed"
+        or (f"every gate that applies passed ({NOT_APPLICABLE_TEXT}: {', '.join(not_applicable)})"
+            if not_applicable else "every gate passed")
     where = (tree if tree == tree_after
              else f"TREE CHANGED DURING THE RUN ({tree} -> {tree_after}), so this is no claim")
     return f"Full gate (mothman check): {gates}; {tests}; {cov}; {minutes}m{seconds:02d}s; {where}"
@@ -509,6 +533,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
 
         def timed(gate):
             label, argv, why, can_warn = gate
+            if label in _SYNTHETIC_GATES and not _asset_passes(label):
+                return label, NOT_APPLICABLE, why, can_warn, 0.0, f"{label}: {NOT_APPLICABLE_TEXT}."
             started = time.monotonic()
             code, output, failed = _run_captured(label, argv, can_warn)
             return _shown(label, failed), code, why, can_warn, time.monotonic() - started, output
@@ -529,6 +555,11 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     for label, argv, why, can_warn in (() if docs else gates):
         if no_pytest and label == "pytest":
             continue
+        if label in _SYNTHETIC_GATES and not _asset_passes(label):
+            console.rule(f"[bold]{label}", style="dim")
+            console.print(f"{label}: {NOT_APPLICABLE_TEXT}.", style="dim")
+            results.append((label, NOT_APPLICABLE, why, can_warn, 0.0))
+            continue
         if label == "pytest":
             argv = _pytest_argv(argv, reports)
         started = time.monotonic()
@@ -542,7 +573,9 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     table.add_column("Time", justify="right")
     table.add_column("What it covers", style="dim")
     for label, code, why, can_warn, took in results:
-        if code == 0:
+        if code == NOT_APPLICABLE:
+            outcome = f"[dim]{NOT_APPLICABLE_TEXT}[/dim]"
+        elif code == 0:
             outcome = "[green]passed[/green]"
         elif code == 127:
             outcome = "[yellow]not installed[/yellow]"
@@ -557,7 +590,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         return can_warn and code == WARNING_EXIT
 
     failed = [label for label, code, _, can_warn, _t in results
-              if code not in (0, 127) and not _warned(code, can_warn)]
+              if code not in (0, 127, NOT_APPLICABLE) and not _warned(code, can_warn)]
+    not_applicable = [label for label, code, _, _, _t in results if code == NOT_APPLICABLE]
     skipped = [label for label, code, _, _, _t in results if code == 127]
     warned = [label for label, code, _, can_warn, _t in results if _warned(code, can_warn)]
     if full:
@@ -565,7 +599,7 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
                            counts=_pytest_counts(reports / "junit.xml"),
                            coverage=_coverage_percent(reports / "coverage.json"),
                            floor=_fail_under(), elapsed=time.monotonic() - gate_started,
-                           failed_gates=failed, not_run=skipped)
+                           failed_gates=failed, not_run=skipped, not_applicable=not_applicable)
         console.print("Paste into the commit message:", style="bold")
         console.out(line, highlight=False)
     shutil.rmtree(reports, ignore_errors=True)
@@ -593,6 +627,9 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
                       f"environment-setup bullet.", style="yellow")
     elif warned:
         pass  # already said above; "Every gate passed" would talk over it
+    elif only is not None and not_applicable:
+        console.print(f"The {only!r} gate is {NOT_APPLICABLE_TEXT}. Other gates were not run.",
+                      style="green")
     elif only is not None:
         # Same reasoning as the skipped-toolchain branch above: never
         # let a summary overstate what actually ran.
@@ -602,6 +639,11 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         console.print("Every documentation gate passed. Code, contracts, the JS suite and "
                       "the Python suite were not run - this change touches none of them.",
                       style="green")
+    elif not_applicable:
+        # EVERY GATE THAT APPLIES, NAMING THE ONES THAT DO NOT (criterion 8).
+        console.print("Every gate that applies passed"
+                      + (" except the Python suite, which was skipped" if no_pytest else "")
+                      + f" - {NOT_APPLICABLE_TEXT}: {', '.join(not_applicable)}.", style="green")
     elif no_pytest:
         console.print("Every gate passed except the Python suite, which was skipped.",
                       style="green")

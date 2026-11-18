@@ -203,10 +203,16 @@ class OneTableCLI(CollectionCLI):
 
         run_by = get_run_by()
         short = self.short
+        # THE SYNTHETIC SOURCE ONLY WHERE SYNTHETIC DATA CAN BE MADE HERE
+        # (REQ-PIPE-385 criterion 7).
+        from cli import synthetic
+
+        offered = synthetic.available()
         source = common.select(
-            "Which source?", [self._SOURCE_SYNTHETIC, self._SOURCE_LOCAL_FILE, self._SOURCE_S3],
-            flag_hint=f"mothman {short} qa --run-id <run_id> / mothman {short} qa --file <csv> "
-                      f"--reference-file <csv> / "
+            "Which source?",
+            ([self._SOURCE_SYNTHETIC] if offered else []) + [self._SOURCE_LOCAL_FILE, self._SOURCE_S3],
+            flag_hint=(f"mothman {short} qa --run-id <run_id> / " if offered else "")
+                      + f"mothman {short} qa --file <csv> --reference-file <csv> / "
                       f"mothman {short} qa --s3-key <key> --s3-reference-key <key>")
         if source is None:
             return
@@ -356,27 +362,33 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                        f"batch.")(generate)
 
     prefix = coll.run_prefix
+    # --run-id AND --reference-run-id ONLY WHERE SYNTHETIC DATA CAN BE MADE
+    # HERE (REQ-PIPE-385 criterion 7): unlisted otherwise, and refused by name.
+    from cli import synthetic
 
-    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - Synthetic "
-                              f"(--run-id), Local files (--file/--reference-file), or S3 "
-                              f"(--s3-key/--s3-reference-key) source mode.")
-    @click.option("--run-id", default=None,
+    offered = synthetic.available()
+    modes = (("Synthetic (--run-id), " if offered else "")
+             + "Local files (--file/--reference-file), or S3 (--s3-key/--s3-reference-key)")
+
+    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - "
+                              f"{modes} source mode.")
+    @click.option("--run-id", default=None, hidden=not offered,
                   help=f"Synthetic mode: an existing manifest run_id (e.g. {prefix}005_2026-...). "
                        f"Omit to pick interactively.")
-    @click.option("--reference-run-id", default=None,
+    @click.option("--reference-run-id", default=None, hidden=not offered,
                   help="Synthetic mode, a trial's only: a run to compare distribution drift "
                        "against. There is no default; a kept run is measured against the last "
                        "promoted supply.")
     @click.option("--file", "file_path", default=None, type=click.Path(exists=True, dir_okay=False),
-                  help="Local files mode: an already-downloaded CSV to check (instead of "
-                       "--run-id).")
+                  help="Local files mode: an already-downloaded CSV to check"
+                       + (" (instead of --run-id)." if offered else "."))
     @click.option("--reference-file", default=None, type=click.Path(exists=True, dir_okay=False),
                   help="Local files mode: a known-good CSV to compare distribution drift "
                        "against. A trial's only: a kept supply is measured against the last "
                        "promoted one.")
     @click.option("--s3-key", default=None,
                   help="S3 mode: an object key under the dataset's s3Source prefix to check "
-                       "(instead of --run-id/--file).")
+                       + ("(instead of --run-id/--file)." if offered else "(instead of --file)."))
     @click.option("--s3-reference-key", default=None,
                   help="S3 mode: a known-good reference object key to compare distribution "
                        "drift against. A trial's only: a kept supply is measured against the "
@@ -404,6 +416,8 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
         from qa_tools.common.git_identity import get_run_by
 
         refuse_a_broken_adapter(coll)
+        synthetic.refuse_flags(f"mothman {coll.short} qa", run_id=run_id,
+                               reference_run_id=reference_run_id)
         cli_ = me()
         if s3_key is not None:
             if run_id is not None or file_path is not None:
@@ -435,7 +449,9 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
 
         if run_id is None:
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
-                raise click.ClickException("Not a real terminal - pass --run-id or --file explicitly.")
+                raise click.ClickException(
+                    "Not a real terminal - pass --run-id or --file explicitly." if offered
+                    else "Not a real terminal - pass --file or --s3-key explicitly.")
             cli_.run_qa_interactive(commit_default=commit)
             return
 

@@ -48,8 +48,11 @@ try:
     # hierarchy, which on a synthetic asset may write offset dates - and the
     # commands that write the anchor file have to be able to start without one.
     with _history_anchor.structure_only():
+        # cli.scenarios IS LOADED ONLY WHERE IT CAN RUN (REQ-PIPE-385 criterion
+        # 3): it imports the generator and scenarios/, which a real deployment
+        # leaves out, so importing it here would fail `mothman --help` there.
         from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
-                       pipeline, plans, population, scenarios, schedule, supply)
+                       pipeline, plans, population, schedule, supply, synthetic)
         from asset_model import collections as _registry
         from asset_model import assets as _assets
 
@@ -85,18 +88,24 @@ _MAIN_MENU_EXIT = "Exit"
 
 
 
+def _main_menu_choices() -> tuple[list[str], str]:
+    """The main menu and its flag hint. Generating and setting up are offered
+    only where synthetic data can be made here (REQ-PIPE-385 criterion 5)."""
+    choices = [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_CALENDAR, _MAIN_MENU_PROCESS]
+    hint = (f"mothman {_COLLECTIONS[0].short} qa / mothman supply queue / "
+            "mothman schedule preview-correction / mothman pipeline process")
+    if synthetic.available():
+        choices += [_MAIN_MENU_GENERATE, _MAIN_MENU_BOOTSTRAP]
+        hint += (f" / mothman {_COLLECTIONS[0].short} generate-synthetic-data / "
+                 "mothman pipeline bootstrap")
+    return choices, hint
+
+
 def _main_menu_loop() -> None:
     print_banner(console)
     while True:
-        choice = common.select(
-            "What would you like to do?",
-            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_CALENDAR, _MAIN_MENU_PROCESS,
-             _MAIN_MENU_GENERATE, _MAIN_MENU_BOOTSTRAP],
-            flag_hint=f"mothman {_COLLECTIONS[0].short} qa / mothman supply queue / "
-                      "mothman schedule preview-correction / mothman pipeline process / "
-                      f"mothman {_COLLECTIONS[0].short} generate-synthetic-data / "
-                      "mothman pipeline bootstrap",
-        )
+        choices, hint = _main_menu_choices()
+        choice = common.select("What would you like to do?", choices, flag_hint=hint)
         if choice is None:
             console.print("Goodbye.", style="dim")
             return
@@ -272,7 +281,7 @@ def _bootstrap_menu() -> None:
     console.print(f"Ready - {boot.closing_line(result)}", style="green", soft_wrap=True)
 
 
-class _MothmanGroup(click.RichGroup):
+class _MothmanGroup(synthetic.Group):
     """Turns a qa schema from another version into the clean one-paragraph
     refusal it already is, not a traceback (REQ-PIPE-144 criterion 29;
     delivery-critic, overnight sprint 4). The message names the remedy."""
@@ -326,7 +335,8 @@ class _MothmanGroup(click.RichGroup):
             raise click.ClickException(common.schedule_refusal(exc)) from None
 
 
-@click.group(cls=_MothmanGroup, invoke_without_command=True)
+@click.group(cls=_MothmanGroup, invoke_without_command=True,
+             synthetic={"population"}, lazy={"scenarios": ("cli.scenarios", "scenarios_group")})
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """mothman - the unified CLI/TUI for this PoC's real pipeline."""
@@ -381,7 +391,6 @@ cli.add_command(debug.debug_group)
 cli.add_command(pipeline.pipeline_group)
 cli.add_command(plans.plans_group)
 cli.add_command(schedule.schedule_group)
-cli.add_command(scenarios.scenarios_group)
 cli.add_command(supply.supply_group)
 cli.add_command(population.population_command)
 cli.add_command(check.check_command)

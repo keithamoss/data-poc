@@ -402,11 +402,12 @@ def make_group(coll) -> click.Group:
 
     # ABOVE N_LIST EACH LINE NAMES ITS AGENCY TOO (REQ-TEST-252 criterion 3),
     # so two similarly named collections can be told apart from the list.
-    from cli import common
+    from cli import common, synthetic
 
     about = f"{name} ({coll.agency_name})" if common.many_collections() else name
 
-    @click.group(coll.short, help=f"{about} - Tier 1 commands.")
+    @click.group(coll.short, help=f"{about} - Tier 1 commands.", cls=synthetic.Group,
+                 synthetic={"generate-synthetic-data"})
     def group() -> None:
         pass
 
@@ -422,6 +423,9 @@ def make_group(coll) -> click.Group:
 
 def qa_hint(coll) -> str:
     """How a collection's `qa` is invoked by flag, for the TUI's hints."""
-    return (f"mothman {coll.short} qa [--run-id/--file]" if len(coll.datasets) == 1
-            else f"mothman {coll.short} qa [--run-id/--folder]")
+    from cli import synthetic
+
+    run_id = "--run-id/" if synthetic.available() else ""
+    return (f"mothman {coll.short} qa [{run_id}--file]" if len(coll.datasets) == 1
+            else f"mothman {coll.short} qa [{run_id}--folder]")
 

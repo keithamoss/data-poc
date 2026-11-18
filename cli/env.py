@@ -11,11 +11,12 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 from asset_model import assets as _assets
+from cli import synthetic
 
 console = Console()
 
 
-@click.group("env")
+@click.group("env", cls=synthetic.Group, synthetic={"reset-synthetic"})
 def env_group() -> None:
     """The deployment this checkout is acting as - Tier 2."""
 

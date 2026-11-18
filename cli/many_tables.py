@@ -466,19 +466,27 @@ class ManyTablesCLI(CollectionCLI):
 
         run_by = get_run_by()
         short = self.short
+        # THE SYNTHETIC SOURCE ONLY WHERE SYNTHETIC DATA CAN BE MADE HERE
+        # (REQ-PIPE-385 criterion 7).
+        from cli import synthetic
+
+        offered = synthetic.available()
         delivery_scope = common.select(
             "Full delivery or single table?", [self._DELIVERY_FULL, self._DELIVERY_SINGLE_TABLE],
-            flag_hint=f"mothman {short} qa --run-id <run_id> / mothman {short} qa --table <table> "
-                      f"--file <csv>")
+            flag_hint=(f"mothman {short} qa --run-id <run_id> / " if offered
+                       else f"mothman {short} qa --folder <dir> / ")
+                      + f"mothman {short} qa --table <table> --file <csv>")
         if delivery_scope is None:
             return
         if delivery_scope == self._DELIVERY_SINGLE_TABLE:
             self._run_qa_interactive_single_table(run_by, commit_default)
             return
         source = common.select(
-            "Which source?", [self._SOURCE_SYNTHETIC, self._SOURCE_LOCAL_FOLDER, self._SOURCE_S3],
-            flag_hint=f"mothman {short} qa --run-id <run_id> / mothman {short} qa --folder <dir> "
-                      f"--reference-folder <dir> / "
+            "Which source?",
+            ([self._SOURCE_SYNTHETIC] if offered else [])
+            + [self._SOURCE_LOCAL_FOLDER, self._SOURCE_S3],
+            flag_hint=(f"mothman {short} qa --run-id <run_id> / " if offered else "")
+                      + f"mothman {short} qa --folder <dir> --reference-folder <dir> / "
                       f"mothman {short} qa --s3-delivery <prefix> --s3-reference-delivery <prefix>")
         if source is None:
             return
@@ -678,22 +686,30 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                        f"collection.")(generate)
 
     prefix = coll.run_prefix
+    # --run-id AND --reference-run-id ONLY WHERE SYNTHETIC DATA CAN BE MADE
+    # HERE (REQ-PIPE-385 criterion 7): unlisted otherwise, and refused by name.
+    from cli import synthetic
 
-    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - Synthetic "
-                              f"(--run-id), Local files (--folder/--reference-folder), S3 "
-                              f"(--s3-delivery/--s3-reference-delivery), or single-table "
-                              f"(--table plus --file or --s3-key) source mode.")
-    @click.option("--run-id", default=None,
+    offered = synthetic.available()
+    modes = (("Synthetic (--run-id), " if offered else "")
+             + "Local files (--folder/--reference-folder), S3 "
+               "(--s3-delivery/--s3-reference-delivery), or single-table (--table plus --file or "
+               "--s3-key)")
+
+    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - "
+                              f"{modes} source mode.")
+    @click.option("--run-id", default=None, hidden=not offered,
                   help=f"Synthetic mode: an existing manifest run_id (e.g. {prefix}05_2024-...). "
                        f"Omit to pick interactively.")
-    @click.option("--reference-run-id", default=None,
+    @click.option("--reference-run-id", default=None, hidden=not offered,
                   help="Synthetic mode, a trial's only: a run to compare distribution drift "
                        "against. There is no default; a kept run is measured against the last "
                        "promoted supply.")
     @click.option("--folder", "folder_path", default=None,
                   type=click.Path(exists=True, file_okay=False),
-                  help="Local files mode: an already-downloaded delivery folder (instead of "
-                       "--run-id). Kept, whatever recognition places in it is the delivery; a "
+                  help="Local files mode: an already-downloaded delivery folder"
+                       + (" (instead of --run-id)." if offered else ".")
+                       + " Kept, whatever recognition places in it is the delivery; a "
                        "trial checks the tables it holds against what the warehouse has for "
                        "the rest.")
     @click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
@@ -702,7 +718,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                        "against the last promoted one.")
     @click.option("--s3-delivery", default=None,
                   help="S3 mode: a delivery prefix under the dataset's s3Source prefix to check "
-                       "(instead of --run-id/--folder).")
+                       + ("(instead of --run-id/--folder)." if offered else "(instead of --folder)."))
     @click.option("--s3-reference-delivery", default=None,
                   help="S3 mode: a known-good reference delivery prefix to compare distribution "
                        "drift against. A trial's only: a kept supply is measured against the "
@@ -714,8 +730,8 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                        f"come from the last promoted run. Required together with --file or "
                        f"--s3-key.")
     @click.option("--file", "table_file", default=None, type=click.Path(exists=True, dir_okay=False),
-                  help="Single-table mode: an already-downloaded CSV for --table (instead of "
-                       "--folder/--run-id).")
+                  help="Single-table mode: an already-downloaded CSV for --table "
+                       + ("(instead of --folder/--run-id)." if offered else "(instead of --folder)."))
     @click.option("--s3-key", default=None,
                   help="Single-table mode: an object key under the dataset's s3Source prefix "
                        "for --table (instead of --s3-delivery).")
@@ -743,6 +759,8 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
         from qa_tools.common.git_identity import get_run_by
 
         refuse_a_broken_adapter(coll)
+        synthetic.refuse_flags(f"mothman {coll.short} qa", run_id=run_id,
+                               reference_run_id=reference_run_id)
         cli_ = me()
         if table is None and (table_file is not None or s3_key is not None):
             raise click.ClickException(
@@ -802,7 +820,8 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
         if run_id is None:
             if not (sys.stdin.isatty() and sys.stdout.isatty()):
                 raise click.ClickException(
-                    "Not a real terminal - pass --run-id or --folder explicitly.")
+                    "Not a real terminal - pass --run-id or --folder explicitly." if offered
+                    else "Not a real terminal - pass --folder or --s3-delivery explicitly.")
             cli_.run_qa_interactive(commit_default=commit)
             return
 
