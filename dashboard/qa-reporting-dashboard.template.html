@@ -1089,7 +1089,10 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     </button>
     <div class="header-actions">
       <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
-      <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 In the warehouse on: <span id="in-place-on-btn-label">…</span></button>
+      <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 <span id="in-place-on-btn-word">In the warehouse on</span>: <span id="in-place-on-btn-label">…</span></button>
+      <!-- THE PERIOD CONTROL (REQ-DASH-355 criterion 1): beside the date
+           control, and like it a filter over the whole page. -->
+      <button class="snapshots-btn" id="period-btn" type="button" aria-haspopup="dialog">🗂 <span id="period-btn-label">Period: all current</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
@@ -1117,6 +1120,9 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
        a link with a past date already set meets the distinction without
        opening the panel. -->
   <div id="in-place-on-past-notice" class="in-place-on-range-notice" role="status" hidden></div>
+  <!-- A period parameter naming no period of the baseline (REQ-DASH-355
+       criterion 8): said above the page, as a stale link is. -->
+  <div id="period-param-notice" class="in-place-on-range-notice" role="status" hidden></div>
   <main id="view"></main>
 
   <footer>
@@ -1212,6 +1218,21 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="link-btn" id="in-place-on-reset-btn" type="button">Reset to default (<span id="in-place-on-default-label"></span>)</button>
     </div>
   </div>
+</aside>
+<!-- THE PERIOD PANEL (REQ-DASH-355 criteria 1 and 2): the baseline's periods,
+     newest first under year headings - or, on a daily baseline, a date input
+     bounded to the days the page has. Outside STATE and history, as the date
+     panel is. -->
+<div class="backdrop" id="period-backdrop"></div>
+<aside class="drawer" id="period-panel" aria-hidden="true" inert aria-labelledby="period-panel-title">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Cadence-aware viewing</div>
+      <h3 id="period-panel-title">Choose a period</h3>
+    </div>
+    <button class="drawer-close" id="period-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="period-panel-body"></div>
 </aside>
 
 <!-- Phase 5a (Thread A, plans/publishing-and-history.md) - the global
@@ -7315,6 +7336,10 @@ window.addEventListener("popstate", (e)=>{
   } else if(STATE && STATE.scenarioJump && STATE.scenarioJump.to !== CURRENT_IN_PLACE_ON){
     setInPlaceOnQuietly(STATE.scenarioJump.to);
   }
+  // THE PERIOD IS NOT IN HISTORY (REQ-DASH-355 criteria 3 and 4): an older
+  // entry's address keeps the period on show rather than stepping back to
+  // the one it was made under.
+  if((periodFromUrl() || null) !== CURRENT_PERIOD) setPeriodInUrl(CURRENT_PERIOD);
   renderFromState();
   if(CLOSE_PANEL_AFTER_POP){
     CLOSE_PANEL_AFTER_POP = false;
@@ -7346,7 +7371,9 @@ function currentViewName(){
 }
 function describeRoute(){
   const name = currentViewName();
-  document.title = name ? `${name} \u00b7 ${SITE_NAME}` : SITE_NAME;
+  document.title = (name ? `${name} \u00b7 ${SITE_NAME}` : SITE_NAME)
+    // ' · <P>' WHILE A PERIOD IS CHOSEN (REQ-DASH-355 criterion 7).
+    + (typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD ? ` \u00b7 ${periodWords(CURRENT_PERIOD)}` : "");
   const announcer = document.getElementById("route-announcer");
   if(announcer) announcer.textContent = name || SITE_NAME;
 }
@@ -13083,6 +13110,10 @@ function updateInPlaceOnButtonLabel(){
   if(!CURRENT_IN_PLACE_ON){ if(btn) btn.hidden = true; return; }
   const label = document.getElementById("in-place-on-btn-label");
   if(label) label.textContent = fmtDay(CURRENT_IN_PLACE_ON);
+  // 'Results recorded by' WHILE A PERIOD IS CHOSEN (REQ-DASH-355 criterion 6).
+  const word = document.getElementById("in-place-on-btn-word");
+  if(word) word.textContent = typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD
+    ? "Results recorded by" : "In the warehouse on";
 }
 // WHICH PERIOD THE CHOSEN DATE FALLS IN, one line per named calendar
 // (criterion 6). A calendar the date is BEFORE gets a line too, saying
@@ -13276,6 +13307,8 @@ function changedSinceNote(onDateStr){
 function renderInPlaceOnPastNotice(){
   const notice = document.getElementById("in-place-on-past-notice");
   if(!notice) return;
+  // WHILE A PERIOD IS CHOSEN, ONE STATEMENT (REQ-DASH-355 criterion 6).
+  if(typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD) return renderPeriodStatement(notice);
   const past = CURRENT_IN_PLACE_ON && DEFAULT_IN_PLACE_ON && CURRENT_IN_PLACE_ON !== DEFAULT_IN_PLACE_ON;
   if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
@@ -13388,6 +13421,149 @@ updateInPlaceOnButtonLabel();
 // reader's first interaction.
 renderInPlaceOnRangeNotice();
 
+/* =========================================================================
+   THE PERIOD CONTROL (REQ-DASH-355): one period of the asset's baseline,
+   chosen beside the date. A filter over the whole page like the date - in
+   its own parameter, period=, kept across every navigation, the history
+   entry replaced rather than added - and with none chosen every page is as
+   it was.
+========================================================================= */
+const PERIOD_PARAM = "period";
+// A var, hoisted: the date control's renderers read it at boot, before this
+// block runs, and a let read there throws.
+var CURRENT_PERIOD = null;
+// THE BASELINE (REQ-PIPE-345): one calendar per asset, the one the embedded
+// sequences hold.
+function baselinePeriods(){
+  const names = calendarNames();
+  return names.length ? ((PERIOD_SEQUENCES.calendars || {})[names[0]] || []) : [];
+}
+// A DAILY BASELINE names its periods by the day (criterion 1's wording and
+// criterion 2's date input).
+function isDailyBaseline(){
+  const ps = baselinePeriods();
+  return ps.length > 0 && isRealDateStr(ps[0].period);
+}
+function baselinePeriod(name){
+  return baselinePeriods().find(p=> p.period === name) || null;
+}
+function periodFromUrl(){
+  return new URLSearchParams(location.search).get(PERIOD_PARAM);
+}
+function setPeriodInUrl(name){
+  const url = new URL(location.href);
+  if(name) url.searchParams.set(PERIOD_PARAM, name);
+  else url.searchParams.delete(PERIOD_PARAM);
+  history.replaceState(STATE, "", url.pathname + url.search + location.hash);
+}
+function periodWords(name){ return fmtPeriodName(name) || name; }
+function updatePeriodButtonLabel(){
+  const btn = document.getElementById("period-btn");
+  const label = document.getElementById("period-btn-label");
+  if(!btn || !label) return;
+  // NO BASELINE, NO CONTROL - as the date control hides with no asset clock.
+  if(!baselinePeriods().length){ btn.hidden = true; return; }
+  btn.hidden = false;
+  const daily = isDailyBaseline();
+  label.textContent = CURRENT_PERIOD
+    ? `${daily ? "For day" : "For period"}: ${periodWords(CURRENT_PERIOD)}`
+    : (daily ? "Day: latest" : "Period: all current");
+}
+// THE PERIOD STATEMENT (criterion 6), in place of the past-date notice while
+// a period is chosen.
+function renderPeriodStatement(notice){
+  notice.hidden = false;
+  notice.innerHTML = `Showing <b>${escHtml(periodWords(CURRENT_PERIOD))}</b> — results recorded by the
+    end of ${fmtDay(CURRENT_IN_PLACE_ON)} · <button class="link-btn" id="period-clear-inline" type="button">Clear period</button>`;
+  const clear = document.getElementById("period-clear-inline");
+  if(clear) clear.addEventListener("click", ()=> applyPeriod(null));
+}
+function announcePeriod(){
+  const announcer = document.getElementById("route-announcer");
+  if(!announcer) return;
+  announcer.textContent = CURRENT_PERIOD ? `Showing ${periodWords(CURRENT_PERIOD)}`
+    : (isDailyBaseline() ? "Showing latest" : "Showing all current");
+}
+// CHOSEN OR CLEARED WITH THE CONTROL (criteria 3 to 5): the date on show is
+// kept, the history entry replaced, and the page drawn again.
+function applyPeriod(name){
+  CURRENT_PERIOD = name && baselinePeriod(name) ? name : null;
+  setPeriodInUrl(CURRENT_PERIOD);
+  updatePeriodButtonLabel();
+  updateInPlaceOnButtonLabel();
+  closePeriodPanel();
+  renderFromState();
+  renderInPlaceOnPastNotice();
+  announcePeriod();
+}
+function periodPanelHtml(){
+  const daily = isDailyBaseline();
+  const clear = CURRENT_PERIOD
+    ? `<div style="margin-bottom:14px;"><button class="link-btn" id="period-clear-btn" type="button">Clear period (${escHtml(periodWords(CURRENT_PERIOD))})</button></div>`
+    : "";
+  const intro = `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
+      Shows every page for one ${daily ? "day" : "period"} of the data asset's calendar, with the
+      results recorded about it by the date on show. Clear it to see ${daily ? "the latest day" : "each dataset's current period"} again.</div>`;
+  if(daily){
+    const range = coveredDateRange();
+    const bound = range ? ` min="${escAttr(range.first)}" max="${escAttr(range.last)}"` : "";
+    return `${intro}${clear}<label for="period-day-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">For day</label>
+      <input type="date" id="period-day-input"${bound} value="${escAttr(CURRENT_PERIOD || "")}"
+        style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">`;
+  }
+  // NEWEST FIRST, UNDER YEAR HEADINGS (criterion 2).
+  const byYear = new Map();
+  [...baselinePeriods()].reverse().forEach(p=>{
+    const year = String(p.date).slice(0, 4);
+    if(!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year).push(p);
+  });
+  const groups = [...byYear.entries()].map(([year, ps])=> `<div role="group" aria-labelledby="period-year-${escAttr(year)}" style="margin-bottom:12px;">
+      <div class="legend-key" id="period-year-${escAttr(year)}" style="margin:0 0 6px;">${escHtml(year)}</div>
+      ${ps.map(p=> `<button class="link-btn" type="button" data-period="${escAttr(p.period)}"
+        aria-pressed="${p.period === CURRENT_PERIOD}" style="margin:0 12px 6px 0;">${escHtml(periodWords(p.period))}</button>`).join("")}
+    </div>`).join("");
+  return `${intro}${clear}${groups}`;
+}
+function openPeriodPanel(){
+  const body = document.getElementById("period-panel-body");
+  body.innerHTML = periodPanelHtml();
+  body.querySelectorAll("[data-period]").forEach(b=> b.addEventListener("click", ()=> applyPeriod(b.dataset.period)));
+  const clear = document.getElementById("period-clear-btn");
+  if(clear) clear.addEventListener("click", ()=> applyPeriod(null));
+  const day = document.getElementById("period-day-input");
+  if(day) day.addEventListener("change", (e)=>{ if(baselinePeriod(e.target.value)) applyPeriod(e.target.value); });
+  document.getElementById("period-backdrop").classList.add("open");
+  document.getElementById("period-panel").classList.add("open");
+  setDrawerHidden("period-panel", false);
+}
+function closePeriodPanel(){
+  document.getElementById("period-backdrop").classList.remove("open");
+  document.getElementById("period-panel").classList.remove("open");
+  setDrawerHidden("period-panel", true);
+}
+document.getElementById("period-btn").addEventListener("click", openPeriodPanel);
+document.getElementById("period-backdrop").addEventListener("click", closePeriodPanel);
+document.getElementById("period-panel-close").addEventListener("click", closePeriodPanel);
+// A PERIOD THE BASELINE DOES NOT HOLD (criterion 8): said, named, removed
+// from the address, and the page shown with none chosen.
+function readPeriodFromUrl(){
+  const asked = periodFromUrl();
+  const notice = document.getElementById("period-param-notice");
+  if(asked && baselinePeriod(asked)){ CURRENT_PERIOD = asked; return; }
+  CURRENT_PERIOD = null;
+  if(asked != null){
+    setPeriodInUrl(null);
+    if(notice){
+      notice.hidden = false;
+      notice.innerHTML = `This link asks for a period called <code>${escHtml(asked)}</code>, which this
+        data asset's calendar does not have. The page is shown with no period chosen.`;
+    }
+  }
+}
+readPeriodFromUrl();
+updatePeriodButtonLabel();
+
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 // 2026-09-18 (running-thoughts.md #9): used to check each of the 4 side
@@ -13400,6 +13576,7 @@ document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e)=>{
   if(e.key!=="Escape") return;
   if(document.getElementById("in-place-on-panel").classList.contains("open")) closeInPlaceOnPanel();
+  else if(document.getElementById("period-panel").classList.contains("open")) closePeriodPanel();
   else if(STATE && STATE.panel) closePanel();
   else if(STATE && STATE.checkKey) closeCheckPanel();
   else closeDrawer();
