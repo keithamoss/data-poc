@@ -414,11 +414,16 @@ class TestAKnockOnRunsAcrossItsStream:
         monkeypatch.setattr(knock_on, "follow_up",
                             lambda cid, **kw: done.append(cid) or [])
         knock_on.follow_up_stream("child-protection")
-        assert sorted(done) == ["child-protection", "emergency-department",
+        assert sorted(done) == ["cancer", "child-protection", "emergency-department",
                                 "linkage-products"]
 
     @pytest.mark.asset("daily")
     def test_a_collection_alone_on_its_calendar_follows_up_alone(self, monkeypatch):
+        import one_collection
+
+        # THE PREMISE, STATED: Birth Registrations alone on the daily calendar,
+        # as it was until Mental Health joined it (tests/one_collection.py).
+        one_collection.only(monkeypatch, "civil-registration")
         done = []
         monkeypatch.setattr(knock_on, "follow_up",
                             lambda cid, **kw: done.append(cid) or [])

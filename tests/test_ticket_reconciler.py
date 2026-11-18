@@ -279,9 +279,13 @@ class TestWhatTheTicketSays:
         assert "say what each file is" in body
 
     @pytest.mark.asset("daily")  # a Birth Registrations pair
-    def test_two_files_say_the_decision_is_made_in_the_terminal(self):
+    def test_two_files_say_the_decision_is_made_in_the_terminal(self, monkeypatch):
         """REQ-PIPE-194 criterion 2: several choices, made in the terminal,
         both files as code, where in the TUI - and no GitHub command."""
+        import one_collection
+
+        # THE PREMISE, STATED: a one-collection asset (tests/one_collection.py).
+        one_collection.only(monkeypatch, "civil-registration")
         body = tr.body_for(a_slot(slot_state.TWO_FILES, dataset="birth-registrations",
                                    period="2026-11-02",
                                    files=("birth_registrations_2026-11-02.csv",

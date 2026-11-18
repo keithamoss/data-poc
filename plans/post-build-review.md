@@ -16905,6 +16905,18 @@ twice. It deliberately did not re-find the `TypeError`.
        and the cache gate had no entry for the two new providers'
        `_postcodes`, a copy of Emergency Department's allowlisted one
        (added; 46 passed).
+     - **And in chunks 05 to 08 of the same gate**: the shared-history and
+       knock-on tests listed the quarterly providers or a calendar's
+       collections by hand (Cancer added); a knock-on test and a ticket-body
+       test used the daily asset as one collection alone on its calendar -
+       now stated through tests/one_collection.py; a carry-forward test
+       asserted no dataset was refused in its made-up quarter, which Cancer
+       now rightly is - it asserts Case Workers' refusal is the one replaced;
+       and tests/real_asset.py copied the daily asset as a real deployment
+       with Mental Health's configuration and none of its supplies, so the
+       build refused a collection with no data - it now copies Birth
+       Registrations' collection alone, generically, removing every other
+       collection's files.
 
 480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
      `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`

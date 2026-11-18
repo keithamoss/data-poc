@@ -57,6 +57,10 @@ def _data_asset(folder: Path) -> None:
     source = (folder / "data-asset.yaml").read_text()
     head = source.split("\nhierarchy:\n", 1)[1]
     hierarchy = yaml.safe_load("hierarchy:\n" + head)["hierarchy"]
+    # ONE COLLECTION, THE ONE WHOSE SUPPLIES ARRIVE (_one_collection).
+    hierarchy["agencies"] = [
+        {**a, "collections": [c for c in a["collections"] if c["id"] == COLLECTION]}
+        for a in hierarchy["agencies"] if a["id"] == AGENCY]
     doc = {
         "data_asset_id": ASSET,
         "timezone": {"versions": [{"effective_from": "1970-01-01", "zone": "Australia/Perth",
@@ -89,6 +93,32 @@ def _calendar(folder: Path) -> None:
     (folder / "calendar.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
 
 
+def _one_collection(folder: Path) -> None:
+    """A real asset of Birth Registrations' collection alone, whose two
+    supplies are the ones that arrived. The daily asset holds others since
+    Mental Health joined it (REQ-QAC-350, 2026-11-18); copied with their
+    configuration and none of their supplies, the build refused a collection
+    with no data. Every other collection's agency folder, adapter, dbt folders
+    and presentation entries go, so no gate finds a file for a collection the
+    hierarchy does not hold."""
+    others = [c for c in (folder / "collections").glob("*.py")
+              if c.stem not in ("__init__", COLLECTION.replace("-", "_"))]
+    for adapter in others:
+        cid = adapter.stem.replace("_", "-")
+        adapter.unlink()
+        for sub in ("models", "tests", "retired"):
+            shutil.rmtree(folder / "dbt" / sub / cid, ignore_errors=True)
+    for agency in folder.iterdir():
+        if agency.is_dir() and agency.name not in (AGENCY, "collections", "dbt") \
+                and any(agency.glob("*-contract.yaml")):
+            shutil.rmtree(agency)
+    presentation = folder / "presentation.yaml"
+    doc = yaml.safe_load(presentation.read_text())
+    doc["agencies"] = {k: v for k, v in (doc.get("agencies") or {}).items() if k == AGENCY}
+    doc["collections"] = {k: v for k, v in (doc.get("collections") or {}).items() if k == COLLECTION}
+    presentation.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+
+
 def make(tmp: Path, deliveries: Path, receipts: Path) -> Path:
     tree = tree_copy.copy_tracked_tree(Path(tmp) / "tree")
     folder = tree / "assets" / ASSET
@@ -103,6 +133,7 @@ def make(tmp: Path, deliveries: Path, receipts: Path) -> Path:
     people.write_text(people.read_text().replace(f"data_asset: {SOURCE}\n", f"data_asset: {ASSET}\n"))
     _data_asset(folder)
     _calendar(folder)
+    _one_collection(folder)
     assert not (folder / "synthetic").exists()
     (folder / "dbt" / "dbt_packages").symlink_to(ROOT / "assets" / SOURCE / "dbt" / "dbt_packages")
     if (ROOT / "node_modules").exists():

@@ -162,8 +162,11 @@ class TestCarryForward:
                              [entry["id"]]).fetchone()
         assert tuple(stood) == (world.q3, None), "it stood on nothing before"
         assert inheritance.inherited(conn, CASE_WORKERS, world.q4).supply == q3
-        assert not inheritance.refusals(conn) or all(
-            r.period != world.q4 for r in inheritance.refusals(conn))
+        # CASE WORKERS' refusal is the one the carry-forward replaces; another
+        # dataset opening the same made-up quarter with nothing to stand on
+        # (Cancer, REQ-QAC-348) is refused in its own right.
+        assert not [r for r in inheritance.refusals(conn)
+                    if r.period == world.q4 and r.dataset_id == CASE_WORKERS]
 
 
 class TestTheFlagRoute:
