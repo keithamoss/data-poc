@@ -2750,6 +2750,13 @@ class TestAnExhaustedScheduleIsLoud:
     one on the same calendar that is not - the case a rollup most wants to
     blur. (Before REQ-GEN-325, cp-case-workers ran out alone at 2027-Q3.)
 
+    AND CANCER NOTIFICATIONS, SINCE REQ-QAC-348 (2026-11-18): Department
+    of Health's annual dataset owes only the August round, at
+    files_go_to_period 0, so its last slot is August 2027's, filling
+    2027-Q3 - by 15 December it has run out too. Seven exhausted, then:
+    Child Protection's six and Cancer Notifications, with Emergency
+    Department still the healthy one beside them on the same calendar.
+
     THE WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
     Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays open
     until Q4's claim window opens in late October, and its siblings' Q4
@@ -2773,10 +2780,11 @@ class TestAnExhaustedScheduleIsLoud:
         notice = page.locator(".notice-exhausted")
         assert notice.count() == 1
         text = " ".join(notice.inner_text().split())
-        assert "6 datasets cannot be filed" in text
+        assert "7 datasets cannot be filed" in text
         assert "delivery dates have run out" in text
         assert "Presentations" not in text, "Emergency Department is not exhausted"
         assert "Case Workers" in text, "the dataset is named (post-build-review #132 A4)"
+        assert "Cancer Notifications" in text
 
     def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, in_place_on=self.ALL_EXHAUSTED)
@@ -2816,7 +2824,9 @@ class TestAnExhaustedScheduleIsLoud:
     def test_the_exhausted_are_said_and_the_healthy_one_is_not(self, page, dashboard_html_without_blockers):
         """The nodata trap, at the tier it would vanish from: every exhausted
         Child Protection row says so, and Emergency Department - on the same
-        calendar, not exhausted - does not."""
+        calendar, not exhausted - does not. On Department of Health's page
+        the one row that does is Cancer Notifications (see the class
+        docstring)."""
         _goto(page, dashboard_html_without_blockers, state={"tier": "agency", "agencyId": self.CP},
               in_place_on=self.ONE_EXHAUSTED)
         rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
@@ -2825,7 +2835,10 @@ class TestAnExhaustedScheduleIsLoud:
         _goto(page, dashboard_html_without_blockers,
               state={"tier": "agency", "agencyId": "department-of-health"},
               in_place_on=self.ONE_EXHAUSTED)
-        assert page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended")).count() == 0
+        ended = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
+        assert ended.count() == 1
+        assert "Cancer Notifications" in ended.first.inner_text()
+        assert "Presentations" not in ended.first.inner_text()
 
     def test_the_dataset_itself_says_so_in_its_own_words(self, page, dashboard_html_without_blockers):
         _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
@@ -2961,8 +2974,15 @@ class TestQuietStatesAreVisiblyBuilt:
         corpus every dataset now has a closed, unmarked period by 2027 and
         reads red (REQ-DASH-133), so no nodata pill is left to measure.
         This is about the pill's styling, not the corpus.
+
+        ON CHILD PROTECTION'S AGENCY PAGE SINCE REQ-QAC-348 (2026-11-18):
+        with Cancer on Department of Health, no agency card on the landing
+        page reads nodata on that date any more; the agency page's dataset
+        rows still carry the pill.
         """
-        _goto(clean_page, dashboard_html_without_blockers, in_place_on="2027-09-01")
+        _goto(clean_page, dashboard_html_without_blockers,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"},
+              in_place_on="2027-09-01")
         clean_page.evaluate(f"document.documentElement.setAttribute('data-theme', '{theme}')")
         pill = clean_page.locator(".pill.nodata").first
         pill.wait_for(state="attached")
@@ -3349,9 +3369,13 @@ class TestTheLowRunwayWarningIsOnThePage:
     def test_it_names_the_calendar_and_the_dataset_that_runs_out_first(
             self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)
+        # The fewest slots left, ties broken by dataset id
+        # (runway.calendar_runway): since REQ-QAC-348, cancer-notifications
+        # (annual, August only) ties cp-case-workers at one slot and sorts
+        # first.
         text = clean_page.locator(".notice-runway").first.inner_text()
         assert "quarterly" in text
-        assert "cp-case-workers" in text, (
+        assert "cancer-notifications" in text, (
             "the number is a minimum across datasets and the notice does not say whose")
 
     def test_it_says_in_words_that_nothing_has_failed(self, clean_page,

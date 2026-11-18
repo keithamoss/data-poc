@@ -16938,6 +16938,16 @@ twice. It deliberately did not re-find the `TypeError`.
        accounted for in the test. The procedure's text said `sort_keys=True`,
        which would have re-sorted the whole committed file; corrected to
        insertion order.
+     - **Three browser classes, found by the full gate's e2e chunk**: Cancer
+       Notifications (annual, August only) runs out after August 2027 like
+       Child Protection's six, so TestAnExhaustedScheduleIsLoud now expects
+       seven exhausted and one ended row on Department of Health's page (it,
+       never Emergency Department); TestTheLowRunwayWarningIsOnThePage's
+       runway driver is cancer-notifications, tied with cp-case-workers at one
+       slot and first by id; and TestQuietStatesAreVisiblyBuilt measures the
+       nodata pill on Child Protection's agency page, since no landing-page
+       card reads nodata any more. Each was the system right and the premise
+       stale; 17 passed across the three classes after.
 
 480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
      `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`
