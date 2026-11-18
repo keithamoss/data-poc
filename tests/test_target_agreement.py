@@ -247,7 +247,12 @@ class TestTheTrialAtGeneration:
         message = raised.value.message
         assert "TS-43" in message and "built to green" in message and "read amber" in message
         assert "place_of_birth_facility" in message
-        assert not any((generated / "deliveries").iterdir()), "criterion 2: not emitted"
+        # Birth Registrations' own deliveries go; another collection's in the
+        # same asset (Mental Health, REQ-QAC-350) are not this trial's to remove.
+        left = [d.name for d in (generated / "deliveries").iterdir()
+                if (d / "birth_registrations.csv").exists()]
+        assert any((generated / "deliveries").iterdir()), "test precondition - another collection's history"
+        assert left == [], "criterion 2: not emitted"
 
     def test_no_lead_in_is_a_disagreement_not_a_crash(self, monkeypatch, tmp_path):
         from cli.collection_cli import of as _cli_of

@@ -686,7 +686,12 @@ class TestOffsetDates:
         from asset_model import asset_time, assets, config_yaml, hierarchy
 
         text = (asset_folders.real_folder() / "data-asset.yaml").read_text()
-        assert "\nsynthetic: true\n" in text and "!anchor" in text
+        assert "\nsynthetic: true\n" in text
+        # THE PREMISE, STATED: data-asset.yaml writes an offset. Its own
+        # synthetic-era versions moved to synthetic/eras.yaml (REQ-GEN-371),
+        # so the copy gains one rather than relying on the real file to.
+        if "!anchor" not in text:
+            text += "\nanchor_probe: !anchor -1\n"
         with asset_folders.pointed(tmp_path / "real-asset"):
             # Kept while the asset was synthetic, as any earlier test may have.
             config_yaml.load(assets.selected().folder / "calendar.yaml")

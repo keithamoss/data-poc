@@ -16848,3 +16848,29 @@ twice. It deliberately did not re-find the `TypeError`.
        threshold scale with how often a dataset is owed, is a product
        decision for Keith. The gate still passes.
 
+479. **[done, 2026-11-18]** **[Testing & dev tooling]** **Adding two collections broke four test modules whose premises were the asset as it was.**
+     Found running every module that reads the setting files after group C
+     (13 failed of 1601). None was a product fault; each test read the real
+     configuration and assumed something adding a collection changed:
+     - **Runway (test_runway, test_turn_off, 10 tests)**: written with
+       cp-case-workers the first dataset on the quarterly calendar to run
+       out. Cancer, owed once a year, now runs out first - the right answer
+       (#478 asks only whether an annual dataset should count differently).
+       The tests now say so: tests/runway_premise.py reads the asset without
+       the annual dataset for them, through the hierarchy's dataset list,
+       which runway and the tests' own counts both walk.
+     - **The target trial's removal (test_target_agreement, 1)**: asserted
+       the whole deliveries folder empty after Birth Registrations' failed
+       trial. The daily asset now holds Mental Health's deliveries too, and
+       the trial rightly removes only its own; it asserts no Birth
+       Registrations delivery is left, after asserting another collection's
+       is there.
+     - **The offset refusal (test_rolling_anchor, 1)**: needed data-asset.yaml
+       to write an `!anchor`; REQ-GEN-371 moved every one to eras.yaml, so
+       the test's copy now gains one.
+     - **The deployment's targets (test_target_agreement, 2 parametrized)**:
+       not changed. It compares this checkout's generated targets with the
+       real supply_<asset> database, bootstrapped before the collections
+       existed; it agrees once that database is bootstrapped with them.
+     - Seen: the 11 failing tests of the first three passed after the
+       change (with the rest of their modules, 183 passed).

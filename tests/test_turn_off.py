@@ -751,6 +751,16 @@ class TestACorrectionOfATurnOffReverts:
 
 # ---- runway and the overlap gate (criteria 25 and 31) -----------------------
 
+@pytest.fixture
+def child_protections_calendar(monkeypatch):
+    """The runway on the real quarterly calendar as these tests were written
+    against it, cp-case-workers running out first - tests/runway_premise.py."""
+    import runway_premise
+
+    runway_premise.child_protections_calendar(monkeypatch)
+
+
+@pytest.mark.usefixtures("child_protections_calendar")
 class TestRunway:
     def test_off_for_good_is_not_an_exhausted_schedule(self, using):
         from qa_tools.common import runway
@@ -1063,6 +1073,7 @@ class TestAnOwedPeriodStillCounts:
         assert not {"2025-Q3", "2025-Q4", "2026-Q1"} & states
 
 
+@pytest.mark.usefixtures("child_protections_calendar")
 class TestCriticFindingsOn190:
     """delivery-critic on REQ-PIPE-179 (post-build-review #190). Each failed
     before its fix."""

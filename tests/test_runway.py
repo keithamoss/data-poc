@@ -19,8 +19,16 @@ from datetime import date
 import pytest
 
 import agreement_split
+import runway_premise
 from asset_model import hierarchy, schedule
 from qa_tools.common import runway
+
+
+@pytest.fixture(autouse=True)
+def _child_protections_calendar(monkeypatch):
+    """Every test here is about the mechanics on the real quarterly calendar,
+    written with cp-case-workers running out first - tests/runway_premise.py."""
+    runway_premise.child_protections_calendar(monkeypatch)
 
 # The real quarterly calendar's last authored date. Written as a
 # constant so a test that goes stale when somebody authors 2028 fails
