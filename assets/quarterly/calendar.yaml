@@ -343,6 +343,30 @@ collections:
               change: >-
                 Emergency Department owes a supply every quarter from 2023-01-01,
                 due at 09:00 with 8 hours' grace.
+  # REQ-QAC-348: a SYNTHETIC test collection, made to exercise annual
+  # participation. Its files go into the period they arrive in, due 09:00 with
+  # 8 hours' grace as Child Protection, owed from the first quarter of Child
+  # Protection's synthetic history.
+  - id: cancer
+    files_go_to_period:
+      versions:
+        - effective_from: "2015-01-01"
+          value: 0
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-348
+              change: >-
+                The Cancer collection's files go into the period they arrive in. Stated from its first round, so nothing moves.
+    participation_defaults:
+      versions:
+        - effective_from: "2015-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-348
+              change: >-
+                The Cancer collection's supplies are due at 09:00 with 8 hours' grace, as Child Protection's.
   # REQ-QAC-330: the data asset's linkage product. On the asset's baseline with
   # the data it links, so its checks read the same period's tables (REQ-PIPE-331
   # criterion 2), and at files_go_to_period 0: the release arriving on a round is
@@ -381,9 +405,9 @@ collections:
 # periods the dataset owes, under `participates:` - by full name in the
 # baseline's own terms, delivery months on authored dates and weekdays on a
 # daily rule (REQ-PIPE-346), or `all` - with a `reason:` when it owes only
-# some. Saying nothing
-# owes every period. The FIRST version's effective_from is the date the
-# dataset began owing supplies; there is no separate owes_from.
+# some. Saying nothing owes every period. The FIRST version's effective_from
+# is the date the dataset began owing supplies; there is no separate
+# owes_from.
 #
 # EVERY VERSION RESTATES WHAT ITS PREDECESSOR STATED, so a version always
 # reads as complete on its own and a value is never silently dropped.
@@ -624,6 +648,21 @@ datasets:
             - date: "2026-10-18"
               author: REQ-QAC-231
               change: Owes supplies from 2023-01-01; due time and grace from Emergency Department's participation_defaults.
+  # REQ-QAC-348: ANNUAL, through participates as built - owed only in the
+  # August round, from the first quarter of Child Protection's synthetic
+  # history.
+  - id: cancer-notifications
+    participation:
+      versions:
+        - effective_from: "2015-01-01"
+          participates: [August]
+          reason: >-
+            A synthetic test dataset made to exercise annual participation: the
+            registry supplies its notifications once a year, in the August round.
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-348
+              change: Owes one supply a year, in the August round, from 2015-01-01; due time and grace from the Cancer collection's participation_defaults.
   - id: linkage-keys
     participation:
       versions:

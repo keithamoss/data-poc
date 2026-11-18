@@ -92,7 +92,12 @@ def sla_timeline(dataset_id: str, agreement=None) -> dict:
         cadence = {k: v for k, v in base.items()
                    if k not in ("expected_time", "latency_minutes", "days_before")}
         partial = False
-        if "anchor_months" in base and version.participates is not None:
+        if version.vocabulary == schedule.WEEKDAYS and version.participates is not None:
+            # THE WEEKDAYS IT SUPPLIES ON (REQ-DASH-347 criterion 1), Monday
+            # 0, on a daily rule - fewer than seven is a subset, with a reason.
+            cadence["weekdays"] = sorted(version.participates)
+            partial = len(cadence["weekdays"]) < 7
+        elif "anchor_months" in base and version.participates is not None:
             own = sorted(m for m in base["anchor_months"] if m in version.participates)
             partial = own != base["anchor_months"]
             cadence["anchor_months"] = own

@@ -50,6 +50,7 @@ from pathlib import Path
 
 import yaml
 from asset_model import config_yaml
+from asset_model import eras as eras_mod
 
 from asset_model import asset_time, assets, schedule
 from qa_tools.common import period_schema
@@ -944,8 +945,12 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
     from qa_tools.common import agreement_freeze
 
     base_at = agreement_freeze.committer_instant(ref, root=ROOT)
+    # BOTH FILES (REQ-GEN-371 criterion 5): a version may be added to the
+    # asset's synthetic eras as well as to data-asset.yaml itself.
+    eras_rel = _eras_rel(rel_path)
     result = subprocess.run(["git", "log", "--reverse", "--format=%H %cI", f"{ref}..HEAD",
-                             "--", rel_path], cwd=ROOT, capture_output=True, text=True)
+                             "--", rel_path, *([eras_rel] if eras_rel else [])],
+                            cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
         return None
     for line in result.stdout.splitlines():
@@ -955,7 +960,9 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
         content = _content_at(rel_path, sha)
         try:
             doc = config_yaml.parse(content or "") or {}
-        except yaml.YAMLError:
+            if isinstance(doc, dict) and eras_rel:
+                doc = _with_eras(doc, _content_at(eras_rel, sha), eras_rel)
+        except (yaml.YAMLError, eras_mod.ErasError):
             continue
         if not isinstance(doc, dict):
             continue
@@ -969,6 +976,69 @@ def _version_added_on(rel_path: str, ref: str, start: str) -> date | None:
                for setting in amber_setting.stated_settings(doc, key).values()):
             return asset_time.local_date(datetime.fromisoformat(stamp))
     return None
+
+
+def _eras_rel(asset_rel: str | None) -> str | None:
+    """The repository path of the eras.yaml beside an asset's data-asset.yaml."""
+    if not asset_rel:
+        return None
+    return str(Path(asset_rel).parent / "synthetic" / eras_mod.FILE)
+
+
+def _eras_text_now(src: Source) -> str | None:
+    path = eras_mod.path_for(src.asset_path)
+    return config_yaml.read(path) if path.exists() else None
+
+
+def _with_eras(doc: dict, eras_text: str | None, where) -> dict:
+    """`doc` with the eras text merged into its setting timelines
+    (REQ-GEN-371 criterion 2); `doc` alone where there is no eras text."""
+    if not eras_text:
+        return doc
+    return eras_mod.merged(doc, config_yaml.parse(eras_text, name=str(where)) or {})
+
+
+def _settings_now(raw: dict, src: Source) -> dict:
+    """The asset's settings as they stand: data-asset.yaml and its synthetic
+    eras, one timeline - an unreadable eras.yaml is _eras_errors' to say."""
+    try:
+        return _with_eras(raw, _eras_text_now(src), eras_mod.path_for(src.asset_path))
+    except (yaml.YAMLError, eras_mod.ErasError):
+        return raw
+
+
+def _settings_at(src: Source, ref: str) -> dict | None:
+    """The asset's settings as they stood at `ref`, merged as now - so a
+    version moved between the two files is no change (criterion 5). None
+    where data-asset.yaml did not exist there."""
+    name = _repo_path(src.asset_path)
+    previous = _content_at(name, ref) if name else None
+    if previous is None:
+        return None
+    try:
+        doc = config_yaml.parse(previous) or {}
+        if not isinstance(doc, dict):
+            return None
+        eras_rel = _eras_rel(name)
+        return _with_eras(doc, _content_at(eras_rel, ref) if eras_rel else None, eras_rel)
+    except (yaml.YAMLError, eras_mod.ErasError):
+        return None
+
+
+def _eras_errors(raw: dict, src: Source) -> list[ConfigError]:
+    """eras.yaml must parse and name only levels the hierarchy holds."""
+    path = eras_mod.path_for(src.asset_path)
+    text = _eras_text_now(src)
+    if not text:
+        return []
+    try:
+        _with_eras(raw, text, path)
+    except yaml.YAMLError as exc:
+        return [ConfigError(eras_mod.FILE, None, f"could not be parsed: {exc}.",
+                            "Fix the YAML syntax.")]
+    except eras_mod.ErasError as exc:
+        return [ConfigError(eras_mod.FILE, None, str(exc), "")]
+    return []
 
 
 def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
@@ -1074,7 +1144,7 @@ def _replacement_setting_errors(raw: dict, src: Source, today: date | None = Non
         "Make the replacement setting 'green' (or 'never') for those dates, or the warn "
         "setting (amber_setting) promote or promote-and-acknowledge - by a NEW version of whichever you "
         "change, since a past version is frozen.")
-        for where, problem in replacement_setting.conflicts(raw)]
+        for where, problem in replacement_setting.conflicts(_settings_now(raw, src))]
 
 
 def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
@@ -1088,12 +1158,7 @@ def _list_setting_errors(raw: dict, src: Source, today: date | None = None,
     from asset_model import amber_setting
 
     ref = ref or diff_base(root=ROOT)
-    name = _repo_path(src.asset_path)
-    previous = _content_at(name, ref) if name else None
-    try:
-        old_doc = (config_yaml.parse(previous) or {}) if previous else {}
-    except yaml.YAMLError:
-        old_doc = {}
+    old_doc = _settings_at(src, ref) or {}
     keys = sorted(set(amber_setting.list_setting_keys(raw))
                   | set(amber_setting.list_setting_keys(old_doc if isinstance(old_doc, dict) else {})))
     out: list[ConfigError] = []
@@ -1127,6 +1192,8 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
     module = module or amber_setting
     key = module.KEY
     today = today or asset_time.local_date(asset_time.now())
+    # ONE TIMELINE, MERGED AGAINST MERGED (REQ-GEN-371 criteria 2 and 5).
+    raw = _settings_now(raw, src)
     standing = [ConfigError(
         src.name, f"{key} ({where})", f"{problem}.",
         "Give each version its own effective_from, and keep a data-asset-level version "
@@ -1134,14 +1201,8 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
         for where, problem in module.standing_problems(raw, today)]
     ref = ref or diff_base(root=ROOT)
     name = _repo_path(src.asset_path)
-    previous = _content_at(name, ref) if name else None
-    if previous is None:
-        return standing
-    try:
-        old_doc = config_yaml.parse(previous) or {}
-    except yaml.YAMLError:
-        return standing
-    if not isinstance(old_doc, dict):
+    old_doc = _settings_at(src, ref)
+    if old_doc is None:
         return standing
     synthetic = bool(old_doc.get("synthetic")) and bool(raw.get("synthetic"))
     problems = module.past_change_problems(old_doc, raw, today, synthetic=synthetic)
@@ -2380,6 +2441,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)
+    errors += _eras_errors(raw, src)
     errors += _amber_setting_errors(raw, src)
     errors += _replacement_setting_errors(raw, src)
     errors += _list_setting_errors(raw, src)

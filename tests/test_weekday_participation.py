@@ -227,5 +227,30 @@ class TestTheTerminalShowsTheWeekdays:
         assert "participates: Monday, Thursday" in " ".join(out.output.split()), out.output
 
 
+@pytest.mark.asset("daily")
+class TestTheBuildCarriesTheWeekdays:
+    """REQ-DASH-347 criteria 1 to 3, the build's half: the SLA tile's versions
+    carry the weekdays with the reason shown once, and a day owed nothing says
+    its weekdays under their own key, never as months."""
+
+    def test_the_sla_versions_carry_the_weekdays_and_the_reason(self, weekly):
+        from pipeline import owed_nothing
+
+        got = owed_nothing.sla_timeline(DAILY_DS, weekly)
+        newest = got["versions"][-1]
+        assert newest["cadence"]["weekdays"] == [0, 3], newest
+        assert newest["reason"] == REASON, newest
+
+    def test_a_day_owed_nothing_carries_weekdays_not_months(self, weekly):
+        from pipeline import owed_nothing
+
+        week = _week_after_newest(weekly, DAILY_DS)
+        rows = owed_nothing.for_dataset(DAILY_DS, week[-1], weekly)
+        tuesday = next(r for r in rows if r["period"] == week[1].isoformat())
+        assert tuesday["kind"] == owed_nothing.PARTICIPATION, tuesday
+        assert tuesday["weekdays"] == [0, 3] and tuesday["months"] is None, tuesday
+        assert week[0].isoformat() not in {r["period"] for r in rows}
+
+
 #: The daily asset by default; the authored-calendar cases name the quarterly.
 pytestmark = pytest.mark.asset("daily")

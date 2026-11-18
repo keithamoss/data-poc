@@ -125,9 +125,14 @@ class Resolved:
 
 
 def load_doc(path: Path | None = None) -> dict:
+    """data-asset.yaml's document with its synthetic eras merged into each
+    setting's timeline (REQ-GEN-371) - data-asset.yaml alone where the asset
+    has no synthetic/eras.yaml."""
+    from asset_model import eras
     from asset_model.hierarchy import data_asset_yaml
 
-    return config_yaml.load(path or data_asset_yaml()) or {}
+    path = path or data_asset_yaml()
+    return eras.merged_for(config_yaml.load(path) or {}, path)
 
 
 def _in_effect(setting: dict | None, on: date) -> dict | None:

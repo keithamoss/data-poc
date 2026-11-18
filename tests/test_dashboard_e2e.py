@@ -1448,6 +1448,59 @@ class TestTicketBadgeOnTheDailyAsset:
         assert tier3_badge.count() > 0, "no ticket badge rendered on the Tier 3 dataset page"
 
 
+@pytest.mark.asset("daily")  # Mental Health is the daily asset's
+class TestAWeeklyDatasetsQuietDays:
+    """REQ-DASH-347 criterion 4 on the real built dashboard: the weekly test
+    dataset (REQ-QAC-350) on a day it owes nothing in reads neither failing,
+    stale nor 'No data', its quiet day is worded by its weekday, and its SLA
+    tile says 'Weekly (Monday)'. Asserts first that the dataset is on the
+    page and the date is one it owes nothing in, so it cannot pass vacuously
+    (REQ-DASH-182 criterion 15's guard)."""
+
+    DOH = "department-of-health"
+    DS = {"tier": "dataset", "agencyId": DOH, "collectionId": "mental-health",
+          "datasetId": "mental-health-contacts"}
+    AGENCY = {"tier": "agency", "agencyId": DOH}
+    #: A Wednesday, after the Monday supply before it.
+    ON = "2026-08-26"
+
+    def _owes_nothing_on(self, page, date):
+        return page.evaluate(
+            """(date) => {
+                const raw = rawRealDatasetById('mental-health-contacts');
+                if (!raw) return 'not on the page';
+                const supplied = (raw.runs || []).some(r => r.run_date <= date);
+                const quiet = (raw.owedNothing || []).some(e => e.period === date
+                                                         && Array.isArray(e.weekdays));
+                return supplied && quiet;
+            }""", date)
+
+    @pytest.mark.asset("daily")
+    def test_its_quiet_day_is_not_stale_and_is_worded_by_weekday(self, page,
+                                                                 built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
+        assert self._owes_nothing_on(page, self.ON) is True, \
+            "precondition: the weekly dataset is on the page and owes nothing that day"
+        head = page.locator(".view-head").inner_text()
+        assert "No data" not in head and "Failing" not in head and "Fail" not in head.split()
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "nothing has landed yet" not in text
+        assert "Not owed — it supplies only on Mondays" in text
+        tile = page.locator(".sla-tile", has_text="SLA").first.inner_text()
+        assert "Weekly (Monday), by 10:00" in tile
+        assert "weekly participation" in tile
+
+    @pytest.mark.asset("daily")
+    def test_nor_in_its_agency_table(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.AGENCY, in_place_on=self.ON)
+        assert self._owes_nothing_on(page, self.ON) is True, "precondition"
+        row = page.locator("tr", has_text="Service Contacts").first
+        assert row.count() == 1
+        words = " ".join(row.inner_text().split())
+        assert "No data" not in words and "nothing has landed yet" not in words
+        assert "Fail" not in words.split()
+
+
 class TestOwedNothingPeriods:
     """REQ-DASH-182 on the real built dashboard. Criterion 15 is a
     REGRESSION GUARD (Keith, 2026-10-14, review Q2): it passes on today's

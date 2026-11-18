@@ -1,0 +1,54 @@
+# The Mental Health collection's dbt checks (REQ-QAC-350). The prose follows
+# docs/check-authoring-rules.md.
+version: 2
+
+models:
+  - name: stg_mental_health_contacts
+    description: One row per contact with a client, per weekly supply.
+    columns:
+      - name: contact_date
+        tests:
+          - not_null:
+              meta:
+                check_id: daily.department-of-health.mental-health.mental-health-contacts.contact_date.not_null_dbt
+                category: completeness
+                introduced_date: "2026-01-01"
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
+                changelog: []
+      - name: service_type
+        tests:
+          - accepted_values:
+              values: ['Community', 'Inpatient', 'Emergency', 'Telehealth']
+              meta:
+                check_id: daily.department-of-health.mental-health.mental-health-contacts.service_type.accepted_values_dbt
+                category: conformity
+                introduced_date: "2026-01-01"
+                description: >
+                  A single unrecognised value fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never
+                  agreed in the contract, usually a new service introduced
+                  upstream without notice.
+                changelog: []
+
+# tests/mental-health/contact_in_its_week.sql - its header says what it finds.
+data_tests:
+  - name: contact_in_its_week
+    config:
+      meta:
+        check_id: daily.department-of-health.mental-health.mental-health-contacts.contact_date.contact_in_its_week_dbt
+        reads_columns: ["mental_health_contacts.contact_id", "mental_health_contacts.contact_date"]
+        reads_tables: []
+        name: Contacts within a week
+        category: consistency
+        introduced_date: "2026-01-01"
+        description: >
+          Every contact in a supply must fall within one week of the supply's
+          earliest contact.
+        failure_indicates: >
+          Contacts from an earlier week were swept into this extract, most
+          often because a backlog of late-entered contacts was released at once.
+        changelog: []

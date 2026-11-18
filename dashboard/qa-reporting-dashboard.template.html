@@ -1861,6 +1861,11 @@ function cadenceLabel(cadence){
   const byTime = !db ? `by ${cadence.expected_time}`
     : db === 1 ? `by ${cadence.expected_time} the day before`
     : `by ${cadence.expected_time}, ${db} days before each date`;
+  // IN THE BASELINE'S OWN TERMS (REQ-DASH-347 criterion 1): a daily rule's
+  // dataset that supplies on some weekdays says which.
+  if(cadence.type==="daily" && Array.isArray(cadence.weekdays) && cadence.weekdays.length < 7){
+    return `${weekdayCycleWord(cadence.weekdays)}, ${byTime}`;
+  }
   if(cadence.type==="daily") return `Daily, ${byTime}`;
   if(cadence.type==="weekly") return `Weekly (${WEEKDAY_NAMES[cadence.weekday]}), ${byTime}`;
   // ANY NUMBER OF MONTHS, AUTHORED OR NOT (REQ-DASH-182 criteria 8 and 11):
@@ -1872,6 +1877,17 @@ function cadenceLabel(cadence){
     return `${frequencyWord(months.length)} (${months.map(m=>MONTH_NAMES[m-1]).join(", ")}, ${day}), ${byTime}`;
   }
   return "";
+}
+// A WEEKDAY SUBSET'S CYCLE (REQ-DASH-347 criterion 1): 'Weekly (Monday)' for
+// one, 'Weekdays' for Monday to Friday exactly, '<N> days a week (<days>)'
+// for any other two to six, 'Daily' for all seven. Monday is 0.
+const WEEKDAY_FULL = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+function weekdayCycleWord(days){
+  const sorted = [...days].sort((a, b)=> a - b);
+  if(sorted.length === 1) return `Weekly (${WEEKDAY_FULL[sorted[0]]})`;
+  if(sorted.length === 7) return "Daily";
+  if(sorted.join(",") === "0,1,2,3,4") return "Weekdays";
+  return `${sorted.length} days a week (${sorted.map(d=> WEEKDAY_FULL[d]).join(", ")})`;
 }
 // 'February', 'February and August', 'February, May and August'.
 function listWords(items){
@@ -1893,8 +1909,11 @@ function owedNothingLabel(entry){
   // ROUNDS, NOT MONTHS (REQ-DASH-182 criterion 2 as amended by REQ-DASH-326,
   // Keith O-D6): beside 2026-Q3 at files_go_to_period 1, 'outside its agreed
   // months (Feb, Aug)' would read as though Q3 were August's.
+  // ON WEEKDAYS, 'it supplies only on Mondays' (REQ-DASH-347 criterion 2).
   const detail = entry.kind === "participation"
-    ? `it supplies only in the ${listWords((entry.months || []).map(m=> _MONTH_FULL[m-1]))} rounds`
+    ? (Array.isArray(entry.weekdays)
+      ? `it supplies only on ${listWords([...entry.weekdays].sort((a, b)=> a - b).map(d=> `${WEEKDAY_FULL[d]}s`))}`
+      : `it supplies only in the ${listWords((entry.months || []).map(m=> _MONTH_FULL[m-1]))} rounds`)
     : (entry.reason || "");
   return {word, label: `${word} — ${detail}`, reason: entry.reason || ""};
 }

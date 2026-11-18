@@ -4788,6 +4788,59 @@ check of the file passes.
 moved. Or the drift is read against the wrong reference: anything other than
 2026-Q2's file, which the replay has promoted by then.
 
+**TS-114 `[INJECT]` An annual dataset's supply received in a round it owes
+nothing in.** PLANTED by REQ-GEN-349 (2026-11-18) on the Cancer collection, a
+synthetic test collection made to exercise annual participation (REQ-QAC-348).
+*Config: quarterly, Cancer Notifications owed in the August round only
+(participates [August]), due 09:00 with 8 hours' grace, files_go_to_period 0.
+2024-Q3's August supply arrives on time at 07:30; a second supply arrives at
+10:00 on the November 2024 round's date. The August slot closes when the
+November round's claim window opens, and the dataset has no November slot.*
+**Expect**: the November arrival finds no slot open and is held for a person
+(REQ-PIPE-131 criterion 10, REQ-PIPE-346 criterion 5) - not filed forward to
+2024-Q4, which it owes nothing in, and not back to 2024-Q3 as a resupply,
+since that slot has closed. 2024-Q3 stays filled by its August supply.
+**Breaks as**: filed to 2024-Q4 as if the dataset owed it; or taken as a
+resupply of the closed August slot.
+
+**TS-115 `[INJECT]` The quarters an annual dataset owes nothing in, standing
+on its August supply.** PLANTED by REQ-GEN-349 (2026-11-18) on the Cancer
+collection.
+*Config: as TS-114. 2025-Q3's August supply arrives on time at 07:30; 2025-Q4,
+2026-Q1 and 2026-Q2 are owed nothing.*
+**Expect**: each of the three quarters inherits 2025-Q3's supply when it is
+born, recorded with the schedule's own reason - "supplies only in the August
+rounds" (REQ-PIPE-098) - and reads neither failing, stale nor 'No data'. Seen
+on the dashboard with the period control (REQ-DASH-355) set to one of them.
+**Breaks as**: a quarter reading 'No supply' or failing for want of a supply
+it was never owed; or standing on anything but the August supply.
+
+**TS-116 `[INJECT]` A weekly dataset's Monday with no supply.** PLANTED by
+REQ-GEN-351 (2026-11-18) on the Mental Health collection, a synthetic test
+collection made to exercise weekly participation on a daily asset
+(REQ-QAC-350).
+*Config: daily, Service Contacts owed on Mondays only (participates [Monday],
+REQ-PIPE-346), due 10:00 with 2 hours' grace, files_go_to_period 0. One
+Monday's supply never comes, and no decision is scripted for it.*
+**Expect**: that Monday reads 'No supply' from its due time until a person
+decides - it is owed, so it does not stand on the Monday before. The six days
+after it are owed nothing and stand on the newest supply there is.
+**Breaks as**: the Monday reading as owed nothing, or standing on the week
+before as if it were a quiet day.
+
+**TS-117 `[INJECT]` A weekly dataset's supply received on a day it owes
+nothing.** PLANTED by REQ-GEN-351 (2026-11-18) on the Mental Health
+collection.
+*Config: daily, as TS-116. Monday's supply arrives on time at 08:15; a second
+supply arrives at 08:15 on the Tuesday, after Tuesday's claim window has
+opened, so Monday's slot has closed and the dataset has no Tuesday slot.*
+**Expect**: the Tuesday arrival finds no slot open and is held for a person
+(REQ-PIPE-131 criterion 10, REQ-PIPE-346 criterion 5) - not filed to Tuesday,
+which it owes nothing in, and not back to Monday as a resupply. Monday stays
+filled by its own supply.
+**Breaks as**: filed to Tuesday as if the dataset owed it; or taken as a
+resupply of Monday's closed slot.
+
 **TS-93c `[INJECT]` A Client Register geocode whose source was rejected -
 named, not planted.** NAMED by REQ-GEN-298 criterion 8 on 2019-Q1, TS-93a's
 quarter.

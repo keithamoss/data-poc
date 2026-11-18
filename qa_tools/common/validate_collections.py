@@ -673,6 +673,47 @@ def allowed_value_problems() -> list[str]:
     return problems
 
 
+def singular_home_problems() -> list[str]:
+    """Every singular dbt test a collection's schema declares under
+    `data_tests:` has a home table in its adapter's DbtSpec.singular_home,
+    and every home is one of the collection's tables - the refusal a run
+    would meet in dbt-core (UnknownCheck), found here without a database (a
+    defect found building REQ-QAC-350, 2026-11-18). An adapter that cannot be
+    loaded is config_problems()' to report."""
+    from asset_model import collections as declared_collections
+    from asset_model import config_yaml
+    from qa_tools import collections as registry
+
+    problems: list[str] = []
+    try:
+        declared = declared_collections.all_collections()
+    except ValueError:
+        return []
+    for coll in declared:
+        try:
+            adapter = registry.adapter(coll)
+        except Exception:  # noqa: BLE001 - an unloadable adapter is reported elsewhere
+            continue
+        home = dict(getattr(adapter.dbt, "singular_home", None) or {})
+        tables = {d.table for d in coll.datasets}
+        schema = ROOT / coll.dbt_schema
+        doc = (config_yaml.load(schema) or {}) if schema.exists() else {}
+        for test in doc.get("data_tests") or []:
+            name = (test or {}).get("name")
+            if name and name not in home:
+                problems.append(
+                    f"{coll.dbt_schema}: {coll.id}'s singular dbt test {name!r} has no home "
+                    f"table - add {name!r} to singular_home in its adapter's DbtSpec "
+                    f"({registry.adapter_file(coll.id)}), naming the table it is about.")
+        for name, table in sorted(home.items()):
+            if table not in tables:
+                problems.append(
+                    f"{registry.adapter_file(coll.id)}: singular_home names {table!r} for "
+                    f"{name!r}, which is not one of {coll.id}'s tables "
+                    f"({', '.join(sorted(tables))}).")
+    return problems
+
+
 def main() -> int:
     from asset_model import linked_datasets, set_member_checks
     from qa_tools.common import run_reads
@@ -680,6 +721,7 @@ def main() -> int:
     from asset_model import file_check_definitions
 
     problems = (config_problems() + check_file_problems() + allowed_value_problems()
+                + singular_home_problems()
                 + file_check_definitions.problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
                 + set_member_checks.problems())

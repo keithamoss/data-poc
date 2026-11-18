@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**24 of 24 scenarios marked for injection have data behind them today.** 24 scenarios are registered in all.
+**26 of 26 scenarios marked for injection have data behind them today.** 26 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -387,6 +387,38 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 | Built to | Warn on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
 | Built to | Pass, the 2026-08-31 14:00 arrival |
 | Built to | Warn on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
+
+## The geocoding history, planted (REQ-GEN-298)
+
+### TS-116 - A weekly dataset's Monday with no supply
+
+**What it demonstrates.** That Monday reads 'No supply' from its due time until a person decides - it is owed, so it does not stand on the Monday before. The six days after it are owed nothing and stand on the newest supply there is.
+
+**What it would look like if the rule were wrong.** The Monday reading as owed nothing, or standing on the week before as if it were a quiet day.
+
+*Config: daily, Service Contacts owed on Mondays only (participates [Monday], REQ-PIPE-346), due 10:00 with 2 hours' grace, files_go_to_period 0. One Monday's supply never comes, and no decision is scripted for it.*
+
+| Where to look | |
+|---|---|
+| Dataset | mental-health-contacts |
+| Supplies | — |
+| Period | 2026-09-07 |
+| Set "in the warehouse on" to | 2026-09-07 |
+
+### TS-117 - A weekly dataset's supply received on a day it owes nothing
+
+**What it demonstrates.** The Tuesday arrival finds no slot open and is held for a person (REQ-PIPE-131 criterion 10, REQ-PIPE-346 criterion 5) - not filed to Tuesday, which it owes nothing in, and not back to Monday as a resupply. Monday stays filled by its own supply.
+
+**What it would look like if the rule were wrong.** Filed to Tuesday as if the dataset owed it; or taken as a resupply of Monday's closed slot.
+
+*Config: daily, as TS-116. Monday's supply arrives on time at 08:15; a second supply arrives at 08:15 on the Tuesday, after Tuesday's claim window has opened, so Monday's slot has closed and the dataset has no Tuesday slot.*
+
+| Where to look | |
+|---|---|
+| Dataset | mental-health-contacts |
+| Supplies | `mental_health_contacts__202609140815000800`, `mental_health_contacts__202609150815000800` |
+| Period | 2026-09-14 |
+| Set "in the warehouse on" to | 2026-09-15 |
 
 
 <!-- scenario-map-data
@@ -1295,6 +1327,51 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
      }
     ],
     "subject": "verdict-line"
+   }
+  },
+  {
+   "id": "TS-116",
+   "mode": "INJECT",
+   "title": "A weekly dataset's Monday with no supply",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "That Monday reads 'No supply' from its due time until a person decides - it is owed, so it does not stand on the Monday before. The six days after it are owed nothing and stand on the newest supply there is.",
+   "breaksAs": "The Monday reading as owed nothing, or standing on the week before as if it were a quiet day.",
+   "config": "Config: daily, Service Contacts owed on Mondays only (participates [Monday], REQ-PIPE-346), due 10:00 with 2 hours' grace, files_go_to_period 0. One Monday's supply never comes, and no decision is scripted for it.",
+   "requirements": [
+    "REQ-PIPE-346",
+    "REQ-GEN-351",
+    "REQ-QAC-350"
+   ],
+   "coordinates": {
+    "dataset": "mental-health-contacts",
+    "supplies": [],
+    "period": "2026-09-07",
+    "inPlaceOn": "2026-09-07",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-117",
+   "mode": "INJECT",
+   "title": "A weekly dataset's supply received on a day it owes nothing",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "The Tuesday arrival finds no slot open and is held for a person (REQ-PIPE-131 criterion 10, REQ-PIPE-346 criterion 5) - not filed to Tuesday, which it owes nothing in, and not back to Monday as a resupply. Monday stays filled by its own supply.",
+   "breaksAs": "Filed to Tuesday as if the dataset owed it; or taken as a resupply of Monday's closed slot.",
+   "config": "Config: daily, as TS-116. Monday's supply arrives on time at 08:15; a second supply arrives at 08:15 on the Tuesday, after Tuesday's claim window has opened, so Monday's slot has closed and the dataset has no Tuesday slot.",
+   "requirements": [
+    "REQ-PIPE-131",
+    "REQ-PIPE-346",
+    "REQ-GEN-351"
+   ],
+   "coordinates": {
+    "dataset": "mental-health-contacts",
+    "supplies": [
+     "mental_health_contacts__202609140815000800",
+     "mental_health_contacts__202609150815000800"
+    ],
+    "period": "2026-09-14",
+    "inPlaceOn": "2026-09-15",
+    "subject": "supply-history-row"
    }
   }
  ]

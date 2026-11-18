@@ -1634,7 +1634,11 @@ _PAIR_CONFIG = ("daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window -
 #: fills rides the correction, its outcome recorded from the impact preview
 #: at confirmation.
 CORRECTION_RIDERS: dict[str, tuple[str, ...]] = {
-    "REQ-GEN-205": ("linkage-keys", "geo-cp-clients", "geo-ed-presentations"),
+    "REQ-GEN-205": ("linkage-keys", "geo-cp-clients", "geo-ed-presentations",
+                    # THE CANCER COLLECTION'S 2015-Q3 AUGUST SUPPLY (REQ-GEN-349;
+                    # Keith, 2026-11-18): owed from 2015-01-01, it holds a supply
+                    # in the quarter the correction alters, and rides it.
+                    "cancer-notifications"),
 }
 
 INJECTIONS: tuple[Injection, ...] = (
@@ -2982,6 +2986,55 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "09:00", "red",
                          "all six tables on time, cp_clients dirtied by its own red preset "
                          "and the other five clean", severity_tables=("cp_clients",)),
+        ),
+    ),
+    # ANNUAL PARTICIPATION (REQ-GEN-349): the Cancer collection owes one
+    # supply a year, in the August round, and nothing in the other three.
+    # Shapes only - the pipeline files, classifies and inherits.
+    Injection(
+        scenario_id="TS-114",
+        dataset_id="cancer-notifications",
+        anchor=-3,
+        config="quarterly, owed in the August round only (participates [August]), due 09:00 with 8 hours' grace, files_go_to_period 0. The year's August supply arrives as usual; a second supply arrives at 10:00 on the November round's date, a round the dataset owes nothing in.",
+        arrivals=(
+            ExtraArrival(0, "07:30", None, "the year's August supply, on time"),
+            ExtraArrival(92, "10:00", None,
+                         "a supply received on the November round's date - a round the "
+                         "dataset owes nothing in"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-115",
+        dataset_id="cancer-notifications",
+        anchor=-2,
+        config="quarterly, owed in the August round only (participates [August]), due 09:00 with 8 hours' grace, files_go_to_period 0. The August supply arrives on time; the three quarters after it are owed nothing, and each stands on it.",
+        arrivals=(
+            ExtraArrival(0, "07:30", None,
+                         "the August supply the following quarters stand on, on time"),
+        ),
+    ),
+    # WEEKLY PARTICIPATION ON A DAILY ASSET (REQ-GEN-351): the Mental Health
+    # collection owes one supply a week, on Mondays, and nothing on the other
+    # six days. Shapes only.
+    Injection(
+        scenario_id="TS-116",
+        dataset_id="mental-health-contacts",
+        # THE LAST MONDAY OF THE HISTORY: a Monday after a missed one is
+        # checked against the Monday before the gap, and its drift reads red
+        # for that (REQ-QAC-108's reference gap) - so nothing follows it here.
+        anchor=-1,
+        config="daily, Mental Health Service Contacts owed on Mondays only (participates [Monday]), due 10:00 with 2 hours' grace, files_go_to_period 0. This Monday's supply never comes; nobody decides anything about it.",
+        suppress=(0,),
+    ),
+    Injection(
+        scenario_id="TS-117",
+        dataset_id="mental-health-contacts",
+        anchor=-3,
+        config="daily, as TS-116. Monday's supply arrives on time at 08:15; a second supply arrives at 08:15 on the Tuesday, a day the dataset owes nothing - after Tuesday's claim window has opened, so Monday's slot has closed.",
+        arrivals=(
+            ExtraArrival(0, "08:15", None, "Monday's supply, on time"),
+            ExtraArrival(1, "08:15", None,
+                         "a supply received on the Tuesday - a day the dataset owes nothing"),
         ),
     ),
 )

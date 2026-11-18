@@ -48479,8 +48479,8 @@ requirements:
     - qa_tools/common/validate_schedule.py::_months_owed
     - qa_tools/common/inheritance.py::_owed_nothing_by_participation
     - qa_tools/common/participation_view.py::_text
-    - cli/schedule.py
-    - pipeline/owed_nothing.py
+    - cli/schedule.py::_show_dataset
+    - pipeline/owed_nothing.py::for_dataset
     evidence:
     - '2026-11-18, built on wip/groupA: tests/test_weekday_participation.py written first and seen failing (6 failed, 14 passed - the parse, the gate and inheritance - before any code), then 20 passed; the schedule, agreement, inheritance, slots, verdict, correction-trial, owed-nothing and CLI schedule modules 544 passed after one test that patched delivery_months was repointed. The full gate''s result is in the commit that carries it.'
     decisions:

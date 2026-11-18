@@ -174,6 +174,30 @@ collections:
               author: REQ-PIPE-320
               change: >-
                 Birth Registrations' files go into the period they arrive in - the day's own. Stated from its first round, so nothing moves.
+  # REQ-QAC-350: a SYNTHETIC test collection, made to exercise weekly
+  # participation on a daily asset. Its files go into the day they arrive on,
+  # due 10:00 with 2 hours' grace, owed from the first day of Birth
+  # Registrations' synthetic history.
+  - id: mental-health
+    files_go_to_period:
+      versions:
+        - effective_from: !anchor -99
+          value: 0
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-350
+              change: >-
+                The Mental Health collection's files go into the day they arrive on. Stated from its first round, so nothing moves.
+    participation_defaults:
+      versions:
+        - effective_from: !anchor -99
+          expected_time: "10:00"
+          grace: 2h
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-350
+              change: >-
+                The Mental Health collection's supplies are due at 10:00 with 2 hours' grace.
 
 # ---------------------------------------------------------------------
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
@@ -183,9 +207,9 @@ collections:
 # periods the dataset owes, under `participates:` - by full name in the
 # baseline's own terms, delivery months on authored dates and weekdays on a
 # daily rule (REQ-PIPE-346), or `all` - with a `reason:` when it owes only
-# some. Saying nothing
-# owes every period. The FIRST version's effective_from is the date the
-# dataset began owing supplies; there is no separate owes_from.
+# some. Saying nothing owes every period. The FIRST version's effective_from
+# is the date the dataset began owing supplies; there is no separate
+# owes_from.
 #
 # EVERY VERSION RESTATES WHAT ITS PREDECESSOR STATED, so a version always
 # reads as complete on its own and a value is never silently dropped.
@@ -259,3 +283,19 @@ datasets:
                 60 minutes), unchanged. 14:00 because the real extract-timestamp
                 ordering check made an earlier time unreachable (corrected
                 2026-09-17).
+  # REQ-QAC-350: WEEKLY, through weekday participation (REQ-PIPE-346) - owed
+  # on Mondays only, from the first day of Birth Registrations' synthetic
+  # history.
+  - id: mental-health-contacts
+    participation:
+      versions:
+        - effective_from: !anchor -99
+          participates: [Monday]
+          reason: >-
+            A synthetic test dataset made to exercise weekly participation on a
+            daily asset: the services supply their contacts once a week, on
+            Mondays.
+          changelog:
+            - date: "2026-11-18"
+              author: REQ-QAC-350
+              change: Owes one supply a week, on Mondays; due time and grace from the Mental Health collection's participation_defaults.

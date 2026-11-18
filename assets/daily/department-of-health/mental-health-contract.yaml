@@ -1,0 +1,185 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Mental Health
+# collection (REQ-QAC-350): one table, one CSV per supply, owed once a week, on
+# Mondays. A SYNTHETIC test dataset made to exercise weekly participation on a
+# daily asset - it stands in for no real supply and holds no real patient
+# data. Written to docs/check-authoring-rules.md.
+apiVersion: v3.2.0
+kind: DataContract
+# `id`, `name` and `domain` are held to the hierarchy in data-asset.yaml
+# (REQ-QAC-039): a one-table collection's contract carries its dataset's id and
+# display name, and its agency.
+id: mental-health-contacts
+status: draft
+version: 1.0.0
+name: Service Contacts
+domain: department-of-health
+description:
+  purpose: >
+    A synthetic test dataset, made to exercise weekly participation on a daily
+    asset: one row per contact a community mental health service had with a
+    client in the week before the supply, owed once a week, on Mondays. It
+    stands in for no real supply and holds no real patient data. In real mental
+    health data, a contact date, postcode, sex and age group together can
+    identify a client, which is why the age is held as a group.
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/mental-health/
+    format: csv
+    delimiter: comma
+    description: A weekly extract of the services' contacts, dropped into this bucket.
+schema:
+  - name: mental_health_contacts
+    physicalType: table
+    description: "One row per contact with a client, per weekly supply."
+    properties:
+      - name: contact_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: "The service's own contact identifier - primary key of this table."
+        quality:
+          - id: daily:department-of-health:mental-health:mental-health-contacts:contact_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: daily.department-of-health.mental-health.mental-health-contacts.contact_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-01"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: daily:department-of-health:mental-health:mental-health-contacts:contact_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: daily.department-of-health.mental-health.mental-health-contacts.contact_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2026-01-01"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The same contact was sent twice, most often because a supply was assembled from overlapping extracts.
+      - name: contact_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: "The day the contact took place."
+      - name: service_type
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        description: "The kind of service the contact was with."
+        quality:
+          - id: daily:department-of-health:mental-health:mental-health-contacts:service_type:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Community", "Inpatient", "Emergency", "Telehealth"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: daily.department-of-health.mental-health.mental-health-contacts.service_type.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new service introduced upstream without notice.
+      - name: referral_source
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        description: "Who referred the client to the service."
+        quality:
+          - id: daily:department-of-health:mental-health:mental-health-contacts:referral_source:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["GP", "Self", "Hospital", "Police", "Other"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: daily.department-of-health.mental-health.mental-health-contacts.referral_source.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new referral pathway introduced upstream without notice.
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        description: "Closed value set (M / F / X)."
+      - name: age_group
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: "The client's age band on the day of the contact."
+      - name: postcode
+        logicalType: string
+        physicalType: varchar(4)
+        required: false
+        description: "The client's residential postcode, where recorded."
+      - name: contact_minutes
+        logicalType: integer
+        physicalType: integer
+        required: true
+        description: "How long the contact lasted, in minutes."
+    quality:
+      - id: daily:department-of-health:mental-health:mental-health-contacts:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [300, 1500]
+        severity: warning
+        customProperties:
+          - property: check_id
+            value: daily.department-of-health.mental-health.mental-health-contacts.rowCount_datacontract
+          - property: introduced_date
+            value: "2026-01-01"
+          - property: description
+            value: >
+              The number of rows in the supply must fall inside the expected band.
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: piiClassification
+    value: "Synthetic. In a real deployment this is health information about identifiable clients; confirm and record its handling classification before this leaves draft status."
+  - property: arrivalPattern
+    value:
+      - type: nested_folder
+        keyPattern: "mental-health/{slot_id}/mental_health_contacts.csv"
+        dataset_id: mental-health-contacts
+        extractTo: mental_health_contacts

@@ -16821,3 +16821,30 @@ twice. It deliberately did not re-find the `TypeError`.
        is still the selected asset's (history_anchor.for_offsets). Under
        `test` and `ci` that is the fixed anchor; a real deployment holds no
        synthetic asset folder, so it never reads one.
+
+477. **[done, 2026-11-18]** **[QA checks & contract]** **A singular dbt test with no home table passed every gate and crashed its first run.**
+     Found building REQ-QAC-350: Mental Health's schema declared the singular
+     test `contact_in_its_week` under `data_tests:`, its adapter's
+     DbtSpec.singular_home did not name it, and `mothman check` passed. The
+     first bootstrap run of the collection stopped in dbt-core with
+     UnknownCheck ("asked for 1 check(s) no dbt test records"), the supply
+     reading Could not be checked.
+     - **Fixed, test-first** (a gate gap, contained): the collections gate's
+       new `singular_home_problems()` refuses a schema's singular test with no
+       home and a home naming a table the collection does not hold;
+       tests/test_singular_home_gate.py was RED (no such function) and is
+       green; both new adapters name their singular tests.
+
+478. **[todo, 2026-11-18]** **[Pipeline & publishing]** **An annual dataset always reads as low on calendar runway.**
+     Found adding the Cancer collection (REQ-QAC-348): the schedule gate
+     warns "calendar 'quarterly' runs out first for 'cancer-notifications',
+     which has only 1 future supply slot(s) left - its own last is 2027-Q3".
+     The calendar is authored to 2027-Q3, which is a year of quarters for
+     everyone else and one slot for a dataset owed once a year, so the
+     warning counts slots rather than time and will stay up for as long as
+     the dataset exists. A warning that never clears is one people stop
+     reading.
+     - **Not changed**: whether runway should be measured in time, or the
+       threshold scale with how often a dataset is owed, is a product
+       decision for Keith. The gate still passes.
+
