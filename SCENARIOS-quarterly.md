@@ -31,7 +31,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**48 of 74 scenarios marked for injection have data behind them today.** 74 scenarios are registered in all.
+**78 of 78 scenarios marked for injection have data behind them today.** 78 scenarios are registered in all.
 
 ## Slot assignment
 
@@ -686,7 +686,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 18:00 with 8 hours' grace; 2016-Q3's release, one row's linkage_key empty.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201608011730000800` |
+| Period | 2016-Q3 |
+| Set "in the warehouse on" to | 2016-08-01 |
 
 ### TS-87 - A dataset code nobody declared - a linked dataset as good as missing
 
@@ -696,7 +701,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2017-Q1's release codes every ED Presentations row EDDC_PRESENTATION_V2.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201702011730000800` |
+| Period | 2017-Q1 |
+| Set "in the warehouse on" to | 2017-02-01 |
 
 ### TS-88 - A surplus identifier
 
@@ -706,7 +716,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q1's release, one DOC_CLIENTS row carrying an id_2, the contract's id_2 column being blank in every ordinary release (PROVISIONAL).*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201802011730000800` |
+| Period | 2018-Q1 |
+| Set "in the warehouse on" to | 2018-02-01 |
 
 ### TS-89 - One record linked twice
 
@@ -716,7 +731,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q2's release, one EDDC_PRESENTATION record under two keys.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201805011730000800` |
+| Period | 2018-Q2 |
+| Set "in the warehouse on" to | 2018-05-01 |
 
 ### TS-90 - A link to a record the quarter does not hold
 
@@ -726,7 +746,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q3's release, one EDDC_PRESENTATION row naming a presentation not in ED's 2018-Q3 supply.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201808011730000800` |
+| Period | 2018-Q3 |
+| Set "in the warehouse on" to | 2018-08-01 |
 
 ### TS-91 - Coverage in the warn band
 
@@ -736,7 +761,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2018-Q4's release links 85.5 to 89.5 percent of the Client Register's rows.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201811011730000800` |
+| Period | 2018-Q4 |
+| Set "in the warehouse on" to | 2018-11-01 |
 
 ### TS-92 - Coverage in the fail band
 
@@ -746,7 +776,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q2's release links 78 to 84 percent of ED Presentations' rows.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201905011730000800` |
+| Period | 2019-Q2 |
+| Set "in the warehouse on" to | 2019-05-01 |
 
 ### TS-93a - A Client Register held failing and rejected - its side of TS-93b
 
@@ -771,7 +806,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q1's release, built from the Client Register as received, checked with TS-93a's supply rejected.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201902011730000800` |
+| Period | 2019-Q1 |
+| Set "in the warehouse on" to | 2019-02-01 |
 
 ### TS-94 - A failing linkage release promoted by a person
 
@@ -781,7 +821,27 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2022-Q2's release, one DOC_CLIENTS row naming a client the quarter does not hold; a scripted person promotes it two days later ("TS-94 promote", REQ-PIPE-332 criterion 8).*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202205011730000800` |
+| Period | 2022-Q2 |
+| Set "in the warehouse on" to | 2022-05-01 |
+
+### TS-95 - A linked dataset marked not supplied - named, not planted
+
+**What it demonstrates.** The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).
+
+**What it would look like if the rule were wrong.** Cp-clients' checks read Fail, could not run.
+
+*Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.*
+
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201505011725000800` |
+| Period | 2015-Q2 |
+| Set "in the warehouse on" to | 2015-05-01 |
 
 ### TS-96 - A quarter with no linkage release
 
@@ -791,7 +851,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 18:00; no release comes for 2020-Q3, and a scripted person marks it not supplied the day after its slot closed, 19 October 2020 ("TS-96 not supplied").*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | — |
+| Period | 2020-Q3 |
+| Set "in the warehouse on" to | 2020-10-19 |
 
 ### TS-97 - Large key groups in the warn band
 
@@ -801,7 +866,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2021-Q3's release, records re-keyed into groups of 51 to 230 records until just over 2 percent of distinct keys are large groups.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202108011730000800` |
+| Period | 2021-Q3 |
+| Set "in the warehouse on" to | 2021-08-01 |
 
 ### TS-98 - Large key groups in the fail band
 
@@ -811,7 +881,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-97; 2022-Q3's release, groups of 51 to 70 records until just over 4 percent of distinct keys are large groups.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202208011730000800` |
+| Period | 2022-Q3 |
+| Set "in the warehouse on" to | 2022-08-01 |
 
 ### TS-99 - A blank expected identifier
 
@@ -821,7 +896,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2024-Q3's release, one DOC_CLIENTS row's id_1 blank.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202408011730000800` |
+| Period | 2024-Q3 |
+| Set "in the warehouse on" to | 2024-08-01 |
 
 ### TS-100a - A Client Register held failing, then promoted by a person - its side of TS-100b
 
@@ -846,7 +926,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2019-Q3's release, ordinary rows, received while TS-100a's Client Register is held.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__201908011730000800` |
+| Period | 2019-Q3 |
+| Set "in the warehouse on" to | 2019-08-01 |
 
 ### TS-101 - Emergency Department's same-round Fail, clearing
 
@@ -856,9 +941,59 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-86; 2021-Q4's release, received while ED Presentations' Fail supply of the morning is held, its resupply arriving days later; no ED arrival moved, no release re-timed.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | linkage-keys |
+| Supplies | `linkage_keys__202111011730000800` |
+| Period | 2021-Q4 |
+| Set "in the warehouse on" to | 2021-11-01 |
 
 ## The geocoding history, planted (REQ-GEN-298)
+
+### TS-93c - A Client Register geocode whose source was rejected - named, not planted
+
+**What it demonstrates.** Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.
+
+**What it would look like if the rule were wrong.** The checks evaluated against another quarter's Client Register.
+
+*Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201902011843000800` |
+| Period | 2019-Q1 |
+| Set "in the warehouse on" to | 2019-02-01 |
+
+### TS-100c - A Client Register geocode cleared by a person's promotion - named, not planted
+
+**What it demonstrates.** Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.
+
+**What it would look like if the rule were wrong.** Still failing after the promotion.
+
+*Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201908011817000800` |
+| Period | 2019-Q3 |
+| Set "in the warehouse on" to | 2019-08-01 |
+
+### TS-101b - An ED geocode while ED's same-round Fail is held - named, not planted
+
+**What it demonstrates.** Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.
+
+**What it would look like if the rule were wrong.** ED's page coloured by a not-evaluated result.
+
+*Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.*
+
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202111011850000800` |
+| Period | 2021-Q4 |
+| Set "in the warehouse on" to | 2021-11-01 |
 
 ### TS-102 - A missing census year
 
@@ -868,7 +1003,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: quarterly, due 19:00 with 8 hours' grace; 2023-Q2's Client Register Geocodes, one census year's rows dropped for one to three records, the record's other years present - two or more years in force since 2017-Q3.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202305011830000800` |
+| Period | 2023-Q2 |
+| Set "in the warehouse on" to | 2023-05-01 |
 
 ### TS-103 - A duplicated census year
 
@@ -878,7 +1018,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2022-Q1's ED Presentations Geocodes, one census year's row repeated, identical in every column, for one to three presentations.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202202011830000800` |
+| Period | 2022-Q1 |
+| Set "in the warehouse on" to | 2022-02-01 |
 
 ### TS-104 - An unexpected census year
 
@@ -888,7 +1033,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2016-Q2's Client Register Geocodes, a row for census year 2026 for one to three records - 2026 joins the set only from 2027-Q3.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__201605011830000800` |
+| Period | 2016-Q2 |
+| Set "in the warehouse on" to | 2016-05-01 |
 
 ### TS-105 - The share not geocoded in the warn band
 
@@ -898,7 +1048,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2023-Q1's ED Presentations Geocodes, whole presentations turned not geocoded in every year, codes empty, until the share lies between 6 and 9 percent.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202302011830000800` |
+| Period | 2023-Q1 |
+| Set "in the warehouse on" to | 2023-02-01 |
 
 ### TS-106 - The share not geocoded in the fail band
 
@@ -908,7 +1063,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-105; 2024-Q1's Client Register Geocodes, until the share lies between 12 and 18 percent.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202402011830000800` |
+| Period | 2024-Q1 |
+| Set "in the warehouse on" to | 2024-02-01 |
 
 ### TS-107 - Coverage in the warn band
 
@@ -918,7 +1078,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2021-Q2's ED Presentations Geocodes, 0.5 to 1.5 percent of the quarter's presentations left out in every year. (Moved from 2014-Q1 on 2026-11-14, post-build-review #322: the quarter before it had no accepted ED geocodes, so drift read Fail across the gap beside the planted Warn.)*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__202105011830000800` |
+| Period | 2021-Q2 |
+| Set "in the warehouse on" to | 2021-05-01 |
 
 ### TS-108 - Coverage in the fail band
 
@@ -928,7 +1093,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-107; 2025-Q1's Client Register Geocodes, 3 to 6 percent of the quarter's clients left out.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202502011830000800` |
+| Period | 2025-Q1 |
+| Set "in the warehouse on" to | 2025-02-01 |
 
 ### TS-109 - A geocode for a record the quarter does not hold
 
@@ -938,7 +1108,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2017-Q4's ED Presentations Geocodes, one record's rows in every year naming a presentation not in ED's 2017-Q4 supply - added, so every presentation still has its geocodes.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-ed-presentations |
+| Supplies | `geo_ed_presentations__201711011830000800` |
+| Period | 2017-Q4 |
+| Set "in the warehouse on" to | 2017-11-01 |
 
 ### TS-110 - An empty geocoding file
 
@@ -948,7 +1123,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-102; 2025-Q4's geo_cp_clients.csv holds no rows while the quarter's Client Register holds its clients.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202511011830000800` |
+| Period | 2025-Q4 |
+| Set "in the warehouse on" to | 2025-11-01 |
 
 ### TS-111 - A Client Register coloured by its geocodes' promotion
 
@@ -958,7 +1138,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: as TS-107; 2024-Q4's Client Register Geocodes, 0.5 to 1.5 percent of clients left out, in a quarter whose amber setting promotes. (Moved from 2026-Q1 on 2026-11-14, post-build-review #322: it sat straight after TS-110's refused 2025-Q4, so drift read Fail across the gap.)*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202411011830000800` |
+| Period | 2024-Q4 |
+| Set "in the warehouse on" to | 2024-11-01 |
 
 ### TS-113 - A Client Register geocode whose placed mix drifts
 
@@ -968,7 +1153,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 *Config: 2026-Q3's ordinary Client Register Geocodes. Enough records are moved from suburb placement to postcode placement to land the drift check's PSI in its warn band. The size is derived from the check's own band, as REQ-GEN-392 derives fault sizes. (The draft's 2019-Q4 holds TS-42a, a scenario of the Client Register, so the provider refuses it there; 2026-Q3 is PROVISIONAL (2026-11-16).)*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | geo-cp-clients |
+| Supplies | `geo_cp_clients__202608011830000800` |
+| Period | 2026-Q3 |
+| Set "in the warehouse on" to | 2026-08-01 |
 
 ### TS-114 - An annual dataset's supply received in a round it owes nothing in
 
@@ -1971,7 +2161,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201608011730000800"
+    ],
+    "period": "2016-Q3",
+    "inPlaceOn": "2016-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-87",
@@ -1984,7 +2182,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201702011730000800"
+    ],
+    "period": "2017-Q1",
+    "inPlaceOn": "2017-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-88",
@@ -1997,7 +2203,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201802011730000800"
+    ],
+    "period": "2018-Q1",
+    "inPlaceOn": "2018-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-89",
@@ -2010,7 +2224,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201805011730000800"
+    ],
+    "period": "2018-Q2",
+    "inPlaceOn": "2018-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-90",
@@ -2024,7 +2246,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201808011730000800"
+    ],
+    "period": "2018-Q3",
+    "inPlaceOn": "2018-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-91",
@@ -2038,7 +2268,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-337",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201811011730000800"
+    ],
+    "period": "2018-Q4",
+    "inPlaceOn": "2018-11-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-92",
@@ -2051,7 +2289,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201905011730000800"
+    ],
+    "period": "2019-Q2",
+    "inPlaceOn": "2019-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-93a",
@@ -2085,7 +2331,36 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201902011730000800"
+    ],
+    "period": "2019-Q1",
+    "inPlaceOn": "2019-02-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-93c",
+   "mode": "INJECT",
+   "title": "A Client Register geocode whose source was rejected - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its two cp-clients checks read Fail, could not run, and the file is held back for the rest of the history, as TS-93b's linkage release is.",
+   "breaksAs": "The checks evaluated against another quarter's Client Register.",
+   "config": "Config: quarterly, due 19:00; 2019-Q1's ordinary Client Register Geocodes, received while TS-93a's Client Register is held and then rejected, nothing replacing it.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201902011843000800"
+    ],
+    "period": "2019-Q1",
+    "inPlaceOn": "2019-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-94",
@@ -2099,7 +2374,38 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-332",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202205011730000800"
+    ],
+    "period": "2022-Q2",
+    "inPlaceOn": "2022-05-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-95",
+   "mode": "INJECT",
+   "title": "A linked dataset marked not supplied - named, not planted",
+   "section": "The linkage history, planted (REQ-GEN-335)",
+   "demonstrates": "The release's cp-clients checks are left out of scope with reason code not_supplied_by_decision, while ED Presentations' are evaluated (REQ-PIPE-332 criterion 7).",
+   "breaksAs": "Cp-clients' checks read Fail, could not run.",
+   "config": "Config: quarterly; Child Protection has no supply for 2015-Q2 and its existing scripted entry marks cp-clients not supplied; the 2015-Q2 release is an ordinary one.",
+   "requirements": [
+    "REQ-PIPE-332",
+    "REQ-GEN-335",
+    "REQ-GEN-205"
+   ],
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201505011725000800"
+    ],
+    "period": "2015-Q2",
+    "inPlaceOn": "2015-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-96",
@@ -2114,7 +2420,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-133",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [],
+    "period": "2020-Q3",
+    "inPlaceOn": "2020-10-19",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-97",
@@ -2127,7 +2439,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202108011730000800"
+    ],
+    "period": "2021-Q3",
+    "inPlaceOn": "2021-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-98",
@@ -2140,7 +2460,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202208011730000800"
+    ],
+    "period": "2022-Q3",
+    "inPlaceOn": "2022-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-99",
@@ -2154,7 +2482,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-335",
     "REQ-GEN-206"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202408011730000800"
+    ],
+    "period": "2024-Q3",
+    "inPlaceOn": "2024-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-100a",
@@ -2189,7 +2525,36 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-331",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__201908011730000800"
+    ],
+    "period": "2019-Q3",
+    "inPlaceOn": "2019-08-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-100c",
+   "mode": "INJECT",
+   "title": "A Client Register geocode cleared by a person's promotion - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its cp-clients checks read Fail, could not run, until 10:00 on 2 August 2019, when the promotion's knock-on re-checks them and they pass.",
+   "breaksAs": "Still failing after the promotion.",
+   "config": "Config: as TS-93c; 2019-Q3's ordinary Client Register Geocodes, received while TS-100a's Client Register is held.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201908011817000800"
+    ],
+    "period": "2019-Q3",
+    "inPlaceOn": "2019-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-101",
@@ -2203,7 +2568,36 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-334",
     "REQ-GEN-335"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "linkage-keys",
+    "supplies": [
+     "linkage_keys__202111011730000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2021-11-01",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-101b",
+   "mode": "INJECT",
+   "title": "An ED geocode while ED's same-round Fail is held - named, not planted",
+   "section": "The geocoding history, planted (REQ-GEN-298)",
+   "demonstrates": "Its ed-presentations checks read Fail, could not run, and clear through the knock-on once the resupply is promoted.",
+   "breaksAs": "ED's page coloured by a not-evaluated result.",
+   "config": "Config: as TS-93c; 2021-Q4's ordinary ED Presentations Geocodes, built from ED's Fail supply of the morning, its share not geocoded in the warn band, received while that supply is held.",
+   "requirements": [
+    "REQ-GEN-298"
+   ],
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202111011850000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2021-11-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-102",
@@ -2216,7 +2610,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202305011830000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-103",
@@ -2229,7 +2631,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202202011830000800"
+    ],
+    "period": "2022-Q1",
+    "inPlaceOn": "2022-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-104",
@@ -2242,7 +2652,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__201605011830000800"
+    ],
+    "period": "2016-Q2",
+    "inPlaceOn": "2016-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-105",
@@ -2255,7 +2673,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202302011830000800"
+    ],
+    "period": "2023-Q1",
+    "inPlaceOn": "2023-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-106",
@@ -2268,7 +2694,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202402011830000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-107",
@@ -2282,7 +2716,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-298",
     "REQ-QAC-340"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__202105011830000800"
+    ],
+    "period": "2021-Q2",
+    "inPlaceOn": "2021-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-108",
@@ -2295,7 +2737,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202502011830000800"
+    ],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-109",
@@ -2308,7 +2758,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-ed-presentations",
+    "supplies": [
+     "geo_ed_presentations__201711011830000800"
+    ],
+    "period": "2017-Q4",
+    "inPlaceOn": "2017-11-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-110",
@@ -2322,7 +2780,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-QAC-340",
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202511011830000800"
+    ],
+    "period": "2025-Q4",
+    "inPlaceOn": "2025-11-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-111",
@@ -2337,7 +2803,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-206",
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202411011830000800"
+    ],
+    "period": "2024-Q4",
+    "inPlaceOn": "2024-11-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-112a",
@@ -2399,7 +2873,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-392",
     "REQ-GEN-298"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "geo-cp-clients",
+    "supplies": [
+     "geo_cp_clients__202608011830000800"
+    ],
+    "period": "2026-Q3",
+    "inPlaceOn": "2026-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-114",
