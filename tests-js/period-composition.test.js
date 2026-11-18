@@ -172,9 +172,9 @@ describe("a scenario about a whole period lands on it (criterion 7)", () => {
 });
 
 describe("every subject the scenario map can name has a place on the page", () => {
-  it("matches scenario_map.SUBJECTS", () => {
+  it("matches the scenario vocabulary's SUBJECTS (scenarios/vocabulary.py)", () => {
     const src = require("node:fs").readFileSync(
-      require("node:path").join(__dirname, "..", "qa_tools", "common", "scenario_map.py"), "utf-8");
+      require("node:path").join(__dirname, "..", "scenarios", "vocabulary.py"), "utf-8");
     const names = [...src.matchAll(/^[A-Z_]+ = "([a-z-]+)"$/gm)].map(m => m[1]);
     expect(names.length).toBeGreaterThan(4);
     page = loadDashboard({hierarchy: MINIMAL_HIERARCHY});

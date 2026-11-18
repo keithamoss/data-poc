@@ -51,9 +51,13 @@ def read_map_data(map_path: Path | str | None = None) -> list[dict]:
     Read by the dashboard build, which may open no data/ - so this
     reads the COMMITTED markdown and nothing else. A map with no data
     block returns nothing rather than raising, because the document is
-    still a document without it.
+    still a document without it - and AN ASSET WITH NO MAP AT ALL (no
+    synthetic history, REQ-PIPE-385 criterion 10) reads as no scenarios.
     """
-    text = Path(map_path or globals()["map_path"]()).read_text()
+    source = Path(map_path or globals()["map_path"]())
+    if not source.is_file():
+        return []
+    text = source.read_text()
     start = text.find(_DATA_OPEN)
     if start < 0:
         return []

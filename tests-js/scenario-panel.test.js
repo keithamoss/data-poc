@@ -39,6 +39,14 @@ function load() {
   return dashboard.window;
 }
 
+// The template with a scenario map embedded, as a build of a synthetic asset
+// has (an empty map has no scenarios page at all, REQ-PIPE-385).
+function withMap(entries) {
+  return require("node:fs").readFileSync(
+    require("node:path").join(__dirname, "..", "dashboard", "qa-reporting-dashboard.template.html"),
+    "utf-8").replace("const SCENARIO_MAP = [];", `const SCENARIO_MAP = ${JSON.stringify(entries)};`);
+}
+
 function entry(overrides = {}) {
   return {
     id: "TS-1", mode: "INJECT", title: "Forward cascade",
@@ -103,14 +111,6 @@ describe("turning coordinates into a target", () => {
 });
 
 describe("the panel", () => {
-  it("says nothing is embedded rather than rendering an empty panel", () => {
-    const w = load();
-    const view = w.document.createElement("div");
-    w.renderScenarios(view);
-    const body = view.querySelector("#scenarios-panel-body").innerHTML;
-    expect(body).toContain("No scenario map embedded");
-  });
-
   // REQ-DASH-139 criterion 1: a top-level tab with a URL of its own, beside
   // Plans and Demo, in place of REQ-DASH-046's drawer.
   it("is a top-level tab with a route of its own, not a drawer", () => {
@@ -122,7 +122,7 @@ describe("the panel", () => {
   });
 
   it("opens from a saved ?panel=scenarios link", () => {
-    const w = loadDashboard({url: "http://localhost/?panel=scenarios"}).window;
+    const w = loadDashboard({html: withMap([PLACED]), url: "http://localhost/?panel=scenarios"}).window;
     expect(w.stateFromLocation()).toEqual({tier: "scenarios"});
   });
 
@@ -130,7 +130,8 @@ describe("the panel", () => {
     // Sprint 11 critic, defect 2: left in the address bar it took over
     // every later reload and every copied link - click Plans, reload, and
     // the page showed Scenarios.
-    const w = loadDashboard({url: "http://localhost/?panel=scenarios&theme=dark"}).window;
+    const w = loadDashboard({html: withMap([PLACED]),
+                             url: "http://localhost/?panel=scenarios&theme=dark"}).window;
     expect(new URLSearchParams(w.location.search).get("panel")).toBeNull();
     expect(new URLSearchParams(w.location.search).get("theme")).toBe("dark");
     expect(w.location.hash).toBe("#/scenarios");
@@ -177,5 +178,48 @@ describe("the mode pill says what is true (#121 D9)", () => {
     expect(html).toContain("Planned for the data");
     expect(html).not.toContain("nodata");
     expect(w.scenarioModePill({ mode: "INJECT" }, { nav: {} })).toContain("In the data");
+  });
+});
+
+// REQ-PIPE-385 criteria 11 and 13: a page built with no scenario map - an
+// asset with no synthetic history - has no scenario button, and every old
+// scenario address lands on the plain not-found page.
+describe("a page with no scenario map", () => {
+  function open(url) {
+    dashboard = loadDashboard({ hierarchy: HIERARCHY, url });
+    return dashboard.window;
+  }
+  const notFound = (w) => w.document.querySelector("#view h2")?.textContent;
+
+  it("shows no Scenarios button", () => {
+    const w = open("http://localhost/");
+    expect(w.document.getElementById("scenarios-btn").hidden).toBe(true);
+  });
+
+  it("shows the button once a map is embedded", () => {
+    dashboard = loadDashboard({ html: withMap([PLACED]), hierarchy: HIERARCHY });
+    expect(dashboard.window.document.getElementById("scenarios-btn").hidden).toBe(false);
+  });
+
+  it("answers /scenarios with the not-found page, naming the word back", () => {
+    const w = open("http://localhost/#/scenarios");
+    expect(notFound(w)).toBe("Page not found");
+    expect(w.document.querySelector("#view code").textContent).toBe("scenarios");
+    expect(w.document.title).toMatch(/^Page not found/);
+    expect(w.document.getElementById("route-announcer").textContent).toBe("Page not found");
+  });
+
+  it.each([
+    ["?panel=scenarios", "panel"],
+    ["?scenario=ts-12", "scenario"],
+  ])("lands %s on the not-found page and drops the parameter", (query, param) => {
+    const w = open(`http://localhost/${query}&theme=dark`);
+    expect(notFound(w)).toBe("Page not found");
+    expect(w.document.title).toMatch(/^Page not found/);
+    const search = new URLSearchParams(w.location.search);
+    expect(search.get(param)).toBeNull();
+    expect(search.get("theme")).toBe("dark");
+    // A reload then opens the rest of the address, not the not-found page.
+    expect(w.stateFromLocation().tier).not.toBe("scenarios");
   });
 });

@@ -754,6 +754,12 @@ def embed() -> None:
                            json.dumps(scenario_entries, separators=(",", ":")))
     print(f"Re-embedded SCENARIO_MAP = {len(scenario_entries)} scenario(s), "
           f"{sum(1 for e in scenario_entries if e.get('coordinates'))} with coordinates")
+    # THE FOOTER SAYS GENERATED ONLY OF A SYNTHETIC ASSET (REQ-PIPE-385
+    # criterion 12), through the one reader of `synthetic: true`.
+    from asset_model import asset_time
+
+    html = _replace_const(html, "ASSET_SYNTHETIC",
+                          json.dumps(asset_time.declared_synthetic()))
 
     outstanding_now = outstanding.survey().as_record()
     html = _replace_const(html, "OUTSTANDING",

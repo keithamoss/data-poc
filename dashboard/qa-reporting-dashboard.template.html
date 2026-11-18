@@ -463,6 +463,8 @@ button{font:inherit; color:inherit;}
 /* MoSCoW priority - one hue at four weights, deliberately NOT the
    status palette (post-build-review #56). A scale, not a verdict. */
 a.snapshots-btn{text-decoration:none; color:inherit;}
+/* REQ-PIPE-385 criterion 11: a page with no scenario map shows no Scenarios button. */
+#scenarios-btn[hidden]{display:none;}
 .fb-summary{font-size:13.5px; color:var(--ink); margin:4px 0 16px;}
 .fb-list{list-style:none; padding:0; margin:0 0 24px; display:grid; gap:12px; max-width:760px;}
 .fb-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px;}
@@ -1091,7 +1093,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
-      <button class="snapshots-btn" id="scenarios-btn" type="button">🎬 Scenarios</button>
+      <button class="snapshots-btn" id="scenarios-btn" type="button" hidden>🎬 Scenarios</button>
       <a class="snapshots-btn" id="feedback-btn" href="#/feedback">💬 Feedback</a>
       <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
       <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
@@ -1118,7 +1120,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <main id="view"></main>
 
   <footer>
-    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every dataset on this page is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against generated synthetic supplies, including cross-table foreign-key and business-rule checks where a collection has more than one table.
+    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every dataset on this page is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against <span id="footer-supplies">generated synthetic supplies</span>, including cross-table foreign-key and business-rule checks where a collection has more than one table.
     <span id="footer-generated-up-to" hidden></span>
     <br><br>
     <em>Internal project codename: Mothman.</em>
@@ -2795,6 +2797,11 @@ const SLOT_DUE_DATES = {};
 // the map does not know this page's routing scheme and a URL written
 // there would break silently the next time a route changed.
 const SCENARIO_MAP = [];
+// WHETHER THE ASSET DECLARES `synthetic: true` (REQ-PIPE-385 criterion 12),
+// read through the one reader (asset_time.declared_synthetic) and embedded
+// with the build: a real asset's footer does not say its supplies are
+// generated. The raw template stands for a synthetic asset.
+const ASSET_SYNTHETIC = true;
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -7172,7 +7179,7 @@ function cmpFromUrl(){
 function stateFromLocation(){
   // THE SCENARIOS DRAWER BECAME A TAB (REQ-DASH-139 criterion 1): a saved
   // `?panel=scenarios` link opens the tab rather than nothing.
-  if(new URLSearchParams(location.search).get("panel") === "scenarios") return {tier:"scenarios"};
+  if(new URLSearchParams(location.search).get("panel") === "scenarios" && SCENARIO_MAP.length) return {tier:"scenarios"};
   const base = hashToState() || {tier:"exec"};
   const panel = panelFromUrl();
   const cmp = cmpFromUrl();
@@ -7514,7 +7521,10 @@ function renderTier(view, done){
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));
-  if(STATE.tier==="scenarios") return done(renderScenarios(view));
+  // NO MAP, NO SCENARIOS PAGE (REQ-PIPE-385 criterion 13): the plain
+  // not-found page, naming the address's word back.
+  if(STATE.tier==="scenarios") return done(SCENARIO_MAP.length ? renderScenarios(view)
+                                                               : renderNotFound(view, "Page", "scenarios"));
   if(STATE.tier==="feedback") return done(renderFeedback(view));
   if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
   if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
@@ -12445,13 +12455,6 @@ function renderScenarios(view){
   renderScenariosPanel(view.querySelector("#scenarios-panel-body"));
 }
 function renderScenariosPanel(body){
-  if(!SCENARIO_MAP.length){
-    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
-      No scenario map embedded — this page renders the repo's own committed
-      <code>SCENARIOS-&lt;asset&gt;.md</code>, rebuilt with the synthetic history itself.
-    </div>`;
-    return;
-  }
   const placed = SCENARIO_MAP.filter(e=>scenarioTarget(e)).length;
   const injected = SCENARIO_MAP.filter(e=>e.mode==="INJECT").length;
   const intro = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:14px; max-width:64ch;">
@@ -12488,6 +12491,10 @@ function renderScenariosPanel(body){
   });
 }
 
+// SHOWN ONLY WITH A MAP TO OPEN (REQ-PIPE-385 criterion 11): hidden in the
+// markup, so a page with no scenario map never flashes it.
+document.getElementById("scenarios-btn").hidden = !SCENARIO_MAP.length;
+if(!ASSET_SYNTHETIC) document.getElementById("footer-supplies").textContent = "each agency's supplies";
 document.getElementById("scenarios-btn").addEventListener("click", ()=> navigate({tier:"scenarios"}));
 document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
@@ -13483,13 +13490,20 @@ renderGeneratedUpTo();
 // (REQ-DASH-139): dropped here, the way the old `asof` parameter is
 // rewritten, or it would take over every later reload and copied link.
 const INITIAL_URL = new URL(location.href);
+// A SCENARIO LINK INTO A PAGE WITH NO MAP (REQ-PIPE-385 criterion 13, v6 Q3):
+// ?panel=scenarios or ?scenario=<any id> lands on the plain not-found page,
+// even where the rest of the address is a real page, and the parameter is
+// removed so a reload does not repeat it.
+const DEAD_SCENARIO_LINK = !SCENARIO_MAP.length
+  && (INITIAL_URL.searchParams.get("panel") === "scenarios" || scenarioParamFromUrl() !== null);
+if(DEAD_SCENARIO_LINK) withScenarioParam(INITIAL_URL, null);
 if(INITIAL_URL.searchParams.get("panel") === "scenarios") INITIAL_URL.searchParams.delete("panel");
 // An empty req= names nothing, so it goes too (post-build-review #182).
 if(INITIAL_URL.searchParams.has("req") && (INITIAL_URL.searchParams.get("panel") !== "requirements" || !INITIAL_URL.searchParams.get("req"))) INITIAL_URL.searchParams.delete("req");
 // A SCENARIO JUMP CARRIED IN THE URL (REQ-DASH-208 criteria 5 and 9): its
 // state restored before the first render, so the jump bar and the mark draw.
 const SCENARIO_ON_LOAD = (()=>{
-  const value = scenarioParamFromUrl();
+  const value = DEAD_SCENARIO_LINK ? null : scenarioParamFromUrl();
   if(value === null) return null;
   const index = scenarioIndexById(value);
   if(index < 0) return {index: -1};
@@ -13524,6 +13538,10 @@ if(SCENARIO_ON_LOAD && "scrollRestoration" in history){
 }
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
+if(DEAD_SCENARIO_LINK){
+  renderNotFound(document.getElementById("view"), "Page", "scenarios");
+  describeRoute();
+}
 if(SCENARIO_ON_LOAD){
   const entry = SCENARIO_MAP[SCENARIO_ON_LOAD.index];
   if(!entry || !landOnScenarioSubject(entry, CURRENT_IN_PLACE_ON)){

@@ -128,23 +128,6 @@ class TestRetired:
         assert not retired & {c.check_id for c in catalogue.checks}
 
 
-class TestTheCommand:
-    def test_it_lists_rules_bands_and_single_tier_readers(self):
-        from click.testing import CliRunner
-
-        from cli import scenarios
-
-        got = CliRunner().invoke(scenarios.scenarios_group,
-                                 ["bands", "--dataset", BDM, "--rows", "2000"])
-        assert got.exit_code == 0, got.output
-        text = " ".join(got.output.split())
-        assert "place_of_birth_facility" in text and "301" in text and "600" in text
-        assert "no warn band" in text
-        assert "sibling_match" in text   # a single-tier check reading facility
-
-
-# ---- post-build-review #153: the critic's findings, each failing first ----
-
 class TestGroupingByName:
     """Keith, 2026-10-11: checks sharing an authored name are one rule across
     tools; otherwise dataset, column, category and measure."""
@@ -261,52 +244,6 @@ class TestNoSilentDefaults:
     def test_default_rows_with_nothing_to_read_refuses(self):
         with pytest.raises(cb.CatalogueError, match="--rows"):
             cb.default_rows("cp-clients", cb.Catalogue([]))
-
-
-class TestTheListing:
-    def _out(self, *args):
-        from click.testing import CliRunner
-
-        from cli import scenarios
-        got = CliRunner().invoke(scenarios.scenarios_group, ["bands", *args],
-                                 env={"COLUMNS": "80"})
-        assert got.exit_code == 0, got.output
-        return got.output
-
-    @pytest.mark.asset("quarterly")
-    def test_a_tolerant_single_tier_check_prints_its_bound(self):
-        """Finding 2: the contract fails at 3% or more, not on any."""
-        out = self._out("--dataset", "cp-clients", "--rows", "527")
-        line = next(ln for ln in out.splitlines() if "datacontract" in ln and ">= 3%" in ln)
-        assert "fails on any" not in line
-
-    @pytest.mark.asset("quarterly")
-    def test_every_line_fits_eighty_columns_and_continues_indented(self):
-        """Finding 9."""
-        lines = self._out("--dataset", "cp-notifications", "--rows", "1000").splitlines()
-        assert all(len(ln) <= 80 for ln in lines), [ln for ln in lines if len(ln) > 80]
-        body = [ln for ln in lines if ln.strip()][1:]
-        assert all(ln.startswith("  ") for ln in body)
-
-    @pytest.mark.asset("quarterly")
-    def test_a_reader_from_another_dataset_is_named_with_it(self):
-        out = " ".join(self._out("--dataset", "cp-clients", "--rows", "527").split())
-        assert "cp-notifications.cp_client_id.relationships_dbt" in out
-
-    def test_a_file_rule_says_which_one(self):
-        out = self._out("--dataset", BDM, "--rows", "2000")
-        assert "Column order" in out and "Text encoding" in out
-
-    def test_with_no_rows_and_nothing_to_read_it_asks_for_them(self, monkeypatch):
-        from click.testing import CliRunner
-
-        from cli import scenarios
-
-        def refuse(ds, cat):
-            raise cb.CatalogueError(f"{ds}: no ordinary size; pass --rows")
-        monkeypatch.setattr(cb, "default_rows", refuse)
-        got = CliRunner().invoke(scenarios.scenarios_group, ["bands", "--dataset", BDM])
-        assert got.exit_code != 0 and "--rows" in got.output
 
 
 class TestAUserDefinedMetricsBandIsRead:

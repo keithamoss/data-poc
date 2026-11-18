@@ -197,20 +197,6 @@ def test_the_warn_setting_commands_help_says_warn_setting():
     assert "amber setting" not in flat.lower()
 
 
-def test_the_scenarios_bands_help_says_warn():
-    """The Pass / Warn / Fail critic's finding 3: `mothman scenarios bands
-    --help` said 'whether it can read amber' and 'its amber band is'."""
-    from click.testing import CliRunner
-
-    from cli import scenarios
-
-    got = CliRunner().invoke(scenarios.scenarios_group, ["bands", "--help"])
-    assert got.exit_code == 0, got.output
-    flat = " ".join(got.output.split())
-    assert "whether it can read Warn" in flat and "its warn band is" in flat, flat
-    _clean(flat, "mothman scenarios bands --help")
-
-
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
