@@ -16417,7 +16417,7 @@ twice. It deliberately did not re-find the `TypeError`.
      the placement this build recorded is 2026-Q3; its Expect wants
      re-observing on a page.
 
-454. **[investigate, 2026-11-16]** **[Data generation]** **Birth Registrations'
+454. **[done, 2026-11-18]** **[Data generation]** **Not a defect: Birth Registrations'
      13 July 2026 resend lands at 02:11 on some plans and 02:13 on others.**
      Found accounting for #447. The 2026-11-03 golden pinned
      `birth_registrations__20260713021103987266` (the 7 July red's fourth
@@ -16432,6 +16432,44 @@ twice. It deliberately did not re-find the `TypeError`.
      resend's rows is not reproducible from the seed alone - which CLAUDE.md's
      "everything is seeded" relies on. Not investigated further here; worth a
      proper look before the next golden capture.
+
+     INVESTIGATED 2026-11-18: the generation is reproducible, and the move is
+     REQ-GEN-392's (12f06b34, merged 2026-11-15), not drift. Method: the
+     provider planned alone (`plan()`, then `slot()`, `entries()` and
+     `received_at()` for every job, nothing written) at the fixed anchor,
+     each commit exported with `git archive` into a scratch folder and run
+     with only that folder on PYTHONPATH. At dc1881c2, six runs - three
+     PYTHONHASHSEEDs (1, 2, 3) and three MOTHMAN_PINNED_NOW wall clocks
+     (2026-09-26, 2026-11-14, 2027-03-01) - gave all 118 receipt instants
+     identical, the 7 July red's fourth delivery at 02:13 and the 9 July
+     red's resend at 02:11, which is what the real `supply_daily` and the
+     bootstraps hold. 6129d66c (two hash seeds) and 479b06b8 (two hash seeds)
+     gave the same. c5d01de5 (the 2026-11-03 golden) and 29c14f9f, the last
+     REQ-GEN-392 checkpoint still on the literal rates, gave 02:11 for both,
+     every run; d96e1ec7 (the merge's first parent) 02:11, the merge
+     12f06b34 02:13. So the "same commit, two answers" above was not
+     reproduced at either commit named, and the likeliest account is that
+     one of those planning runs imported another tree's modules (a `uv run`
+     resolves the project's editable install, not the exported folder) -
+     unverified, since that run's command was not recorded.
+
+     THE MECHANISM, read off the payloads. Both resends' earliest legitimate
+     row comes from `churn()`'s added registrations, drawn by
+     `generate_daily_batch(seed=seed + 1)` with the slot seed plus 800 plus
+     the attempt: 7 July's fourth attempt and 9 July's second share that
+     seed, so the two resends carry the same added rows - which is why they
+     were thought to move together. The 02:11 row (BDM-782076733) is in the
+     fourth attempt's churned frame (1878 rows, previous supply 1838); the
+     red preset's truncation then cuts it. On the literal rates it kept 1194
+     rows, the 02:11 row among them; sized from the row-count band since
+     REQ-GEN-392 it keeps 1097, and the seeded draw over the larger cut
+     takes that row, so the receipt falls to the next one, 02:13. 9 July's
+     red resend draws its own cut and keeps it. No fix and no new test:
+     nothing produced a different answer from the same inputs, so there is
+     no behaviour to pin. Nothing to regenerate either: the golden's
+     re-capture (#447) already holds `...20260713021303987266`, as do the
+     real databases; tests/test_asset_time_semantics.py's comment now dates
+     the move rather than pointing here for it.
 
 455. **[done, 2026-11-16]** **[Testing & dev tooling]** **A test's real replay rewrote the checkout's real Birth Registrations results file.**
      Found accounting for the six golden failures on 244d7db0's gate (#457).

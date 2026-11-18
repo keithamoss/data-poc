@@ -605,8 +605,9 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # 18:44 -> 18:30; both 2026-08 18:53 -> 18:30), early all eighteen; and
         # with TS-113 geo-ed's ordinary red's resupply moved from 14 August
         # 2017 to 9 August 2018 (late, both). Birth Registrations' 13 July
-        # resend moved 02:11 -> 02:13 (early, both) - not dated to a commit; see
-        # post-build-review #454.
+        # resend moved 02:11 -> 02:13 (early, both) - REQ-GEN-392's band-sized
+        # truncation (12f06b34, 2026-11-15) cuts its earliest row; reproducible,
+        # not drift (post-build-review #454).
         assert counts == {"on_time": 342, "early": 198, "late": 54, "unfiled": 13}
         assert sum(counts.values()) == 607
 
