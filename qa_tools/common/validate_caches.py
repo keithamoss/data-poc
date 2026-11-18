@@ -93,6 +93,10 @@ ALLOWLIST: dict[tuple[str, str], str] = {
         "drawn from N_DELIVERIES and a fixed seed; reads no file",
     ("assets/*/synthetic/collections/emergency_department.py", "_postcodes"):
         "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
+    ("assets/*/synthetic/collections/cancer.py", "_postcodes"):
+        "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
+    ("assets/*/synthetic/collections/mental_health.py", "_postcodes"):
+        "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
 }
 
 
