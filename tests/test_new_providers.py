@@ -75,6 +75,12 @@ class _Provider:
         firsts = _firsts(book)
         assert len(firsts) >= 10, "test precondition - a history of owed rounds"
         assert {e["period"] for e in firsts} <= set(owed), sorted({e["period"] for e in firsts} - set(owed))
+        # AND EVERY OWED ROUND UP TO THE NEWEST SUPPLIED HAS ONE (post-build
+        # review of group C, F5): a dropped round passed the subset check.
+        newest = max(owed[e["period"]].due_at for e in firsts)
+        missing = sorted(name for name, s in owed.items()
+                         if s.due_at <= newest and name not in {e["period"] for e in firsts})
+        assert not missing, f"owed rounds with no supply: {missing}"
         for entry in firsts:
             slot = owed[entry["period"]]
             got = datetime.fromisoformat(entry["received_at"])

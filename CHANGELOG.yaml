@@ -209,6 +209,21 @@ releases:
               An asset's file-checks.yaml naming a check the code cannot run
               now fails `mothman check`, naming the checks you can use, rather
               than failing every file when it arrives.
+      - category: Fixed
+        items:
+          - headline: A link to a period opens with its statement
+            components: ["Dashboard UI"]
+            description: >
+              A shared link, bookmark or reload that names a period now shows
+              "Showing <period>" with its Clear link, and the date control
+              reads "Results recorded by", as choosing the period in the page
+              does.
+          - headline: Opening a run's tries keeps them open
+            components: ["Dashboard UI"]
+            description: >
+              Clicking "Checked on the second try" in a supply's history now
+              opens the list of tries, rather than moving the page to that
+              run's date and closing it again.
   - date: "2026-11-16"
     summary: >
       Each supply's checks take less time, and you can now see how long each

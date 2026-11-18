@@ -52642,7 +52642,9 @@ requirements:
       <d>''), beside rather than inside the existing re-check words.'
     - 'PROVISIONAL (2026-11-16): the trend''s x labels are the day each run''s newest try ended; its y labels 0, half and the
       largest time shown, in the shared format.'
+    - 'THE BROWSER CASES ARE WRITTEN INTO ONE REAL DATASET''S RECORD (2026-11-18): the real corpus records no run that needed another try and none that crashed, so the retried and crashed tests rewrite cp-clients'' runTimes or OUTSTANDING''s blockers in the real build, every other byte unchanged - the same approach as _with_blockers. REJECTED recording a crash into a scratch copy of the deployment database, which costs a bootstrap per run for the same page.'
     linked_tests:
+    - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html::runTimeTrend
@@ -52659,15 +52661,7 @@ requirements:
       failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
       23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
       half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
-    unmet_criteria:
-    - criterion: Criterion 11, in part - the real-browser tests on the built dashboard (a real dataset's supply history shows
-        the trend, a could-not-be-checked page included, with zero console errors).
-      why: tests/test_dashboard_e2e.py builds from the deployment database, which is at schema 50 and is refused at 51 until it
-        is rebuilt; this builder may not rebuild the real databases. The JS half is built and passing.
-      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
-        not run against the real databases'
-      blocked_by:
-        unowned: true
+    - '2026-11-18: criterion 11''s browser half, once both deployment databases were rebuilt at schema 51 the same day: tests/test_dashboard_e2e.py''s TestRunTimesOnTheBuiltPage drives the real quarterly build - cp-clients'' supply history opens with ''How long our checks took'' and its points, each row''s run time in its Status cell - and, on the build with one could-not-check blocker written into OUTSTANDING, the trend still heads a ''Could not be checked'' page; clean_page asserts zero console errors on every one. 3 passed.'
     open_questions: []
     signed_off:
       by: Keith
@@ -52716,7 +52710,9 @@ requirements:
     - 'NO NOTE UNLESS THE TRY BEFORE FAILED (post-build-review #404), as the terminal says it.'
     - 'Criterion 6 is held at the build, where verdicts are made (TestAFailedTryNeverRaisesAStatus, #408), replacing a vacuous
       JS assertion.'
+    - 'A DISCLOSURE INSIDE A CLICKABLE ROW IS NOT THE ROW''S CLICK (defect found by criterion 8''s browser test, 2026-11-18): the supply-history row''s click handler skipped links but not a details element, so opening a run''s tries moved the page to the row''s date, re-rendered it and closed the details - and wrote in-place-on to the address. The handler now leaves a click inside a details element alone, as it does a link (post-build-review #488).'
     linked_tests:
+    - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html::triesNote
@@ -52738,15 +52734,7 @@ requirements:
       test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
       test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
       91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
-    unmet_criteria:
-    - criterion: Criterion 8, in part - the real-browser test on a built dashboard holding a retried run that opening the details
-        does not touch location.
-      why: 'As REQ-DASH-413''s: the e2e module needs the deployment database rebuilt at schema 51. The details element adds no
-        handler of its own.'
-      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
-        not run against the real databases'
-      blocked_by:
-        unowned: true
+    - '2026-11-18: criterion 8''s browser half (TestRunTimesOnTheBuiltPage): the real build with cp-clients'' newest arrival given two tries, the first timed out; the closed summary reads ''Checked on the second try - the first timed out after 45m'', and opening it leaves location.href and history.length unchanged. Its first run found the defect in this requirement''s decisions: the row''s own click moved the page to the row''s date, re-rendering it and closing the details; seen failing with the template''s fix reverted and passing with it.'
     open_questions: []
     signed_off:
       by: Keith
@@ -52805,6 +52793,7 @@ requirements:
     - 'FOR KEITH (recorded, #401): should a crashed re-check of an old period turn a later period red? 417 c4 says ''red for the
       period once''.'
     linked_tests:
+    - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html::couldNotCheckWords
@@ -52827,13 +52816,7 @@ requirements:
       test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
       test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
       91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
-    unmet_criteria:
-    - criterion: Criterion 10, in part - the real-browser test on a built dashboard holding a run whose only try crashed.
-      why: 'As REQ-DASH-413''s: the e2e module needs the deployment database rebuilt at schema 51.'
-      owner: 'the main session: a cache-miss bootstrap of both assets at schema 51 (the draft''s N11), which this builder may
-        not run against the real databases'
-      blocked_by:
-        unowned: true
+    - '2026-11-18: criterion 10''s browser half (TestRunTimesOnTheBuiltPage): the real build with one could-not-check blocker - a newer cp-clients supply whose only try crashed - reads ''Could not be checked'', ''Nothing is yet known about this supply''s data'' and ''The next processing pass retries it'' on the dataset page, with zero console errors.'
     open_questions: []
     signed_off:
       by: Keith

@@ -140,11 +140,11 @@ describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
     };
     let div = steps("2026-03-01", "2026-Q1");
     const prev = div.querySelector('[data-period-step="2025-Q4"]');
-    expect(prev.textContent).toBe("Previous period: 2025-Q4");
+    expect(prev.textContent).toBe("‹ Previous period: 2025-Q4");
     expect(prev.getAttribute("href")).toContain("period=2025-Q4");
     expect(div.querySelector('[data-period-step="2026-Q2"]')).toBeNull();
     div = steps("2026-06-01", "2026-Q1");
-    expect(div.querySelector('[data-period-step="2026-Q2"]').textContent).toBe("Next period: 2026-Q2");
+    expect(div.querySelector('[data-period-step="2026-Q2"]').textContent).toBe("Next period: 2026-Q2 ›");
     div = steps("2026-03-01", "2025-Q4");
     expect(div.querySelector('[data-period-step="2025-Q4"]')).toBeNull();
     expect(div.textContent).not.toContain("Previous");

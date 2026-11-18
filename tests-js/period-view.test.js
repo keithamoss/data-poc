@@ -55,7 +55,7 @@ describe("a dataset under a chosen period (REQ-DASH-356 criteria 1 to 3)", () =>
     expect(w.periodHoldsWords({ kind: "promoted" })).toBe("Promoted");
     expect(w.periodHoldsWords({ kind: "inherited", from: "2025-Q4" })).toBe("Inherited from 2025-Q4");
     expect(w.periodHoldsWords({ kind: "substituted", from: "2025-Q4" })).toBe("Substituted from 2025-Q4");
-    expect(w.periodHoldsWords({ kind: "notsupplied", word: "No supply" })).toBe("No supply");
+    expect(w.periodHoldsWords({ kind: "notsupplied", word: "No supply" })).toBe("Not supplied"); // criterion 1's word (group D review F6)
     expect(w.periodHoldsWords({ kind: "notowed", label: "Not owed — it supplies only on Mondays" }))
       .toBe("Not owed — it supplies only on Mondays");
   });
@@ -100,5 +100,23 @@ describe("the two sections (REQ-DASH-356 criteria 4 and 5)", () => {
     w.eval('CURRENT_PERIOD = "2026-Q1"');
     const sections = w.periodSectionsOf([{ id: "x", name: "X", collections: [{ id: "y", name: "Y", status: "green" }] }]);
     expect(sections.map((s) => s.key)).toEqual(["source"]);
+  });
+});
+
+
+describe("the verdict line under a period (group D review, UX #4)", () => {
+  const ds = { verdictOf: { state: "promoted" }, lastArrival: { arrivedAt: "2025-08-01T00:00:00+00:00" },
+               blocked: null, noDataInPlaceOn: false, packageGatingOn: null };
+  it("names the supply the period holds while a period is chosen", () => {
+    page = loadDashboard();
+    page.window.eval('CURRENT_PERIOD = "2026-Q2"');
+    const text = page.window.verdictLine(ds);
+    expect(text).toContain("The results below are the supply 2026-Q2 holds, received");
+    expect(text).not.toContain("in place in the warehouse");
+  });
+  it("names the warehouse's supply with none chosen", () => {
+    page = loadDashboard();
+    page.window.eval("CURRENT_PERIOD = null");
+    expect(page.window.verdictLine(ds)).toContain("the supply in place in the warehouse, received");
   });
 });

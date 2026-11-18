@@ -468,6 +468,18 @@ button{font:inherit; color:inherit;}
 a.snapshots-btn{text-decoration:none; color:inherit; display:inline-flex; align-items:center; justify-content:center;}
 /* REQ-PIPE-385 criterion 11: a page with no scenario map shows no Scenarios button. */
 #scenarios-btn[hidden], #demo-btn[hidden]{display:none;}
+/* THE PERIOD CONTROL'S POLISH (post-build review of group D, visual critic
+   2026-11-18): the chosen period reads as chosen, not as one of 57 identical
+   links (#2); a collection's caption titles its table above the count line
+   (#5); the new controls are tappable on a touch screen (#6). */
+#period-panel .link-btn[aria-pressed="true"]{font-weight:700; text-decoration:none; background:var(--surface-alt);
+  border-radius:var(--radius-sm); padding:2px 6px; color:var(--ink);}
+[data-composition-count]{font-size:12.5px; color:var(--ink-muted); margin:0 0 4px;}
+[data-nothing-held]{font-size:13.5px; color:var(--ink-muted); margin:0 0 8px;}
+[data-testid="period-composition"] caption{font-size:13.5px !important; color:var(--ink) !important; font-weight:600;}
+@media (pointer:coarse){
+  #period-panel .link-btn, #period-clear-inline, [data-period-step]{display:inline-flex; align-items:center; min-height:44px; padding:0 8px;}
+}
 .fb-summary{font-size:13.5px; color:var(--ink); margin:4px 0 16px;}
 .fb-list{list-style:none; padding:0; margin:0 0 24px; display:grid; gap:12px; max-width:760px;}
 .fb-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px;}
@@ -8191,7 +8203,12 @@ function verdictLine(ds){
     return `<div class="verdict-of" data-verdict-of="gating" data-gating="${escAttr(g.form)}" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;">${pill("amber", "sm")} <b style="display:inline">${escHtml(g.lead)}</b>${segmentsHtml(g.words)}</div>`;
   }
   if(v.state === "promoted"){
-    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place in the warehouse, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
+    // UNDER A PERIOD, THE PERIOD'S SUPPLY (post-build review of group D, UX
+    // #4): 'in place in the warehouse' is the supply of the date on show,
+    // which a chosen period's holder need not be.
+    const whose = typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD
+      ? `the supply ${escHtml(periodWords(CURRENT_PERIOD))} holds` : "the supply in place in the warehouse";
+    return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are ${whose}, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
   const inPlace = warehouseClauseHtml(ds) || (v.inPlaceRunDate
     ? `The supply in place in the warehouse is the one received ${v.inPlaceReceivedAt ? fmtInstant(v.inPlaceReceivedAt) : escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
@@ -8931,6 +8948,9 @@ function periodHoldsWords(row){
     return `${COMPOSITION_WORD[row.kind]}${row.from ? ` from ${periodWords(row.from)}` : ""}`;
   }
   if(row.kind === "notowed") return row.label;
+  // 'Not supplied', the criterion's word, never the history's 'No supply'
+  // (post-build review of group D, F6).
+  if(row.kind === "notsupplied") return COMPOSITION_WORD.notsupplied;
   return row.word || COMPOSITION_WORD[row.kind] || "";
 }
 function periodDatasetHeading(view){
@@ -8942,7 +8962,7 @@ function periodDatasetHeading(view){
   const head = view.querySelector(".view-head");
   if(!head) return;
   const holds = periodHoldsWords(ds.periodHeld);
-  const sub = ds.periodHeld.owedLabel ? ` <span style="color:var(--ink-faint);">· ${escHtml(ds.periodHeld.owedLabel)}</span>` : "";
+  const sub = ds.periodHeld.owedLabel ? ` <span style="color:var(--ink-muted);">· ${escHtml(ds.periodHeld.owedLabel)}</span>` : "";
   head.insertAdjacentHTML("afterend", `<div class="view-sub" data-period-heading style="margin:-6px 0 14px;">
     <b>For ${escHtml(periodWords(CURRENT_PERIOD))} · results recorded by ${fmtDay(CURRENT_IN_PLACE_ON)}</b>
     — <span data-period-holds>${escHtml(holds)}</span>${sub}</div>`);
@@ -8964,10 +8984,11 @@ function periodStepsHtml(ag){
     const url = new URL(navUrl(), location.href);
     url.searchParams.set(PERIOD_PARAM, p.period);
     const label = daily ? `${which} day: ${fmtDay(p.period)}` : `${which} period: ${periodWords(p.period)}`;
-    return `<a href="${escAttr(url.pathname + url.search + url.hash)}" data-period-step="${escAttr(p.period)}">${escHtml(label)}</a>`;
+    const text = which === "Previous" ? `‹ ${escHtml(label)}` : `${escHtml(label)} ›`;
+    return `<a href="${escAttr(url.pathname + url.search + url.hash)}" data-period-step="${escAttr(p.period)}" data-period-step-which="${which}">${text}</a>`;
   };
   if(!prev && !next) return "";
-  return `<nav class="promo-actions" aria-label="Periods" data-period-steps style="margin:0 0 12px;">${prev ? link(prev, "Previous") : ""} ${next ? link(next, "Next") : ""}</nav>`;
+  return `<nav class="promo-actions" aria-label="Periods" data-period-steps style="margin:0 0 12px;">${prev ? link(prev, "Previous") : ""}${prev && next ? `<span aria-hidden="true" style="color:var(--ink-faint); margin:0 10px;">·</span>` : ""}${next ? link(next, "Next") : ""}</nav>`;
 }
 function collectionIsDerived(collectionId){
   for(const ag of (HIERARCHY && HIERARCHY.agencies) || []){
@@ -9089,7 +9110,11 @@ function renderAgency(view, agencyId){
     view.querySelectorAll("[data-period-step]").forEach(a=> a.addEventListener("click", e=>{
       if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
+      const which = a.dataset.periodStepWhich;
       applyPeriod(a.dataset.periodStep);
+      // ONTO THE SAME STEP, re-rendered (F9), else the period control.
+      const again = document.querySelector(`[data-period-step-which="${which}"]`);
+      if(again) again.focus({preventScroll: true}); else focusPeriodControl();
     }));
     return;
   }
@@ -10374,10 +10399,13 @@ function wireSupplyHistorySection(container){
     toggle.dataset.collapsedLabel = toggle.textContent;
   }
   // A LINK INSIDE A CLICKABLE ROW IS FOLLOWED ALONE (REQ-DASH-221 criterion
-  // 10): the row's own click is not also acted on.
+  // 10): the row's own click is not also acted on. NOR IS A DISCLOSURE'S
+  // (REQ-DASH-414 criterion 8): opening a run's tries opens them, and never
+  // also moves the page to the row's date - which re-rendered the row and
+  // closed the details before they were seen.
   container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
     tr.addEventListener("click", e=>{
-      if(e.target && e.target.closest && e.target.closest("a")) return;
+      if(e.target && e.target.closest && e.target.closest("a, details")) return;
       applyInPlaceOn(tr.dataset.runDate);
     }));
 }
@@ -10516,7 +10544,7 @@ function compositionCells(ag, col, row){
       : COMPOSITION_WORD[row.kind];
     const lead = `${word} — `;
     if(label.startsWith(lead)) label = label.slice(lead.length);
-    return `<td><b>${word}</b> <span style="color:var(--ink-faint);">— ${escHtml(label)}</span></td>
+    return `<td><b>${word}</b> <span style="color:var(--ink-muted);">— ${escHtml(label)}</span></td>
       <td></td><td></td><td></td><td></td><td></td><td></td>`;
   }
   const e = row.entry;
@@ -10528,7 +10556,7 @@ function compositionCells(ag, col, row){
   const ack = !row.ack ? ""
     : row.ack.given ? `Acknowledged by ${escHtml(row.ack.actor || "")}, ${fmtInstant(row.ack.at)}`
     : "Not acknowledged";
-  const why = row.owedLabel ? `<div style="color:var(--ink-faint); font-size:12px;" data-owed-nothing-sub>${escHtml(row.owedLabel)}</div>` : "";
+  const why = row.owedLabel ? `<div style="color:var(--ink-muted); font-size:12px;" data-owed-nothing-sub>${escHtml(row.owedLabel)}</div>` : "";
   return `<td><b>${COMPOSITION_WORD[row.kind]}</b>${from}${why}</td>
       <td>${row.receivedAt ? fmtInstant(row.receivedAt) : ""}</td>
       <td>${fmtInstant(e.at)}</td>
@@ -13682,9 +13710,9 @@ function updatePeriodButtonLabel(){
 function renderPeriodStatement(notice){
   notice.hidden = false;
   notice.innerHTML = `Showing <b>${escHtml(periodWords(CURRENT_PERIOD))}</b> — results recorded by the
-    end of ${fmtDay(CURRENT_IN_PLACE_ON)} · <button class="link-btn" id="period-clear-inline" type="button">Clear period</button>`;
+    end of ${fmtDay(CURRENT_IN_PLACE_ON)} · <button class="link-btn" id="period-clear-inline" type="button">Clear ${isDailyBaseline() ? "day" : "period"}</button>`;
   const clear = document.getElementById("period-clear-inline");
-  if(clear) clear.addEventListener("click", ()=> applyPeriod(null));
+  if(clear) clear.addEventListener("click", ()=>{ applyPeriod(null); focusPeriodControl(); });
 }
 function announcePeriod(){
   const announcer = document.getElementById("route-announcer");
@@ -13708,7 +13736,7 @@ function applyPeriod(name){
 function periodPanelHtml(){
   const daily = isDailyBaseline();
   const clear = CURRENT_PERIOD
-    ? `<div style="margin-bottom:14px;"><button class="link-btn" id="period-clear-btn" type="button">Clear period (${escHtml(periodWords(CURRENT_PERIOD))})</button></div>`
+    ? `<div style="margin-bottom:14px;"><button class="link-btn" id="period-clear-btn" type="button">Clear ${daily ? "day" : "period"} (${escHtml(periodWords(CURRENT_PERIOD))})</button></div>`
     : "";
   const intro = `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
       Shows every page for one ${daily ? "day" : "period"} of the data asset's calendar, with the
@@ -13716,9 +13744,10 @@ function periodPanelHtml(){
   if(daily){
     const range = coveredDateRange();
     const bound = range ? ` min="${escAttr(range.first)}" max="${escAttr(range.last)}"` : "";
+    const span = range ? `<div id="period-day-range" style="font-size:12.5px; color:var(--ink-muted); margin:6px 0 0;">Days from ${fmtDay(range.first)} to ${fmtDay(range.last)}.</div>` : "";
     return `${intro}${clear}<label for="period-day-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">For day</label>
-      <input type="date" id="period-day-input"${bound} value="${escAttr(CURRENT_PERIOD || "")}"
-        style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">`;
+      <input type="date" id="period-day-input" aria-describedby="period-day-range"${bound} value="${escAttr(CURRENT_PERIOD || "")}"
+        style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">${span}`;
   }
   // NEWEST FIRST, UNDER YEAR HEADINGS (criterion 2).
   const byYear = new Map();
@@ -13734,17 +13763,37 @@ function periodPanelHtml(){
     </div>`).join("");
   return `${intro}${clear}${groups}`;
 }
+// FOCUS GOES INTO THE PANEL AND BACK TO ITS CONTROL (post-build review of
+// group D, UX #5 and F9): on opening, the chosen period, else the first
+// choice; after a choice or a clear, the control that opened it - the
+// element that was activated is gone or hidden by then.
+function focusPeriodControl(){
+  const btn = document.getElementById("period-btn");
+  if(btn && !btn.hidden) btn.focus({preventScroll: true});
+}
 function openPeriodPanel(){
   const body = document.getElementById("period-panel-body");
   body.innerHTML = periodPanelHtml();
-  body.querySelectorAll("[data-period]").forEach(b=> b.addEventListener("click", ()=> applyPeriod(b.dataset.period)));
+  const title = document.getElementById("period-panel-title");
+  if(title) title.textContent = isDailyBaseline() ? "Choose a day" : "Choose a period";
+  const choose = name=>{ applyPeriod(name); focusPeriodControl(); };
+  body.querySelectorAll("[data-period]").forEach(b=> b.addEventListener("click", ()=> choose(b.dataset.period)));
   const clear = document.getElementById("period-clear-btn");
-  if(clear) clear.addEventListener("click", ()=> applyPeriod(null));
+  if(clear) clear.addEventListener("click", ()=> choose(null));
   const day = document.getElementById("period-day-input");
-  if(day) day.addEventListener("change", (e)=>{ if(baselinePeriod(e.target.value)) applyPeriod(e.target.value); });
+  // A DAY OUTSIDE THE CALENDAR IS SAID, not silently ignored (UX critic #6).
+  if(day) day.addEventListener("change", (e)=>{
+    if(baselinePeriod(e.target.value)) return choose(e.target.value);
+    const range = document.getElementById("period-day-range");
+    if(range && e.target.value) range.innerHTML = `<span style="color:var(--ink);">There is no day ${escHtml(e.target.value)} on this calendar.</span> ${escHtml(range.dataset.span || "")}`;
+  });
+  const range = document.getElementById("period-day-range");
+  if(range) range.dataset.span = range.textContent;
   document.getElementById("period-backdrop").classList.add("open");
   document.getElementById("period-panel").classList.add("open");
   setDrawerHidden("period-panel", false);
+  const first = body.querySelector('[data-period][aria-pressed="true"]') || body.querySelector("[data-period], #period-day-input");
+  if(first) first.focus({preventScroll: false});
 }
 function closePeriodPanel(){
   document.getElementById("period-backdrop").classList.remove("open");
@@ -13773,6 +13822,11 @@ function readPeriodFromUrl(){
 readPeriodFromUrl();
 if(CURRENT_PERIOD) DATA = buildData(CURRENT_IN_PLACE_ON);
 updatePeriodButtonLabel();
+// A PERIOD THAT ARRIVED IN THE ADDRESS (criterion 6 on a link, a bookmark or
+// a reload; post-build review of group D, 2026-11-18): the date control's
+// word and the statement are drawn here as applyPeriod draws them - the
+// notices above ran before the period was known.
+if(CURRENT_PERIOD){ updateInPlaceOnButtonLabel(); renderInPlaceOnPastNotice(); }
 
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);

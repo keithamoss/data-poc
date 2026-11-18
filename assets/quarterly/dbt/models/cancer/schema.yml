@@ -43,6 +43,7 @@ data_tests:
         reads_columns: ["cancer_notifications.notification_id", "cancer_notifications.diagnosis_date", "cancer_notifications.notification_date"]
         reads_tables: []
         name: Notified after diagnosis
+        measures: Notifications before diagnosis
         category: consistency
         introduced_date: "2015-01-01"
         description: >

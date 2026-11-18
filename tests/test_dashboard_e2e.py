@@ -10259,3 +10259,156 @@ class TestTheGeocodingPagesOnTheDailyAsset:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = [*(pytestmark if isinstance(pytestmark, list) else [pytestmark]), pytest.mark.asset("quarterly")]
+
+
+_CP_CLIENTS = {"tier": "dataset", "agencyId": "child-protection-family-support",
+               "collectionId": "child-protection", "datasetId": "cp-clients"}
+
+
+def _with_run_times(built: Path, out: Path, change, blockers: list | None = None) -> Path:
+    """The built page with cp-clients' recorded run times passed through
+    `change` (and, when given, OUTSTANDING's blockers replaced) - every other
+    byte the real build, as _with_blockers. The real corpus records no run
+    that needed another try and none that crashed, so the two cases the
+    browser halves of REQ-DASH-414/415 name are written into one real
+    dataset's own record rather than invented as a page of their own."""
+    for name in ("fonts", "vendor", "data"):
+        if not (out.parent / name).exists():
+            (out.parent / name).symlink_to((built.parent / name).resolve())
+    html = built.read_text()
+    if blockers is not None:
+        html = _rewrite_const(html, "OUTSTANDING", lambda r: r.__setitem__("blockers", blockers))
+    data = _collection_data(built)
+    found = [d for entry in data.values() for d in entry["datasets"] if d["id"] == "cp-clients"]
+    assert found and found[0].get("runTimes"), "precondition: cp-clients has recorded run times"
+    change(found[0]["runTimes"])
+    out.write_text(_with_collection_data_inline(html, data))
+    return out
+
+
+def _newest_arrival(run_times: list) -> dict:
+    """The arrival run that ended last - the one the current cycle shows
+    (rank orders a supply's own runs, not the supplies)."""
+    return max((r for r in run_times if r["scope"] == "arrival" and r["ended_at"]),
+               key=lambda r: r["ended_at"])
+
+
+def _at(iso: str, minutes: int) -> str:
+    from datetime import datetime, timedelta
+    return (datetime.fromisoformat(iso) + timedelta(minutes=minutes)).isoformat()
+
+
+@pytest.mark.shared_page
+class TestRunTimesOnTheBuiltPage:
+    """The browser halves of REQ-DASH-413 criterion 11, REQ-DASH-414
+    criterion 8 and REQ-DASH-415 criterion 10, deferred until the deployment
+    databases were rebuilt at schema 51 (they were, 2026-11-18). The JS
+    halves are tests-js/run-times*.test.js; these drive the built page.
+    clean_page asserts zero console errors in its own teardown."""
+
+    def test_a_real_dataset_opens_its_supply_history_with_the_run_time_trend(
+            self, clean_page, built_dashboard_html):
+        """413 c11: on the real build, unchanged."""
+        _goto(clean_page, built_dashboard_html, _CP_CLIENTS)
+        trend = clean_page.locator('.supply-history [data-unit-trend="run-time"]')
+        assert trend.count() == 1
+        assert trend.locator(".unit-trend-title").inner_text().strip() == "How long our checks took"
+        assert trend.locator("[data-run-point]").count() >= 2
+        assert clean_page.locator(".supply-history [data-run-time]").count() > 0, \
+            "each row's run time sits in its Status cell"
+
+    @pytest.mark.fresh_load  # a page of its own, written for this case
+    def test_opening_a_retried_runs_tries_does_not_touch_location(
+            self, clean_page, built_dashboard_html, tmp_path):
+        """414 c8: a run that needed another try, its details opened."""
+        def retried(run_times):
+            r = _newest_arrival(run_times)
+            ended = r["ended_at"]
+            r["attempts"] = {"count": 2, "left_out": 0, "tries": [
+                {"number": 1, "began_at": _at(ended, -50), "ended_at": _at(ended, -5),
+                 "outcome": "TIMED-OUT", "run_time_ms": 2_700_000, "tool": "dbt", "error_type": None},
+                {"number": 2, "began_at": _at(ended, -1), "ended_at": ended,
+                 "outcome": "COMPLETED", "run_time_ms": r["run_time_ms"], "tool": None, "error_type": None}]}
+        page_file = _with_run_times(built_dashboard_html, tmp_path / "retried.html", retried)
+        _goto(clean_page, page_file, _CP_CLIENTS)
+        note = clean_page.locator("details[data-tries-note]").first
+        assert note.count() == 1
+        if not note.is_visible():
+            # The current cycle may hold nothing yet at the build's date; the
+            # run is then under 'Show all history', opened as a reader would.
+            clean_page.locator("#supply-history-toggle").click()
+        summary = " ".join(note.locator("summary").inner_text().split())
+        assert summary == "Checked on the second try - the first timed out after 45m"
+        assert note.evaluate("d => d.open") is False
+        before = clean_page.evaluate("() => [location.href, history.length]")
+        note.locator("summary").click()
+        assert note.evaluate("d => d.open") is True
+        assert clean_page.evaluate("() => [location.href, history.length]") == before
+        assert "Try 1:" in note.inner_text() and "Try 2:" in note.inner_text()
+
+    @pytest.mark.fresh_load  # a page of its own, written for this case
+    def test_a_supply_whose_only_try_crashed_reads_could_not_be_checked(
+            self, clean_page, built_dashboard_html, tmp_path):
+        """415 c10 and 413 c11's could-not-be-checked page: a newer supply
+        whose one try crashed, with no run of its own; the trend still heads
+        the supply history."""
+        data = _collection_data(built_dashboard_html)
+        newest = _newest_arrival(next(d for e in data.values() for d in e["datasets"]
+                                      if d["id"] == "cp-clients")["runTimes"])
+        received = _at(newest["ended_at"], 24 * 60)
+        blocker = {"kind": "could-not-check", "datasetId": "cp-clients",
+                   "supply": "cp-clients@crashed", "openedAt": _at(received, 5),
+                   "resolvedAt": None, "reason": "Our check of this supply did not finish.",
+                   "files": [], "loadFailures": [], "delivery": None, "rejected": None,
+                   "scheduleEnded": None, "agreementRefused": None, "turnedOff": None,
+                   "doublyFed": None, "settlement": None, "supersededBy": None, "ended": None,
+                   "settleAt": None, "tables": [], "receivedAt": received,
+                   "tries": {"runId": "cp_clients__crashed", "outcome": "CRASHED", "tool": None,
+                             "errorType": "RuntimeError", "beganAt": _at(received, 5),
+                             "endedAt": _at(received, 9), "failed": 1,
+                             "failedEndedAt": [_at(received, 9)]}}
+        page_file = _with_run_times(built_dashboard_html, tmp_path / "crashed.html",
+                                    lambda rt: None, blockers=[blocker])
+        on = received[:10]
+        from datetime import date, timedelta
+        on = (date.fromisoformat(on) + timedelta(days=2)).isoformat()
+        _goto(clean_page, page_file, _CP_CLIENTS, on)
+        text = " ".join(clean_page.locator("#view").inner_text().split())
+        assert "Could not be checked" in text
+        assert "Nothing is yet known about this supply's data" in text
+        assert "The next processing pass retries it" in text
+        assert clean_page.locator('.supply-history [data-unit-trend="run-time"]').count() == 1
+
+
+class TestAPeriodLinkOpensWithItsStatement:
+    """REQ-DASH-355 criterion 6 on a COLD LOAD (post-build review of group D,
+    2026-11-18, found by the functional and UX critics both): a shared link,
+    a bookmark or a reload carrying period= showed the period's results with
+    no statement, no inline 'Clear period' and the date control still
+    reading 'In the warehouse on' - the statement was drawn only when the
+    period was chosen in the page. Each test loads its own document."""
+
+    PERIOD = "2025-Q3"
+
+    def _cold(self, page, html: Path, fragment: str, in_place_on: str | None = None):
+        query = f"?{'in-place-on=' + in_place_on + '&' if in_place_on else ''}period={self.PERIOD}"
+        page.goto(f"file://{html.resolve()}{query}#{fragment}")
+        page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+
+    @pytest.mark.parametrize("fragment", ["/", "/agency/department-of-health"])
+    def test_the_statement_and_the_date_word_are_there_on_arrival(self, clean_page, built_dashboard_html,
+                                                                  fragment):
+        self._cold(clean_page, built_dashboard_html, fragment)
+        assert clean_page.locator("#period-btn-label").inner_text().strip() == f"For period: {self.PERIOD}"
+        notice = clean_page.locator("#in-place-on-past-notice")
+        assert notice.is_visible()
+        assert " ".join(notice.inner_text().split()).startswith(f"Showing {self.PERIOD} — results recorded by")
+        assert clean_page.locator("#period-clear-inline").is_visible()
+        assert clean_page.locator("#in-place-on-btn-word").inner_text().strip() == "Results recorded by"
+
+    def test_a_past_date_and_a_period_show_the_period_statement_not_the_past_date_notice(
+            self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html, "/", in_place_on="2026-09-01")
+        text = " ".join(clean_page.locator("#in-place-on-past-notice").inner_text().split())
+        assert text.startswith(f"Showing {self.PERIOD}"), text
+        assert "in place in the warehouse on" not in text

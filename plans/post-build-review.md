@@ -17090,3 +17090,105 @@ twice. It deliberately did not re-find the `TypeError`.
      the week` on the check in assets/daily/dbt/models/mental-health/schema.yml.
      The existing test was the failing-first test; it passes after the fix.
      Minor (a label), so fixed without Keith under the amended standing rule.
+
+487. **[done, 2026-11-18]** **[Docs & process]** **a6d20186's commit message names the wrong base for its first gate chunks.**
+     It says chunks 00-02 and 04-13 ran "at 858d9a79's parent". They ran
+     before ce82ad4f (the tree-snapshot fixture), at ce82ad4f's parent -
+     858d9a79's parent is ce82ad4f itself, which already held that fixture.
+     Every other statement in the message stands. An amend and force-push
+     to correct it was refused by the session's permission check, so the
+     correction is recorded here and in the next commit's message.
+
+488. **[done, 2026-11-18]** **[Dashboard]** **Opening a run's tries moved the page to that run's date and closed the tries again.**
+     Found by REQ-DASH-414 criterion 8's browser test, the first time it
+     could run (the deployment databases rebuilt at schema 51). The supply
+     history's row click handler (`wireSupplyHistorySection`) skipped a
+     click on a link (REQ-DASH-221 criterion 10) but not one inside a
+     `details`, so clicking 'Checked on the second try - ...' applied the
+     row's date: the page re-rendered, the details closed before they were
+     seen, and in-place-on was written to the address - against the
+     criterion's "does not touch location". Fixed: the handler leaves a
+     click inside `a, details` alone. TestRunTimesOnTheBuiltPage's retried
+     test failed with the fix reverted and passes with it. A defect against
+     a signed criterion with an obvious fix; no product decision.
+
+489. **[todo, 2026-11-18]** **[Collections]** **Group C post-build functional review (a6d20186) - what was found and done.**
+     The delivery critic checked REQ-QAC-348/350, REQ-GEN-349/351,
+     REQ-PIPE-346, REQ-DASH-347, REQ-GEN-371 and REQ-DOCS-358's A2/A5/A6/A11/
+     A17, and found every criterion met apart from these.
+     - **F1, fixed**: Cancer's `notified_before_diagnosed` had no `measures:`
+       - #486 again, on the quarterly asset - and tests/test_check_measures.py
+       read only the daily asset, so it could not see it. The two
+       configuration tests now run on both assets (the quarterly case failed
+       first); the check says `measures: Notifications before diagnosis`.
+     - **F5, fixed**: test_new_providers asserted each first supply fell in an
+       owed round, never that each owed round up to the newest supplied had
+       one. It does now; both providers pass.
+     - **F2, FOR KEITH**: Cancer, annual, has one future slot on the
+       quarterly calendar against a warning threshold of four, so the
+       quarterly asset's low-runway warning now fires essentially always
+       (and names cancer-notifications). Options: count an annual dataset's
+       runway in years, give a dataset its own threshold, or accept it.
+     - **F3, minor, not changed**: the daily calendar's REQ-GEN-205-WINDOW
+       correction's reason names only Birth Registrations; it is the shared
+       baseline's, so it also governs Mental Health. A committed changelog
+       entry, so left for Keith rather than rewritten.
+     - **F4, FOR KEITH**: A11 as applied to REQ-PIPE-181 c8 also changed "the
+       months, or all" to "the months or weekdays, or all" and "a list of
+       some months needs" to "a list of some needs" - beyond the signed
+       amendment's text. Sensible, but requirement text he did not sign.
+     - F6 (TS-116's 'No supply' from the next day rather than its due time -
+       the date-only view) and F7 (delivery folder prefixes shared across
+       agencies) noted, not defects in group C.
+
+490. **[todo, 2026-11-18]** **[Dashboard]** **Group D post-build reviews (a6d20186): functional, UX and visual - what was found and done.**
+     Three critics on REQ-DASH-355/356/367. Fixed, each test-first where it
+     was a defect:
+     - **A period link opened without its statement** (functional and UX
+       critics both; 355 c6): a cold load, bookmark or reload with period=
+       drew the date control's word and the notice before the period was
+       read. TestAPeriodLinkOpensWithItsStatement (3 tests) failed first.
+     - **'Not supplied'** beneath a dataset heading, the criterion's word,
+       where it said the history's 'No supply' (F6).
+     - **The verdict line under a period** names "the supply <P> holds"
+       rather than "the supply in place in the warehouse" (UX #4).
+     - **Focus**: into the panel on opening (the chosen period, else the
+       first); back to the control after a choice or a clear; onto the same
+       step after Previous/Next (UX #5, F9).
+     - **The day control on a daily asset**: 'Choose a day', 'Clear day', the
+       range it takes, and a day outside it said rather than ignored (UX #6).
+     - **Polish**: Previous/Next as '‹ ... · ... ›' (UX #7); the chosen
+       period styled as chosen (visual #2); not-owed sub-lines at --ink-muted
+       (visual #4, 3.39:1 -> 5.76:1); the caption above the count line in
+       weight (visual #5); 44px tap targets on a touch screen (visual #6).
+     FOR KEITH - product decisions, not changed:
+     - **F1 / UX #2 / F3 / F2: does a period's status count gaps and held
+       supplies from OTHER periods?** Today it does: Linkage Keys reads Fail
+       at 2025-Q4 because of a 2015-Q4 gap, Cancer at 2026-Q2 because of a
+       held 2024-Q3 supply, and every agency card reads Fail for a period
+       that had not opened (2027-Q1 on 2026-08-15) - where the agencies list
+       also has no "had not opened" line (355 c9 is met only on the agency
+       page). The section cards also carry the whole agency's counters
+       ("12 things waiting...") on both cards (356 c5 says each card rolls up
+       only its section's collections). Options: scope the status to P, or
+       keep it and say "Fail from outside P: ...".
+     - **UX #3**: with a period chosen, the period's sections sit under the
+       whole-history queue - ten screens down on the agencies list.
+     - **F8**: Back after a link that set a period keeps the period on the
+       page left (c4's letter; navigate()'s comment says otherwise).
+     - **F4**: period-link hrefs carry from/scenario parameters a click
+       drops; a scenario chip's href drops period=. Middle-click only.
+     - **F5**: a middle-clicked period link opens at the top, not at its
+       collection's table.
+     - **F7**: 356 c9's test asserts the page's model, not its text (the
+       critic checked the text by hand: 'Pass 90.7%'); the row says when the
+       supply that read it was received, not when the result was recorded.
+     - **Visual #3**: the composition table is about 3x a phone's width and
+       the Acknowledgement column is empty on every quarterly row.
+     - **Visual #7**: the period button shares Plans' 🗂 icon.
+     - **Visual #9**: table headers at --ink-faint (2.81:1), as #49 left them.
+     - The visual critic also noted: 'held anything in Tuesday, 17 November'
+       on the daily page, and a Reason cell naming a repository path.
+     Verified met by the functional critic: 355 c1-c8, c11; 356 c4-c8;
+     367 c1-c7; REQ-DASH-209's amendments and 208 c2. Not verified: 355 c10
+     and 356 c10 (one-off comparisons in evidence).

@@ -23,11 +23,21 @@ def _declared_kinds() -> set[str]:
     return {tool_ref(m.check_id) for m in _active()}
 
 
-def test_the_configuration_declares_rule_kinds():
+#: BOTH ASSETS (post-build review of group C, 2026-11-18): run against the
+#: daily asset alone, this missed the quarterly asset's Cancer check with no
+#: measure, the same defect #486 fixed on the daily one.
+_EACH_ASSET = pytest.mark.parametrize("asset", [
+    pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+    pytest.param("daily", marks=pytest.mark.asset("daily"))])
+
+
+@_EACH_ASSET
+def test_the_configuration_declares_rule_kinds(asset):
     assert _declared_kinds(), "no rule kinds found - the test would pass on nothing"
 
 
-def test_every_declared_rule_kind_names_its_measure():
+@_EACH_ASSET
+def test_every_declared_rule_kind_names_its_measure(asset):
     """MEASURES names the kind, or every check of it declares its own."""
     unnamed = sorted({tool_ref(m.check_id) for m in _active()
                       if not m.measures and tool_ref(m.check_id) not in MEASURES})
