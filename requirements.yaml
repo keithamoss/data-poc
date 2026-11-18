@@ -6993,10 +6993,10 @@ requirements:
     linked_tests:
       - tests/test_scenario_map.py
     implemented_by:
-      - qa_tools/common/scenarios.py::parse_register
-      - qa_tools/common/scenario_map.py::build_map
-      - qa_tools/common/scenario_map.py::read_placements
-      - qa_tools/common/scenario_map.py::write_map
+      - scenarios/register.py::parse_register
+      - generator/scenario_map_writer.py::build_map
+      - scenarios/placements.py::read_placements
+      - generator/scenario_map_writer.py::write_map
       - cli/scenarios.py::map_command
       - cli/scenarios.py::list_command
     evidence:
@@ -20182,8 +20182,7 @@ requirements:
     - qa_tools/common/file_checks.py::screen
     - qa_tools/common/file_checks.py::record
     - asset_model/file_check_definitions.py::check_id_for
-    - assets/daily/file-checks.yaml
-    - assets/quarterly/file-checks.yaml
+    - file-checks.yaml
     - asset_model/check_id.py::parse
     - asset_model/check_lifecycle.py::parse_file_check_metadata
     - qa_tools/common/qa_store.py::record_file_results
@@ -30311,8 +30310,8 @@ requirements:
     - '2026-10-05 (sprint 11): tests/test_scripted_decisions.py - 13 tests: the script validated against configuration alone; the synthetic actor refused outside playback, acting inside it, unreachable by GitHub, and the people gate refusing a synthetic entry with a GitHub username, an assignment or a placeholder mark; playback against a real database raising a PERSON''s decision as the synthetic actor at the scripted instant before a later arrival, waiting for an arrival received after it, stopping loudly on a refusal, and refusing a non-synthetic asset; and no writer of the decision log but decision_log itself. `mothman scenarios validate` gates the committed script in `mothman check` and CI.'
     implemented_by:
     - bootstrap/decision_player.py::Player
-    - qa_tools/common/scripted_decisions.py::problems
-    - qa_tools/common/scripted_decisions.py::load
+    - bootstrap/scripted_decision_checks.py::problems
+    - scenarios/scripted_decisions.py::load
     - qa_tools/common/people.py::playback
     - qa_tools/common/people.py::synthetic_actor
     - qa_tools/common/people.py::person_by_email
@@ -30555,8 +30554,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::renderScenarios
     - dashboard/qa-reporting-dashboard.template.html::scenarioEntryHtml
     - dashboard/qa-reporting-dashboard.template.html::stateFromLocation
-    - qa_tools/common/scenarios.py::Scenario
-    - qa_tools/common/scenario_map.py::build_map
+    - scenarios/register.py::Scenario
+    - generator/scenario_map_writer.py::build_map
     - dashboard/qa-reporting-dashboard.template.html::scenarioJumpBar
     - dashboard/qa-reporting-dashboard.template.html::scenarioModePill
     linked_tests:
@@ -32803,6 +32802,13 @@ requirements:
     - 'Auditability: no config-hash churn. dbt and Soda already exclude their whole metadata block from the hash and the ODCS parser drops customProperties before hashing; the one parser that hashes by exclusion list (Evidently) has no SQL-bodied checks.'
     - 'Cost: reading a few YAML files and one Python module; well under a second, and nothing added to the bootstrap beyond that.'
     - 'Privacy: reads configuration only and could run unchanged against a real deployment''s contracts, because it never sees a row.'
+    retired_criteria:
+      - criterion: 14
+        date: "2026-11-18"
+        by: Keith
+        replaced_by:
+          - REQ-PIPE-385
+        reason: "`mothman scenarios bands` is deleted by REQ-PIPE-385 criterion 9 (CLI D, SETTLED by Keith 2026-11-14, the register edit approved the same day): it was this requirement's debug print of the catalogue, rarely run, and REQ-GEN-392's refusal names an empty band anyway. The catalogue itself (check_bands) stays for the generator and REQ-GEN-392."
     dependencies: []
     decisions:
     - 'A RULE IS ALSO ONE MEASURE (found building it, 2026-10-11): within Keith''s dataset, column and category, checks of a different quantity are different rules - a table''s size (Soda row_count, the contract''s rowCount) and its proportional drop against the last supply (Evidently) share a category and no unit, so no intersection of them means anything. Bad rows stated as a count or as a percentage ARE one measure, compared at a given row count.'
@@ -32844,7 +32850,6 @@ requirements:
     - asset_model/check_lifecycle.py::reads_columns_errors
     - asset_model/check_lifecycle.py::contract_columns
     - qa_tools/common/validate_reads_columns.py::main
-    - cli/scenarios.py::bands_command
     - cli/check.py::_GATES
     - docs/check-authoring-rules.md
     evidence:
@@ -32906,7 +32911,7 @@ requirements:
     - assets/daily/synthetic/collections/civil_registration.py::_ordinary_severities
     - assets/quarterly/synthetic/collections/child_protection.py::_ordinary_severities
     - generator/scenario_injection.py::ExtraArrival
-    - qa_tools/common/scenario_map.py::_target_text
+    - generator/scenario_map_writer.py::_target_text
     - generator/resupply.py::run_slot_chain
     evidence:
     - '2026-10-11: tests/test_generate_to_target.py with tests/test_generate_runs.py, test_generate_cp_runs.py, test_scenario_injection.py, test_scenario_map.py and test_resupply.py - 161 passed. Part B: a green target clears every lever of its first warning (c4); an amber target on a named rule lands inside its band with every other lever clear (c3); a red target fails its rule (c2); twins untouched and the size as asked (c4, c5); a rule with no amber band, a column another single-tier check reads and a Child Protection red are each refused naming why (c5, c11), before anything is written and with the old history left standing (c11); same seed, same rows (c13); the moved record carries no row data (c12); an injected amber target end to end through the real generator lands in its band at the size of the supply before it, and its placement and scenario-map line say what it was built to (c1, c4, c12); naming a severity and a target together is refused (c1). Real tools through the trial path (c15): a green target passed all 80 checks; an amber target on registering_parent_1_name warned on that rule alone. Part A: an ordinary amber''s rule lands in its band (c6); twins untouched (c5); Child Protection postcodes in band with nothing else changed (c7, c8); ambers placed off held, injected and emptied periods, generated equals drawn, sized to the supply before, never stale (c6, c9); reds as drawn (c10); an unreachable target names its period (c11); the real tools warn on an ordinary Birth Registrations amber and the contract passes while Soda warns on a Child Protection one (c15).'
@@ -33767,7 +33772,7 @@ requirements:
     - assets/daily/synthetic/collections/civil_registration.py::_ordinary_severities
     - generator/targets.py::written
     - bootstrap/target_agreement.py::after_replay
-    - qa_tools/common/scripted_decisions.py::answers_for
+    - bootstrap/scripted_decision_checks.py::answers_for
     - assets/daily/synthetic/scripted_decisions.yaml
     - assets/quarterly/synthetic/scripted_decisions.yaml
     - assets/daily/calendar.yaml
@@ -34153,11 +34158,11 @@ requirements:
     - tests/test_scripted_decisions.py::TestAPeriodScopedDecisionIsPlayed
     - tests/test_scripted_decisions.py::TestPlayback
     implemented_by:
-    - qa_tools/common/scripted_decisions.py::Script
-    - qa_tools/common/scripted_decisions.py::load
-    - qa_tools/common/scripted_decisions.py::_scope_problems
+    - scenarios/scripted_decisions.py::Script
+    - scenarios/scripted_decisions.py::load
+    - bootstrap/scripted_decision_checks.py::_scope_problems
     - bootstrap/decision_player.py::_timed_by_period
-    - qa_tools/common/scripted_decisions.py::_due_at
+    - scenarios/scripted_decisions.py::due_at
     - bootstrap/decision_player.py::_apply
     - asset_model/slots.py::relative_period
     evidence:
@@ -34233,7 +34238,7 @@ requirements:
     - generator/scenario_injection.py::generated_periods
     - generator/scenario_injection.py::placement_of
     - generator/scenario_injection.py::check_every_index_has_its_supply
-    - qa_tools/common/scripted_decisions.py::problems
+    - bootstrap/scripted_decision_checks.py::problems
     - cli/scenarios.py::validate_command
     evidence:
     - "2026-10-13: tests/test_scenario_links.py, 20 tests with no database. Swapping the end of the day for its start in link_dates() fails five of them, so criterion 4's reading of a bare date is held rather than assumed.\n"
@@ -35427,7 +35432,7 @@ requirements:
     - tests/test_dashboard_e2e.py
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html
-    - qa_tools/common/scenario_map.py::Placement
+    - scenarios/placements.py::Placement
     - generator/scenario_injection.py::Link
     - generator/scenario_injection.py::Placement::subject_for
     - generator/scenario_injection.py::write_placements
@@ -36211,7 +36216,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::scenarioTarget
     - pipeline/slot_timeline.py::for_dataset
     - pipeline/slot_timeline.py::with_runs
-    - qa_tools/common/scenario_map.py::PERIOD_COMPOSITION
+    - scenarios/vocabulary.py::PERIOD_COMPOSITION
     evidence:
     - "Criteria 7 and 10, their halves that waited, cleared 2026-11-16 by REQ-GEN-206's TS-55: its chip opens 2023-Q1's composition view on the history's last day ('6 datasets: 1 substituted, 1 inherited, 4 promoted'), and tests/test_dashboard_e2e.py::TestThePeriodComposition::test_ts55s_period_holds_all_three_kinds_and_agrees_both_ways compares those rows with the period's _manifest both ways on the bootstrapped history - passed against both assets bootstrapped from empty that day."
     - 'tests-js/period-composition.test.js (seen failing first): each kind and its stood-on period, an earlier date as it stood, the counting line and group order, who decided by name or the schedule, status when promoted, acknowledgement, a reason as text, the dataset and from-period links, the h2/sub-line/caption, previous and next links left out at the ends, had-not-opened, nothing held, the route round trip, the period-composition subject and target.'
@@ -43299,7 +43304,7 @@ requirements:
     - "cli/filing_tui.py::stands_on_line"
     - "cli/filing_tui.py::_supply_line"
     - "cli/scenarios.py::where_line"
-    - "qa_tools/common/scenario_map.py::_entry"
+    - "generator/scenario_map_writer.py::_entry"
     evidence:
     - "2026-10-24, TARGETED RUNS ON THE BUILT CODE (tree dcc33f8): tests/test_in_place_in_the_warehouse.py 7 passed within the 48-module run (1351 passed, 1 xfailed); npm test 899 passed; tests/test_dashboard_e2e.py -n0 303 passed, 2 failed (TestARequirementHasItsOwnAddress, failing identically on base aaaa9ba), TestInPlaceInTheWarehouse and the TS-78b chip among the passes; mothman scenarios map --check current."
     - "2026-10-24, KEITH'S ANSWERS Q5 AND Q7 (post-build-review #266): the scenario text in plans/supply-model.md reworded and SCENARIOS.md regenerated with mothman scenarios map, --check current; tests/test_scenario_map.py and tests/test_in_place_in_the_warehouse.py passed within the 285 run on tree e56ed0e. Q7 kept the picker line's labels, no code change."
@@ -47329,7 +47334,7 @@ requirements:
     - 'dashboard/qa-reporting-dashboard.template.html::twoLinePaths'
     - 'dashboard/qa-reporting-dashboard.template.html::replacementWords'
     - 'pipeline/cross_table_grid.py::_clause'
-    - 'qa_tools/common/scenario_map.py::_target_text'
+    - 'generator/scenario_map_writer.py::_target_text'
     - 'qa_tools/common/replacement_setting.py::words'
     evidence:
     - '2026-11-01, tree f22855b (worktree bpwf), empty warehouse, no bootstrap: the full Vitest suite 1075 of 1078 passed with the Python run beside it; the three that failed (another-table, census, implemented-by) passed alone, 11 of 11 - timeouts under load. tests-js/pass-warn-fail.test.js (criterion 17) and tests-js/status-parity.test.js''s words block pass.'
@@ -48647,7 +48652,7 @@ requirements:
     - bootstrap/bootstrap.py::bootstrap
     - qa_tools/common/streams.py::streams
     - qa_tools/common/scenario_map.py::map_path
-    - qa_tools/common/scenario_map.py::write_map
+    - generator/scenario_map_writer.py::write_map
     - generator/scenario_injection.py::mixed_asset_problems
     - .claude/hooks/session-start.sh
     evidence:

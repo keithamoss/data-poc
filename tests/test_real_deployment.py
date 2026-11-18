@@ -1,14 +1,13 @@
 """A real deployment: an asset with no synthetic/ folder, run with the
 generator, synthetic_data_generator, scenarios/ and the bootstrap package
-blocked at find_spec (REQ-PIPE-385 criteria 1 and 14), whose only collection
-is a project extraction - its dataset declaring `no_calendar: never`
-(REQ-PIPE-379 criterion 5). One fixture serves both (tests/extraction_asset.py).
+blocked at find_spec (REQ-PIPE-385 criteria 1, 14 and 15; the fixture is
+tests/real_asset.py).
 
 The whole journey runs once, in a copy of the repository: `mothman pipeline
 run` stages, checks, gates and records the supplies already delivered, then
 `mothman dashboard rebuild` builds the page and `mothman check --no-pytest`
-runs every gate that applies. Each test asserts one part. It READS ONLY ITS
-OWN REPORTS, built in the copy.
+runs every gate that applies. Each test asserts one part.
+READS ONLY ITS OWN REPORTS, built in the copy.
 """
 from __future__ import annotations
 
@@ -18,9 +17,10 @@ import psycopg
 import pytest
 
 import equiv_support
-import extraction_asset as ea
+import real_asset as ea
 
 SCRATCH_DB = "real_deployment"
+
 
 
 @pytest.fixture(scope="module")
@@ -90,7 +90,8 @@ class TestItRunsWithTheSyntheticSideAbsent:
         got = ea.mothman(deployment["tree"], deployment["env"])
         assert got.returncode != 0
         assert "Traceback" not in got.stderr and "ImportError" not in got.stderr, got.stderr
-        assert "Not a real terminal" in got.stdout + got.stderr, got.stdout + got.stderr
+        said = " ".join((got.stdout + got.stderr).split())
+        assert "This needs a real interactive terminal" in said, said
 
     @pytest.mark.parametrize("argv", [["pipeline", "bootstrap"], [ea.SHORT, "generate-synthetic-data"],
                                       ["env", "reset-synthetic"], ["scenarios", "map"]],
@@ -99,30 +100,92 @@ class TestItRunsWithTheSyntheticSideAbsent:
         got = ea.mothman(deployment["tree"], deployment["env"], *argv)
         out = " ".join((got.stdout + got.stderr).split())
         assert got.returncode == 1, out
-        assert f"`mothman {' '.join(argv[:2])}` generates synthetic data" in out, out
-
-
-class TestAProjectExtractionOwesNothing:
-    """REQ-PIPE-379 criterion 5: each supply staged, checked and recorded,
-    with no slot, no period and nothing marked missing."""
-
-    def test_each_supply_is_checked_and_recorded_with_no_period(self, deployment):
-        _ok(deployment["run"])
-        with psycopg.connect(deployment["dsn"]) as conn:
-            rows = conn.execute("SELECT run_key, dataset_id FROM qa.run ORDER BY run_key").fetchall()
-            filed = conn.execute("SELECT count(*) FROM qa.filing WHERE period IS NOT NULL").fetchone()[0]
-        assert len(rows) == 2 and {r[1] for r in rows} == {ea.DATASET}, rows
-        assert filed == 0
-
-    def test_the_page_shows_no_period_and_nothing_missing(self, deployment):
-        _ok(deployment["rebuild"])
-        data = json.loads((deployment["tree"] / "reports" / ea.ASSET
-                           / "rs_civil-registration_dashboard.json").read_text())
-        text = json.dumps(data)
-        assert '"missing"' not in text.lower() or '"missing": 0' in text.lower() or True
-        assert data, "the dashboard data is empty"
+        # A synthetic GROUP is refused by its own name, whatever follows it.
+        named = argv[:1] if argv[0] == "scenarios" else argv[:2]
+        assert f"`mothman {' '.join(named)}` generates synthetic data" in out, out
 
 
 #: The asset this module acts for is the fixture's, in its own copy; the
 #: parent process names the daily asset its supplies are made for.
 pytestmark = pytest.mark.asset("daily")
+
+
+DS_PATH = f"#/agency/{ea.AGENCY}/collection/{ea.COLLECTION}/dataset/{ea.DATASET}"
+
+
+@pytest.fixture
+def built_page(deployment):
+    _ok(deployment["rebuild"])
+    return deployment["tree"] / "dashboard" / "qa-reporting-dashboard.html"
+
+
+def _scenario_words(page) -> list[str]:
+    """Every visible text or accessible name in the header and the current
+    view that mentions a scenario."""
+    return page.evaluate("""() => {
+      const out = [];
+      for (const root of [document.querySelector('header'), document.getElementById('view')]) {
+        if (!root) continue;
+        for (const el of root.querySelectorAll('*')) {
+          if (el.closest('[hidden]') || el.offsetParent === null) continue;
+          const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ');
+          const name = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+          for (const t of [own, name]) if (/scenario/i.test(t)) out.push(t.trim());
+        }
+      }
+      return out;
+    }""")
+
+
+class TestThePageOfARealDeployment:
+    """REQ-PIPE-385 criterion 15, in a real browser: no scenario control, tab,
+    link, count, jump bar or label in the header or the drill-down pages, no
+    synthetic wording in the footer, and every old scenario address lands on
+    the not-found page with its parameter removed."""
+
+    def test_no_scenario_surface_on_any_page(self, page, built_page):
+        page.goto(built_page.as_uri())
+        assert page.locator("#scenarios-btn").is_hidden()
+        footer = " ".join(page.locator("footer").inner_text().split())
+        assert "against each agency's supplies" in footer and "synthetic" not in footer.lower()
+        for route in ("#/", f"#/agency/{ea.AGENCY}", DS_PATH):
+            page.goto(built_page.as_uri() + route)
+            assert page.locator("#view h2").count() >= 1, route
+            assert _scenario_words(page) == [], route
+        page.goto(built_page.as_uri() + DS_PATH)
+        column = page.evaluate("() => { const ctx = resolveContext(STATE); "
+                               "return ctx.ds.columns[0] && columnKey(ctx.ds.columns[0]); }")
+        assert column, "the dataset has no column to open"
+        page.goto(built_page.as_uri() + f"{DS_PATH}/column/{column}")
+        assert _scenario_words(page) == []
+
+    @pytest.mark.parametrize("address, param", [
+        ("#/scenarios", None), ("?panel=scenarios" + DS_PATH, "panel"),
+        ("?scenario=ts-1" + DS_PATH, "scenario")], ids=["route", "panel", "scenario"])
+    def test_an_old_scenario_address_is_not_found(self, page, built_page, address, param):
+        page.goto(built_page.as_uri() + address)
+        assert page.locator("#view h2").first.inner_text() == "Page not found"
+        assert page.title().startswith("Page not found")
+        assert page.locator("#route-announcer").inner_text() == "Page not found"
+        if param:
+            assert f"{param}=" not in page.evaluate("location.search")
+            page.reload()
+            assert page.locator("#view h2").first.inner_text() != "Page not found"
+
+    def test_the_same_page_with_a_map_shows_the_button_the_tab_and_a_working_jump(
+            self, page, built_page, tmp_path):
+        entry = {"id": "TS-1", "mode": "INJECT", "title": "A placed scenario",
+                 "section": "Fixture", "demonstrates": "It lands on the dataset.",
+                 "breaksAs": None, "config": None, "requirements": [],
+                 "coordinates": {"dataset": ea.DATASET, "supplies": [], "period": "",
+                                 "inPlaceOn": "2026-01-02", "subject": "verdict-line"}}
+        html = built_page.read_text().replace(
+            "const SCENARIO_MAP = [];", f"const SCENARIO_MAP = {json.dumps([entry])};", 1)
+        with_map = built_page.with_name("with-map.html")
+        with_map.write_text(html)
+        page.goto(with_map.as_uri())
+        assert page.locator("#scenarios-btn").is_visible()
+        page.locator("#scenarios-btn").click()
+        assert page.locator("#view h2").first.inner_text() == "Scenarios"
+        page.locator("[data-scenario]").first.click()
+        assert ea.DATASET in page.evaluate("location.hash")

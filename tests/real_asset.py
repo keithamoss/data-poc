@@ -1,14 +1,17 @@
 """A real deployment's asset, in a copy of the repository (REQ-PIPE-385
-criteria 1 and 14, REQ-PIPE-379 criterion 5 - one fixture for both, the
-architect's note on 379).
+criteria 1 and 14).
 
-`make(tmp, deliveries)` copies the tracked tree and adds assets/extraction/:
+`make(tmp, deliveries)` copies the tracked tree and adds assets/registry/:
 the daily asset's configuration with its synthetic/ folder left out, every
-check id renamed to the new asset, `synthetic: true` dropped, no offset date
-anywhere, and its one dataset declaring `no_calendar: never` - a project
-extraction, which has supplies and no cadence. The supplies are copied in
-already made (the generator is what such a deployment does not have), and the
-copy is committed, since a build links to a commit.
+check id renamed to the new asset, `synthetic: true` dropped and no offset
+date anywhere - a daily calendar and participation from a fixed date. The
+supplies are copied in already made (the generator is what such a deployment
+does not have), and the copy is committed, since a build links to a commit.
+
+NOT A PROJECT EXTRACTION (Keith, 2026-11-18): REQ-PIPE-379 criterion 5 wanted
+one fixture for both tests, and its `no_calendar: never` shape turned out
+never to have run end to end - plans/running-thoughts.md #141, scoped
+separately.
 
 `mothman(tree, env, *argv)` runs the CLI there with the generator,
 synthetic_data_generator, scenarios/ and the bootstrap package blocked at
@@ -29,7 +32,7 @@ import yaml
 
 import tree_copy
 
-ASSET, SOURCE = "extraction", "daily"
+ASSET, SOURCE = "registry", "daily"
 AGENCY, COLLECTION, SHORT = "registry-services", "civil-registration", "bdm"
 DATASET, TABLE = "birth-registrations", "birth_registrations"
 BLOCKED = ("generator", "synthetic_data_generator", "scenarios", "bootstrap")
@@ -71,14 +74,17 @@ def _data_asset(folder: Path) -> None:
 
 
 def _calendar(folder: Path) -> None:
-    """One calendar from a fixed date, and the dataset owing no slot ever."""
+    """A daily calendar and participation from a fixed date before the
+    supplies, each due at 14:00 on its day."""
     doc = {
-        "calendars": [{"name": "daily", "description": "Unused: the extraction has no cadence.",
-                       "versions": [{"effective_from": "2026-01-01", "claim_window": "4h",
+        "calendars": [{"name": "daily", "description": "Every day, from a fixed date.",
+                       "versions": [{"effective_from": "2025-12-01", "claim_window": "4h",
                                      "cadence": {"rule": "daily"}, "changelog": _CHANGELOG}]}],
         "collections": [{"id": COLLECTION, "files_go_to_period": {"versions": [
-            {"effective_from": "2026-01-01", "value": 0, "changelog": _CHANGELOG}]}}],
-        "datasets": [{"id": DATASET, "no_calendar": "never"}],
+            {"effective_from": "2025-12-01", "value": 0, "changelog": _CHANGELOG}]}}],
+        "datasets": [{"id": DATASET, "participation": {"versions": [
+            {"effective_from": "2025-12-01", "expected_time": "14:00", "days_before": 0,
+             "grace": "1h", "changelog": _CHANGELOG}]}}],
     }
     (folder / "calendar.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
 
@@ -122,7 +128,9 @@ def env(tree: Path, dsn: str) -> dict:
     copy."""
     return {**os.environ, "MOTHMAN_ASSET": ASSET, "MOTHMAN_SUPPLY_DSN": dsn,
             "MOTHMAN_ENVIRONMENT": "test", "NO_COLOR": "1", "COLUMNS": "200",
-            "PYTHONPATH": str(tree.parent / "blocked"),
+            # THE COPY'S OWN CODE FIRST, so `uv run mothman` - whose console
+            # script this checkout's environment installed - runs the copy.
+            "PYTHONPATH": os.pathsep.join([str(tree.parent / "blocked"), str(tree)]),
             "UV_PROJECT_ENVIRONMENT": str(Path(sys.prefix)), "UV_NO_SYNC": "1"}
 
 
@@ -133,7 +141,7 @@ def mothman(tree: Path, environ: dict, *argv: str, stdin=subprocess.DEVNULL,
 
 
 def fresh_database(name: str) -> str:
-    """An empty database marked as the extraction asset's test environment
+    """An empty database marked as the fixture asset's test environment
     (REQ-PIPE-107), which the copy's checkout is configured for."""
     import psycopg
 

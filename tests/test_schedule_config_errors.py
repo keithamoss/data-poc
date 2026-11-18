@@ -222,6 +222,20 @@ class TestTheSlotHelpersStopSwallowing:
         with pytest.raises(schedule.ScheduleConfigError, match="is broken"):
             broken.period_claimed_at("cp-clients", datetime(2026, 2, 1, tzinfo=timezone.utc))
 
+    def test_the_arrival_pattern_gate_stops_rather_than_skipping(self, broken, monkeypatch):
+        """Criterion 15's caller validate_arrival_patterns.missing_patterns:
+        a dataset with no pattern and a broken schedule stops the gate."""
+        from asset_model import hierarchy
+        from qa_tools.common import validate_arrival_patterns
+
+        real = hierarchy.all_datasets()
+        assert real, "test precondition - the asset has datasets"
+        patternless = [type(d)(**{**d.__dict__, "arrival_pattern": None}) if hasattr(d, "__dict__")
+                       else d for d in real]
+        monkeypatch.setattr(hierarchy, "all_datasets", lambda: patternless)
+        with pytest.raises(schedule.ScheduleConfigError, match="is broken"):
+            validate_arrival_patterns.missing_patterns()
+
     def test_no_calendar_agreed_is_still_nothing_owed(self, monkeypatch):
         from datetime import datetime, timezone
 

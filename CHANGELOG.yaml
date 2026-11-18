@@ -109,6 +109,54 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-18"
+    summary: >
+      Emergency Department's age groups are checked by one more tool, every
+      asset shares one set of file checks, and a deployment with no synthetic
+      data no longer offers the commands and pages that make it.
+    changes:
+      - category: New
+        items:
+          - headline: Age groups checked by datacontract-cli too
+            components: ["QA checks & contract"]
+            description: >
+              Emergency Department's age_group now has a datacontract-cli
+              check beside its dbt one, with results across the whole sample
+              history, so you see a second card on that column.
+          - headline: One set of file checks for every asset
+            components: ["QA checks & contract"]
+            description: >
+              The six file checks live once, in file-checks.yaml at the top
+              of the repository. An asset can add a check, replace one, or
+              retire one for itself in its own file-checks.yaml.
+      - category: Improved
+        items:
+          - headline: Value counts follow the contract
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              The allowed values each run counts against are read from the
+              collection's contract when the run starts. A column whose
+              contract gives no list stops the run before any tool runs, and
+              says which line to add.
+          - headline: Only the commands a deployment can run
+            components: ["Testing & dev tooling"]
+            description: >
+              On an asset with no synthetic data, `mothman` does not list
+              generating, the bootstrap, resetting or scenarios, and refuses
+              them by name if you type them. `mothman check` shows the three
+              synthetic gates as not applicable rather than passed.
+          - headline: No scenario button without scenarios
+            components: ["Dashboard UI"]
+            description: >
+              A page built with no scenario map shows no Scenarios button,
+              an old scenario link opens a plain not-found page, and a real
+              asset's footer no longer says its supplies are generated.
+          - headline: A broken calendar is said, not guessed around
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              A date before a calendar's first version used to borrow that
+              version's settings. It now stops the command with one paragraph
+              naming the calendar, the date and the file to fix.
   - date: "2026-11-16"
     summary: >
       Each supply's checks take less time, and you can now see how long each

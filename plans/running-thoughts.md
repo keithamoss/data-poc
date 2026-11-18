@@ -6190,3 +6190,16 @@ could never have computed it), and it belongs with batch 5's check work.
      repository, a repository per asset, or shared checks with per-asset
      configuration injected at deploy time. This is configuration
      architecture, not code architecture (REQ-PIPE-240 to 248).
+
+141. **[todo, 2026-11-18]** **[Pipeline & publishing]** **[QA pipeline]** **A project extraction's supplies have never run end to end - scope how a no-period supply is filed, checked and gated.**
+     Found building REQ-PIPE-379 criterion 5's test: an asset whose one
+     dataset declares `no_calendar: never`, put through `mothman pipeline
+     run`. Filing raised NoCalendarAgreed (it is not a ValueError, so
+     file_arrivals' handlers missed it); past that, the supply is held as
+     "waiting for a person to place it", so no tool checks it; and the
+     promotion gate raises NoCalendarAgreed again. The dashboard build's
+     agreement.cadence() raises it too. **Keith, 2026-11-18: scope it
+     separately** - what filing, the run's view and promotion mean when a
+     supply has no period is a design question, not a fix. REQ-PIPE-379
+     criterion 5 stays unmet pointing here; REQ-PIPE-385's no-synthetic-folder
+     test runs on an asset with a calendar instead. Not scoped yet.
