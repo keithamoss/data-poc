@@ -141,7 +141,11 @@ def stubbed(tree, monkeypatch):
     """A bootstrap of the daily asset with the real tools out of it: its
     generation and replay replaced by `on_generate` and `on_replay`."""
     import dbsupport
+    import one_collection
 
+    # One collection, so the stream pool never spawns: its child processes
+    # would not see these stubs and would replay for real (post-build-review #485).
+    one_collection.only(monkeypatch, "civil-registration")
     dbsupport.use_empty_supply_db(monkeypatch)
     from qa_tools.common import supply_db
 

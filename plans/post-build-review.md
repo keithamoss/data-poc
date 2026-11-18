@@ -17063,3 +17063,9 @@ twice. It deliberately did not re-find the `TypeError`.
        data/. Worth a guard: a child stream process started under pytest
        refusing the default delivery tree, or the pool running in-process
        under a test. Logged for a decision; not changed.
+     - **A second case, the same night**: tests/test_tree_snapshot.py's own
+       `stubbed` fixture runs `boot.bootstrap(collection="all")` on the daily
+       asset, and its four tree-snapshot tests sat in the stream pool for the
+       length of a gate chunk. Fixed the same way (one collection stated as its
+       premise); the module passes in 6 seconds. Two cases found by a gate
+       rather than by a guard is the argument for the guard above.
