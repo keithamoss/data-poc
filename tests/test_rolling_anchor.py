@@ -876,3 +876,36 @@ class TestTheSuiteSeesTheFixedAnchor:
         assert history_anchor.for_offsets() == FIXED == get_anchor_date()
         start = min(v.effective_from for v in schedule.calendar("daily").versions)
         assert start == FIXED - timedelta(days=99)
+
+
+@pytest.mark.asset("daily")
+def test_another_assets_offsets_are_read_while_acting_for_a_real_one(tmp_path, monkeypatch):
+    """post-build-review #475: the offset refusal asked whether the SELECTED
+    asset is synthetic, so a gate acting for a real asset that reads every
+    asset's hierarchy (the feedback gate's every_asset.declared) was refused
+    on a synthetic asset's own offset dates. It asks of the asset whose file
+    is read; a real asset's own file writing an offset is still refused."""
+    import shutil
+
+    import real_asset
+
+    from asset_model import assets, config_yaml
+
+    root = tmp_path / "assets"
+    shutil.copytree(assets.selected().folder, root / "daily",
+                    ignore=shutil.ignore_patterns("dbt_packages", "synthetic", "__pycache__"))
+    shutil.copy(assets.ROOT / "assets" / "environments.yaml", root / "environments.yaml")
+    real = root / real_asset.ASSET
+    shutil.copytree(root / "daily", real)
+    real_asset._data_asset(real)
+    real_asset._calendar(real)
+    assets.use_root(root)
+    monkeypatch.setenv(assets.ASSET_ENV, real_asset.ASSET)
+    assert assets.selected().name == real_asset.ASSET
+
+    doc = config_yaml.load(root / "daily" / "data-asset.yaml")
+    assert doc["synthetic"] is True and doc["amber_setting"]["versions"]
+
+    (real / "offset.yaml").write_text("d: !anchor -1\n")
+    with pytest.raises(config_yaml.OffsetRefused, match="offset.yaml, line 1"):
+        config_yaml.load(real / "offset.yaml")

@@ -16791,3 +16791,33 @@ twice. It deliberately did not re-find the `TypeError`.
      dashboard build's agreement.cadence() raises it too. Keith, 2026-11-18:
      scoped separately as a design question - plans/running-thoughts.md #141.
      Not fixed; criterion 5 is recorded unmet.
+
+474. **[done, 2026-11-18]** **[Testing & dev tooling]** **Old session-start blocks kept exporting a retired DSN and asset name.**
+     The session-start hook appends its exports to $CLAUDE_ENV_FILE on every
+     start and resume. A session's file had accumulated blocks since
+     2026-11-01, the older ones exporting MOTHMAN_SUPPLY_DSN=.../supply and
+     MOTHMAN_ASSET=data-asset-1, and no newer block cleared them - which
+     explains #446 and a reset refused on 2026-11-18 for the wrong database.
+     Not the environment's settings: they hold no variables.
+     - **Fixed** (Keith: delete both): the hook's block now begins `unset
+       MOTHMAN_ASSET MOTHMAN_SUPPLY_DSN`; this session's file was trimmed by
+       hand. Nothing tested - a shell hook, checked with `bash -n`.
+
+475. **[done, 2026-11-18]** **[QA checks & contract]** **Acting for a real asset, reading another asset's offset dates was refused.**
+     Found by REQ-PIPE-385's real-deployment test: in a checkout holding a
+     real asset beside the synthetic ones, `mothman check`'s feedback gate
+     (which reads every asset's hierarchy through every_asset.declared)
+     stopped with OffsetRefused on the daily asset's own `!anchor` dates. The
+     refusal asked whether the SELECTED asset is synthetic, not the asset
+     whose file was being read.
+     - **Fixed, test-first** (a correctness bug, contained; Keith may want to
+       know): config_yaml asks of the asset folder holding the file, and keys
+       the cached parse on that asset's declaration;
+       tests/test_rolling_anchor.py's
+       `test_another_assets_offsets_are_read_while_acting_for_a_real_one` was
+       RED (OffsetRefused on daily/data-asset.yaml) and is green, and a real
+       asset's own offset is still refused.
+     - **Known limit, not changed**: the anchor those dates resolve against
+       is still the selected asset's (history_anchor.for_offsets). Under
+       `test` and `ci` that is the fixed anchor; a real deployment holds no
+       synthetic asset folder, so it never reads one.

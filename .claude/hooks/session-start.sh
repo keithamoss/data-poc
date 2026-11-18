@@ -57,6 +57,12 @@ fi
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
+    # THIS FILE IS APPENDED TO ON EVERY START AND RESUME, so an older block
+    # can still be setting what a newer one leaves out: a session's file had
+    # blocks from 2026-11-01 exporting MOTHMAN_SUPPLY_DSN=.../supply and
+    # MOTHMAN_ASSET=data-asset-1, which no later block cleared - the cause of
+    # post-build-review #446 and a refused reset (#474). Cleared first here.
+    echo 'unset MOTHMAN_ASSET MOTHMAN_SUPPLY_DSN'
     # NO MOTHMAN_SUPPLY_DSN (Keith, 2026-11-15): each command opens its
     # asset's own supply_<asset>, found from MOTHMAN_ASSET, on the server
     # MOTHMAN_PG names - a URL naming no database. CI's name for the same.

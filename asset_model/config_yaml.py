@@ -50,6 +50,7 @@ import copy
 import os
 import re
 import threading
+from pathlib import Path
 from collections import OrderedDict
 
 import yaml
@@ -103,7 +104,7 @@ def _anchor_offset(loader, node):
 
     where = f"{getattr(_parsing, 'name', None) or 'a configuration file'}, line {node.start_mark.line + 1}"
     if not getattr(_parsing, "checking", False):
-        if not _asset_is_synthetic():
+        if not _asset_is_synthetic(getattr(_parsing, "name", None)):
             raise OffsetRefused(
                 f"{where} writes a date as an offset from the history's anchor "
                 f"({ANCHOR_TAG}), and this asset does not declare `synthetic: true` - a real "
@@ -124,21 +125,59 @@ def _anchor_offset(loader, node):
 _SYNTHETIC: "OrderedDict[str, bool]" = OrderedDict()
 
 
-def _asset_is_synthetic() -> bool:
+#: Which asset folder holds a file, by (file, selected folder, asset folders):
+#: paths, not configuration, so remembering them answers nothing stale.
+_OWNERS: "OrderedDict[tuple, Path | None]" = OrderedDict()
+
+
+def _owner_data_asset_yaml(name) -> Path | None:
+    """The data-asset.yaml of the asset folder holding the file `name`, where
+    it lies in one other than the selected asset's (post-build-review #475)."""
+    if not name:
+        return None
+    from asset_model import assets
+
+    selected = assets.selected_or_none()
+    if selected is None:
+        return None
+    every = assets.every()
+    key = (str(name), str(selected.folder), tuple(str(a.folder) for a in every))
+    if key in _OWNERS:
+        return _OWNERS[key]
+    path = Path(name).resolve()
+    found = None
+    if not path.is_relative_to(selected.folder.resolve()):
+        found = next((a.data_asset_yaml for a in every
+                      if path.is_relative_to(a.folder.resolve())), None)
+    with _lock:
+        _OWNERS[key] = found
+        while len(_OWNERS) > MAX_DOCUMENTS:
+            _OWNERS.popitem(last=False)
+    return found
+
+
+def _asset_is_synthetic(name=None) -> bool:
     """asset_time.declared_synthetic(), remembered by data-asset.yaml's text -
     so the answer is part of an offset-using document's cache key and the
     refusal holds on every load (post-build-review #435). The declaration is
     read with `checking` set: data-asset.yaml may itself write offsets, which
-    resolve unchecked there, since the check is what is being answered."""
+    resolve unchecked there, since the check is what is being answered.
+
+    OF THE ASSET WHOSE FILE IS READ (post-build-review #475): a file in
+    another asset's folder - a gate acting for a real asset reading every
+    asset's hierarchy - is asked of that asset's own declaration."""
     from asset_model import asset_time
 
-    text = read(asset_time.data_asset_yaml())
+    owner = _owner_data_asset_yaml(name)
+    path = owner or asset_time.data_asset_yaml()
+    text = read(path)
     found = _SYNTHETIC.get(text)
     if found is None:
         before = getattr(_parsing, "checking", False)
         _parsing.checking = True
         try:
-            found = asset_time.declared_synthetic()
+            found = ((parse(text, name=str(path)) or {}).get("synthetic") is True if owner
+                     else asset_time.declared_synthetic())
         finally:
             _parsing.checking = before
         with _lock:
@@ -178,9 +217,11 @@ def uses_anchor(text) -> bool:
     return found
 
 
-def anchored_key(text):
+def anchored_key(text, name=None):
     """`text` itself, or - where it uses the tag - `text` with the anchor it
-    resolves against, so a cached document or a built value is per anchor."""
+    resolves against, so a cached document or a built value is per anchor.
+    `name` is the file's, so another asset's file is keyed on that asset's
+    declaration (post-build-review #475)."""
     if not uses_anchor(text):
         return text
     from asset_model import history_anchor
@@ -188,7 +229,7 @@ def anchored_key(text):
     if getattr(_parsing, "checking", False):
         # The synthetic check's own read: never remembered (parse()).
         return f"checking\0{text}"
-    if not _asset_is_synthetic():
+    if not _asset_is_synthetic(name):
         # Refused when parsed, so nothing is ever kept under this key - and an
         # offset document kept while the asset was synthetic is not answered.
         return f"real\0{text}"
@@ -231,7 +272,7 @@ def parse(source, *, name: str | None = None, remember: bool = True):
     if isinstance(text, bytes):
         text = text.decode("utf-8")
     # PER ANCHOR WHERE THE TEXT WRITES AN OFFSET DATE (REQ-GEN-406).
-    key = anchored_key(text)
+    key = anchored_key(text, name)
     if remember:
         with _lock:
             if key in _cache:
