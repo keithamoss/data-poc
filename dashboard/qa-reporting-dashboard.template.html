@@ -12467,7 +12467,12 @@ function onScenarioPage(entry){
   const target = scenarioTarget(entry);
   if(!target || !STATE) return false;
   if(target.inPlaceOn && target.inPlaceOn !== CURRENT_IN_PLACE_ON) return false;
-  return Object.keys(target.nav).every(k=> STATE[k] === target.nav[k]);
+  // A PERIOD LINK'S EXTRA KEYS ARE NOT STATE (REQ-DASH-367 criterion 6):
+  // navigate() turns setPeriod into the period on show and focusCollection
+  // into focus, and keeps neither.
+  return Object.keys(target.nav).every(k=> k === "focusCollection" ? true
+    : k === "setPeriod" ? CURRENT_PERIOD === target.nav.setPeriod
+    : STATE[k] === target.nav[k]);
 }
 // THE PARAMETER'S NAME IN ANY CASE (criterion 11), its raw value or null.
 function scenarioParamFromUrl(){
@@ -12499,7 +12504,11 @@ function scenarioChipHref(entry){
   url.search = "";
   if(target.inPlaceOn) url.searchParams.set(IN_PLACE_ON_PARAM, target.inPlaceOn);
   withScenarioParam(url, entry.id);
-  return url.pathname + url.search + stateToHash(target.nav);
+  // A PERIOD'S SCENARIO CARRIES THE PERIOD (REQ-DASH-367 criterion 6), so a
+  // middle-click or a cold load opens the same page the click does.
+  if(target.nav.setPeriod) url.searchParams.set(PERIOD_PARAM, target.nav.setPeriod);
+  const {setPeriod, focusCollection, ...state} = target.nav;
+  return url.pathname + url.search + stateToHash(state);
 }
 function scenarioSubjectEl(entry){
   const coords = entry && entry.coordinates;

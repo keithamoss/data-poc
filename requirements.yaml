@@ -48517,7 +48517,7 @@ requirements:
     date_written: '2026-10-31'
     story: As a data team leader glancing at the daily asset, I want a weekly dataset's tile and its quiet days to say 'Weekly' and which day, so that six quiet days a week read as expected rather than as something missing.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48535,9 +48535,22 @@ requirements:
     - REQ-PIPE-346
     - REQ-DASH-182
     - REQ-DASH-359
+    linked_tests:
+    - tests-js/weekday-labels.test.js
+    - tests/test_weekday_participation.py
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::weekdayCycleWord
+    - dashboard/qa-reporting-dashboard.template.html::cadenceLabel
+    - dashboard/qa-reporting-dashboard.template.html::owedNothingLabel
+    - pipeline/owed_nothing.py::for_dataset
+    - pipeline/owed_nothing.py::sla_timeline
+    evidence:
+    - '2026-11-18: tests-js/weekday-labels.test.js covers each label form of criterion 1 and passes; tests/test_weekday_participation.py''s build half (the SLA versions carry the weekdays and the reason once; a day owed nothing carries weekdays, never months) passes. Criterion 4''s real-browser test, TestAWeeklyDatasetsQuietDays, passed against the daily database bootstrapped from empty with Mental Health the same day (419s), among the period and weekly browser tests run together (68 passed; the 2 failures were period-link tests since fixed, REQ-DASH-367).'
     decisions:
     - WORDING FOLLOWS REQ-DASH-182 CRITERION 8'S FREQUENCY WORDS (delivery-scoper; SETTLED by Keith 2026-11-01 with v4), with 'Weekdays' for Monday to Friday (UX NIT) rather than '5 days a week'.
     - 'THE PERIOD VIEW AND THIS ROW AGREE (UX SHOULD, the 356/347 clash): on a not-owed day the composition table''s kind is ''Inherited from <Monday>'' and its sub-line is this requirement''s ''Not owed — it supplies only on Mondays'' (REQ-DASH-356 criterion 8). One sentence, two places.'
+    - 'WEEKDAYS UNDER THEIR OWN KEY (built 2026-11-18): an owed-nothing row and an SLA version carry weekdays (Monday 0) beside months, never months holding day numbers, so a reader that knows only months reads nothing rather than the wrong thing.'
     open_questions: []
   - id: REQ-QAC-348
     title: The quarterly asset gains Department of Health's Cancer collection, one annual dataset owed in the August round through participates as built, with its contract and checks
@@ -51509,6 +51522,7 @@ requirements:
     - 'REQ-PIPE-250''s TITLE IS STALE (architect, non-blocking): it says ''all three collections'', which predates the asset split; a retitle to ''each asset''s bootstrap from empty'' is a register edit to an in-progress requirement and goes to Keith as wording before it is made - not made by this requirement.'
     - 'BUILT WITH CRITERION 3 OPEN (2026-11-18): the measurement this requirement owns is the sandbox''s; criterion 3 cites CI''s, which a push does not produce since REQ-TEST-375. Left unmet rather than starting a 145-minute run for one number.'
     - 'THE AFTER FIGURES WERE TAKEN UNDER LOAD, AND SAY SO (Keith, 2026-11-18, the post-build functional critic): another worktree was running tests and py-spy was profiling the run, so criterion 1''s ''nothing else running'' did not hold. The figures stay as an upper bound, bootstrap.yaml''s header says how they were taken, and the next quiet from-empty bootstrap replaces them. Criterion 1''s per-tool shares are given as thread-seconds and ''negligible'' rather than shares of the replay. REJECTED re-measuring before anything else moved.'
+    - 'REPLACED BY A QUIET RUN THE SAME DAY (2026-11-18): each asset reset and bootstrapped from empty with nothing else running and no profiler - quarterly 1620s (commit 5235b8a4), daily 419s (427ee38c) - and those are the figures bootstrap.yaml carries now. They include group C''s new collections (Cancer, Mental Health), so they are not a like-for-like comparison with the 1413s/375s run; docs/suite-timings.md logs both.'
     open_questions: []
     signed_off:
       by: Keith
