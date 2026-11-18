@@ -223,6 +223,10 @@ HISTORY_END = "end of the history"
 #: wherever the anchor has moved it - TS-57b to TS-61b show what the replay's
 #: confirmation recorded there.
 LAST_DAY = "last day"
+#: THE PLACEMENT PERIOD'S DUE INSTANT as a link's bounding event (TS-116): a
+#: supply that never comes has no arrival and, nobody deciding, no decision -
+#: the moment from which its gap reads 'No supply' is the slot's due time.
+SLOT_DUE = "slot due"
 _CORRECTION = "correction "
 
 
@@ -917,6 +921,10 @@ def link_dates(injection: Injection, placement: Placement,
                                f"name one of 0 to {len(supplies) - 1}")
         if ref == HISTORY_END:
             return ref, asset_time.start_of_day(_history_last_day() + timedelta(days=1)), None
+        if ref == SLOT_DUE:
+            at = scripted_decisions.due_at(placement.dataset, placement.period)
+            return ref, at, (None if at is not None else
+                             f"{placement.dataset} has no slot for {placement.period}")
         if ref.startswith(_CORRECTION):
             reference = ref[len(_CORRECTION):]
             on = _correction_date(reference)
@@ -3025,6 +3033,9 @@ INJECTIONS: tuple[Injection, ...] = (
         anchor=-1,
         config="daily, Mental Health Service Contacts owed on Mondays only (participates [Monday]), due 10:00 with 2 hours' grace, files_go_to_period 0. This Monday's supply never comes; nobody decides anything about it.",
         suppress=(0,),
+        # NOTHING ARRIVES AND NOBODY DECIDES: the link lands on the history's
+        # last day, after the Monday was due, where its gap reads 'No supply'.
+        links=(Link("TS-116", LAST_DAY, SLOT_DUE, HISTORY_END),),
     ),
     Injection(
         scenario_id="TS-117",

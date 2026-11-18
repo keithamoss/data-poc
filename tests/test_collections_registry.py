@@ -51,9 +51,10 @@ class TestTheRegistry:
                            ("emergency-department", "ed", "ed_run_")]
 
     @pytest.mark.asset("daily")
-    def test_the_daily_assets_one_collection_is_birth_registrations(self):
+    def test_the_daily_assets_collections_are_birth_registrations_and_mental_health(self):
         got = [(c.id, c.short, c.run_prefix) for c in declared_collections.all_collections()]
-        assert got == [("civil-registration", "bdm", "run_")]
+        # Mental Health joined it 2026-11-18 (REQ-QAC-350).
+        assert got == [("civil-registration", "bdm", "run_"), ("mental-health", "mh", "mh_run_")]
         assert declared_collections.by_short("bdm").id == "civil-registration"
         assert declared_collections.by_run_prefix("run_").id == "civil-registration"
         assert declared_collections.dataset("birth-registrations").table == "birth_registrations"

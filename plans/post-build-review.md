@@ -16917,6 +16917,16 @@ twice. It deliberately did not re-find the `TypeError`.
        build refused a collection with no data - it now copies Birth
        Registrations' collection alone, generically, removing every other
        collection's files.
+     - **And in chunks 11 and 12**: the cache allowlist's per-provider
+       `_postcodes` entries named a collection in product code, which the
+       collections literal gate refuses - one `assets/*/synthetic/
+       collections/*.py` pattern now covers every provider's; the registry
+       test named the daily asset's one collection (it lists both now); and
+       TS-116, a suppress-only scenario, had no link to what is in place, as
+       #290's rule requires. Nothing arrives and nobody decides, so no
+       existing link event fitted: a new one, SLOT_DUE (the placement
+       period's due instant), lets its link land on the history's last day,
+       where the missed Monday reads 'No supply'.
 
 480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
      `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`

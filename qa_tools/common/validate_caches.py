@@ -91,11 +91,9 @@ ALLOWLIST: dict[tuple[str, str], str] = {
         "drawn from GROWN_QUARTERS and a fixed seed; reads no file",
     ("assets/*/synthetic/collections/civil_registration.py", "run_plan"):
         "drawn from N_DELIVERIES and a fixed seed; reads no file",
-    ("assets/*/synthetic/collections/emergency_department.py", "_postcodes"):
-        "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
-    ("assets/*/synthetic/collections/cancer.py", "_postcodes"):
-        "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
-    ("assets/*/synthetic/collections/mental_health.py", "_postcodes"):
+    # ANY PROVIDER'S, BY PATTERN, naming no collection (REQ-PIPE-240's literal
+    # gate): Emergency Department's, Cancer's and Mental Health's alike.
+    ("assets/*/synthetic/collections/*.py", "_postcodes"):
         "the postcodes of generator/names_au.py's SUBURBS constant; reads no file",
 }
 
