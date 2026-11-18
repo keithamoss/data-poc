@@ -3846,9 +3846,39 @@ function noDataDataset(id, name, provider, deliveryFormat, sla){
 // criterion 5), as at the date on show: each clipped to that date, or a
 // no-data tile where it has nothing yet - a collection with no recorded
 // runs included (criterion 6).
-function buildCollectionDatasets(collectionId, inPlaceOnDateStr){
+// THE SUPPLY A CHOSEN PERIOD HOLDS (REQ-DASH-356 criteria 1 to 3): REQ-DASH-
+// 209's own lookup over the slot timeline names it - Promoted, Inherited or
+// Substituted - and the dataset is clipped to it as the date clips to the
+// newest, so its checks, the reads of it and its status are that supply's as
+// recorded by the end of the date on show. A period holding nothing gives no
+// supply, and its row says why.
+function clipDatasetToPeriod(d, period, dateStr){
+  const row = compositionRow(d, period, dateStr);
+  if(!HELD_KINDS.has(row.kind)) return {row, clipped: null};
+  const holderId = row.entry && row.entry.holder_run_id;
+  const holder = (d.runs || []).find(r=> r.run_id === holderId);
+  if(!holder) return {row, clipped: null};
+  const ms = r=> { const t = Date.parse(r.received_at || r.run_date); return Number.isNaN(t) ? 0 : t; };
+  // THE HOLDER IS THE NEWEST RUN LEFT, so it is the supply on show; the runs
+  // before it stay, for the comparisons a page draws against the previous.
+  const runs = d.runs.filter(r=> r.run_id === holderId || ms(r) < ms(holder));
+  const clipped = clipDatasetToInPlaceOn({...d, runs}, dateStr);
+  // NEVER STALE: the supply is the period's by construction, however old.
+  if(clipped) clipped.staleInPlaceOn = false;
+  return {row, clipped};
+}
+function buildCollectionDatasets(collectionId, inPlaceOnDateStr, period = null){
   const entry = COLLECTION_DATA && COLLECTION_DATA[collectionId];
   if(!entry) return [];
+  if(period){
+    return (entry.datasets || []).map(d => {
+      const {row, clipped} = clipDatasetToPeriod(d, period, inPlaceOnDateStr);
+      const built = clipped ? buildRealDataset(clipped)
+        : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
+           closedSlots: d.closedSlots || []};
+      return {...built, periodHeld: row};
+    });
+  }
   return (entry.datasets || []).map(d => {
     const clipped = clipDatasetToInPlaceOn(d, inPlaceOnDateStr);
     return clipped ? buildRealDataset(clipped)
@@ -4270,13 +4300,13 @@ const AGENCY_BLURB = {};
 // per date (REQ-DASH-226 NFR 6). Without it every Child Protection dataset
 // asked for rebuilt all six. Never shared between dates or builds, because
 // buildDatasetsOn() marks statuses onto the objects it is handed.
-function datasetTile(datasetId, inPlaceOnDateStr, cache){
+function datasetTile(datasetId, inPlaceOnDateStr, cache, period = null){
   const found = realDatasetIndex()[datasetId];
   if(!found) return null;
-  const key = "collection:" + found.collectionId;
+  const key = "collection:" + found.collectionId + (period ? "@" + period : "");
   let built = cache && cache[key];
   if(!built){
-    built = buildCollectionDatasets(found.collectionId, inPlaceOnDateStr);
+    built = buildCollectionDatasets(found.collectionId, inPlaceOnDateStr, period);
     if(cache) cache[key] = built;
   }
   return built.find(d => d.id === datasetId) || null;
@@ -4287,7 +4317,7 @@ function datasetTile(datasetId, inPlaceOnDateStr, cache){
 // lifted out so that the agency cards' and collection headings' counts and
 // weekly trends judge a dataset by exactly the code its pill does. The group
 // rollups stay in buildData().
-function buildDatasetsOn(inPlaceOnDateStr){
+function buildDatasetsOn(inPlaceOnDateStr, period = null){
   const tiles = {};
   const agencies = ((HIERARCHY && HIERARCHY.agencies) || []).map(ag => ({
     id: ag.id,
@@ -4297,7 +4327,7 @@ function buildDatasetsOn(inPlaceOnDateStr){
       id: col.id,
       name: col.name,
       datasets: (col.datasets || []).map(d =>
-        datasetTile(d.id, inPlaceOnDateStr, tiles)
+        datasetTile(d.id, inPlaceOnDateStr, tiles, period)
         || noDataDataset(d.id, d.name, "", "", null)),
     })),
   }));
@@ -4403,7 +4433,10 @@ function markTurnOffs(data, inPlaceOnDateStr){
   return data;
 }
 function buildData(inPlaceOnDateStr){
-  const data = buildDatasetsOn(inPlaceOnDateStr);
+  // UNDER A CHOSEN PERIOD (REQ-DASH-356), each dataset is the supply that
+  // period holds; with none, as before.
+  const data = buildDatasetsOn(inPlaceOnDateStr,
+    typeof CURRENT_PERIOD !== "undefined" ? CURRENT_PERIOD : null);
   markTurnOffs(data, inPlaceOnDateStr);
   data.agencies.forEach(ag=>{
     ag.collections.forEach(col=>{ col.status = rollup(col.datasets); });
@@ -7573,7 +7606,11 @@ function renderTier(view, done){
                                                                : renderNotFound(view, "Page", "scenarios"));
   if(STATE.tier==="feedback") return done(renderFeedback(view));
   if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
-  if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
+  if(STATE.tier==="dataset"){
+    const r = renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
+    periodDatasetHeading(view);
+    return done(r);
+  }
   if(STATE.tier==="period") return done(renderPeriod(view, STATE.agencyId, STATE.collectionId, STATE.period));
 }
 
@@ -8835,7 +8872,95 @@ function renderExec(view){
     <div class="grid" id="agency-grid"></div>
   `;
   const grid = document.getElementById("agency-grid");
-  grid.innerHTML = DATA.agencies.map(ag=>{
+  // UNDER A CHOSEN PERIOD, TWO SECTIONS (REQ-DASH-356 criteria 4 and 5).
+  if(CURRENT_PERIOD){
+    grid.outerHTML = periodSectionsOf(DATA.agencies).map(s=> `<section data-period-section="${s.key}">
+        <h3 class="section-heading" style="margin:18px 0 10px;">${escHtml(s.heading)}</h3>
+        <div class="grid">${s.agencies.map(agencyCardHtml).join("")}</div></section>`).join("");
+    view.querySelectorAll("[data-period-section] .grid").forEach(g=>{ wireCards(g); fillDatasetsTrends(g); });
+    return;
+  }
+  grid.innerHTML = DATA.agencies.map(agencyCardHtml).join("");
+  wireCards(grid);
+  fillDatasetsTrends(grid);
+}
+// WHICH SECTION A COLLECTION IS IN (REQ-DASH-356 criterion 4): a derived
+// release - its datasets declare linked_datasets, which the embed marks - or a
+// source supply. Never a name written here.
+// WHAT A DATASET'S PAGE SHOWS UNDER A CHOSEN PERIOD (REQ-DASH-356 criterion
+// 1): headed 'For <P> · results recorded by <date>', with what the period
+// holds - Promoted, Inherited from <period>, Substituted from <period>, Not
+// supplied or Not owed - beneath the dataset's own heading.
+function periodHoldsWords(row){
+  if(!row) return "";
+  if(row.kind === "promoted") return "Promoted";
+  if(row.kind === "inherited" || row.kind === "substituted"){
+    return `${COMPOSITION_WORD[row.kind]}${row.from ? ` from ${periodWords(row.from)}` : ""}`;
+  }
+  if(row.kind === "notowed") return row.label;
+  return row.word || COMPOSITION_WORD[row.kind] || "";
+}
+function periodDatasetHeading(view){
+  if(!CURRENT_PERIOD) return;
+  const ag = DATA.agencies.find(a=> a.id === STATE.agencyId);
+  const col = ag && ag.collections.find(c=> c.id === STATE.collectionId);
+  const ds = col && col.datasets.find(d=> d.id === STATE.datasetId);
+  if(!ds || !ds.periodHeld) return;
+  const head = view.querySelector(".view-head");
+  if(!head) return;
+  const holds = periodHoldsWords(ds.periodHeld);
+  const sub = ds.periodHeld.owedLabel ? ` <span style="color:var(--ink-faint);">· ${escHtml(ds.periodHeld.owedLabel)}</span>` : "";
+  head.insertAdjacentHTML("afterend", `<div class="view-sub" data-period-heading style="margin:-6px 0 14px;">
+    <b>For ${escHtml(periodWords(CURRENT_PERIOD))} · results recorded by ${fmtDay(CURRENT_IN_PLACE_ON)}</b>
+    — <span data-period-holds>${escHtml(holds)}</span>${sub}</div>`);
+}
+// PREVIOUS AND NEXT PERIOD (REQ-DASH-367 criterion 2): real links, so a
+// middle-click opens a new tab, each setting the period by replacing the
+// history entry when clicked; one is left out, never disabled, where there is
+// no earlier period or the next had not opened for any of the agency's
+// collections by the date on show.
+function periodStepsHtml(ag){
+  const seq = baselinePeriods();
+  const at = seq.findIndex(p=> p.period === CURRENT_PERIOD);
+  if(at < 0) return "";
+  const daily = isDailyBaseline();
+  const prev = at > 0 ? seq[at - 1] : null;
+  const after = at + 1 < seq.length ? seq[at + 1] : null;
+  const next = after && ag.collections.some(c=> periodOpenedOn(c, after, CURRENT_IN_PLACE_ON)) ? after : null;
+  const link = (p, which)=>{
+    const url = new URL(navUrl(), location.href);
+    url.searchParams.set(PERIOD_PARAM, p.period);
+    const label = daily ? `${which} day: ${fmtDay(p.period)}` : `${which} period: ${periodWords(p.period)}`;
+    return `<a href="${escAttr(url.pathname + url.search + url.hash)}" data-period-step="${escAttr(p.period)}">${escHtml(label)}</a>`;
+  };
+  if(!prev && !next) return "";
+  return `<nav class="promo-actions" aria-label="Periods" data-period-steps style="margin:0 0 12px;">${prev ? link(prev, "Previous") : ""} ${next ? link(next, "Next") : ""}</nav>`;
+}
+function collectionIsDerived(collectionId){
+  for(const ag of (HIERARCHY && HIERARCHY.agencies) || []){
+    const col = (ag.collections || []).find(c=> c.id === collectionId);
+    if(col) return !!col.derived;
+  }
+  return false;
+}
+// THE TWO SECTIONS, each agency in each it has collections for, its status
+// rolled up from that section's collections alone; an empty section is left
+// out with its heading (criterion 5).
+function periodSectionsOf(agencies){
+  const name = periodWords(CURRENT_PERIOD);
+  const split = derived => agencies.map(ag=>{
+    const cols = ag.collections.filter(c=> collectionIsDerived(c.id) === derived);
+    return cols.length ? {...ag, collections: cols,
+      status: rollupStatuses(cols.map(c=> c.status))} : null;
+  }).filter(Boolean);
+  const source = split(false), derived = split(true);
+  const derivedNames = [...new Set(derived.flatMap(ag=> ag.collections.map(c=> c.name)))];
+  return [
+    {key: "source", heading: `Source supplies for ${name}`, agencies: source},
+    {key: "derived", heading: `${joinNames(derivedNames)} for ${name}`, agencies: derived},
+  ].filter(s=> s.agencies.length);
+}
+function agencyCardHtml(ag){
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     // REQ-DASH-226: how many of the agency's counted datasets are not
     // green, then the weekly red and amber trend (drawn after first paint).
@@ -8856,9 +8981,6 @@ function renderExec(view){
       ${acceptedGapsMarker(ag.acceptedCount)}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </a>`;
-  }).join("");
-  wireCards(grid);
-  fillDatasetsTrends(grid);
 }
 
 // A URL POINTING AT SOMETHING THAT NO LONGER EXISTS is an ordinary
@@ -8916,9 +9038,28 @@ function renderAgency(view, agencyId){
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
     ${outstandingQueue("agency", ag.id)}
+    ${CURRENT_PERIOD ? periodStepsHtml(ag) : ""}
     <div id="collections"></div>
   `;
   const wrap = document.getElementById("collections");
+  // UNDER A CHOSEN PERIOD (REQ-DASH-367 criterion 1, REQ-DASH-356 criteria 4
+  // and 5): each collection's composition table for the period, in the two
+  // sections, each rolled up on its own.
+  if(CURRENT_PERIOD){
+    wrap.innerHTML = periodSectionsOf([ag]).map(s=> `<section data-period-section="${s.key}">
+        <h3 class="section-heading" style="margin:18px 0 10px;">${escHtml(s.heading)} <span style="font-weight:400;">${pill(s.agencies[0].status, "sm")}</span></h3>
+        ${s.agencies[0].collections.map(col=> `<div class="collection-block" data-collection-panel="${escAttr(col.id)}">
+          <div class="collection-title"><h3>${escHtml(col.name)}</h3>${pill(col.status,"sm")}</div>
+          ${compositionPanelHtml(ag, col, CURRENT_PERIOD, CURRENT_IN_PLACE_ON)}
+        </div>`).join("")}</section>`).join("");
+    wireNavLinks(view);
+    view.querySelectorAll("[data-period-step]").forEach(a=> a.addEventListener("click", e=>{
+      if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      applyPeriod(a.dataset.periodStep);
+    }));
+    return;
+  }
   // A BROKEN COLLECTION SAYS SO WHERE ITS TABLE WOULD BE (#268 (g)), pointing
   // at the one notice above rather than repeating it.
   wrap.innerHTML = ag.collections.map(col=> collectionBroken(col.id) ? `
@@ -10283,6 +10424,7 @@ function acknowledgementOn(raw, runId, dateStr){
 }
 function compositionRow(raw, period, dateStr){
   const e = newestOnOrBefore(raw && raw.slotTimeline, dateStr, x=> x.slot === period);
+  const owedEntry = ((raw && raw.owedNothing) || []).find(x=> x.period === period);
   if(e && HELD_KINDS.has(e.held_as)){
     const runId = e.holder_run_id || null;
     const run = runId ? ((raw.runs || []).find(r=> r.run_id === runId) || null) : null;
@@ -10290,9 +10432,12 @@ function compositionRow(raw, period, dateStr){
     return {kind: e.held_as, from: e.held_as === "promoted" ? null : (e.stands_on || null),
             entry: e, receivedAt: run ? run.received_at : null,
             promotedOn: health ? health.promotedOn : null,
-            ack: acknowledgementOn(raw, runId, dateStr)};
+            ack: acknowledgementOn(raw, runId, dateStr),
+            // WHY IT STANDS ON ANOTHER PERIOD, beneath it (REQ-DASH-356
+            // criterion 8): 'Not owed — it supplies only on Mondays'.
+            owedLabel: owedEntry ? owedNothingLabel(owedEntry).label : null};
   }
-  const owed = ((raw && raw.owedNothing) || []).find(x=> x.period === period);
+  const owed = owedEntry;
   if(owed){
     const words = owedNothingLabel(owed);
     return {kind: "notowed", word: words.word, label: words.label};
@@ -10342,7 +10487,8 @@ function compositionCells(ag, col, row){
   const ack = !row.ack ? ""
     : row.ack.given ? `Acknowledged by ${escHtml(row.ack.actor || "")}, ${fmtInstant(row.ack.at)}`
     : "Not acknowledged";
-  return `<td><b>${COMPOSITION_WORD[row.kind]}</b>${from}</td>
+  const why = row.owedLabel ? `<div style="color:var(--ink-faint); font-size:12px;" data-owed-nothing-sub>${escHtml(row.owedLabel)}</div>` : "";
+  return `<td><b>${COMPOSITION_WORD[row.kind]}</b>${from}${why}</td>
       <td>${row.receivedAt ? fmtInstant(row.receivedAt) : ""}</td>
       <td>${fmtInstant(e.at)}</td>
       <td>${who}</td>
@@ -10368,26 +10514,15 @@ function periodOpenedOn(col, p, dateStr){
   }
   return slotted ? false : p.date <= dateStr;
 }
-function compositionHtml(ag, col, period, dateStr){
-  const seq = collectionPeriods(col);
-  const at = seq.findIndex(p=> p.period === period);
-  const name = fmtPeriodName(period) || fmtPeriodOrDay(period);
-  const daily = /^\d{4}-\d{2}-\d{2}$/.test(period);
-  const prev = at > 0 ? seq[at - 1] : null;
-  const next = at >= 0 && at + 1 < seq.length && periodOpenedOn(col, seq[at + 1], dateStr) ? seq[at + 1] : null;
-  const step = (p, which)=> {
-    const label = daily ? `${which} day: ${fmtDay(p.period)}` : `${which} period: ${fmtPeriodName(p.period) || p.period}`;
-    return periodLinkHtml(ag.id, col.id, p.period, escHtml(label)).replace("data-period-link", `data-period-link data-period-${which === "Previous" ? "prev" : "next"}`);
-  };
-  const title = `${col.name} · ${name}`;
-  const sub = `What each dataset held at the end of ${fmtDay(dateStr)}`;
-  const head = `<div class="view-head"><div>
-      <h2>${escHtml(title)}</h2>
-      <div class="view-sub">${escHtml(sub)}</div>
-      <div class="promo-actions">${prev ? step(prev, "Previous") : ""} ${next ? step(next, "Next") : ""}</div>
-    </div></div>`;
-  if(at >= 0 && !periodOpenedOn(col, seq[at], dateStr)){
-    return head + `<p data-not-opened>${escHtml(name)} had not opened by ${fmtDay(dateStr)}.</p>`;
+// A COLLECTION'S PANEL ON THE AGENCY PAGE UNDER A CHOSEN PERIOD (REQ-DASH-367
+// criterion 1): REQ-DASH-209's composition table for that collection and the
+// period, captioned; or, before the period opened for it, a line saying so in
+// its own panel (REQ-DASH-355 criterion 9), every other collection as it is.
+function compositionPanelHtml(ag, col, period, dateStr){
+  const p = baselinePeriod(period) || collectionPeriods(col).find(x=> x.period === period) || null;
+  const name = periodWords(period);
+  if(p && !periodOpenedOn(col, p, dateStr)){
+    return `<p data-not-opened>${escHtml(name)} had not opened by ${fmtDay(dateStr)}.</p>`;
   }
   const rows = (col.datasets || []).map(ds=> ({ds, row: compositionRow(rawRealDatasetById(ds.id), period, dateStr)}))
     .sort((a, b)=> COMPOSITION_KINDS.indexOf(a.row.kind) - COMPOSITION_KINDS.indexOf(b.row.kind)
@@ -10397,10 +10532,11 @@ function compositionHtml(ag, col, period, dateStr){
     + counts.map(([k, n])=> `${n} ${COMPOSITION_WORD[k].toLowerCase()}`).join(", ");
   const nothing = !rows.some(r=> HELD_KINDS.has(r.row.kind))
     ? `<p data-nothing-held>No dataset of ${escHtml(col.name)} held anything in ${escHtml(name)} at the end of ${fmtDay(dateStr)}.</p>` : "";
-  return head + `<p data-composition-count>${escHtml(count)}</p>${nothing}
+  const caption = `${col.name} · ${name} — what each dataset held at the end of ${fmtDay(dateStr)}`;
+  return `<p data-composition-count>${escHtml(count)}</p>${nothing}
     <div class="overflow-x" data-testid="period-composition">
     <table class="dataset-table static-rows">
-      <caption class="sr-only">${escHtml(title)} — ${escHtml(sub.charAt(0).toLowerCase() + sub.slice(1))}</caption>
+      <caption id="composition-caption-${escAttr(col.id)}" tabindex="-1" style="text-align:left; font-size:12.5px; color:var(--ink-muted); padding:0 0 6px;">${escHtml(caption)}</caption>
       <thead><tr><th>Dataset</th><th>Holds</th><th>Received</th><th>Decided</th><th>Who decided</th><th>Reason</th><th>Status when promoted</th><th>Acknowledgement</th></tr></thead>
       <tbody>${rows.map(({ds, row})=>{
         const nav = {tier:"dataset", agencyId: ag.id, collectionId: col.id, datasetId: ds.id};
@@ -10410,20 +10546,33 @@ function compositionHtml(ag, col, period, dateStr){
       }).join("")}</tbody>
     </table></div>`;
 }
+// THE RETIRED PERIOD ROUTE (REQ-DASH-367 criteria 3 to 5): the agency page
+// with the period set, the history entry replaced and every other parameter
+// kept, that collection's panel brought into view and its caption focused.
+// An agency or collection the page does not hold is the not-found page; a
+// period the baseline does not hold, the agency page with criterion 8's notice.
 function renderPeriod(view, agencyId, collectionId, period){
   const ag = DATA.agencies.find(a=> a.id === agencyId);
   if(!ag) return renderNotFound(view, "Agency", agencyId);
   const col = (ag.collections || []).find(c=> c.id === collectionId);
   if(!col) return renderNotFound(view, "Collection", collectionId);
-  if(!collectionPeriods(col).some(p=> p.period === period)) return renderNotFound(view, "Period", period);
-  const name = fmtPeriodName(period) || fmtPeriodOrDay(period);
-  setRail([
-    {tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}},
-    {tier:"Tier 2", label:escHtml(ag.name), nav:{tier:"agency", agencyId}},
-    {tier:"Tier 3", label:escHtml(col.name), nav:{tier:"agency", agencyId}},
-    {tier:"Tier 4", label:escHtml(name), nav:periodNav(agencyId, collectionId, period)},
-  ]);
-  view.innerHTML = compositionHtml(ag, col, period, CURRENT_IN_PLACE_ON);
+  STATE = {tier: "agency", agencyId};
+  const url = new URL(location.href);
+  url.searchParams.set(PERIOD_PARAM, String(period));
+  history.replaceState(STATE, "", url.pathname + url.search + stateToHash(STATE));
+  readPeriodFromUrl();
+  DATA = buildData(CURRENT_IN_PLACE_ON);
+  updatePeriodButtonLabel();
+  updateInPlaceOnButtonLabel();
+  renderInPlaceOnPastNotice();
+  renderAgency(view, agencyId);
+  const caption = document.getElementById(`composition-caption-${col.id}`);
+  const panel = view.querySelector(`[data-collection-panel="${CSS.escape(col.id)}"]`);
+  const target = caption || panel;
+  if(target){
+    if(target.scrollIntoView) target.scrollIntoView({block: "start"});
+    if(caption) caption.focus({preventScroll: true});
+  }
 }
 
 function renderDataset(view, agencyId, collectionId, datasetId){
@@ -13489,6 +13638,7 @@ function announcePeriod(){
 function applyPeriod(name){
   CURRENT_PERIOD = name && baselinePeriod(name) ? name : null;
   setPeriodInUrl(CURRENT_PERIOD);
+  DATA = buildData(CURRENT_IN_PLACE_ON);
   updatePeriodButtonLabel();
   updateInPlaceOnButtonLabel();
   closePeriodPanel();
@@ -13562,6 +13712,7 @@ function readPeriodFromUrl(){
   }
 }
 readPeriodFromUrl();
+if(CURRENT_PERIOD) DATA = buildData(CURRENT_IN_PLACE_ON);
 updatePeriodButtonLabel();
 
 document.getElementById("backdrop").addEventListener("click", closeDrawer);

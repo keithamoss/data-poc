@@ -673,6 +673,33 @@ def allowed_value_problems() -> list[str]:
     return problems
 
 
+def mixed_linked_problems() -> list[str]:
+    """A collection whose datasets declare linked_datasets holds no dataset
+    that does not (REQ-DASH-356 criterion 6): the period view's sections
+    split the agencies list on it, so a collection holding both would sit
+    under a heading that misdescribes it. Names the collection and both."""
+    from asset_model import hierarchy
+
+    try:
+        entries = hierarchy.all_datasets()
+    except ValueError:
+        return []
+    by_collection: dict[str, list] = {}
+    for e in entries:
+        by_collection.setdefault(e.collection_id, []).append(e)
+    problems = []
+    for cid, members in sorted(by_collection.items()):
+        linked = [e.dataset_id for e in members if e.linked]
+        source = [e.dataset_id for e in members if not e.linked]
+        if linked and source:
+            problems.append(
+                f"collection {cid!r} holds datasets that declare linked_datasets "
+                f"({', '.join(linked)}) and datasets that do not ({', '.join(source)}) - a "
+                f"collection is all source supplies or all derived releases, so move one "
+                f"side into a collection of its own.")
+    return problems
+
+
 def singular_home_problems() -> list[str]:
     """Every singular dbt test a collection's schema declares under
     `data_tests:` has a home table in its adapter's DbtSpec.singular_home,
@@ -721,7 +748,7 @@ def main() -> int:
     from asset_model import file_check_definitions
 
     problems = (config_problems() + check_file_problems() + allowed_value_problems()
-                + singular_home_problems()
+                + singular_home_problems() + mixed_linked_problems()
                 + file_check_definitions.problems() + literal_problems()
                 + presentation_problems() + linked_datasets.problems() + run_reads.declaration_problems()
                 + set_member_checks.problems())

@@ -72,7 +72,7 @@ describe("each dataset's row, looked up as at the date on show (criteria 1 and 2
 describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
   const view = (w, date = "2026-03-01", period = "2026-Q1")=>{
     const div = w.document.createElement("div");
-    div.innerHTML = w.compositionHtml(w.eval("DATA.agencies[0]"), COL, period, date);
+    div.innerHTML = w.compositionPanelHtml(w.eval("DATA.agencies[0]"), COL, period, date);
     return div;
   };
 
@@ -113,23 +113,39 @@ describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
     expect(hrefs.some(h => h.includes("/period/2025-Q4"))).toBe(true);
   });
 
-  it("heads the view and captions the table", () => {
+  it("captions the table with the collection, the period and the date (REQ-DASH-367 criterion 1)", () => {
     const w = load();
     const div = view(w);
-    expect(div.querySelector("h2").textContent).toBe("Child Protection · 2026-Q1");
-    expect(div.querySelector(".view-sub").textContent).toContain("What each dataset held at the end of");
-    expect(div.querySelector("caption")).not.toBeNull();
+    expect(div.querySelector("caption").textContent).toBe(
+      `Child Protection · 2026-Q1 — what each dataset held at the end of ${w.fmtDay("2026-03-01")}`);
   });
 
-  it("links the previous period, and the next only once it had opened", () => {
+  it("says beneath an inherited row why it stands on another period (REQ-DASH-356 criterion 8)", () => {
     const w = load();
-    let div = view(w);
-    expect(div.querySelector("[data-period-prev]").textContent).toContain("Previous period: 2025-Q4");
-    expect(div.querySelector("[data-period-next]")).toBeNull();
-    div = view(w, "2026-06-01");
-    expect(div.querySelector("[data-period-next]").textContent).toContain("Next period: 2026-Q2");
-    div = view(w, "2026-03-01", "2025-Q4");
-    expect(div.querySelector("[data-period-prev]")).toBeNull();
+    const row = view(w).querySelector('tr[data-kind="inherited"]');
+    expect(row.querySelector("[data-owed-nothing-sub]").textContent)
+      .toBe("Not owed — it supplies only in the November rounds");
+  });
+
+  it("links the previous period, and the next only once it had opened (REQ-DASH-367 criterion 2)", () => {
+    const w = load();
+    w.baselinePeriods = () => Q;
+    const steps = (date, period) => {
+      w.eval(`CURRENT_PERIOD = ${JSON.stringify(period)}; CURRENT_IN_PLACE_ON = ${JSON.stringify(date)};`);
+      const div = w.document.createElement("div");
+      div.innerHTML = w.periodStepsHtml(w.eval("DATA.agencies[0]"));
+      return div;
+    };
+    let div = steps("2026-03-01", "2026-Q1");
+    const prev = div.querySelector('[data-period-step="2025-Q4"]');
+    expect(prev.textContent).toBe("Previous period: 2025-Q4");
+    expect(prev.getAttribute("href")).toContain("period=2025-Q4");
+    expect(div.querySelector('[data-period-step="2026-Q2"]')).toBeNull();
+    div = steps("2026-06-01", "2026-Q1");
+    expect(div.querySelector('[data-period-step="2026-Q2"]').textContent).toBe("Next period: 2026-Q2");
+    div = steps("2026-03-01", "2025-Q4");
+    expect(div.querySelector('[data-period-step="2025-Q4"]')).toBeNull();
+    expect(div.textContent).not.toContain("Previous");
   });
 
   it("says a period had not opened by the date, in place of the rows", () => {
@@ -207,10 +223,10 @@ describe("post-build-review #204 - the rows that hold nothing", () => {
   it("F3: a not-owed row says its word once", () => {
     const w = load();
     const div = w.document.createElement("div");
-    div.innerHTML = w.compositionHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
+    div.innerHTML = w.compositionPanelHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
     const inherited = {...RAW.inherited, slotTimeline: []};
     w.rawRealDatasetById = id => (id === "inherited" ? inherited : RAW[id] || null);
-    div.innerHTML = w.compositionHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
+    div.innerHTML = w.compositionPanelHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
     const text = div.querySelector('tr[data-dataset="inherited"]').textContent.replace(/\s+/g, " ");
     expect(text).toContain("Not owed");
     expect(text).not.toMatch(/Not owed\W+Not owed/);

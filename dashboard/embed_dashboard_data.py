@@ -500,6 +500,11 @@ def embed() -> None:
             col = {"id": entry.collection_id, "name": entry.collection_name, "datasets": []}
             ag["collections"].append(col)
         col["datasets"].append({"id": entry.dataset_id, "name": entry.dataset_name})
+        # A DERIVED RELEASE (REQ-DASH-356 criterion 4): a collection whose
+        # datasets declare linked_datasets, from configuration - the period
+        # view's second section, never a name written in code.
+        if entry.linked:
+            col["derived"] = True
     html = _replace_const(html, "HIERARCHY", json.dumps(tree, separators=(",", ":")))
 
     # ASSET_TIMEZONES - REQ-PIPE-048, versioned by REQ-PIPE-112. So the page
