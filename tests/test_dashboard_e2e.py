@@ -6562,11 +6562,13 @@ class TestEveryScenarioJumpLands:
 
 @pytest.mark.shared_page
 class TestThePeriodComposition:
-    """REQ-DASH-209 on the real bootstrapped build: the view's rows agree with
-    the period's own _manifest at the build's date, both ways (criterion 10),
-    an earlier date agrees with the decision log's as-at reader, the view is
-    reached from a dataset's supply history and lands with focus on its h2,
-    and an unknown period is the not-found page."""
+    """REQ-DASH-209 on the real bootstrapped build, its table now on the agency
+    page under a chosen period (REQ-DASH-367; criterion 7 re-points criterion
+    10's test here): the rows agree with the period's own _manifest at the
+    build's date, both ways, an earlier date agrees with the decision log's
+    as-at reader, a supply history's period link lands on the agency page with
+    the period set and focus on the table's caption, and an unknown period
+    opens the agency page with the period notice."""
 
     AGENCY, COLLECTION = "child-protection-family-support", "child-protection"
 
@@ -6651,8 +6653,8 @@ class TestThePeriodComposition:
         """REQ-DASH-209 criterion 7's last half (REQ-GEN-206 criterion 4)."""
         _scenario_chip(clean_page, built_dashboard_html, "TS-55")
         assert clean_page.locator("[data-scenario-not-found]").count() == 0
-        got = clean_page.evaluate("() => [STATE.tier, STATE.period]")
-        assert got == ["period", "2023-Q1"], got
+        got = clean_page.evaluate("() => [STATE.tier, CURRENT_PERIOD]")
+        assert got == ["agency", "2023-Q1"], got
         table = clean_page.locator('#view [data-testid="period-composition"]')
         assert table.count() == 1
         kinds = set(clean_page.evaluate(
@@ -6693,13 +6695,71 @@ class TestThePeriodComposition:
         assert link.count() == 1
         link.click()
         clean_page.wait_for_selector('#view [data-testid="period-composition"]')
-        assert "/period/" in clean_page.url
-        assert clean_page.evaluate("document.activeElement && document.activeElement.tagName") == "H2"
+        assert "/period/" not in clean_page.url and "period=" in clean_page.url
+        assert clean_page.evaluate("document.activeElement && document.activeElement.tagName") == "CAPTION"
 
-    def test_an_unknown_period_is_the_not_found_page(self, clean_page, built_dashboard_html):
+    def test_an_unknown_period_opens_the_agency_page_with_the_notice(self, clean_page,
+                                                                    built_dashboard_html):
+        """REQ-DASH-367 criterion 5, with REQ-DASH-355 criterion 8's notice."""
         self._open(clean_page, built_dashboard_html, "1999-Q9")
-        assert "Period not found" in clean_page.locator("#view h2").inner_text()
+        notice = clean_page.locator("#period-param-notice")
+        assert notice.is_visible() and "1999-Q9" in notice.inner_text()
+        assert clean_page.evaluate("() => [STATE.tier, CURRENT_PERIOD]") == ["agency", None]
         assert clean_page.locator('#view [data-testid="period-composition"]').count() == 0
+
+
+class TestTheRetiredPeriodRoute:
+    """REQ-DASH-367 criterion 7: a real retired period URL lands on the agency
+    page with the period set, the history entry replaced, the collection's
+    table in view with rows, and Back leaves the dashboard."""
+
+    AGENCY, COLLECTION = "child-protection-family-support", "child-protection"
+
+    def test_a_retired_period_url_opens_the_agency_page_with_the_period(self, clean_page,
+                                                                       built_dashboard_html):
+        clean_page.goto("about:blank")
+        period = "2025-Q3"
+        url = (built_dashboard_html.as_uri()
+               + f"?in-place-on=2026-01-15#/agency/{self.AGENCY}/collection/{self.COLLECTION}"
+               + f"/period/{period}")
+        length = clean_page.evaluate("history.length")
+        clean_page.goto(url)
+        clean_page.wait_for_selector('#view [data-testid="period-composition"] tbody tr')
+        loc = clean_page.evaluate("() => [location.hash, location.search, history.length]")
+        assert loc[0] == f"#/agency/{self.AGENCY}", loc
+        assert "period=2025-Q3" in loc[1] and "in-place-on=2026-01-15" in loc[1], loc
+        assert loc[2] == length + 1, ("the redirect added no entry of its own", loc, length)
+        caption = clean_page.locator(f"#composition-caption-{self.COLLECTION}")
+        assert caption.is_visible() and caption.evaluate("e => document.activeElement === e")
+        assert clean_page.locator(
+            f'[data-collection-panel="{self.COLLECTION}"] tbody tr').count() > 0
+        clean_page.go_back()
+        assert clean_page.url == "about:blank"
+
+
+@pytest.mark.asset("daily")  # Mental Health is the daily asset's
+class TestAWeeklyDatasetUnderAChosenDay:
+    """REQ-DASH-356 criterion 8: on the daily dashboard, with a day chosen that
+    is not a Monday, the Mental Health row reads 'Inherited from <the previous
+    Monday>' with 'Not owed — it supplies only on Mondays' beneath, and neither
+    failing nor 'No data'."""
+
+    @pytest.mark.asset("daily")
+    def test_its_row_stands_on_the_previous_monday(self, page, built_dashboard_html):
+        day = "2026-08-26"  # a Wednesday
+        _goto(page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "department-of-health"}, in_place_on="2026-09-20")
+        assert page.evaluate("(d) => new Date(d + 'T00:00:00Z').getUTCDay()", day) != 1, \
+            "precondition: the day chosen is not a Monday"
+        assert page.evaluate("() => !!rawRealDatasetById('mental-health-contacts')"), \
+            "precondition: the Mental Health dataset is on the page"
+        page.evaluate("(d) => applyPeriod(d)", day)
+        row = page.locator('tr[data-dataset="mental-health-contacts"]').first
+        text = " ".join(row.inner_text().split())
+        monday = page.evaluate("() => periodWords('2026-08-24')")
+        assert f"Inherited from {monday}" in text, text
+        assert "Not owed — it supplies only on Mondays" in text, text
+        assert "No data" not in text and "Fail" not in text.split(), text
 
 
 @pytest.mark.shared_page
