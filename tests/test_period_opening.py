@@ -362,6 +362,15 @@ class TestOweNothingQuarter:
                                                  else real_not_expected(ds, *a, **k)))
         monkeypatch.setattr(schedule, "date_of",
                             lambda name, ds=None: order.get(name) or real_date_of(name, ds))
+        # THE PREMISE, STATED (post-build-review #459): Case Workers owes Q2 and
+        # sits out Q4. Its real participation owes neither made-up quarter, so
+        # Q2 opened inherited whenever an earlier module on the worker had left
+        # a Case Workers supply to stand on - and the test passed alone only
+        # because there was none.
+        real_sits_out = inheritance._does_not_participate
+        monkeypatch.setattr(inheritance, "_does_not_participate",
+                            lambda ds, period: (False, "") if (ds, period) == (CASE_WORKERS, q2)
+                            else real_sits_out(ds, period))
 
         def assign(**kw):
             slot = q2 if kw["dataset_id"] == CASE_WORKERS else q4

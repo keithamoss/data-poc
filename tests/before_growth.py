@@ -96,8 +96,12 @@ def calendar(doc: dict) -> dict:
 
 
 def asset(doc: dict) -> dict:
-    """`doc` (a parsed data-asset.yaml) with the grown history's settings
-    versions removed, in place; returns it."""
+    """`doc` (a parsed data-asset.yaml) with its synthetic eras merged in
+    (REQ-GEN-371: the grown history's versions live in synthetic/eras.yaml)
+    and the grown history's settings versions removed; returns it."""
+    from asset_model import eras, hierarchy
+
+    doc = eras.merged_for(doc, hierarchy.data_asset_yaml())
     for key in ("amber_setting", "replacement_setting"):
         block = doc.get(key)
         if block and block.get("versions"):

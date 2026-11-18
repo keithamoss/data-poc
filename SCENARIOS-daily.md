@@ -402,8 +402,8 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 |---|---|
 | Dataset | mental-health-contacts |
 | Supplies | — |
-| Period | 2026-09-07 |
-| Set "in the warehouse on" to | 2026-09-07 |
+| Period | 2026-09-21 |
+| Set "in the warehouse on" to | 2026-09-21 |
 
 ### TS-117 - A weekly dataset's supply received on a day it owes nothing
 
@@ -416,9 +416,9 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 | Where to look | |
 |---|---|
 | Dataset | mental-health-contacts |
-| Supplies | `mental_health_contacts__202609140815000800`, `mental_health_contacts__202609150815000800` |
-| Period | 2026-09-14 |
-| Set "in the warehouse on" to | 2026-09-15 |
+| Supplies | `mental_health_contacts__202609070815000800`, `mental_health_contacts__202609080815000800` |
+| Period | 2026-09-07 |
+| Set "in the warehouse on" to | 2026-09-08 |
 
 
 <!-- scenario-map-data
@@ -1345,8 +1345,8 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
    "coordinates": {
     "dataset": "mental-health-contacts",
     "supplies": [],
-    "period": "2026-09-07",
-    "inPlaceOn": "2026-09-07",
+    "period": "2026-09-21",
+    "inPlaceOn": "2026-09-21",
     "subject": "supply-history-row"
    }
   },
@@ -1366,11 +1366,11 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
    "coordinates": {
     "dataset": "mental-health-contacts",
     "supplies": [
-     "mental_health_contacts__202609140815000800",
-     "mental_health_contacts__202609150815000800"
+     "mental_health_contacts__202609070815000800",
+     "mental_health_contacts__202609080815000800"
     ],
-    "period": "2026-09-14",
-    "inPlaceOn": "2026-09-15",
+    "period": "2026-09-07",
+    "inPlaceOn": "2026-09-08",
     "subject": "supply-history-row"
    }
   }

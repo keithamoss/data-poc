@@ -111,12 +111,36 @@ intro: >
 releases:
   - date: "2026-11-18"
     summary: >
-      Emergency Department's age groups are checked by one more tool, every
-      asset shares one set of file checks, and a deployment with no synthetic
-      data no longer offers the commands and pages that make it.
+      You can choose one period and see every page as it stood for it, a
+      dataset can owe on chosen weekdays, and two test collections show an
+      annual and a weekly dataset. Emergency Department's age groups are
+      checked by one more tool, every asset shares one set of file checks, and
+      a deployment with no synthetic data no longer offers the commands and
+      pages that make it.
     changes:
       - category: New
         items:
+          - headline: Choose a period
+            components: ["Dashboard UI"]
+            description: >
+              A period control beside the date shows every page for one period
+              of the asset's calendar: each dataset's page shows the supply that
+              period holds and the results recorded about it, and each agency
+              page shows what every dataset held. Clear it to see the current
+              periods again.
+          - headline: Datasets that owe on chosen weekdays
+            components: ["Pipeline & publishing"]
+            description: >
+              On a daily asset, `participates:` can name weekdays, like
+              [Monday], as it names months on a quarterly one. The days a
+              dataset owes nothing in stand on its last supply.
+          - headline: An annual and a weekly test collection
+            components: ["QA checks & contract", "Data generation"]
+            description: >
+              The quarterly asset gains Cancer, owed once a year in August, and
+              the daily asset gains Mental Health, owed on Mondays. Both are
+              synthetic, with checks in all four tools and scenarios for a
+              supply that arrives when nothing is owed.
           - headline: Age groups checked by datacontract-cli too
             components: ["QA checks & contract"]
             description: >
@@ -131,6 +155,16 @@ releases:
               retire one for itself in its own file-checks.yaml.
       - category: Improved
         items:
+          - headline: Weekly datasets worded by their weekday
+            components: ["Dashboard UI"]
+            description: >
+              A weekly dataset's tile reads 'Weekly (Monday)', and a day it owes
+              nothing in reads 'Not owed — it supplies only on Mondays'.
+          - headline: Period pages open on the agency page
+            components: ["Dashboard UI"]
+            description: >
+              An old link to a period's page opens its agency page with that
+              period chosen and the collection's table in view.
           - headline: Value counts follow the contract
             components: ["QA checks & contract", "Pipeline & publishing"]
             description: >
