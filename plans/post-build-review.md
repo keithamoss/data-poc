@@ -16844,3 +16844,19 @@ twice. It deliberately did not re-find the `TypeError`.
        synthetic asset folder, so it never reads one.
 
 476. **[superseded, 2026-11-18]** **[Testing & dev tooling]** **`test_readers_of_case_workers_promote_in_a_quarter_it_sits_out` failed once in a full gate and has not failed since.** The same failure as #459, folded into it with its root cause and fix.
+
+480. **[done, 2026-11-18]** **[Testing & dev tooling]** **REQ-PIPE-385's synthetic gates broke a CLI test that used one as its example.**
+     `tests/test_cli_check.py::TestEveryFailureNamesItsAsset::test_the_side_by_side_docs_passes_name_it_too`
+     failed every time in group A+B's full gate (alone and in parallel):
+     it ran the `scenarios` gate over two fake assets, and since REQ-PIPE-385
+     criterion 8 a synthetic gate skips an asset with no synthetic/ folder,
+     so both passes were dropped and the gate returned 0. The test is about
+     naming each asset's lines in a side-by-side docs pass, not about
+     scenarios; it now uses `premise`, a docs gate that reads each asset and
+     is not synthetic, and asserts that is so first. No product change.
+     - **Also seen in the same gate**: `test_dashboard_e2e.py::TestTheDataFilesLoadFromDisk::test_the_first_view_answers_within_its_budget_of_navigation`
+       drew the agency trends in 5.3 to 6.4 seconds against its 6-second
+       budget while three other heavy jobs shared the machine; re-run on a
+       quiet machine the whole browser chunk passed (439). Not changed - its
+       docstring already calls the budget generous, and this is a load
+       sighting rather than a slower page.
