@@ -191,6 +191,24 @@ releases:
               A date before a calendar's first version used to borrow that
               version's settings. It now stops the command with one paragraph
               naming the calendar, the date and the file to fix.
+          - headline: A refused command says what to run instead
+            components: ["Testing & dev tooling"]
+            description: >
+              Where a deployment has no synthetic data, a refused command now
+              says it is for synthetic data and names what to run instead, such
+              as `mothman pipeline process` or `--file`.
+          - headline: No Demo tab without synthetic data
+            components: ["Dashboard UI"]
+            description: >
+              The Demo tab plays a recording made on test data, so a deployment
+              with no synthetic data no longer shows it, and its dataset pages
+              no longer call their figures generated.
+          - headline: A file check that cannot run is refused up front
+            components: ["QA checks & contract"]
+            description: >
+              An asset's file-checks.yaml naming a check the code cannot run
+              now fails `mothman check`, naming the checks you can use, rather
+              than failing every file when it arrives.
   - date: "2026-11-16"
     summary: >
       Each supply's checks take less time, and you can now see how long each
