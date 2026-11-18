@@ -3758,3 +3758,59 @@ one or more component tags, and a date.
         - Speed F6/F7: file existence is not pinned; the memo is bounded per
           agreement.
 
+14. **[in-progress, 2026-11-18]** **[Docs & process]** **Build run, 2026-11-18
+    into the night: groups A to D pushed, F built, E not started.**
+
+    - **THE PLAN AND TERMS (Keith, 2026-11-18)**: "let's do A through D, and
+      then do F, and then come back to E. But rather than launching a builder
+      for each of them, let's have you build them. Apply the usual overnight
+      policy, but I'm around today, so you can come to me for questions. And
+      once you're done, send them to the reviewers and stuff." A: speed
+      (REQ-PIPE-403, REQ-PIPE-250). B: #134 step 4. C: the new collections
+      (REQ-QAC-348/350, REQ-GEN-349/351, REQ-PIPE-346, REQ-DASH-347,
+      REQ-GEN-371). D: the period control (REQ-DASH-355/356/367). F: #459,
+      the timing browser halves (DASH-413 c11, 414 c8, 415 c10), REQ-DASH-394.
+      E: private hosting. Resets of the real databases approved ("Yes, reset as
+      needed").
+    - **A AND B PUSHED (29822d45, ~15:30 Perth)**: full chunked gate 8515
+      passed, 0 failed; CI green. Post-build reviews found and fixed with
+      Keith's decisions the same afternoon (#479-#485).
+    - **C AND D PUSHED (a6d20186, ~22:20 Perth)**: full chunked gate 8602
+      passed, 0 failed, 0 skipped, coverage 95%; `mothman check --no-pytest`
+      green with warnings; CI (critical, validate-config) green. Both real
+      databases re-bootstrapped from main-a with C on a quiet machine:
+      quarterly 1620s, daily 419s. Its commit message names the wrong base
+      for the first gate chunks; the force-push to correct it was refused,
+      so #487 records the correction.
+    - **THE REVIEWS OF C AND D (~22:45 Perth)**: four critics (functional on
+      C, functional, UX and visual on D). Fixed test-first or as polish:
+      a period link opening without its statement (both D critics), Cancer's
+      check with no measure (the gate read one asset only), the not-supplied
+      word, the verdict line under a period, focus, the day control's words,
+      contrast and tap targets. All written up in #489 and #490.
+    - **F**: the timing browser halves built (TestRunTimesOnTheBuiltPage);
+      their first run found #488 (opening a run's tries moved the page and
+      closed them) - fixed. #459 was resolved in A.
+    - **REQ-DASH-394 NOT BUILT - FOR KEITH**: criterion 7's drive (a broken
+      calendar in a copy of the repository as a real deployment) showed every
+      configuration error that stops a pass also stops the build, so a queue
+      item would barely be seen; decision 3's example is a held supply, not an
+      error. Recorded in the requirement's decisions and open question.
+      Recommended: park it. Also: the arrival-patterns check is a `mothman
+      check` gate with no database, so recording its stop is a deviation from
+      criterion 1 to settle.
+    - **ENVIRONMENT, FOR THE NEXT SESSION**: a new worktree needs `mothman env
+      dbt-deps` per asset AND the bootstrapped `data/` copied in (scenario
+      placements, bookkeeping) plus `npm ci` and `mothman dashboard rebuild-results` then `build-data` per asset, before a gate - each cost chunk re-runs (the missing reports showed only as 14 skips); the gate restart
+      tonight. And the session-start hook drops a running gate's test
+      databases on a context compaction (running-thoughts #142).
+    - **QUESTIONS FOR KEITH** (#489, #490): whether a chosen period's status
+      counts other periods' gaps and holds; the period sections under the
+      whole-history queue; Back keeping a link-set period; the annual
+      dataset's permanent low-runway warning; A11's wording beyond what was
+      signed on REQ-PIPE-181 c8; the composition table on a phone, the
+      period button's icon, table-header contrast; and REQ-DASH-394 above.
+    - **F PUSHED (~01:35 Perth, 2026-11-19)**: full chunked gate on this tree
+      8610 passed, 0 failed, 0 skipped, coverage 95%; `mothman check
+      --no-pytest` green with warnings.
+    - **E NOT STARTED.**
