@@ -16715,3 +16715,41 @@ twice. It deliberately did not re-find the `TypeError`.
        ~76MB `.test-history/`, and nothing but a manual delete removes it.
        A `mothman` command to clear it would be a new feature, so none was
        built; worth knowing when disk is tight, since worktrees multiply it.
+
+470. **[done, 2026-11-18]** **[Pipeline & publishing]** **A grace of nothing printed as an empty string in `mothman schedule show`.**
+     Found building REQ-PIPE-378 criterion 17's refusal: test fixtures with a
+     `grace: 0h` participation made `schedule show` print an empty grace.
+     - **Fixed, test-first** (minor): format_duration(timedelta(0)) reads
+       "0h"; tests/test_schedule_config_errors.py pins it (red before, green
+       after).
+
+471. **[done, 2026-11-18]** **[Testing & dev tooling]** **The fixed-anchor fallback test passed only where the checkout held a delivery tree.**
+     #431 (dc1881c2) made a checkout with no delivery tree fall back to the
+     fixed anchor everywhere. test_anchor_date's fallback test asserted the
+     sandbox refusal with the anchor file absent, which is now reachable only
+     where a delivery tree exists - green in the main checkout, red in a
+     worktree, and it would be red on a CI runner.
+     - **Fixed** (test-only): the test states a history was generated
+       (patches history_anchor._generated to True) before asserting the
+       refusal.
+
+472. **[done, 2026-11-18]** **[Testing & dev tooling]** **A worktree checkpoint committed two absolute symlinks, and a scratch worktree set-up made a cyclic link inside the main checkout's dbt packages.**
+     A process slip of this session's own, written down so it is not
+     repeated. `.gitignore`'s `assets/*/dbt/dbt_packages/` matches a folder
+     but not a symlink, so the links a worktree needs to reach the installed
+     dbt packages were committed (046c25b8). A later scratch worktree checked
+     that commit out, and `ln -s` onto the existing link created a link INSIDE
+     the main checkout's real `dbt_packages/` pointing back at itself - which
+     broke ~75 tests in an affected-module run (copytree loops,
+     DbtPackagesMissing) until found.
+     - **Fixed**: the links are untracked and the ignore pattern matches a
+       link too (`assets/*/dbt/dbt_packages`, `node_modules`); the cyclic
+       link was removed from the main checkout. Nothing is tested: the fix
+       removes the mechanism.
+
+473. **[todo, 2026-11-18]** **[QA pipeline]** **A `no_calendar: never` dataset cannot be processed end to end.**
+     Found by REQ-PIPE-379 criterion 5's test. Filing and the promotion gate
+     raise NoCalendarAgreed, a no-period supply is held unchecked, and the
+     dashboard build's agreement.cadence() raises it too. Keith, 2026-11-18:
+     scoped separately as a design question - plans/running-thoughts.md #141.
+     Not fixed; criterion 5 is recorded unmet.
