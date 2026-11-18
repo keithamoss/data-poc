@@ -7678,7 +7678,7 @@ requirements:
       - THE SYSTEM SHALL express a schedule that genuinely is "every
         day" as a cadence rule rather than as an enumerated date list.
       - "THE SYSTEM SHALL let a dataset state, under participates in assets/<asset>/calendar.yaml, which of an authored calendar's delivery months it participates in, and SHALL treat a dataset stating none as participating in all of them. AMENDED 2026-11-15 by REQ-DOCS-358 (criterion 2, the blanket path rule)."
-      - "IF a dataset on a cadence-rule baseline also names delivery months, THEN THE SYSTEM SHALL reject the configuration rather than ignoring the months. AMENDED 2026-11-15 by REQ-PIPE-345."
+      - 'IF a dataset''s participation names periods in a vocabulary its baseline calendar version does not take - months on a daily rule, weekdays on an authored calendar - THEN THE SYSTEM SHALL reject the configuration rather than ignoring them (REQ-PIPE-346). AMENDED 2026-11-15 by REQ-PIPE-345. AMENDED 2026-11-18 by REQ-PIPE-346.'
       - THE SYSTEM SHALL accept full month names only, case-insensitively,
         and SHALL NOT accept abbreviations, month numbers or positional
         indices.
@@ -24266,9 +24266,9 @@ requirements:
     - THE SYSTEM SHALL carry each named calendar as effective-dated versions, each version holding either its authored dates or its cadence rule, and its default claim window.
     - THE SYSTEM SHALL carry, for every dataset that is on a calendar, a participation entry made of effective-dated versions.
     - THE SYSTEM SHALL let each participation version state the dataset's expected time of day and its grace allowance, and override its calendar's default claim window.
-    - "THE SYSTEM SHALL state, under the key participates, which of its calendar's rounds a dataset supplies in - and so, through its collection's files_go_to_period (REQ-PIPE-320), which periods it owes - either as the keyword all or by naming delivery months in full and case-insensitively, naming the month of each round's CALENDAR DATE even where days before is set and whatever the collection's files_go_to_period, and SHALL NOT accept a month number, an abbreviation or a positional index. AMENDED 2026-10-30 by REQ-PIPE-321."
+    - 'THE SYSTEM SHALL state, under the key participates, which of its baseline''s rounds a dataset supplies in - and so, through its collection''s files_go_to_period (REQ-PIPE-320), which periods it owes - either as the keyword all or by naming, in full and case-insensitively, the month - or, on a daily baseline, the weekday - of each round''s CALENDAR DATE (REQ-PIPE-346) even where days before is set and whatever the collection''s files_go_to_period, and SHALL NOT accept a month number, an abbreviation or a positional index. AMENDED 2026-10-30 by REQ-PIPE-321. AMENDED 2026-11-18 by REQ-PIPE-346.'
     - "WHERE nothing states participates for a dataset on a round's date, THE SYSTEM SHALL treat the dataset as supplying in every round its calendar generates, and so as owing every period those rounds fill; WHERE nothing states days before, SHALL take it as zero; and WHERE nothing states a claim-window override, SHALL take the claim window from the calendar version in force on that date. AMENDED 2026-10-30 by REQ-PIPE-321."
-    - IF participates resolves to delivery months for a dataset whose calendar version in force on any of its periods' dates is a cadence rule, THEN THE SYSTEM SHALL reject the configuration, checking each participation version against every calendar version it overlaps.
+    - 'IF participates resolves to months where the baseline calendar version in force on any of a dataset''s periods'' dates is a daily rule, or to weekdays where it is authored, THEN THE SYSTEM SHALL reject the configuration, checking each participation version against every calendar version it overlaps. AMENDED 2026-11-18 by REQ-PIPE-346.'
     - WHERE participates resolves to only some of a calendar's periods, THE SYSTEM SHALL require a reason on the version that states that list.
     - THE SYSTEM SHALL keep not_expected as its own list, separate from participation, of once-off periods a dataset owes nothing in, each carrying a reason, which a person may add ahead of the period.
     - THE SYSTEM SHALL let a collection name a calendar, and SHALL apply that calendar to every dataset in the collection that names none of its own.
@@ -25608,7 +25608,7 @@ requirements:
     - "THE SYSTEM SHALL accept the keyword inherit for a participation value on a version whose previous version at the same level stated that value or wrote inherit for it, meaning the value from the nearest level above on each round's date. AMENDED 2026-10-30 by REQ-PIPE-321."
     - IF inherit is written for a value no earlier version at that level stated, THEN THE SYSTEM SHALL reject it, saying to leave the value out instead.
     - "WHEN the restate rule refuses a version, THE SYSTEM SHALL offer restating the value, and SHALL offer writing inherit only where inherit would resolve to a value on the date of every round that version governs, saying what it would resolve to and the level it would come from; WHERE nothing above states the value, THE SYSTEM SHALL offer restating it only. AMENDED 2026-10-30 by REQ-PIPE-321."
-    - "IF participates: inherit on a version - a dataset's, or a collection's - would make any dataset supply, on any round that version governs, in a round the previous version did not, and so owe a period it did not, THEN THE SYSTEM SHALL reject the configuration, naming the item, each dataset affected, the months newly owed and the periods those rounds fill, and SHALL give the fix to paste: the months, or all, written explicitly, together with the reason a list of some months needs. AMENDED 2026-10-30 by REQ-PIPE-321."
+    - 'IF participates: inherit on a version - a dataset''s, or a collection''s - would make any dataset supply, on any round that version governs, in a round the previous version did not, and so owe a period it did not, THEN THE SYSTEM SHALL reject the configuration, naming the item, each dataset affected, the rounds newly owed, named as participates names them (REQ-PIPE-346) and the periods those rounds fill, and SHALL give the fix to paste: the months or weekdays, or all, written explicitly, together with the reason a list of some needs. AMENDED 2026-10-30 by REQ-PIPE-321. AMENDED 2026-11-18 by REQ-PIPE-346.'
     - IF a dataset names a calendar other than its collection's and would take any participation value from its collection's participation_defaults, THEN THE SYSTEM SHALL reject the configuration unless the dataset states that value itself, naming the dataset, both calendars and each value.
     - IF a collection's participation_defaults version writes inherit for expected time or grace, THEN THE SYSTEM SHALL reject it, saying that a calendar states neither, so inherit there resolves to nothing, and to state the value instead.
     - IF two participation_defaults versions of one collection share an effective_from date or are out of order, THEN THE SYSTEM SHALL reject the configuration.
@@ -25696,17 +25696,13 @@ requirements:
     - THE SYSTEM SHALL show, in a dataset page's supply history - and, once REQ-DASH-209 is built, in its period-composition
       view's 'Not owed' group - every period the dataset owes nothing in, whether by participation or by not_expected, together
       with its reason; SHALL NOT omit it; and SHALL show those rows even where the dataset has no supply cycles yet.
-    - "WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet row stating its kind - a participation row 'Not owed — it supplies only in the February and August rounds', naming the months of the rounds it supplies in whatever its collection's files_go_to_period, 'Not expected — <reason>', and WHERE the dataset is turned off (REQ-PIPE-179), 'Turned off — <reason>' (REQ-DASH-180 criterion 15) - in its chronological place among the supply cycles, only for periods up to the date on show, and SHALL NOT show it red, among things needing action, or as 'No supply'; a participation row, which recurs, SHALL carry that short label generated from the configuration, and the authored reason SHALL be shown once, on the dataset's SLA tile (criterion 11), not on every row. AMENDED 2026-10-30 by REQ-DASH-326."
+    - 'WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet row stating its kind - a participation row ''Not owed — it supplies only in the February and August rounds'' - or, WHERE it participates by weekday, ''Not owed — it supplies only on Mondays'' (REQ-DASH-347) - naming the months or weekdays of the rounds it supplies in whatever its collection''s files_go_to_period, ''Not expected — <reason>'', and WHERE the dataset is turned off (REQ-PIPE-179), ''Turned off — <reason>'' (REQ-DASH-180 criterion 15) - in its chronological place among the supply cycles, only for periods up to the date on show, and SHALL NOT show it red, among things needing action, or as ''No supply''; a participation row, which recurs, SHALL carry that short label generated from the configuration, and the authored reason SHALL be shown once, on the dataset''s SLA tile (criterion 11), not on every row. AMENDED 2026-10-30 by REQ-DASH-326. AMENDED 2026-11-18 by REQ-DASH-347.'
     - "WHERE the dashboard shows a dataset's delivery time or cycle - on its SLA tile or anywhere else - THE SYSTEM SHALL take it from the values resolved for the dataset on the date on show - expected time, grace, participates and days before - each from the level REQ-PIPE-181 resolves it to; WHERE the date on show falls before the dataset's first participation version, or on or after it but before its first slot's claim window opens (REQ-PIPE-321 criterion 5), SHALL show 'Not owed yet — owes from <period>, first due <instant>', the first period its first participating round fills and that slot's due instant in the page's own instant format, on the SLA tile and as the heading of the notice that today reads 'Nothing had been supplied by this date', which it replaces, that notice's body keeping only its way-back sentence, 'Pick a later date, or reset to the default, using the 📅 In the warehouse on control above.', and dropping 'There is no QA run within the accepted freshness window as of <date>.', and SHALL show its status pill, on its page and in its collection table, as 'Not owed yet' in place of 'No data'; and WHERE the dataset is turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says. AMENDED 2026-10-15 by Keith (morning report 5 Q19). AMENDED 2026-10-23 by REQ-DASH-277; it read 'the 📅 In place on control'. AMENDED 2026-10-30 by REQ-DASH-326."
     - THE SYSTEM SHALL render every reason it shows as text, never as markup.
     - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
     - "THE SYSTEM SHALL NOT show periods before the first period a dataset's first participating round fills (REQ-PIPE-321 criterion 5) as owed-nothing rows, nor as 'No supply'. AMENDED 2026-10-30 by REQ-DASH-326."
     - "WHERE a dataset's supply is due on an earlier day than the date of the round it is due on (days_before above 0), THE SYSTEM SHALL say so in the delivery-time label on the SLA tile - 'by 22:00 the day before' where it is one day, 'by 22:00, N days before each date' where it is more - SHALL NOT show the time alone, and SHALL have a test of each of the two forms. AMENDED 2026-10-30 by REQ-DASH-326."
-    - WHERE a dataset's calendar is not exactly four delivery months a year, or its periods fall on different days of the month,
-      THE SYSTEM SHALL still label its cycle in words - 'Yearly' for one delivery month a year, 'Twice a year' for two, 'Quarterly'
-      for four, 'Monthly' for twelve, otherwise '<N> times a year' - and 'various days' in place of the day where its periods
-      fall on different days of the month, for a calendar of the 'authored' type as for any other, and SHALL NOT render the
-      label blank.
+    - 'WHERE a dataset''s calendar is not exactly four delivery months a year, or its periods fall on different days of the month, THE SYSTEM SHALL still label its cycle in words - ''Yearly'' for one delivery month a year, ''Twice a year'' for two, ''Quarterly'' for four, ''Monthly'' for twelve, otherwise ''<N> times a year'', and WHERE a dataset participates by weekday, as REQ-DASH-347 criterion 1 words it - and ''various days'' in place of the day where its periods fall on different days of the month, for a calendar of the ''authored'' type as for any other, and SHALL NOT render the label blank. AMENDED 2026-11-18 by REQ-DASH-347.'
     - 'WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL say so on the
       same row, as muted text ''Inherited from <period>'' with no pill, rather than as a second row or a second pill for the
       same period; and the heading of the standing-in panel near the top of the dataset page (standingInHeading, in standingInDetail)
@@ -35291,9 +35287,7 @@ requirements:
     - WHEN a scenario link (REQ-GEN-201) is followed from the test-scenarios panel, THE SYSTEM SHALL scroll the page so that
       the element the scenario is about is in the viewport, and SHALL then move focus to it without scrolling again (focus with
       preventScroll), as drillToPeriod brings a period into view.
-    - THE SYSTEM SHALL name each scenario's subject semantically in its placement record - the as-at panel, the verdict line,
-      the substitution drill-down, the standing-in pill, a supply-history row, or the period-composition view's table once REQ-DASH-209
-      adds it (REQ-DASH-209 criterion 7) - and SHALL NOT name it by a CSS selector or a pixel offset.
+    - 'THE SYSTEM SHALL name each scenario''s subject semantically in its placement record - the as-at panel, the verdict line, the substitution drill-down, the standing-in pill, a supply-history row, or a collection''s composition table on the agency page (REQ-DASH-367) - and SHALL NOT name it by a CSS selector or a pixel offset. AMENDED 2026-11-18 by REQ-DASH-367.'
     - WHERE the subject is inside a collapsed section of supply history, THE SYSTEM SHALL expand that section before scrolling
       to it.
     - THE SYSTEM SHALL mark the subject with a static left rule in the accent colour, as the arrival notice (.arrival-notice)
@@ -36010,12 +36004,7 @@ requirements:
       about thirty datasets per period. Drafted by delivery-scoper the same morning; NOT REVIEWED by delivery-architect or by
       a UX reviewer.'
     acceptance_criteria:
-    - THE SYSTEM SHALL offer, for each period of every collection - daily collections included, one view per day - a period-composition
-      view with one row per dataset of that collection, each saying what the dataset holds in that period as at the end of the
-      date on show - 'Promoted', 'Inherited from <period>', 'Substituted from <period>', 'Not supplied' where the dataset owes
-      the period a supply and none is held there, or 'Not owed' where it owes none (turned off, REQ-PIPE-179; not expected;
-      outside its agreed months) - and, for 'Not supplied' and 'Not owed', the one-word state the dataset's supply history shows
-      for that period.
+    - 'WHILE a period is chosen (REQ-DASH-355), THE SYSTEM SHALL show in each collection''s panel on the agency page - daily collections included, one per day - a composition table with one row per dataset of that collection, each saying what the dataset holds in that period as at the end of the date on show - ''Promoted'', ''Inherited from <period>'', ''Substituted from <period>'', ''Not supplied'' where the dataset owes the period a supply and none is held there, or ''Not owed'' where it owes none (turned off, REQ-PIPE-179; not expected; outside its agreed months) - and, for ''Not supplied'' and ''Not owed'', the one-word state the dataset''s supply history shows for that period. AMENDED 2026-11-18 by REQ-DASH-367.'
     - THE SYSTEM SHALL take every row from the per-dataset timelines the build already embeds (pipeline/slot_timeline.py and
       pipeline/promotion_timeline.py), looked up by the date on show with the same lookup REQ-DASH-198's standing-in qualifier
       uses (promotionStateOn), and SHALL NOT work out a second derivation, nor read a period schema, its catalogue, its _manifest
@@ -36025,19 +36014,13 @@ requirements:
       supplied, 1 substituted, 2 inherited, 25 promoted, 1 not owed'' - and SHALL list the rows grouped by kind in that order,
       ''Not supplied'' first and ''Not owed'' last, each group in dataset display-name order, with every row shown and no group
       collapsed.'
-    - THE SYSTEM SHALL make each dataset's name a real link (<a href>) to that dataset's page at the same date on show, and
-      each 'from <period>' a real link to that period's composition view.
+    - 'THE SYSTEM SHALL make each dataset''s name a real link (<a href>) to that dataset''s page at the same date on show and period, and each ''from <period>'' a real link to the agency page with that period set (REQ-DASH-367 criterion 6). AMENDED 2026-11-18 by REQ-DASH-367.'
     - 'THE SYSTEM SHALL give the view its own address in the dashboard''s existing routing - #/agency/<agency>/collection/<collection>/period/<period>,
       with the date on show as the existing in-place-on query parameter (docs/spa-best-practices.md section A) - and SHALL link
       to it, by a real <a href>, from each period''s label in a dataset''s supply history and from that history''s gap and owed-nothing
       rows, never from inside a delivery row, and from the standing-in pill''s drill-down (REQ-DASH-198).'
-    - THE SYSTEM SHALL let TS-55's chip in the test-scenarios panel open its period's composition view, TS-55's coordinate in
-      the scenario map still naming the substituted dataset, with the view as its link's target, so that REQ-GEN-045 criterion
-      1 needs no change; and SHALL add the view's table to REQ-DASH-208 criterion 2's subjects, so that TS-55's chip lands with
-      it in view.
-    - WHERE no dataset of the collection holds anything in the period on the date on show, THE SYSTEM SHALL say so in one line
-      above the rows; and WHERE the date on show is before the period opened, THE SYSTEM SHALL show '<period> had not opened
-      by <date>' in place of the rows.
+    - 'THE SYSTEM SHALL let TS-55''s chip in the test-scenarios panel open the agency page with its period set and its collection''s composition table in view, TS-55''s coordinate in the scenario map still naming the substituted dataset, with the view as its link''s target, so that REQ-GEN-045 criterion 1 needs no change; and SHALL add the view''s table to REQ-DASH-208 criterion 2''s subjects, so that TS-55''s chip lands with it in view. AMENDED 2026-11-18 by REQ-DASH-367.'
+    - 'WHERE no dataset of the collection holds anything in the period on the date on show, THE SYSTEM SHALL say so in one line above the rows; and WHERE the date on show is before the period opened, THE SYSTEM SHALL show ''<period> had not opened by <date>'' in that collection''s panel, in place of its table (REQ-DASH-355 criterion 9). AMENDED 2026-11-18 by REQ-DASH-355.'
     - 'THE SYSTEM SHALL have the build embed the answers and the page look them up: the build SHALL add to each per-dataset
       timeline entry the period it stands on (stands_on), and SHALL embed each supply''s receipt, status when promoted and acknowledgements
       once per supply, not once per period or per day; and THE SYSTEM SHALL render every name and reason in the view as text,
@@ -36052,9 +36035,7 @@ requirements:
       the present.'
     - THE SYSTEM SHALL measure the built dashboard's size before and after this change, from the same recorded history, and
       SHALL report both figures in this requirement's evidence, with no size budget set.
-    - THE SYSTEM SHALL head the view with an h2 reading '<collection> · <period name>' over a sub-line 'What each dataset held
-      at the end of <date on show>', SHALL show the rail as Agencies › <agency> › <collection> › <period name>, SHALL give the
-      table a caption saying the same, and SHALL move focus to the h2 on arrival.
+    - 'THE SYSTEM SHALL caption each composition table ''<collection> · <period name> — what each dataset held at the end of <date on show>'', SHALL leave the rail as the agency page''s, and SHALL move focus to the caption on arrival from a retired period link (REQ-DASH-367 criterion 3). AMENDED 2026-11-18 by REQ-DASH-367.'
     - IF the address names an agency, collection or period the dashboard does not hold, THEN THE SYSTEM SHALL show the existing
       not-found page (renderNotFound) naming what was not found, and SHALL NOT show an empty view.
     - 'THE SYSTEM SHALL show beside the view''s h2 a link to the previous period''s composition view and one to the next period''s,
@@ -36094,6 +36075,25 @@ requirements:
     - REQ-DASH-197
     - REQ-PIPE-179
     - REQ-DASH-182
+    retired_criteria:
+    - by: Keith
+      criterion: 14
+      date: '2026-11-18'
+      reason: 'A35, signed with REQ-DOCS-358: the previous and next links move to the agency page, setting the global period control - REQ-DASH-367 criterion 2. Applied 2026-11-18 with REQ-DASH-367''s build.'
+      replaced_by:
+      - REQ-DASH-367
+    - by: Keith
+      criterion: 13
+      date: '2026-11-18'
+      reason: 'A34, signed with REQ-DOCS-358: an address naming an agency, collection or period the dashboard does not hold is REQ-DASH-367 criterion 5''s. Applied 2026-11-18 with REQ-DASH-367''s build.'
+      replaced_by:
+      - REQ-DASH-367
+    - by: Keith
+      criterion: 6
+      date: '2026-11-18'
+      reason: 'A30, signed with REQ-DOCS-358: the period route is retired, old links open the agency page with the period set, and every link to the view goes there - REQ-DASH-367 criteria 3 and 6. Applied 2026-11-18 with REQ-DASH-367''s build.'
+      replaced_by:
+      - REQ-DASH-367
     decisions:
     - 'BUILT 2026-10-15: ONE LOOKUP OVER THE SLOT TIMELINE. Every row is the newest embedded slot-timeline entry for that period on or before the date on show (newestOnOrBefore, the qualifier''s own lookup), read for held_as, holder, the decision''s actor, reason and instant, and the new stands_on - qa.slot_holds'' answers, so promoted, substituted and inherited come from the one source _manifest''s ''why'' also reads. The receipt, status when promoted (promotedHealth''s promotedOn) and acknowledgements were already embedded once per supply, keyed by run; the entry carries holder_run_id to reach them. REJECTED reading promotionTimeline.standing for the stand-ins beside the slot timeline for the promoted rows: two sources for one view.'
     - 'THE PERSON''S NAME IN THE EMBEDDED TIMELINE (PRIVACY NFR): the slot timeline the page embeds carried the decider''s email address, unrendered until now; slot_timeline.with_runs - the embedding layer only - now puts people.display_name in its place for a person, so the view never has an email to show.'
@@ -49010,7 +49010,7 @@ requirements:
     date_written: '2026-10-31'
     story: As Keith during a quarterly refresh and release, I want to choose a period - 2026-Q2 - once in the header and have every page show what we know about that period as at the date on show, so that I can see a period's whole picture, including what arrived about it later, without losing my place.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -49025,7 +49025,7 @@ requirements:
     - 'WHILE a period is chosen, THE SYSTEM SHALL add '' · <P>'' to document.title, and SHALL announce ''Showing <P>'' through #route-announcer when it is chosen and ''Showing all current'' - ''Showing latest'' WHERE the baseline is daily - when it is cleared.'
     - IF the period parameter names no period of the asset's baseline, THEN THE SYSTEM SHALL say so in a notice naming the value, as the stale-link notice does, remove the parameter with replaceState, and show the page with no period chosen.
     - WHILE a period is chosen and the date on show is before that period opened for a collection, THE SYSTEM SHALL show '<period> had not opened by <date>' in that collection's own panel on the agencies list and agency page, in place of that collection's content, leaving every other collection as it is.
-    - WHILE no period is chosen, THE SYSTEM SHALL render the agencies list, an agency page and a dataset page on two dates exactly as before this change, held by a real-browser test comparing each page's rendered text with a capture taken from the build of the commit before this change against the same recorded history, asserting first that each capture is non-empty and holds the page's heading.
+    - 'WHILE no period is chosen, THE SYSTEM SHALL render the agencies list, an agency page and a dataset page on two dates exactly as before this change, shown by a one-off comparison recorded in evidence of each page''s rendered text with a capture taken from the build of the commit before this change against the same recorded history, each capture first confirmed non-empty and holding the page''s heading (amended by Keith 2026-11-18: a one-off check in evidence, not a standing test).'
     - THE SYSTEM SHALL keep the in-place-on selection a calendar date in its own parameter (REQ-DASH-054 criterion 7, unchanged).
     non_functional_requirements:
     - 'PERFORMANCE: choosing a period re-renders from data already embedded, as changing the date does - no fetch, no rebuild - and should feel as immediate as the date control does today.'
@@ -49038,6 +49038,21 @@ requirements:
     - REQ-PIPE-354
     - REQ-DASH-054
     - REQ-DASH-359
+    linked_tests:
+    - tests-js/period-control.test.js
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::applyPeriod
+    - dashboard/qa-reporting-dashboard.template.html::readPeriodFromUrl
+    - dashboard/qa-reporting-dashboard.template.html::setPeriodInUrl
+    - dashboard/qa-reporting-dashboard.template.html::baselinePeriods
+    - dashboard/qa-reporting-dashboard.template.html::isDailyBaseline
+    - dashboard/qa-reporting-dashboard.template.html::periodWords
+    - dashboard/qa-reporting-dashboard.template.html::openPeriodPanel
+    - dashboard/qa-reporting-dashboard.template.html::renderPeriodStatement
+    - dashboard/qa-reporting-dashboard.template.html::announcePeriod
+    evidence:
+    - '2026-11-18: tests-js/period-control.test.js passes (the control, the URL parameter, replaceState, the statement, the title and the announcements, the unknown-period notice). Criterion 10, the one-off Keith asked for: both assets built from the same scratch history (supply_quarterly_c, supply_daily_c) at the commit before the change (b176445e) and at this one; the agencies list, an agency page and a dataset page captured with no period on the latest date and on a past one (quarterly 2025-06-30, daily 2026-08-15) - 12 captures each side, each non-empty and holding its heading - and #view''s rendered text identical in all 12. The real-browser period tests pass against both real databases bootstrapped from empty the same day.'
     decisions:
     - 'A PERIOD VIEW, ALONGSIDE AS-AT (Keith, 2026-10-31, rejecting all three options put for the geocoding batch''s J1/G1 surfacing question - accept, a quiet notice, or move the timing): ''what we need here is a new way to view the dashboard ... almost by period''. Supersedes the geocoding batch''s J1 question.'
     - 'A GLOBAL PERIOD CONTROL, BESIDE THE GLOBAL AS-AT CONTROL (Keith, 2026-10-31): ''something like another global as at control ... that''s what I want''. In the header, in the URL, kept across navigation like as-at; every page reads it; with no period chosen every page behaves as today. REJECTED growing only the existing period page (REQ-DASH-209) into the view.'
@@ -49053,13 +49068,15 @@ requirements:
     - 'A PERIOD MODE ON THE AS-AT SWITCHER WAS FLOATED AND DROPPED (Keith, about midnight 2026-10-30, then ''Hmm maybe it''s OK as it is''): superseded by the separate control; recorded so it is not re-proposed.'
     - 'THE NO-PERIOD GUARD CAN FAIL (UX, proofs that cannot fail): v1''s ''passing on today''s page'' compared the page with itself; criterion 10 compares against a capture of the build before the change.'
     - '''Day: latest'' ON THE DAILY ASSET (dashboard UX v3 NIT; delivery-scoper''s choice, signed with v4): ''Day: all current'' read oddly. The quarterly ''Period: all current'' is unchanged.'
+    - 'THE PERIOD IS A var, NOT A let (built 2026-11-18): CURRENT_PERIOD is read by functions the page''s first render calls before the script reaches a let''s declaration, which would throw in the temporal dead zone; a var is undefined there, which reads as no period chosen.'
+    - 'C10 IS A ONE-OFF, NOT A STANDING TEST (Keith, 2026-11-18): the comparison against the commit before the change is run once and recorded; a standing test would need a second build of an old commit on every run.'
     open_questions: []
   - id: REQ-DASH-356
     title: With a period chosen, the agencies list, agency pages and dataset pages show that period's supplies and every result recorded about them as at the date on show, later linkage and geocoding verdicts included, source supplies and derived releases in separately named sections
     date_written: '2026-10-31'
     story: As Keith during a quarterly release, I want 2026-Q2 to show both what arrived for Q2 from the source agencies and what the linkage and geocoding releases for Q2 found about those supplies, kept apart, so that a verdict recorded hours after a supply was replaced as current is still seen on that supply's own page.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -49091,6 +49108,22 @@ requirements:
     - REQ-QAC-348
     - REQ-QAC-350
     - REQ-DASH-359
+    linked_tests:
+    - tests-js/period-view.test.js
+    - tests/test_mixed_linked_gate.py
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::clipDatasetToPeriod
+    - dashboard/qa-reporting-dashboard.template.html::buildCollectionDatasets
+    - dashboard/qa-reporting-dashboard.template.html::periodSectionsOf
+    - dashboard/qa-reporting-dashboard.template.html::collectionIsDerived
+    - dashboard/qa-reporting-dashboard.template.html::agencyCardHtml
+    - dashboard/qa-reporting-dashboard.template.html::periodHoldsWords
+    - dashboard/qa-reporting-dashboard.template.html::periodDatasetHeading
+    - dashboard/embed_dashboard_data.py::embed
+    - qa_tools/common/validate_collections.py::mixed_linked_problems
+    evidence:
+    - '2026-11-18: tests-js/period-view.test.js and tests/test_mixed_linked_gate.py pass. Criterion 7: the facts the view needs and whether the build embedded them - each dataset''s slot timeline (pipeline/slot_timeline.py, embedded), every check''s history with recorded_at (embedded), each cross-table result with the run it read (read_run) and when it was recorded (embedded, results_history), PERIOD_SEQUENCES (embedded), linked_datasets (the hierarchy). Added: one configuration fact, each HIERARCHY collection''s derived flag. Nothing reads supply rows, a period schema or its _manifest. Criterion 8: TestAWeeklyDatasetUnderAChosenDay passes on the daily database bootstrapped with Mental Health. Criterion 9: TestALinkageVerdictUnderAChosenPeriod finds its own case in the built data (2026-Q3 on 2026-08-15, the verdict 90.7 about cp_clients__202605270100000000) and passes against this build; against the build of the commit before the change (b176445e) the same steps fail - the period control is not there (ReferenceError: baselinePeriods is not defined), and with no period the check reads no data. Criterion 10, sizes, page plus data files, from the same scratch history before (b176445e) and after: quarterly 23,473,201 -> 23,517,823 bytes (+44.6KB), daily 16,464,080 -> 16,501,812 (+37.7KB); the data files are identical but for the requirements bundle, so the growth is the template''s.'
     decisions:
     - 'KEYED BY PERIOD, NOT BY ROUND (Keith, 2026-10-31, (a)): a view of 2026-Q2 shows the source supplies filed to Q2, which arrived in an earlier round, and the linkage and geocoding releases for Q2, which arrive in a later round, in two sections, one per workstream, with the as-at time picked within it. REJECTED (b), a view by round or refresh, and (c), both views.'
     - 'TWO DISTINCT VIEWS FOR A QUARTERLY REFRESH (Keith, 2026-10-31): what we know about the source data arriving for its period, and what we know about the linkage products and geocoding for the current period - ''distinct, separate releases, almost separate work streams''.'
@@ -49101,13 +49134,15 @@ requirements:
     - 'REUSE WHAT THE BUILD ALREADY EMBEDS FIRST (architect NIT): much of it is (build_dashboard_data.py 247-252, 627, 942; slot_timeline.py 284), so criterion 7 records the gap before adding to it.'
     - 'THE OPTIONS BEFORE THE CONTROL WAS CHOSEN (2026-10-30, not taken): (a) results on the period page, (b) the dataset page opening by period, (c) both.'
     - 'THE SECOND HEADING NAMES THE COLLECTION - Q1 CLOSED (Keith, 2026-10-31, sign-off Q1 (a)): ''Linkage Products for 2026-Q2'', from the collection''s configured name, one line however many datasets it holds. REJECTED (b), listing the datasets'' names in the heading.'
+    - 'ONE FACT ADDED TO THE BUILD, AND IT IS CONFIGURATION (built 2026-11-18, criterion 7): each HIERARCHY collection carries derived: true where a dataset of it declares linked_datasets, set by embed_dashboard_data.py from the asset''s hierarchy, so the page never infers a section from a name. Everything else the view shows was already embedded - the slot timeline, every check''s history with recorded_at, the cross-table reads with the run they read (read_run), PERIOD_SEQUENCES.'
+    - 'A PERIOD''S SUPPLY IS THE HOLDER AND THE RUNS BEFORE IT (built 2026-11-18): clipDatasetToPeriod keeps the run that holds the period and those before it - for the comparisons a page draws against the previous - and never marks it stale, since it is the period''s by construction however old.'
     open_questions: []
   - id: REQ-DASH-367
     title: With a period chosen, the agency page shows each collection's composition table for that period; the period page's route is retired and its old links open the agency page with the period set
     date_written: '2026-10-31'
     story: As Keith during a quarterly release, I want what each dataset holds in the chosen period, and how it got there, shown on the agency page itself, so that there is one 'period on show', set in one place, and a link I saved to an old period page still lands on the same answer.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -49129,11 +49164,24 @@ requirements:
     - REQ-DASH-355
     - REQ-DASH-209
     - REQ-DASH-208
+    linked_tests:
+    - tests-js/period-composition.test.js
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::compositionPanelHtml
+    - dashboard/qa-reporting-dashboard.template.html::compositionRow
+    - dashboard/qa-reporting-dashboard.template.html::compositionCells
+    - dashboard/qa-reporting-dashboard.template.html::periodStepsHtml
+    - dashboard/qa-reporting-dashboard.template.html::renderPeriod
+    evidence:
+    - '2026-11-18: tests-js/period-composition.test.js passes, re-pointed at the agency page (criterion 6''s links carry period= and never /period/). Real-browser: TestThePeriodComposition (re-pointed at the agency page''s table, criterion 7''s REQ-DASH-209 half) and TestTheRetiredPeriodRoute (a real retired URL replaces its entry, keeps in-place-on, focuses the caption, and Back leaves the dashboard) pass against the quarterly database bootstrapped from empty the same day. Their first run found the period-link defects recorded in this requirement''s decisions; fixed, the period, scenario-chip and supply-history browser tests pass.'
     decisions:
     - 'FOLD THE TABLE INTO THE AGENCY PAGE AND RETIRE THE ROUTE (Keith, 2026-10-31, draft Q1 (b)): old period links redirect to the agency page with that period set, and REQ-DASH-209''s criteria are rewritten as amendments signed one by one (A28 to A36). REJECTED (a), keeping the page joined to the control, and (c), keeping it independent. This made UX MUST 4 and UX Q3 moot.'
     - 'THE ROUTE''S PERIOD WINS OVER THE PARAMETER (UX SHOULD): criterion 4, because a link to a period page always meant that period.'
     - 'A REDIRECT INSIDE THE DASHBOARD, NOT A SCRIPT ON ANOTHER PAGE (delivery-scoper): the retired route is this dashboard''s own, so the page that opens it replaces the entry itself; unlike v1''s landing-page redirect, which is gone.'
     - 'PREVIOUS AND NEXT ARE REAL LINKS (dashboard UX v3 SHOULD; docs/spa-best-practices.md section D): criterion 2.'
+    - 'A PERIOD LINK GOES STRAIGHT TO THE AGENCY PAGE, NOT THROUGH THE RETIRED ROUTE (built 2026-11-18, found by this build''s own browser tests): routed through renderPeriod''s redirect, a link''s navigation replaced the entry the reader was on (Back skipped the page they came from), dropped a scenario jump riding it (TS-55''s chip showed its not-found notice), and left focus on the heading. periodNav now names the agency page with the period to set and the collection to focus; navigate() sets the period before the entry is pushed and focuses that collection''s caption, and the link''s href is the same address.'
+    - 'THE RETIRED ROUTE''S RENDERER IS NOW THE REDIRECT (built 2026-11-18): renderPeriod replaces the history entry with the agency page and period=<period>, so every old link and bookmark lands where the table now lives; the composition table itself moved to compositionPanelHtml (REQ-DASH-209''s implemented_by re-pointed).'
     open_questions: []
   - id: REQ-TEST-357
     title: "The move to two assets changes nothing a collection records, generates, builds or offers - proven by the test suite and the existing pins, never by re-capturing them"
@@ -49310,16 +49358,12 @@ requirements:
     - "THE SWEEP'S THREE AMBIGUOUS CRITERIA ANSWERED (Keith, 2026-11-15, after the critic's review of fe3f5671): REQ-PIPE-190 c1 names the two contracts' real paths (assets/quarterly/child-protection-family-support/ and assets/daily/registry-services/); REQ-TEST-252 c15 reads 'the repository's own assets/, data/ or reports/'; REQ-QAC-294 c3 reads 'assets/<asset>/synthetic/synthetic_inputs.yaml (today the quarterly asset's)', its stale 'moving with the asset split to ... contract/<asset>/' note dropped. Each marked AMENDED by REQ-DOCS-358, and criterion 2 is met. With them the sweep amended 127 criteria, and 39 still name an old form: the 37 recorded above that were not ambiguous, plus REQ-TEST-252 c15 (now naming only the whole data/ and reports/ trees) and REQ-QAC-294 c3, whose clause 'kept at the top of contract/ among the asset-wide files - added to validate_collections.ASSET_WIDE ... by amendment A8' is outside Keith's wording and left for him."
     - "REQ-PIPE-240 c9 (Keith's wording, 2026-11-15): the scenario register's exemptions are INJECTIONS, INHERITING_DATASET and CORRECTION_RIDERS - the third had been added to validate_collections.SCENARIO_EXEMPT_NAMES without the criterion following."
     unmet_criteria:
-    - criterion: "Criterion 1, the LATER amendments - A2, A5, A6, A11, A17 (weekday participation), A16, A24, A25, A26, A27, A40's snapshots half, A41, A42 and C1/E6 (hosting and the snapshot archive), and A28 to A35 (the period control)."
+    - criterion: "Criterion 1, the LATER amendments still to apply - A16, A24, A25, A26, A27, A40's snapshots half, A41, A42 and C1/E6 (hosting and the snapshot archive). A2, A5, A6, A11 and A17 (weekday participation) and A28 to A35 (the period control) were applied 2026-11-18 with REQ-PIPE-346, REQ-DASH-347, REQ-DASH-355 and REQ-DASH-367."
       why: "Each is applied in the change that builds the requirement it serves (criterion 1), and those are the split's features, which come after #134's core and the speed batch (decisions-2026-11-01, 'Finishing the split'). The sweep's snapshot-archive criteria wait here too."
-      owner: "REQ-PIPE-346, REQ-DASH-347, REQ-PIPE-354, REQ-DASH-355, REQ-DASH-367, REQ-DASH-373"
+      owner: "REQ-PIPE-354, REQ-DASH-373"
       blocked_by:
         requirements:
-        - REQ-PIPE-346
-        - REQ-DASH-347
         - REQ-PIPE-354
-        - REQ-DASH-355
-        - REQ-DASH-367
         - REQ-DASH-373
     - criterion: "Criterion 3, its hosting notes - CLAUDE.md's 'The repo is public ... GitHub Pages hosting depends on that' bullet (E15)."
       why: "Nothing about hosting has changed until REQ-PIPE-354 is built; REQ-DOCS-259 criterion 7 rewrites the bullet when it moves (G9)."
@@ -49327,23 +49371,14 @@ requirements:
       blocked_by:
         requirements:
         - REQ-PIPE-354
-    - criterion: "Criterion 4, plans/running-thoughts.md #109, #131 and #134's configuration half."
-      why: "Each comes out once the last requirement it feeds is built: #109 feeds the Cancer and weekly collections, #131 the period control, hosting and weekdays, #134's configuration half REQ-GEN-371's eras.yaml (docs358-wording section 5). #131's two uncarried decisions are now in REQ-PIPE-342 and REQ-PIPE-354."
-      owner: "REQ-QAC-348, REQ-GEN-349, REQ-PIPE-346, REQ-DASH-347, REQ-QAC-350, REQ-GEN-351, REQ-DASH-355, REQ-DASH-356, REQ-DASH-367, REQ-PIPE-354, REQ-DASH-373, REQ-GEN-371"
+    - criterion: "Criterion 4, plans/running-thoughts.md #131 and #134's configuration half (#109 came out 2026-11-18, its Cancer and weekly collections built)."
+      why: "Each comes out once the last requirement it feeds is built: #131 feeds the period control and weekdays, built 2026-11-18, and hosting (REQ-PIPE-354, REQ-DASH-373); #134's configuration half REQ-GEN-371's eras.yaml, built 2026-11-18, and stays until REQ-DASH-394 (Keith, 2026-11-18)."
+      owner: "REQ-PIPE-354, REQ-DASH-373, REQ-DASH-394"
       blocked_by:
         requirements:
-        - REQ-QAC-348
-        - REQ-GEN-349
-        - REQ-PIPE-346
-        - REQ-DASH-347
-        - REQ-QAC-350
-        - REQ-GEN-351
-        - REQ-DASH-355
-        - REQ-DASH-356
-        - REQ-DASH-367
         - REQ-PIPE-354
         - REQ-DASH-373
-        - REQ-GEN-371
+        - REQ-DASH-394
     linked_tests:
     - tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_declaring_dataset_with_no_calendar
     - tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_dataset_with_no_calendar
