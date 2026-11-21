@@ -47,3 +47,13 @@ Verified working: the asset name everywhere, the not-production marker, the move
 notice at agency and dataset depth (announced, Back/Forward, mobile), the empty
 archive wording, #488's fix, the slow marker, View as table, no run times on home
 or agency pages, the weekday and annual labels.
+
+## Keith's answers to the five product questions, 2026-11-21
+
+1. Trend scale: an off-scale marker for a value beyond the chart's range.
+2. Unchecked supplies: say "not checked" and leave them off the trend.
+3. M2, our own could-not-check failure: KEEP the red Fail and its rollup, and reword the banner so its first line says our pipeline could not check the supply and that this is not a problem with the supplier's data.
+4. M3/M4, weekly gaps: count what the dataset owes, in its own unit - "9 Mondays with no supply, 21 September to 16 November"; several weekdays -> "9 owed days"; daily keeps "days".
+5. M6, tries note: amend REQ-DASH-414's signed summary to name how the last try ended (e.g. "3 tries - the last stopped at the 45-minute limit"); inside, one number and one date per try. Exact amended wording still needs Keith's yes.
+
+These go into post-build-review #493 with H1, M5, M1 and the nits; fixes are built test-first.

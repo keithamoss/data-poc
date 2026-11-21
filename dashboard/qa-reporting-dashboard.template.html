@@ -12770,6 +12770,36 @@ function markScenarioSubject(){
   }
   return el;
 }
+// WHERE THE SUBJECT IS PUT (post-build-review #202 F7, #420): run at the jump
+// and again once the fonts are in (#493). Returns whether a head pill was
+// landed first, at the window's top, in place of the subject staying whole.
+function placeScenarioSubject(el, entry, tall){
+  // CENTRED (post-build-review #202 F7, Keith 2026-10-15): "nearest" met the
+  // criterion and landed every subject flush on the bottom edge. From the top
+  // first, as a reload restores the old position; a subject near the page's
+  // top or end goes as far as the page scrolls, and one taller than the
+  // window starts at its top rather than losing its head above it.
+  window.scrollTo({top: 0, behavior: "instant"});
+  if(el.scrollIntoView) el.scrollIntoView({block: tall ? "start" : "center", behavior: "instant"});
+  // BUT AS MUCH OF THE PAGE HEAD AS FITS COMES BACK (Keith, 2026-10-15): a
+  // scenario can quote the head - TS-76's 'Substituted from' pill - and
+  // centring a subject far below it scrolled the head off. Scroll back by the
+  // room left below the subject, never past the head's top, so the subject
+  // stays whole and the head is shown as far as the window allows.
+  const head = !tall && el.getBoundingClientRect && document.querySelector("#view .view-head");
+  const pill = head && entry.coordinates.subject === "substitution-drill-down"
+    && document.querySelector('#view [data-testid="standing-in"]');
+  if(!head) return false;
+  const headTop = head.getBoundingClientRect().top;
+  // WHOLE PIXELS, AND ONE TO SPARE: a fractional height left the subject
+  // 0.375px past the fold, as TS-77b's did once, and an edge flush with the
+  // fold rounds either way with the machine's fonts - TS-78a's landed 0.28px
+  // past it on CI's (post-build-review #255).
+  const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom) - 1;
+  const back = scenarioBackBy(headTop, room, pill ? pill.getBoundingClientRect().top : null);
+  if(back > 0) window.scrollBy({top: -back, behavior: "instant"});
+  return back > Math.max(0, room);
+}
 // THE JUMP ITSELF, after the page has rendered (criteria 1, 3 and 7): expand
 // the history the subject sits in, scroll it into view at once, mark it, and
 // move focus to it without scrolling again. False where it is not on the page.
@@ -12786,43 +12816,40 @@ function landOnScenarioSubject(entry, on){
     if(toggle) toggle.click(); else older.hidden = false;
   }
   markScenarioSubject();
-  // CENTRED (post-build-review #202 F7, Keith 2026-10-15): "nearest" met the
-  // criterion and landed every subject flush on the bottom edge. From the top
-  // first, as a reload restores the old position; a subject near the page's
-  // top or end goes as far as the page scrolls, and one taller than the
-  // window starts at its top rather than losing its head above it.
-  window.scrollTo({top: 0, behavior: "instant"});
   const tall = el.getBoundingClientRect && el.getBoundingClientRect().height > window.innerHeight;
-  if(el.scrollIntoView) el.scrollIntoView({block: tall ? "start" : "center", behavior: "instant"});
-  // BUT AS MUCH OF THE PAGE HEAD AS FITS COMES BACK (Keith, 2026-10-15): a
-  // scenario can quote the head - TS-76's 'Substituted from' pill - and
-  // centring a subject far below it scrolled the head off. Scroll back by the
-  // room left below the subject, never past the head's top, so the subject
-  // stays whole and the head is shown as far as the window allows.
-  const head = !tall && el.getBoundingClientRect && document.querySelector("#view .view-head");
-  const pill = head && entry.coordinates.subject === "substitution-drill-down"
-    && document.querySelector('#view [data-testid="standing-in"]');
-  let pillFirst = false;
-  if(head){
-    const headTop = head.getBoundingClientRect().top;
-    // WHOLE PIXELS, AND ONE TO SPARE: a fractional height left the subject
-    // 0.375px past the fold, as TS-77b's did once, and an edge flush with the
-    // fold rounds either way with the machine's fonts - TS-78a's landed 0.28px
-    // past it on CI's (post-build-review #255).
-    const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom) - 1;
-    const back = scenarioBackBy(headTop, room, pill ? pill.getBoundingClientRect().top : null);
-    pillFirst = back > Math.max(0, room);
-    if(back > 0) window.scrollBy({top: -back, behavior: "instant"});
-  }
+  const pillFirst = placeScenarioSubject(el, entry, tall);
   // AND IT STAYS INSIDE ONCE THE FONTS ARE IN (post-build-review #259): on a
   // GitHub runner TS-78a's subject ended 0.28px past the fold after a cold
   // reload, though the jump had left a pixel to spare - something laid out
   // after the jump pushed it down.
+  // PLACED AGAIN, NOT ONLY NUDGED (post-build-review #493): a font arriving
+  // after the jump reflows the page above the subject in either direction,
+  // and a nudge that only lifts a subject pushed past the fold left one moved
+  // up off its edge. Once every font has loaded the whole placement runs
+  // again - unless the reader has started moving about the page, whose
+  // position is then theirs.
   if(!tall && document.fonts && document.fonts.ready){
-    // A pill landed first (#420) is the edge kept instead: lifting the subject
-    // back inside the fold would push the pill above the window again.
-    document.fonts.ready.then(()=> requestAnimationFrame(()=> pillFirst
-      ? keepPillInsideTop(pill) : keepSubjectInsideFold(el, window.innerHeight)));
+    let moved = false;
+    const mine = ()=>{ moved = true; };
+    const events = ["wheel", "keydown", "touchstart", "pointerdown"];
+    events.forEach(e=> window.addEventListener(e, mine, {once: true, passive: true}));
+    const settle = ()=> requestAnimationFrame(()=>{
+      if(!moved && el.isConnected){
+        // A pill landed first (#420) is the edge kept instead: lifting the
+        // subject back inside the fold would push the pill above the window.
+        if(pillFirst) keepPillInsideTop(document.querySelector('#view [data-testid="standing-in"]'));
+        else { placeScenarioSubject(el, entry, false); keepSubjectInsideFold(el, window.innerHeight); }
+      }
+    });
+    document.fonts.ready.then(settle);
+    // ARMED EVEN WHEN NOTHING IS LOADING YET: the jump's own render can use a
+    // face no earlier view needed, which the browser requests only at the next
+    // layout - after this line, with fonts.ready already resolved (#493).
+    if(document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", settle, {once: true});
+    setTimeout(()=>{
+      events.forEach(e=> window.removeEventListener(e, mine));
+      if(document.fonts.removeEventListener) document.fonts.removeEventListener("loadingdone", settle);
+    }, 5000);
   }
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.

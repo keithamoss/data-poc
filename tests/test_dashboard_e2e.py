@@ -3353,14 +3353,18 @@ class TestTheLowRunwayWarningIsOnThePage:
     warning appears "both in the dashboard and as a non-fatal warning in
     the repository's gates", and only the gate half was built.
 
-    Live against the real committed config at the time of writing: the
-    quarterly calendar has 2 future slots against a threshold of 4, so a
-    warning is due right now, which is what makes this assertable
-    against the real built page rather than a fixture.
+    Against the real committed config, ON A NAMED DATE (Keith's runway
+    amendment, 2026-11-21: each dataset against a year of its own
+    supplies): on 2026-11-01 cp-carers has 3 quarterly slots left against
+    its own 4, so a warning is due there. The page's default date is not
+    used - whether it warns moves with the data, and before the amendment
+    this class silently depended on it.
     """
 
+    ON = "2026-11-01"
+
     def test_it_is_visible_on_the_landing_view(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html)
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ON)
         notice = clean_page.locator(".notice-runway")
         assert notice.count() == 1, (
             "the low-runway warning is computed and still not rendered anywhere")
@@ -3368,14 +3372,12 @@ class TestTheLowRunwayWarningIsOnThePage:
 
     def test_it_names_the_calendar_and_the_dataset_that_runs_out_first(
             self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html)
-        # The fewest slots left, ties broken by dataset id
-        # (runway.calendar_runway): since REQ-QAC-348, cancer-notifications
-        # (annual, August only) ties cp-case-workers at one slot and sorts
-        # first.
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ON)
+        # The dataset furthest below its own year's worth drives
+        # (runway.calendar_runway): cp-carers, 3 left of its own 4.
         text = clean_page.locator(".notice-runway").first.inner_text()
         assert "quarterly" in text
-        assert "cancer-notifications" in text, (
+        assert "cp-carers" in text, (
             "the number is a minimum across datasets and the notice does not say whose")
 
     def test_it_says_in_words_that_nothing_has_failed(self, clean_page,
@@ -3384,9 +3386,28 @@ class TestTheLowRunwayWarningIsOnThePage:
         well as colour. A reader who cannot tell them apart treats both
         as noise."""
         text = None
-        _goto(clean_page, built_dashboard_html)
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ON)
         text = clean_page.locator(".notice-runway").first.inner_text().lower()
         assert "nothing has failed" in text or "not failing" in text
+
+    def test_the_page_counts_slots_left_as_the_gate_does(self, clean_page, built_dashboard_html,
+                                                          monkeypatch):
+        """The page and `runway.calendar_runway` must agree on how many
+        slots each dataset has left, BY THE ROUND EACH IS DUE ON
+        (REQ-PIPE-321 criterion 8). Found 2026-11-21 (post-build-review
+        #493): the build embedded each slot's PERIOD date, so at
+        files_go_to_period 1 the page counted one slot more than the gate
+        and stayed silent on a date the gate warned on."""
+        import datetime
+        from qa_tools.common import runway
+        monkeypatch.setenv("MOTHMAN_ASSET", "quarterly")
+        gate = runway.calendar_runway("quarterly", datetime.date.fromisoformat(self.ON))
+        assert gate.per_dataset, "no dataset counted - the comparison would prove nothing"
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ON)
+        page = dict(clean_page.evaluate(
+            """on => SCHEDULE_RUNWAY.calendars.find(c => c.name === 'quarterly').datasets
+                 .map(d => [d.id, (d.dates || []).filter(x => x > on).length])""", self.ON))
+        assert {k: page.get(k) for k, _ in gate.per_dataset} == dict(gate.per_dataset)
 
 
 @pytest.mark.shared_page
@@ -6489,6 +6510,42 @@ class TestEveryScenarioSubjectLandsCentred:
             if not ok:
                 off.append((sid, got))
         assert not off, f"subjects not centred: {off}"
+
+
+class TestASubjectStaysOnItsEdgeWhenTheFontsArriveLate:
+    """post-build-review #493 (found 2026-11-21, the C/D gate): a web font
+    that arrives AFTER a scenario jump reflows the page above the subject,
+    and the settle step only corrected a subject pushed past the fold - one
+    lifted off the bottom edge stayed there, up to a pixel short, which
+    TestEveryScenarioSubjectLandsCentred caught on some builds and not
+    others. Held fonts make the late arrival certain rather than a race."""
+
+    @pytest.mark.parametrize("sid", ["TS-38", "TS-66", "TS-87"])
+    def test_the_subject_is_placed_again_once_they_are_in(self, clean_page,
+                                                         built_dashboard_html, sid):
+        held = []
+        clean_page.route("**/*.woff2", lambda route: held.append(route))
+        clean_page.set_viewport_size({"width": 1280, "height": 800})
+        clean_page.goto(built_dashboard_html.as_uri(), wait_until="domcontentloaded")
+        clean_page.wait_for_function("document.querySelector('#view') !== null")
+        clean_page.locator("#scenarios-btn").click()
+        index = clean_page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
+        assert index >= 0, sid
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
+        clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
+        assert held, "no font was held, so the late arrival this guards never happened"
+        for route in held:
+            route.continue_()
+        clean_page.wait_for_function("document.fonts.status === 'loaded'")
+        clean_page.wait_for_timeout(300)
+        got = clean_page.evaluate("""() => {
+            const r = document.querySelector('#view .scenario-subject').getBoundingClientRect();
+            return {top: r.top, bottom: r.bottom, h: r.height, vh: innerHeight};
+        }""")
+        assert got["h"] <= got["vh"], (sid, got)
+        centred = abs((got["top"] + got["bottom"]) / 2 - got["vh"] / 2) <= 2
+        on_edge = got["top"] >= 0 and got["vh"] - 2 <= got["bottom"] <= got["vh"]
+        assert centred or on_edge, (sid, got)
 
 
 class TestTheEarlyEmergencyDepartmentScenariosLandOnItsPage:

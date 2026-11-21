@@ -647,7 +647,11 @@ def embed() -> None:
             except (ValueError, KeyError, FileNotFoundError):
                 ends = owed[-1].date if owed else None
             datasets.append({"id": entry.dataset_id,
-                              "dates": [p.date.isoformat() for p in owed],
+                              # BY THE ROUND EACH SLOT IS DUE ON, as runway.py
+                              # counts it (REQ-PIPE-321 criterion 8; post-build-
+                              # review #493) - never the period's own date, which
+                              # at files_go_to_period N is N rounds later.
+                              "dates": [(p.round_date or p.date).isoformat() for p in owed],
                               "lastPeriod": owed[-1].name if owed else None,
                               "lastDate": owed[-1].date.isoformat() if owed else None,
                               "endsOn": ends.isoformat() if ends else None,
