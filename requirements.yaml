@@ -51208,6 +51208,7 @@ requirements:
     - 'FOUR MORE READERS AND A WIDER GATE (post-build-review #394 and #395, the critic on 22e45ff5): scripted_corrections.load, validate_check_lifecycle._sources and sources_fingerprint, soda_common.readable_checks_yaml
       and synthetic_reset.asset_id now read through config_yaml (PROVISIONAL (2026-11-16): Soda''s check file pinned in both of its readers); the gate reads bootstrap/ and cli/ too and finds a parse imported
       by name and a parse of a name assigned a file''s content. Tests: TestEveryReaderInsideARunIsPinned and test_validate_imports.py''s planted forms, failing against 22e45ff5.'
+    - "KNOWN LIMIT, ACCEPTED (Keith, 2026-11-21, post-build-review #409 F6): a pin holds files' TEXT only. Whether a file exists and what a folder lists are still asked of the disk inside a pin, so a file added or removed mid-run is seen at once while an edited one is not. Accepted because editing configuration during a run is not a supported use; REJECTED pinning the listings too, which would need a new signed criterion."
     open_questions: []
     signed_off:
       by: Keith
@@ -51418,6 +51419,7 @@ requirements:
     - 'THE HIERARCHY IS IN THE KEY (post-build-review #393, the critic on 22e45ff5): a dataset''s collection, and so the defaults its slots take, is the hierarchy''s, read from data-asset.yaml outside its timezone
       block; the memo keys on (agreement, zones, hierarchy.tree()), the tree one value per text from hierarchy''s own Built store. Tested by tests/test_derived_once.py::TestAHierarchyEditIsSeenUnpinned, failing
       against 22e45ff5.'
+    - "KNOWN LIMIT, ACCEPTED (Keith, 2026-11-21, post-build-review #409 F7): the memo is bounded per (agreement, zones, hierarchy) triple, not per entry, so one triple's entries grow with the distinct arguments a run asks. Accepted because it matters only to a process that lives for days, which nothing does yet; a per-entry bound waits until a long-running unpinned process shows the growth."
     open_questions: []
     signed_off:
       by: Keith

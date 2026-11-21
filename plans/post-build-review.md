@@ -15810,7 +15810,7 @@ twice. It deliberately did not re-find the `TypeError`.
      every test, and releases and fails on a leftover configuration pin or
      delivery-tree snapshot. Hygiene, not a defect.
 
-409. **[todo, 2026-11-16]** **[QA pipeline]** **For Keith: what the pin and the memo do not hold.**
+409. **[done, 2026-11-16]** **[QA pipeline]** **For Keith: what the pin and the memo do not hold.**
      Recorded from the critic, no behaviour changed:
      - **F6**: a pin holds files' TEXT. Whether a file exists, and what a
        folder lists, are still asked of the disk inside a pin
@@ -15824,6 +15824,8 @@ twice. It deliberately did not re-find the `TypeError`.
        REQ-PIPE-400's SCALABILITY NFR). Worth a per-entry bound only if a
        long-running unpinned process shows it.
 
+     - **KEITH, 2026-11-21: accepted, both.** Recorded as known limits in
+       REQ-PIPE-397's and REQ-PIPE-400's decisions; nothing changes.
 410. **[done, 2026-11-16]** **[Data generation]** **[Testing & dev tooling]** **After REQ-GEN-392 no geocoding file drifted, and two geocoding tests went red.**
      Found running tests/test_geocoding_faults.py on the merged tree:
      `test_the_plans_drift_set_is_exactly_the_computed_drift` ("the history
@@ -16269,6 +16271,9 @@ twice. It deliberately did not re-find the `TypeError`.
      REQ-GEN-206 criterion 20's Expect quotes the page as it is rather than
      the reason codes. Whether the row should name the reason is a page
      change for its own requirement - not changed here.
+     - **KEITH, 2026-11-21: name the reason now** - 'Not evaluated: the Client
+       Register is contested (two files)' / '... was rejected'. Words only; the
+       row's status stays #95's to settle. Built with groups C and D's answers.
 
 446. **[done, 2026-11-16]** **[Testing & dev tooling]** **The container's
      environment carried stale MOTHMAN_ASSET and MOTHMAN_SUPPLY_DSN.** As the
@@ -17079,6 +17084,11 @@ twice. It deliberately did not re-find the `TypeError`.
        length of a gate chunk. Fixed the same way (one collection stated as its
        premise); the module passes in 6 seconds. Two cases found by a gate
        rather than by a guard is the argument for the guard above.
+     - **KEITH, 2026-11-21: run in-process.** Under pytest the bootstrap's
+       streams run one after another in the test's own process, so a stub
+       always applies; a test that needs the real pool asks for it with a
+       marker. Built in tests/ (an autouse conftest fixture), not as a
+       pytest check in product code. Built with groups C and D's answers.
 
 486. **[done, 2026-11-18]** **[QA pipeline]** **Mental Health's dbt check `contact_in_its_week` named no measure, so its dashboard figure would read only 'Value (count)'.**
      Found by the full gate on group C (tests/test_check_measures.py's
