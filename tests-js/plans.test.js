@@ -33,6 +33,9 @@ describe("plansStatusLabel / plansStatusPill", () => {
     ["todo", "To do"],
     ["parked", "Parked"],
     ["superseded", "Superseded"],
+    // REQ-DOCS-072 - a sprint that has built everything it owns and
+    // whose remaining criteria all belong to another sprint.
+    ["blocked", "Blocked"],
   ])("labels %s as %s", (status, label) => {
     const w = load();
     expect(w.plansStatusLabel(status)).toBe(label);
@@ -48,6 +51,16 @@ describe("plansStatusLabel / plansStatusPill", () => {
     expect(w.plansStatusPill("done")).toContain("pill green");
     expect(w.plansStatusPill("parked")).toContain("pill nodata");
   });
+
+  it("gives blocked a quiet pill, not an amber one", () => {
+    // Grey on purpose: nothing is happening inside a blocked sprint and
+    // the action belongs to its blocker, so amber would compete with
+    // the entries that genuinely want attention now.
+    const w = load();
+    expect(w.plansStatusPill("blocked")).toContain("pill nodata");
+    expect(w.plansStatusPill("blocked")).not.toContain("amber");
+  });
+
 });
 
 describe("inlinePlansMd", () => {
@@ -157,6 +170,18 @@ describe("plansEntryMatchesFilter", () => {
     expect(w.plansEntryMatchesFilter(entry({}))).toBe(true);
   });
 
+  it("offers blocked as a real filter chip", () => {
+    // REQ-DOCS-072. Asserted by clicking the chip rather than by
+    // reading PLANS_ALL_STATUSES, which is a const and so never
+    // reaches `window` - and which would prove the list contains a
+    // string, not that the filter works.
+    const w = load();
+    const view = renderedView(w);
+    clickChip(view, "status", "blocked");
+    expect(w.plansEntryMatchesFilter(entry({ status: "blocked" }))).toBe(true);
+    expect(w.plansEntryMatchesFilter(entry({ status: "done" }))).toBe(false);
+  });
+
   it("excludes an entry whose status isn't in a non-empty status filter, once a status chip is clicked", () => {
     const w = load();
     const view = renderedView(w);
@@ -217,5 +242,31 @@ describe("renderPlans (raw template, empty PLANS placeholder)", () => {
     w.renderPlans(view);
     expect(w.document.getElementById("plans-count").textContent).toBe("0 of 0 entries");
     expect(w.document.getElementById("plans-list").innerHTML).toContain("No plans entries match");
+  });
+});
+
+// REQ-DOCS-073's dependency view. Only the empty path is reachable
+// here: SPRINT_DEPENDENCIES is a top-level `const`, null in the
+// template, so it cannot be swapped in from outside - the same
+// limitation this file's own header describes for PLANS. The real
+// content rendering is covered against the real built dashboard by
+// tests/test_dashboard_e2e.py.
+describe("renderSprintDependencies", () => {
+  it("renders nothing at all when there is no embedded graph", () => {
+    // Asserted through the function, not on the const: a top-level
+    // `const` never reaches `window`, which is what this file's own
+    // header says and what the first draft of this test forgot.
+    const w = load();
+    expect(w.renderSprintDependencies()).toBe("");
+  });
+
+  it("does not break the Plans tab when the graph is absent", () => {
+    // The template is opened with no data by real people - a
+    // half-rendered tab is the failure this guards.
+    const w = load();
+    const view = w.document.getElementById("view");
+    w.renderPlans(view);
+    expect(view.querySelector("#plans-list")).not.toBeNull();
+    expect(view.querySelector("details.plans-deps")).toBeNull();
   });
 });

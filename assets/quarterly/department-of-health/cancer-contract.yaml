@@ -1,0 +1,190 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Cancer collection
+# (REQ-QAC-348): one table, one CSV per supply, owed once a year in the August
+# round. A SYNTHETIC test dataset made to exercise annual participation - it
+# stands in for no real supply and holds no real patient data. Written to
+# docs/check-authoring-rules.md.
+apiVersion: v3.2.0
+kind: DataContract
+# `id`, `name` and `domain` are held to the hierarchy in data-asset.yaml
+# (REQ-QAC-039): a one-table collection's contract carries its dataset's id and
+# display name, and its agency.
+id: cancer-notifications
+status: draft
+version: 1.0.0
+name: Cancer Notifications
+domain: department-of-health
+description:
+  purpose: >
+    A synthetic test dataset, made to exercise annual participation: one row
+    per cancer notified to the registry in the year before the supply, owed
+    once a year in the August round. It stands in for no real supply and holds
+    no real patient data. In a real cancer registry, a diagnosis date, postcode,
+    sex and age group together can identify a patient, which is why the age is
+    held as a group rather than a date of birth.
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/cancer/
+    format: csv
+    delimiter: comma
+    description: A yearly extract of the registry's notifications, dropped into this bucket.
+schema:
+  - name: cancer_notifications
+    physicalType: table
+    description: "One row per cancer notified to the registry, per yearly supply."
+    properties:
+      - name: notification_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: "The registry's own notification identifier - primary key of this table."
+        quality:
+          - id: quarterly:department-of-health:cancer:cancer-notifications:notification_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: quarterly.department-of-health.cancer.cancer-notifications.notification_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2015-01-01"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: quarterly:department-of-health:cancer:cancer-notifications:notification_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: quarterly.department-of-health.cancer.cancer-notifications.notification_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2015-01-01"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The same notification was sent twice, most often because a supply was assembled from overlapping extracts.
+      - name: diagnosis_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: "The date the cancer was diagnosed."
+      - name: notification_date
+        logicalType: date
+        physicalType: date
+        required: true
+        description: "The date the registry received the notification."
+      - name: primary_site
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        description: "The cancer's primary site, grouped."
+        quality:
+          - id: quarterly:department-of-health:cancer:cancer-notifications:primary_site:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Breast", "Colorectal", "Lung", "Prostate", "Melanoma", "Lymphoma", "Other"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: quarterly.department-of-health.cancer.cancer-notifications.primary_site.invalidValues_datacontract
+              - property: introduced_date
+                value: "2015-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The registry has started grouping sites in a way that was never agreed in the contract, usually a new site group introduced upstream without notice.
+      - name: stage
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: "The stage at diagnosis, I to IV, or Unknown."
+        quality:
+          - id: quarterly:department-of-health:cancer:cancer-notifications:stage:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["I", "II", "III", "IV", "Unknown"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: quarterly.department-of-health.cancer.cancer-notifications.stage.invalidValues_datacontract
+              - property: introduced_date
+                value: "2015-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a staging scheme changed upstream without notice.
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        description: "Closed value set (M / F / X)."
+      - name: age_group
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: "The patient's age band at diagnosis."
+      - name: postcode
+        logicalType: string
+        physicalType: varchar(4)
+        required: false
+        description: "The patient's residential postcode at diagnosis, where recorded."
+      - name: basis_of_diagnosis
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        description: "How the diagnosis was made."
+    quality:
+      - id: quarterly:department-of-health:cancer:cancer-notifications:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [800, 3000]
+        severity: warning
+        customProperties:
+          - property: check_id
+            value: quarterly.department-of-health.cancer.cancer-notifications.rowCount_datacontract
+          - property: introduced_date
+            value: "2015-01-01"
+          - property: description
+            value: >
+              The number of rows in the supply must fall inside the expected band.
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: piiClassification
+    value: "Synthetic. In a real deployment this is health information about identifiable patients; confirm and record its handling classification before this leaves draft status."
+  - property: arrivalPattern
+    value:
+      - type: nested_folder
+        keyPattern: "cancer/{slot_id}/cancer_notifications.csv"
+        dataset_id: cancer-notifications
+        extractTo: cancer_notifications

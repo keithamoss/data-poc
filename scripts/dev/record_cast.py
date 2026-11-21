@@ -39,6 +39,8 @@ import sys
 import termios
 import time
 
+import pyte
+
 NAMED_KEYS = {
     "up": "\x1b[A",
     "down": "\x1b[B",
@@ -52,19 +54,34 @@ NAMED_KEYS = {
     "backspace": "\x7f",
 }
 
-# ESC[6n (Device Status Report / cursor-position-request) and a real
-# terminal's own reply, ESC[<row>;<col>R - see _drain()'s own comment
-# for why this is answered for real rather than left unanswered.
+# ESC[6n (Device Status Report / cursor-position-request). A real
+# terminal replies ESC[<row>;<col>R with its ACTUAL cursor position - see
+# _drain()'s own comment for why this is answered at all, and why the
+# answer has to be truthful rather than constant.
 _CPR_QUERY = "\x1b[6n"
-_CPR_RESPONSE = b"\x1b[1;1R"
 
 
 def parse_steps(raw_steps: list[str]) -> list[dict]:
-    """Each --step is either "wait:<substring>[:timeout_seconds]" (block
-    until that substring appears in the decoded output so far, or raise
-    after timeout_seconds - default 10, pass a bigger one for a step
-    that triggers a real, slow subprocess) or "key:<name or literal
-    text>" (sent immediately, no waiting)."""
+    """Each --step is one of:
+
+    - "wait:<substring>[:timeout_seconds]" - block until that substring
+      appears in the decoded output so far, or raise after
+      timeout_seconds (default 10; pass a bigger one for a step that
+      triggers a real, slow subprocess).
+    - "key:<name or literal text>" - sent immediately, no waiting.
+    - "pause:<seconds>" - send nothing and keep recording for that long.
+
+    `pause` exists because a recording of a TUI is watched by a human,
+    and a script that answers every prompt the instant it renders reads
+    as a machine driving a machine (plans/dashboard.md #13). The first
+    qa_wizard.cast gave a viewer a uniform 0.78s to read each menu and
+    0.48s to read a dense results table, with zero arrow keys anywhere -
+    every choice was just the already-highlighted first option. Real
+    hesitation is content here, not dead air, so it is scripted
+    explicitly rather than faked with a global delay: pauses genuinely
+    differ (a first-time menu earns longer than a familiar y/N), and
+    keeping them per-step keeps the recording deterministic, which a
+    random jitter would not."""
     steps = []
     for raw in raw_steps:
         kind, _, rest = raw.partition(":")
@@ -76,8 +93,17 @@ def parse_steps(raw_steps: list[str]) -> list[dict]:
                 steps.append({"type": "wait", "text": rest, "timeout": 10.0})
         elif kind == "key":
             steps.append({"type": "key", "value": rest})
+        elif kind == "pause":
+            try:
+                seconds = float(rest)
+            except ValueError:
+                raise ValueError(f"--step {raw!r}: pause needs a number of seconds, got {rest!r}") from None
+            if seconds < 0:
+                raise ValueError(f"--step {raw!r}: pause cannot be negative")
+            steps.append({"type": "pause", "seconds": seconds})
         else:
-            raise ValueError(f"Unrecognised --step {raw!r} (expected wait:... or key:...)")
+            raise ValueError(
+                f"Unrecognised --step {raw!r} (expected wait:..., key:... or pause:...)")
     return steps
 
 
@@ -105,6 +131,12 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
     t0 = time.time()
     events: list[tuple[float, str]] = []
     decoded_so_far = ""
+    # A real terminal-emulator buffer, fed every byte the child writes, so
+    # the CPR replies below can report the genuine cursor position rather
+    # than a constant. Same pyte dependency scripts/dev/tui_screenshot.py
+    # already uses to resolve in-place TUI redraws.
+    screen = pyte.Screen(cols, rows)
+    stream = pyte.Stream(screen)
 
     def _drain(deadline: float | None) -> None:
         nonlocal decoded_so_far
@@ -126,6 +158,7 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
                 text = chunk.decode("utf-8", errors="replace")
                 events.append((time.time() - t0, text))
                 decoded_so_far += text
+                stream.feed(text)
                 # Answer a real CPR (cursor-position-request, ESC[6n) query
                 # the moment it appears - prompt_toolkit/questionary send
                 # one on every fresh prompt render to check the real
@@ -144,8 +177,23 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
                 # real, immediately, fixes both at the actual source
                 # rather than working around the symptom.
                 if _CPR_QUERY in text:
+                    # Answer with the REAL cursor position, tracked by
+                    # feeding everything through a terminal emulator.
+                    # This used to reply a constant ESC[1;1R ("you are at
+                    # the top-left"), which silenced the warning but told
+                    # prompt_toolkit a lie: it re-rendered every prompt
+                    # from row 0 and erased whatever was above, so the
+                    # splash screen and every answered line got wiped the
+                    # instant the next prompt drew. What a viewer saw was
+                    # an unreadable orange flash - questionary's own
+                    # "answered" style, colour 214, appearing and being
+                    # destroyed in the same frame (plans/dashboard.md
+                    # #13's follow-up; Keith spotted it in the published
+                    # demo). A real terminal session never behaved that
+                    # way; only the recording did.
                     for _ in range(text.count(_CPR_QUERY)):
-                        os.write(master_fd, _CPR_RESPONSE)
+                        os.write(master_fd,
+                                  f"\x1b[{screen.cursor.y + 1};{screen.cursor.x + 1}R".encode())
                 continue
             if deadline is not None and time.time() >= deadline:
                 return
@@ -175,6 +223,13 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
         elif step["type"] == "key":
             os.write(master_fd, NAMED_KEYS.get(step["value"], step["value"]).encode())
             _drain(time.time() + settle_delay)
+        elif step["type"] == "pause":
+            # Keep draining rather than sleeping: real output arriving
+            # mid-pause still gets recorded with its own true timestamp,
+            # and asciinema v2 stores absolute elapsed times per event,
+            # so the resulting GAP is exactly what playback renders as
+            # the viewer's own thinking time.
+            _drain(time.time() + step["seconds"])
 
     # Keep recording real output until it genuinely goes quiet.
     last_activity = time.time()
@@ -231,7 +286,8 @@ def main() -> None:
                          help="Seconds of real silence after the last step before the recording stops.")
     parser.add_argument("--title", default="mothman CLI/TUI demo")
     parser.add_argument("--step", action="append", default=[], required=True,
-                         help="wait:<substring>[:timeout_s] or key:<name|literal text> - repeatable, in order.")
+                         help="wait:<substring>[:timeout_s], key:<name|literal text>, or "
+                              "pause:<seconds> - repeatable, applied in order.")
     args = parser.parse_args()
 
     steps = parse_steps(args.step)

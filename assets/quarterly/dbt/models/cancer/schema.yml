@@ -1,0 +1,54 @@
+# The Cancer collection's dbt checks (REQ-QAC-348). The prose follows
+# docs/check-authoring-rules.md.
+version: 2
+
+models:
+  - name: stg_cancer_notifications
+    description: One row per cancer notified to the registry, per yearly supply.
+    columns:
+      - name: diagnosis_date
+        tests:
+          - not_null:
+              meta:
+                check_id: quarterly.department-of-health.cancer.cancer-notifications.diagnosis_date.not_null_dbt
+                category: completeness
+                introduced_date: "2015-01-01"
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
+                changelog: []
+      - name: primary_site
+        tests:
+          - accepted_values:
+              values: ['Breast', 'Colorectal', 'Lung', 'Prostate', 'Melanoma', 'Lymphoma', 'Other']
+              meta:
+                check_id: quarterly.department-of-health.cancer.cancer-notifications.primary_site.accepted_values_dbt
+                category: conformity
+                introduced_date: "2015-01-01"
+                description: >
+                  A single unrecognised value fails.
+                failure_indicates: >
+                  The registry has started grouping sites in a way that was never
+                  agreed in the contract, usually a new site group introduced
+                  upstream without notice.
+                changelog: []
+
+# tests/cancer/notified_before_diagnosed.sql - its header says what it finds.
+data_tests:
+  - name: notified_before_diagnosed
+    config:
+      meta:
+        check_id: quarterly.department-of-health.cancer.cancer-notifications.notification_date.notified_before_diagnosed_dbt
+        reads_columns: ["cancer_notifications.notification_id", "cancer_notifications.diagnosis_date", "cancer_notifications.notification_date"]
+        reads_tables: []
+        name: Notified after diagnosis
+        measures: Notifications before diagnosis
+        category: consistency
+        introduced_date: "2015-01-01"
+        description: >
+          A cancer must not be notified before the date it was diagnosed.
+        failure_indicates: >
+          A diagnosis date was keyed with its day and month swapped, or a
+          notification was raised against the wrong patient.
+        changelog: []

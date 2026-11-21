@@ -1,0 +1,465 @@
+- id: REQ-GHUB-433
+  title: "The processing pass reads new slot-ticket comments from GitHub and hands each to the GitHub filing route once, so a comment reaches the decision log without GitHub Actions reaching the database"
+  date_written: "2026-11-21"
+  story: "As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database."
+  moscow: should
+  status: not_started
+  source: "Keith, delivery-architect triage of REQ-GHUB-082 criterion 1, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H's drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21; SETTLED as polling by Keith the same day (Q2.1 (a)); v5 folds in the delivery-architect's and delivery-dashboard-ux's reviews of v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL, as a stage before ticket reconciliation, read the comments on the asset's ticket repository that it has not yet handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by its creation time."
+    - "THE SYSTEM SHALL read them with two repository-level paged listings per pass - the repository's issue comments updated since the oldest unhandled comment, and the slot tickets with their labels, which say each ticket's slot - and SHALL NOT make a request per ticket."
+    - "THE SYSTEM SHALL read those comments by an outbound request from inside the environment that holds the asset's database, and SHALL NOT require any inbound connection to that environment."
+    - "THE SYSTEM SHALL record the id of every comment it has handled in the asset's own database, and SHALL NOT keep that record in the repository or on local disk."
+    - "THE SYSTEM SHALL hand any one comment id to the handler at most once, whatever GitHub's listing returns again, so that a pass re-run after a failure, or a comment edited later, does not raise a decision twice."
+    - "THE SYSTEM SHALL leave out every comment authored by the identity the service itself posts as, so that its own replies and reconciliations are never read as commands."
+    - "THE SYSTEM SHALL give each decision raised the comment's GitHub creation instant as its effective_at."
+    - "IF reading or handling comments fails partway through a pass, THEN THE SYSTEM SHALL keep every id handled so far, SHALL report the stage as failed in the pass's exit status, and SHALL read the rest on the next pass."
+    - "THE SYSTEM SHALL take each comment's author from GitHub's own record of who posted it, and SHALL NOT read an author from the comment's body (REQ-GHUB-082 criterion 4)."
+    - "WHERE a comment is on a ticket whose slot is not a dataset of the selected asset, THE SYSTEM SHALL neither handle it nor reply to it."
+    - "WHERE the environment's ticketing is off, THE SYSTEM SHALL read no comments and SHALL say so in one line of the pass's report."
+    - "THE SYSTEM SHALL say, in every slot ticket's reconciled body, that commands posted on it are acted on at the next processing pass, and how often passes run, so that nobody re-posts a command that has not yet been read. PROVISIONAL (relay Q1 of round 6)."
+    - "THE SYSTEM SHALL delete the disabled .github/workflows/ticket-sync.yml in the same change, and SHALL close REQ-GHUB-082 criterion 1's unmet entry citing this requirement."
+  non_functional_requirements:
+    - "COMPATIBILITY: the environment already calls GitHub outbound for ticket reconciliation (ticket_reconciler.service_from_env), so this adds reads over the same route and the same credential; no new network path is opened."
+    - "SECURITY: the credential is read-and-write on one repository's issues only, never contents; a comment's authority still comes from its GitHub author being in people.yaml, never from the poller."
+    - "SECURITY: when the repository goes private (REQ-DOCS-259), commenting already needs repository access; the people.yaml allowlist stays the gate either way."
+    - "SCALABILITY: two paged listings per pass, independent of the number of tickets, well inside GitHub's per-token rate limit at about 30 collections an asset."
+    - "RELIABILITY: a GitHub outage delays decisions until the next pass and never loses one; handled ids only grow over comments actually handled."
+    - "LATENCY: a comment is acted on at the next processing pass, so the scheduler's interval is the response time, and criterion 12 tells the person so."
+    - "STATE: the handled-comment ids are state, so they live in the database."
+  dependencies:
+    - REQ-GHUB-082
+    - REQ-PIPE-151
+    - REQ-PIPE-083
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q2.1 (a)): POLLED BY THE PROCESSING PASS. The environment already calls GitHub outbound to reconcile tickets, so polling adds no new path or credential. A scheduled Lambda is the scheduler that already calls `mothman pipeline process` (REQ-PIPE-151), so it is not a separate option."
+    - "REJECTED a webhook into the environment: an inbound endpoint, a public address and secret verification for each of two separated environments, to save at most one scheduler interval on a decision that is not urgent."
+    - "REJECTED reviving ticket-sync.yml with database access: a runner with a route to the database breaks REQ-PIPE-089/092's line."
+    - "REJECTED retiring the GitHub route and keeping the terminal one: it reverses Keith's 2026-09-22 'not PoC-only' and 2026-09-26 'both routes first-class' decisions."
+    - "HANDLED IDS, NOT A TIME MARKER (delivery-architect, v4 review): GitHub's `since` filters on UPDATED time, so an edited old comment returns in a later listing; a time high-water mark would either re-raise it or skip a comment created earlier but listed later. Recording ids is the only exactly-once."
+    - "TWO LISTINGS (delivery-architect): ticket_github.comments() reads one ticket and returns bodies only, and a comment says nothing about its slot; the slot is the ticket's label, so the issue listing is the second read."
+    - "DRAIN THE BACKLOG, carried from Thread H (2026-09-22): each pass reads everything unhandled rather than reacting to one event; applied serially, oldest first, last wins."
+    - "ONE ASSET PER ENVIRONMENT READS ONLY ITS OWN SLOTS: both assets name the same ticket_repository today, so each ignores the other's tickets in silence."
+    - "CRITERION 12 IS THE UX REVIEW'S (delivery-dashboard-ux, 2026-11-21): a command that is not acted on at once reads as ignored and gets posted again."
+    - "PROVISIONAL, delivery-scoper v5: the UX review asked for WHEN A PASS LAST RAN in the ticket. That time changes every pass, so REQ-PIPE-083's reconciler - which writes a ticket only when its state changes - would rewrite every open ticket on every pass, about one GitHub write per ticket per pass and a notification each time. v5 states how often passes run instead, and what says a command WAS read is already there: a decision taken shows in the reconciled ticket (REQ-GHUB-082 criterion 8) and a refusal is replied to directly (criterion 23). Put to Keith as round 6 Q1."
+  open_questions:
+    - "Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. A deployment decision; it does not change what is built."
+
+- id: REQ-PIPE-434
+  title: "A supply for a dataset with no calendar is filed to no period, never held for placing, and checked when it arrives"
+  date_written: "2026-11-21"
+  story: "As whoever runs QA on a one-off, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately); plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27). Drafted by delivery-scoper 2026-11-21, v5. Buildable at once (Keith, round 5, architect Q1). PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing."
+    - "THE SYSTEM SHALL NOT hold such a supply for a person to place (REQ-PIPE-064), because no period exists to place it in."
+    - "WHEN such a supply is staged, THE SYSTEM SHALL run its dataset's active checks over it in the same pass as any other arrival, against a run view of the newest version of each no-calendar table (REQ-PIPE-106)."
+    - "THE SYSTEM SHALL NOT compute a claim window, lateness, runway, a missing slot or a schedule-ended hold for such a dataset, and SHALL NOT report any of them as failing for want of a calendar."
+  non_functional_requirements:
+    - "SCALABILITY: no work per period, so the cost is per arrival only."
+    - "RELIABILITY: a supply that cannot be loaded or checked reads could-not-load or could-not-check as for any arrival, and is never silently skipped."
+    - "MAINTAINABILITY: one rule at the filing boundary, asked of the declaration (sample_data.is_sample), not a branch per caller."
+  dependencies:
+    - REQ-PIPE-106
+  decisions:
+    - "BOTH no_calendar VALUES ARE FILED THE SAME WAY (delivery-scoper): neither has a period, so filing, holding and lateness cannot differ; what the record COUNTS for differs, and that is REQ-PIPE-438's."
+    - "THE DEFECT, from #141 (2026-11-18), confirmed by the delivery-architect at filing.py:446-469: NoCalendarAgreed is not a ValueError, so file_arrivals' handlers missed it; past that the supply was held as waiting for a person to place it, so no tool checked it."
+    - "REJECTED holding a no-period supply for a person: there is nothing a person could choose."
+    - "REJECTED inventing a pseudo-period (the receipt date, or one period per one-off) so the ordinary filing path runs: it would put a period into the arithmetic REQ-PIPE-106 criterion 5 excludes by construction."
+
+- id: REQ-PIPE-435
+  title: "A person records one release-or-withhold decision for a whole one-off, with a reason, in an append-only table the publisher can read; nothing about it is ever promoted"
+  date_written: "2026-11-21"
+  story: "As the person accountable for handing a one-off's data to a project, I want to record whether it is released or withheld, and why, so that there is a named, dated account of who let the data go - or stopped it."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.2 (b) and round 2 Q4 (a); plans/running-thoughts.md #141 (the promotion gate raises); the delivery-architect's v4 review (a new qa table, not decision_log). Drafted by delivery-scoper 2026-11-21, v5. Shared by every one-off kind. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN every dataset of a one-off has a recorded outcome for its checks, THE SYSTEM SHALL offer, in the TUI and as `mothman one-off decide`, one decision for the whole one-off - release or withhold."
+    - "WHEN a person records that decision, THE SYSTEM SHALL append it to an append-only table of one-off decisions in the qa schema with the person as actor, the instant, the decision and their reason, and SHALL refuse it without a reason."
+    - "THE SYSTEM SHALL grant the publisher role read on that table (REQ-PIPE-092), and SHALL grant no role update or delete on it."
+    - "IF the person is not named in the one-off's people.yaml, or is a placeholder, THEN THE SYSTEM SHALL refuse the decision and say why."
+    - "THE SYSTEM SHALL NOT accept a decision for a single dataset of a one-off, only for the whole one-off."
+    - "WHERE more than one decision has been recorded for a one-off, THE SYSTEM SHALL treat the latest as standing, and SHALL keep and show every earlier one."
+    - "THE SYSTEM SHALL NOT put a supply for a `no_calendar` dataset to the promotion gate; IF the gate is asked about one, THEN THE SYSTEM SHALL refuse it as having no period, and SHALL NOT raise NoCalendarAgreed."
+    - "THE SYSTEM SHALL NOT open a ticket for a one-off, nor accept its decision from GitHub."
+    - "THE SYSTEM SHALL record the decision only, and SHALL NOT itself move, copy or send a one-off's data to anyone."
+  non_functional_requirements:
+    - "OBSERVABILITY / COMPLIANCE: the database is dropped once the work is done (REQ-PIPE-442), so the latest published page is the only lasting copy of every decision; REQ-DASH-444 carries them."
+    - "SECURITY: the same identity rules as a filing decision - a named, non-placeholder person, the actor from git identity on the terminal."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.2 (b)): one release-or-withhold decision for the WHOLE one-off, with actor and reason. REJECTED (a) report only, the v1 recommendation, and (c) a decision per dataset."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q4 (a)): recorded only - the system never moves data. REJECTED (b) withholding blocking a hand-over step."
+    - "ITS OWN TABLE, NOT THE DECISION LOG (delivery-architect, v4 review): decision_log entries are keyed to a dataset's slot and carry filing semantics; a release has neither. An append-only qa table read by the publisher is what puts it on the page without the build reading anything else."
+    - "TERMINAL ONLY: GitHub tickets are per slot (REQ-PIPE-083) and a one-off has none; this is not a breach of REQ-GHUB-082's two-route parity, which governs filing decisions."
+    - "LAST WINS, ALL KEPT, carried from Thread H's rule for filing decisions: a withheld one-off can be released after discussion, and both entries stay visible."
+
+- id: REQ-DASH-436
+  title: "The dashboard builds and reads correctly for no-calendar datasets, and a one-off's page drops every control that only means something for a schedule"
+  date_written: "2026-11-21"
+  story: "As a reader of a one-off's dashboard, I want each dataset's checks and supplies shown without any schedule language or controls, so that I see what was checked rather than a page that failed to build, calls everything missing or offers buttons that do nothing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 (2026-11-18); sprint 29 point 8; delivery-dashboard-ux's v4 review findings 6 and 10. Drafted by delivery-scoper 2026-11-21, v5. Buildable at once (Keith, round 5). PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN the dashboard is built for an asset or one-off holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() (build_dashboard_data.py) or any other cadence read."
+    - "THE SYSTEM SHALL list such a dataset's supplies by receipt instant, and SHALL NOT show a period, a slot, a due date, lateness or anything marked missing for it."
+    - "THE SYSTEM SHALL show such a dataset's checks with their real verdicts, on a rendered page."
+    - "WHERE a dataset of a one-off has arrived but has no recorded check outcome yet, THE SYSTEM SHALL show it as 'Not yet checked', leave it out of the rollup with that reason, and SHALL NOT show it as No data."
+    - "WHERE the page is built for a folder under one-offs/, THE SYSTEM SHALL NOT show the in-the-warehouse date, the period control or its tier, trends, sparklines, run comparison or the supply-history list."
+    - "IF a link into a one-off's page carries an in-place-on date or a period, THEN THE SYSTEM SHALL open the view without them and show a notice that this page has no dates or periods, and SHALL NOT show a blank page."
+    - "THE SYSTEM SHALL roll such datasets up as REQ-PIPE-438 decides, and SHALL NOT decide it a second time here."
+  non_functional_requirements:
+    - "COMPATIBILITY: the built page opens from file:// with no network, as every dashboard does."
+    - "PERFORMANCE: a one-off is tens of tables with one supply each; no budget beyond the existing build."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-438
+  decisions:
+    - "KEYED ON THE FOLDER ROOT, NOT ON EVERY DATASET DECLARING no_calendar (delivery-dashboard-ux): a recurring asset can hold a not-yet-agreed dataset and must keep its schedule controls; a one-off never needs them. The root is the one fact that says which."
+    - "'NOT YET CHECKED' IS ITS OWN STATE (delivery-dashboard-ux, finding 6): publishing at any time (REQ-PIPE-443) means a page can go out before QA finishes; No data says nothing arrived, which would be false."
+    - "THE ROLLUP LIVES IN ONE PLACE: REQ-PIPE-438 amends REQ-PIPE-106, and this requirement follows it."
+
+- id: REQ-PIPE-438
+  title: "A `never` dataset's results are real quality history and roll up within its one-off - except a dataset declared derived; REQ-PIPE-106's not-counted rules apply to `not-yet-agreed` only; an asset under assets/ refuses `never`"
+  date_written: "2026-11-21"
+  story: "As a reader of a one-off's dashboard, I want its tables' verdicts to count and roll up, so that the page answers whether the data is fit to release rather than reading 'Not counted' throughout."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21, v5. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only."
+    - "THE SYSTEM SHALL record the QA results of a dataset declaring `no_calendar: never` as agreed results, unless its configuration declares it `derived: true`, whose results are recorded in development."
+    - "THE SYSTEM SHALL roll a `never` dataset's verdicts up into its collection and its one-off, as for any dataset with a calendar, and SHALL leave a derived dataset's out."
+    - "WHERE a cross-table check spans a derived dataset and a counted one, THE SYSTEM SHALL count its result toward the counted dataset's status and exclude it only from the derived dataset's."
+    - "THE SYSTEM SHALL label a derived dataset in words as 'Derived product, not counted in the <kind>'s status', and SHALL name derived products in the line that says what was not counted."
+    - "THE SYSTEM SHALL NOT label a `never` dataset row by row as a one-off; the page says that once (REQ-DASH-444)."
+    - "THE SYSTEM SHALL change the no-schedule tooltip so that it says a `never` dataset IS counted, rather than that every dataset without a schedule is not."
+    - "IF an asset under assets/ declares a dataset `no_calendar: never` or `derived`, THEN THE SYSTEM SHALL refuse the configuration in `mothman check`, naming the dataset."
+    - "IF a one-off declares a dataset `no_calendar: not-yet-agreed` or with a calendar, THEN THE SYSTEM SHALL refuse it, naming the dataset."
+  non_functional_requirements:
+    - "CORRECTNESS: every status implementation changes together - the template's rollup and unagreedMarker(), dataset_status.py, sample_data.state_for_participants and status-cases.json - with one test driving the same inputs through each (the item-74 lesson)."
+    - "SCALABILITY: the refusals are per dataset, so they cost nothing extra at 30 collections."
+  dependencies:
+    - REQ-PIPE-106
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.1 (a)): a one-off's QA IS the deliverable, so its verdicts count. REJECTED (b), REQ-PIPE-106 as built, under which an all-`never` folder reads 'Not counted' at every level."
+    - "WHY 106 GOT THIS WRONG: its 'one mechanism, two exits' (2026-09-27) gave both exits the check-development semantics, and sprint 29 point 5 - only DERIVED products are excluded - implied otherwise. Nobody reconciled the two until 2026-11-21."
+    - "A `derived:` DECLARATION OF ITS OWN (delivery-architect, v4 finding 5): once `never` is counted, routing (the no-period schema) and state (in development) come apart, and `not-yet-agreed` is refused in a one-off, so a derived product needs a key that says only that."
+    - "SETTLED by Keith 2026-11-21 (round 5 architect Q3 (a)): a cross-table check over a derived and a counted table counts on the counted side and is excluded only from the derived product's - one new rule. Today state_for_participants records the whole result in development if any participant has no calendar; that rule stays for not-yet-agreed, where it protects an agreed dataset from a check under development."
+    - "SETTLED by Keith 2026-11-21 (Q4.7 (a)): `never` lives only under one-offs/; an asset under assets/ refuses it. REJECTED allowing both."
+    - "THE WORDS ARE THE UX REVIEW'S (findings 7 to 9): derived products had no words; the current tooltip would become false; a marker on 30 rows is noise."
+    - "WHAT STAYS FROM 106 for `never`: criteria 4 and 5 (the no-period schema, excluded from period arithmetic by construction) and the hierarchy criteria 11 to 15. Criterion 17's discard is superseded for a one-off by dropping it (REQ-PIPE-442)."
+
+- id: REQ-PIPE-446
+  title: "one-offs/<kind>/<id>/ is read by the resolver beside assets/ - selected by MOTHMAN_ASSET by bare id, one id namespace across assets and every kind, each (gate, kind) declared, and changed folders fully gated with a digest pass over the rest"
+  date_written: "2026-11-21"
+  story: "As whoever maintains the pipeline, I want one-offs of any kind found and selected like assets while staying out of everything that serves the enduring assets, so that hundreds of them cost the gates little and never touch CI."
+  moscow: must
+  status: not_started
+  source: "Keith 2026-11-21, round 3 (one-offs apart from the enduring assets), round 4 (one-offs/<kind>/<id>/, the extraction the first kind) and round 5 (architect Q2 (b)); delivery-architect v4 findings 6, 7 and 9 and its reuse list. Checked against asset_model/assets.py, cli/check.py's _GATES and _asset_passes, qa_tools/common/diff_base.py and REQ-PIPE-342/363. Drafted by delivery-scoper 2026-11-21, v5. Shared by every kind. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL list one-offs from one-offs/<kind>/ for every kind folder under one-offs/ - directories only, '_' and '.' names skipped, names held to NAME_PATTERN - and SHALL NOT hold a list of one-offs anywhere in code."
+    - "IF a kind folder under one-offs/ has no kind plug-in registered in code - the reader for its package, its generator and its check layers - THEN THE SYSTEM SHALL fail `mothman check`, naming the folder."
+    - "WHEN MOTHMAN_ASSET names a one-off's bare id, THE SYSTEM SHALL select it, its configuration in one-offs/<kind>/<id>/, its state paths data/<id>/ and reports/<id>/, and its database supply_<id>."
+    - "IF one id is a folder under assets/ and under any kind, or under two kinds, THEN THE SYSTEM SHALL refuse to select it, and `mothman check` SHALL fail, naming every folder - since they would share data/, reports/, a database and a module tag."
+    - "IF a folder's data-asset.yaml states a data_asset_id other than its folder name, THEN `mothman check` SHALL fail, naming both, for assets and one-offs alike."
+    - "THE SYSTEM SHALL keep assets.names(), and every reader that iterates the enduring assets through it, to assets/ alone, and SHALL list one-offs only through a reader of their own."
+    - "THE SYSTEM SHALL let a deployment point the one-offs root elsewhere as use_root does for assets/ (REQ-PIPE-342), and SHALL let a test point it at a temporary folder."
+    - "THE SYSTEM SHALL build no per-collection command group for a one-off, and SHALL reach every one-off step through `mothman one-off` (open, load, decide, publish, drop, list), so that a one-off's collection short can never clash with a top-level command."
+    - "IF `mothman pipeline bootstrap`, `mothman env reset-synthetic`, a dashboard deployment or any other synthetic or deployment command runs WHILE MOTHMAN_ASSET names a one-off, THEN THE SYSTEM SHALL refuse it, naming the one-off."
+    - "THE SYSTEM SHALL have every per-asset gate in `mothman check` declare, for each one-off kind, whether it applies, and SHALL refuse to run a gate with any (gate, kind) pair undeclared."
+    - "WHEN `mothman check` runs, THE SYSTEM SHALL run each applicable gate in full over every one-off folder changed since the diff base (MOTHMAN_DIFF_BASE), and SHALL check every other one-off folder in one in-process pass that its files still match the digest it recorded when generated."
+    - "THE SYSTEM SHALL show one row per gate for all one-offs of a kind - how many were checked in full, how many by digest, and the name of each that failed - rather than one row per one-off, and SHALL show a gate that does not apply as 'not applicable (<kind>)', never as passed."
+    - "THE SYSTEM SHALL let the collections gate accept a one-off's collections served by its kind's shared adapter, resolved through the adapter registry, and SHALL go on failing any enduring asset's collection without an adapter of its own."
+    - "THE SYSTEM SHALL have a test that no CI workflow and no session-start hook loops over, selects or loads a one-off folder."
+    - "THE SYSTEM SHALL amend REQ-PIPE-342 criterion 5 and REQ-PIPE-363 criteria 1, 4 and 6 in the same change, as amendments-v5 states."
+  non_functional_requirements:
+    - "SCALABILITY: each per-asset gate is a subprocess, so full gating of 200 folders would be about 2,000 interpreter starts (delivery-architect); changed-only plus a digest pass is what keeps `mothman check` near today's time."
+    - "SCALABILITY: the two-level listing cannot use assets.py's single-directory stat cache; each kind folder needs its own stat stamp, or the listing is re-read on every selected() call."
+    - "COST: the shell loops in test.yml (about 15) and the session-start hook (3) list assets/ and so never see one-offs. CI does still PARSE them - `yamllint --strict .` in critical.yml and test.yml reads every YAML file - which reads no data and is cheap, but is why criterion 14 says loops over, selects or loads, not names."
+    - "SECURITY: a one-off's database holds real supply rows, so nothing CI runs may select one."
+    - "MAINTAINABILITY: validate-config.yml never checks one-offs; their configuration is gated locally by criterion 11, and that is a deliberate limit."
+  dependencies:
+    - REQ-PIPE-342
+    - REQ-PIPE-363
+    - REQ-PIPE-385
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (round 3): one-offs live apart from the enduring assets, are selected by MOTHMAN_ASSET and get a database as any asset does, and are never listed by the enduring-asset loops."
+    - "SETTLED by Keith 2026-11-21 (round 4): one-offs/<kind>/<id>/, the kind a folder level, each kind's template beside its folders; shared by every kind - the listing, the database, the release decision and publishing - each kind plugging in its own recipe reader and checks. REJECTED one root with a declared `kind:`, the recommendation."
+    - "ONE ID NAMESPACE ACROSS ASSETS AND EVERY KIND (Keith, round 4 note): MOTHMAN_ASSET, supply_<name> and data/<name> do not carry a kind, so an id must be unique across all of them, not only within its kind."
+    - "THE BARE ID, NOT A PREFIX (delivery-scoper, v4): a prefix with a slash breaks NAME_PATTERN, the module tag and the data/<name> paths; a name prefix would be cosmetic. Criterion 4 refuses the clash a prefix would have prevented."
+    - "EACH (GATE, KIND) DECLARES, NO DEFAULT: a default of 'applies' fails every calendar or scenario gate; 'does not apply' silently leaves a new gate unrun. A new kind therefore declares every gate before its first folder can pass."
+    - "THE EXTRACTION KIND'S DECLARATIONS, matched to cli/check.py's real per-asset gates (delivery-architect, v4 finding 6). APPLY - hierarchy, collections, caches, schedule (it gates the `never` and `derived` declarations in the minimal calendar.yaml), patterns, soda, columns, people. DO NOT APPLY - providers, scenarios and scenario map (synthetic), guard (it opens a database), and the docs gates plans, requirements, sprints, provisional, changelog, feedback and premise (repository-wide reads with nothing of a one-off in them). The repository-wide gates (ruff, yamllint, agents, imports, dbt packages, layout, npm test, pytest) run once; layout learns the one-offs/<kind>/<id>/ layout, and dbt packages accepts a one-off's dbt project pointing at dbt_shared."
+    - "SETTLED by Keith 2026-11-21 (round 5 architect Q2 (b)): full gates on folders changed since the diff base, plus one cheap pass over the rest checking each still matches its recorded digest. It replaces v4's 'under one second per folder', which the architect showed unreachable."
+    - "NO PER-COLLECTION COMMANDS FOR A ONE-OFF (delivery-scoper, v5; delivery-architect v4 finding 9): REQ-PIPE-363 criterion 2 builds a command group per collection short, so a one-off's shorts would become top-level commands and could clash with `pipeline` or `dashboard`. One group, `mothman one-off`, removes the clash rather than refusing it."
+    - "REUSE (delivery-architect): the adapter registry already loads by path, so a kind's shared adapter is resolved there; check.py's per-gate rows gain one new 'checked by digest' state."
+    - "REJECTED putting one-offs under assets/ (v3): every enduring-asset loop would have needed teaching to skip them - about 18 shell loops and every Python reader."
+
+- id: REQ-PIPE-442
+  title: "Each one-off is loaded into a database of its own, worked from the TUI, refused if its id has been seen, and dropped - with its local files, reports and dbt scratch - only by a person with a typed confirmation"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a one-off, I want it worked in a database of its own that I remove, with everything it left on disk, when I am done, so that one one-off's rows never sit beside another's and never outlast the work."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 7 and 9 (Keith, 2026-09-27); Keith 2026-11-21 Q4.3 (a), Q4.6 (a), round 2 Q1 (a) and Q5 (b), round 5 architect Q4 (a); delivery-architect v4 findings 2 and 9 and its reuse list. Drafted by delivery-scoper 2026-11-21, v5. Shared by every kind. Running any REAL one-off waits for REQ-DOCS-259 (Keith, round 5). PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL let `mothman one-off open` and `mothman one-off list` run with MOTHMAN_ASSET unset, reading only the one-offs root and the kind's template, as an exemption from REQ-PIPE-363 criterion 6."
+    - "WHEN a person loads a committed one-off from the TUI or `mothman one-off load`, THE SYSTEM SHALL select it, create supply_<id> on the configured local server, mark that database's identity as the one-off's (db_identity.mark), and stage, check and record its package there through the same pipeline as any arrival."
+    - "IF the one-off's folder already existed when its package was opened, a database for that id exists, or a page for it is already published (REQ-PIPE-443), THEN THE SYSTEM SHALL refuse the package and say a re-send is a new one-off."
+    - "WHEN a person drops a one-off from the TUI or `mothman one-off drop`, THE SYSTEM SHALL list in the confirmation each thing that will be removed - the database supply_<id>, data/<id>/, reports/<id>/ and its dbt scratch - SHALL require them to type the id, and SHALL NOT remove anything otherwise."
+    - "WHEN the id is typed, THE SYSTEM SHALL remove every item the confirmation listed, and SHALL leave the one-off's committed configuration in place."
+    - "WHERE the one-off's page has not been published, THE SYSTEM SHALL warn, in that confirmation, that no record of its QA results or decisions will remain once it is dropped - only its committed configuration - and SHALL drop it if the id is typed."
+    - "THE SYSTEM SHALL NOT drop a one-off automatically - not on publishing, not on a schedule, and not as a side effect of anything else."
+    - "THE SYSTEM SHALL list, in the TUI and `mothman one-off list`, every one-off database still on the server and how long since it was created."
+    - "THE SYSTEM SHALL NOT run any part of a one-off in CI."
+  non_functional_requirements:
+    - "SECURITY: creating a database needs CREATEDB on the local server; the role that holds it is the operator's, never a CI or service identity."
+    - "PRIVACY: a one-off's rows sit on a shared local server between load and drop, and copies of its files and its failing-row keys sit under data/<id>/ and reports/<id>/ until the drop removes them (criterion 5)."
+    - "COMPLIANCE / RETENTION: a forgotten one-off is the retention risk, which is why criterion 8 lists them with their age; nothing drops one for the person."
+    - "RELIABILITY: a failed run leaves the database in place and resumable; a drop that fails partway names what it could not remove and can be run again."
+  dependencies:
+    - REQ-PIPE-440
+    - REQ-PIPE-443
+    - REQ-PIPE-446
+    - REQ-DOCS-259
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 7) and confirmed 2026-11-21 (round 2 Q1 (a)): one ephemeral PostgreSQL database per one-off, on the local server, driven by a human through the TUI, with no CI anywhere near it."
+    - "REJECTED by Keith 2026-11-21 (round 2 Q1), after drafting it as a real alternative at his own ask ('maybe it doesn't have a database'): checking a one-off in process over its files with no database, its record a file beside the package. Its gain was real - rows never copied, no server or CREATEDB - but it reversed REQ-PIPE-087's 'one engine, and it is PostgreSQL' for dbt, Soda and datacontract-cli (a second DuckDB adapter each, and soda-core-duckdb's old duckdb pin back), gave every check a second SQL dialect, forked staging, run views, the results writer and the decision record into a second implementation (the item-74 pattern), and kept the record append-only by convention only. The published page is the lasting record either way. Also REJECTED: a shape with no engine at all, dropping three of the four tools."
+    - "SETTLED by Keith 2026-09-27 (point 9), A REVERSAL: a corrected re-send is a NEW one-off. He first chose resupply, then reversed because a package arriving months later finds the first database dropped and its dashboard a static file that cannot be merged into. REJECTED with it: re-running QA over both packages from disk, a non-ephemeral database, and the new dashboard merely linking back."
+    - "SETTLED by Keith 2026-11-21 (Q4.3 (a)): a second package is refused; the committed folder is the lasting guard, the server and the destination are checked too."
+    - "SETTLED by Keith 2026-11-21 (Q4.6 (a), round 2 Q5 (b), round 5 architect Q4 (a)): a person drops it with a typed confirmation, never automatically; an unpublished one may be dropped with a warning; the drop removes the database AND data/<id>/, reports/<id>/ and the dbt scratch, each listed. Found by the architect: hand-filing copies the delivery under data/<id>/ and reports/<id>/ holds failing-row keys, so dropping the database alone would have left the extract on disk."
+    - "THE OPEN EXEMPTION (delivery-architect, v4 finding 9): the TUI refuses with no asset selected and the first connection claims the process, so a one-off that does not exist yet cannot be opened under the normal rule. Open reads no asset and connects to nothing; load selects the new one-off before it connects."
+    - "WAITS FOR REQ-DOCS-259 (Keith, round 5 architect Q1 (a)): the repository is public, and a real one-off's committed folder would publish its project, cohort and filter. The test fixture is synthetic and is not held."
+    - "REUSE (delivery-architect): hand_filing.file_supply and s3_source for loading; bootstrap/checkpoints' administrative create-and-drop; db_identity for marking; cli/env.py's database ages for criterion 8."
+
+- id: REQ-PIPE-443
+  title: "A one-off's dashboard can be published at any time to a configured shared folder or S3 location, showing its decision once there is one, never retired and never overwriting another one-off"
+  date_written: "2026-11-21"
+  story: "As a project team member or auditor, I want each one-off's QA page in one known place, permanently, so that what was checked and decided can be found years later."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 point 8 and its durable-record paragraph (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q3 (b); delivery-architect v4 finding 10. Drafted by delivery-scoper 2026-11-21, v5. Shared by every kind. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a person publishes a one-off from the TUI or `mothman one-off publish`, THE SYSTEM SHALL build its dashboard through the same build sequence as any asset's and write it as one page named by the id to the destination its configuration names - a filesystem path or an S3 prefix - with the page's fonts/ beside it, whether or not a decision has been recorded."
+    - "WHEN a person publishes a one-off already published, THE SYSTEM SHALL replace its own page at the same address, the new page showing every decision recorded so far."
+    - "IF a page at that address was published for a different package, THEN THE SYSTEM SHALL refuse to write over it."
+    - "THE SYSTEM SHALL NOT delete or retire a published page, and SHALL NOT build an index of published pages."
+    - "THE SYSTEM SHALL NOT publish any one-off from CI or to the recurring assets' hosting."
+  non_functional_requirements:
+    - "SCALABILITY: 30-40 extraction pages a year, about 200 after five years, in one place with no index; Keith accepted that cost out loud."
+    - "SECURITY: who can read the destination is the destination's access control, not this system's; the page carries failing-row identifier keys (Q4.5 (b)), so the destination must be restricted to people entitled to them."
+    - "COMPATIBILITY: the page needs no network; its fonts load from a fonts/ folder beside it, which publishing writes to the destination. A copy of the page alone, downloaded elsewhere, still opens and reads, falling back to system fonts."
+    - "COST: S3 storage for a few hundred small files is negligible."
+  dependencies:
+    - REQ-DASH-444
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 8): one dashboard per one-off, to a shared filesystem or S3, never retired, with no index."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q3 (b)): publish at any time as a QA report, showing the decision once there is one. REJECTED (a) refusing until a decision exists, the recommendation, and (c) publishing once only."
+    - "REJECTED by Keith 2026-09-27: a generated index page, with the cost accepted out loud - after five years, 200 files and no way to answer 'which extractions did we QA for that project'."
+    - "THE FONTS NFR WAS FALSE IN v4 (delivery-architect, finding 10): it said fonts and vendor assets were self-contained 'as today', and they load from fonts/ beside the page. The page needs no vendor/ either, because the Demo tab that uses it is removed from a one-off's page (REQ-DASH-444)."
+    - "A LATER PUBLISH REPLACES ONLY ITS OWN PAGE: replacing is how an undecided report becomes a decided one; refusing another package's overwrite keeps 'never retired' true for everyone else's."
+    - "REUSE (delivery-architect): publish()'s build sequence, not the recurring assets' hosting."
+
+- id: REQ-DASH-444
+  title: "A one-off's page says what it is once in its masthead, shows its release decision - or that there is none - above the QA result on every view, and says when, where and from what it was published"
+  date_written: "2026-11-21"
+  story: "As someone reading a one-off's page, possibly a downloaded copy long after the work, I want it to say plainly whether the data was released or withheld, by whom and why - or that nobody has decided - and how current the copy is, so that a green QA result is never read as a release."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29, 'the durable record is a static file' (2026-09-27); Keith 2026-11-21 Q4.2 (b) and round 5 UX Q1 (a), Q2 (a), Q3 (a); delivery-dashboard-ux v4 findings 1 to 5, 9, 11 and 14. Drafted by delivery-scoper 2026-11-21, v5 (split from v4's REQ-DASH-444; the recipe display is REQ-DASH-447). Shared by every kind. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL title a one-off's page, and head its masthead, '<id> · <project> · QA report', and SHALL say once, in the masthead, which kind of one-off it is."
+    - "THE SYSTEM SHALL show the standing decision as one line above the QA status on every view of the page, a cold-loaded deep link included, in words of its own - 'Released by <actor>, <instant>: <reason>' or 'Withheld by <actor>, <instant>: <reason>' - and SHALL NOT show it as a Pass, Warn or Fail pill or by colour."
+    - "WHERE no release-or-withhold decision has been recorded, THE SYSTEM SHALL say, on every view of the page and above its QA status, 'No release decision recorded. This page reports QA results only; it does not release or withhold the data.', and SHALL NOT show the words released, withheld, approved, cleared or pending."
+    - "THE SYSTEM SHALL label the QA status on a one-off's page as the QA result, so that it cannot be read as the release decision."
+    - "WHERE the standing decision is withhold, THE SYSTEM SHALL show its reason in full in that line, in neutral words."
+    - "THE SYSTEM SHALL list every decision on the home view, newest first, the standing one marked 'Current' and each earlier one 'Replaced by the decision of <instant>'."
+    - "THE SYSTEM SHALL word decisions from a word table of their own, and SHALL NOT use decisionWords() or causeNoun(), whose filing vocabulary ('held back') would clash."
+    - "THE SYSTEM SHALL show, beside the decision line, the instant the page was published, the address it was published to, and the commit of this repository that built it."
+    - "THE SYSTEM SHALL NOT show, on a one-off's page, the Plans, Requirements, Release notes, Demo, Feedback, Leaderboard, Scenarios, Past snapshots or Recent activity controls."
+    - "THE SYSTEM SHALL show which checks are the default layer and which are the kind's own, in words."
+  non_functional_requirements:
+    - "OBSERVABILITY / COMPLIANCE: the page is the only lasting record of the decisions once the one-off is dropped, so criterion 8's instant, address and commit are what make a found copy trustworthy."
+    - "PRIVACY: the page shows failing-row identifier keys as recurring dashboards do (Q4.5 (b)); REQ-PIPE-443's destination access control is what limits who reads them."
+  dependencies:
+    - REQ-DASH-436
+    - REQ-PIPE-435
+  decisions:
+    - "SPLIT FROM v4's REQ-DASH-444 (Keith, round 4 kinds; delivery-dashboard-ux finding 14): the decision block, the undecided wording, the header and routes are every kind's; the recipe display is the extraction's and is REQ-DASH-447."
+    - "SETTLED by Keith 2026-11-21 (round 5 UX Q2 (a)): one line above the QA status on every view, deep links included, in its own words, never a pill or colour; the QA status labelled as the QA result. REJECTED (b) a section on the home view only."
+    - "SETTLED by Keith 2026-11-21 (round 5 UX Q3 (a)): the undecided words, exactly as criterion 3 has them. REJECTED 'Awaiting a release decision', which reads as though one is coming."
+    - "SETTLED by Keith 2026-11-21 (round 5 UX Q1 (a)): the PoC development tools come out of a one-off's header. REJECTED keeping them."
+    - "WHY THE UNDECIDED LINE IS SO EXPLICIT (delivery-dashboard-ux, finding 1): a filled green Pass with a small 'undecided' line reads as cleared, and REQ-PIPE-443 lets a page go out before anyone decides."
+    - "'RELEASED' MEANS RECORDED AS RELEASED (finding 4): the line names the actor and the instant because the system never moves data (REQ-PIPE-435)."
+    - "THE MARKER ONCE, IN THE MASTHEAD (finding 9), not on 30 rows."
+    - "THE BUILD COMMIT IS A CRITERION, NOT ONLY AN NFR (finding 11); its value comes from snapshot_dashboard._git_short_sha (delivery-architect reuse)."
+
+- id: REQ-DASH-447
+  title: "An extraction's page shows what its recipe declared - id, project, recipe version and filter on the home view, each table's declared columns, cohort and expected rows on its own view"
+  date_written: "2026-11-21"
+  story: "As someone reading an extraction's page long after its working data is gone, I want it to say what the extraction claimed to contain, so that the declaration survives the database and can be compared with what the checks found."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29, 'the durable record is a static file' (2026-09-27); delivery-dashboard-ux v4 findings 12 and 14. Drafted by delivery-scoper 2026-11-21, v5, split from v4's REQ-DASH-444. The extraction kind's own. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL show on an extraction's home view its id, project, recipe format version and filter text."
+    - "THE SYSTEM SHALL show on each table's own view its declared columns with their types and identifier marks, its placement, whether it is a derived product, its cohort bounds and its expected row count where the recipe gave one."
+    - "THE SYSTEM SHALL show a recipe-derived check beside the declaration it came from, marked in words as from the recipe."
+    - "THE SYSTEM SHALL read all of this from the extraction's committed folder, and SHALL NOT read the recipe file at build time."
+  non_functional_requirements:
+    - "PERFORMANCE: tens of tables; progressive disclosure keeps the home view short whatever the column count."
+  dependencies:
+    - REQ-DASH-444
+    - REQ-PIPE-440
+  decisions:
+    - "LOAD-BEARING, NOT A NICETY (sprint 29, 2026-09-27): the recipe never enters a database and the working data is removed, so leave the declaration off the page and it is gone the moment the work ends."
+    - "PROGRESSIVE DISCLOSURE (delivery-dashboard-ux, finding 12): the summary on the home view, each table's detail on its own view, so the home view stays the release decision and the result."
+
+- id: REQ-PIPE-439
+  title: "An extraction arrives as a package - CSV files plus a recipe JSON whose format we define, with optional expected row counts - and a package with no valid recipe is refused"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want the extraction to declare itself in a recipe beside its files, so that what it claims to contain is stated before anything checks it."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 1-3 (Keith, 2026-09-27); Keith 2026-11-21 Q4.4 (b) and round 2 Q6 (b); delivery-architect v4 finding 4. Drafted by delivery-scoper 2026-11-21, v5. The extraction kind's own. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL read an extraction as a package - a directory on local disk or an S3 prefix - holding one recipe file and the data files it names."
+    - "THE SYSTEM SHALL read the recipe as JSON against a schema committed in this repository, carrying a recipe format version."
+    - "THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file and that file's format, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement."
+    - "THE SYSTEM SHALL accept, for each table, an optional expected row count."
+    - "THE SYSTEM SHALL accept CSV as the only file format in recipe format version 1, and IF a recipe names any other format, THEN THE SYSTEM SHALL refuse it, naming the table."
+    - "IF the recipe is missing, does not parse, or fails the schema, THEN THE SYSTEM SHALL refuse the package before anything is generated or loaded, naming each problem."
+    - "IF the extraction id is not lowercase letters, digits and single hyphens, or is already a folder under assets/ or any one-off kind, THEN THE SYSTEM SHALL refuse the package, naming the id and any folder it clashes with."
+    - "THE SYSTEM SHALL NOT write the recipe into any database."
+  non_functional_requirements:
+    - "MAINTAINABILITY: the recipe schema is versioned and each file names its format, so a later version adds formats without guessing."
+    - "PORTABILITY: S3 is read with the environment's own credentials; no new third-party domain beyond AWS's."
+    - "SECURITY: the recipe is untrusted input; it is parsed as data, its filter text is never executed, and a file name in it is refused if it escapes the package directory."
+  dependencies:
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (sprint 29 point 1): a package of files, local or S3; format may change, so nothing ASSUMES CSV - each file states its format."
+    - "CSV ONLY IN VERSION 1 (delivery-architect, v4 finding 4): staging is CSV-only (qa_tools/tools/stage.py, read_csv_explicit_nulls into a staging CSV), so another format is new work. Version 1 says so and refuses the rest rather than half-supporting them."
+    - "SETTLED by Keith 2026-09-27 (point 2): the recipe is OURS to define - tables, columns, filter/cohort/date range, placement."
+    - "SETTLED by Keith 2026-09-27 (point 3): the recipe lives beside the package and never enters the database. REJECTED, deferred not refused, recording it in the database. What it declares is carried into the committed folder (REQ-PIPE-440), which is configuration in the repository, not the database."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q6 (b)): the core fields plus an optional expected row count per table. REJECTED (a) the core fields only, the recommendation."
+    - "COHORT BOUNDS ARE STRUCTURED, THE FILTER IS PROSE: only a structured bound can become a check; filter text is shown, never parsed."
+
+- id: REQ-PIPE-440
+  title: "Opening an extraction generates one-offs/extraction/<id>/ from its recipe and the kind's template - hierarchy, a minimal calendar.yaml, contracts, checks and defaults - which must be committed before the package loads"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want its configuration generated from its recipe into a committed folder of its own, apart from the enduring assets, so that each extraction's checks and declaration are reviewable configuration and nothing is typed by hand."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b), round 3 Q1 (a) and addition, round 4 (one-offs/<kind>/<id>/), round 5 architect Q1 (a); delivery-architect v4 findings 1, 3 and 5. Drafted by delivery-scoper 2026-11-21, v5. The extraction kind's own. BUILDING IT WAITS FOR REQ-DOCS-259 (Keith, round 5). PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a person runs `mothman one-off open --kind extraction` on a package, THE SYSTEM SHALL generate one-offs/extraction/<id>/ from its recipe and the kind's template (one-offs/extraction/_template/), and SHALL NOT read any hierarchy or check authored by hand for that extraction."
+    - "THE SYSTEM SHALL generate in that folder a data-asset.yaml whose data_asset_id is the id, naming its project, recipe format version and recipe digest, its filter text, and the agency, collection and dataset hierarchy of the recipe's placements, with `derived: true` on each dataset the recipe marks derived."
+    - "THE SYSTEM SHALL generate in that folder a minimal calendar.yaml declaring every dataset `no_calendar: never` and nothing else, because the one calendar loader reads `no_calendar` from there."
+    - "THE SYSTEM SHALL generate in that folder each dataset's contract and recipe check layer (REQ-QAC-441), a dbt project whose packages point at dbt_shared, and copies of the template's people.yaml, presentation.yaml, default check layer and publishing destination, and SHALL generate no synthetic/ folder and no QA adapter module of its own."
+    - "THE SYSTEM SHALL record in the folder a digest of every file it generated, for REQ-PIPE-446's digest pass."
+    - "IF one-offs/extraction/<id>/, assets/<id>/ or any other kind's <id>/ already exists, THEN THE SYSTEM SHALL refuse the package, naming which, and say a re-send is a new extraction."
+    - "IF two tables of one recipe claim the same dataset placement, or an id does not meet the hierarchy's naming rules, THEN THE SYSTEM SHALL refuse the package before generating anything, naming them."
+    - "IF the recipe beside the package no longer matches the digest its folder records, THEN THE SYSTEM SHALL refuse to load or check the package, naming both digests."
+    - "IF the generated folder has uncommitted changes, or is not in the repository's history at all, THEN THE SYSTEM SHALL refuse to load the package, so that the published page names a commit holding the configuration it ran."
+    - "THE SYSTEM SHALL NOT add any level above agency, nor any hierarchy or naming scheme of an extraction's own."
+  non_functional_requirements:
+    - "STATE, THE COST FLAGGED AND ACCEPTED: 30-40 generated folders a year, about 200 after five, each with a dbt project. Configuration in the CLAUDE.md sense - they declare how that extraction is checked - but generated from a supplier's input rather than authored; one-offs/ keeps that distinction visible in the tree."
+    - "PRIVACY: a committed folder carries the project name, the cohort and the filter text, readable by everyone with repository access - the public, until REQ-DOCS-259 lands, which is why this waits for it."
+    - "PORTABILITY: each dbt project needs its packages at load; pointing them at the local dbt_shared package and the dbt_utils version the enduring assets already lock avoids a network fetch per extraction on a government network."
+    - "MAINTAINABILITY: the template is the one place defaults are edited; a folder keeps the copy it was generated with."
+    - "OBSERVABILITY: the commit of criterion 9 is git-identity-authored, so who generated and committed an extraction's configuration, and when, is in git."
+  dependencies:
+    - REQ-PIPE-439
+    - REQ-PIPE-446
+    - REQ-PIPE-438
+    - REQ-DOCS-259
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (round 2 Q2 (b)): a generated folder committed per extraction. REJECTED (a) one committed template with each extraction's hierarchy built in memory from its recipe - the scoper's recommendation, flagged as keeping 30-40 a year of folders closer to state than configuration out of the repository - and (c) a generated folder beside the package, not committed."
+    - "SETTLED by Keith 2026-11-21 (round 3 and round 4): apart from the enduring assets, at one-offs/<kind>/<id>/, the extraction the first kind and each kind's template beside its folders. Replaces v3's assets/<id>/ and v4's extractions/<id>/."
+    - "SETTLED by Keith 2026-11-21 (round 3 Q1 (a)): loading is refused until the folder is committed. REJECTED (b) loading at once and committing afterwards."
+    - "SETTLED by Keith 2026-11-21 (round 5 architect Q1 (a)): blocked on going private - draft and sign now; building the committed folders and running any real extraction wait for REQ-DOCS-259. REJECTED keeping one-off configuration in a separate private repository through use_root."
+    - "A MINIMAL calendar.yaml (delivery-architect, v4 finding 3): v4 said 'no calendar.yaml', and agreement.load reads `no_calendar:` from calendar.yaml's datasets, so a missing file raises. One file of declarations, no versions, no dates."
+    - "data_asset_id IS THE FOLDER NAME, gated for every folder (REQ-PIPE-446 criterion 5; delivery-architect reuse)."
+    - "THE TEMPLATE KEEPS ITS UNDERSCORE, as one-offs/extraction/_template/: the listing already skips '_' names, so no extraction id needs reserving."
+    - "THE FOLDER'S LOCATION IS ITS KIND: no `kind:` or `shape:` declaration that could disagree with where the folder is."
+    - "DEFAULTS ARE COPIED, NOT READ AT RUN TIME: the committed folder is then the whole account of what that extraction ran."
+    - "ONE SHARED ADAPTER PER KIND, NOT A GENERATED ONE: generating Python per extraction would commit 30-40 code files a year."
+    - "THE COMMITTED FOLDER IS THE LASTING DUPLICATE GUARD: a dropped database forgets an id and a page may never have been published, but the folder stays in git."
+    - "SETTLED by Keith 2026-09-27 (points 4 and 5): each table its own calendar-less dataset; derived products in development, real verdicts, out of the extraction's rollup."
+    - "REJECTED by Keith 2026-09-27: a new concept above agency ('there would be some convenience to have them all in one dashboard, but then we have to add a new concept above agency'); deriving the hierarchy by convention from the package or extraction name; and hand-authoring it per extraction."
+
+- id: REQ-QAC-441
+  title: "An extraction is checked in two layers - a default set every extraction gets and a set derived from its recipe - separate from the recurring datasets' checks, plus the shared file checks, and stated as assertions, not tools"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want a standard floor of checks on every extraction plus checks derived from what its recipe declares, so that every extract is held to the same baseline and to its own promises."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 point 6 and its tool-agnostic note (Keith, 2026-09-27); Keith 2026-11-21 Q4.5 (b), round 2 Q6 (b), Q7 (a), Q8 (a). Drafted by delivery-scoper 2026-11-21, v5. The extraction kind's own. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL apply a default check layer to every extraction, defined once in the kind's template and copied into each generated folder (REQ-PIPE-440)."
+    - "THE SYSTEM SHALL assert, in that default layer, at least that every table the recipe declares arrived, every declared column arrived in each, and no primary identifier the recipe declares is null."
+    - "WHERE a declared table did not arrive, or a file arrived that the recipe does not declare, THE SYSTEM SHALL record it as a failing default-layer result, and SHALL go on checking everything else."
+    - "THE SYSTEM SHALL derive a recipe layer from each recipe, asserting at least that each declared column has its declared type and each table's structured cohort bounds hold."
+    - "WHERE the recipe declares an expected row count for a table, THE SYSTEM SHALL assert that the table arrived with exactly that many rows."
+    - "WHERE the recipe declares a cross-table relationship, THE SYSTEM SHALL check it as a cross-table check (REQ-PIPE-106 criterion 13), counted as REQ-PIPE-438 criterion 4 says where a derived table takes part."
+    - "THE SYSTEM SHALL keep both layers separate from the recurring datasets' check definitions, and SHALL NOT import or share them."
+    - "THE SYSTEM SHALL run the shared file checks (the root file-checks.yaml) over every extraction file, as for any delivery."
+    - "THE SYSTEM SHALL record every result with up to the same number of failing-row identifier keys per check as a recurring dataset's (FAILING_SAMPLE_LIMIT), and SHALL NOT record row content."
+  non_functional_requirements:
+    - "MAINTAINABILITY: each criterion names what is ASSERTED and no tool; which tool evaluates each is a build decision, revisitable once the PoC settles which tools stay."
+    - "PRIVACY: failing-row identifier keys are recorded exactly as for recurring datasets, and so reach a page that is never retired (Keith, Q4.5 (b))."
+  dependencies:
+    - REQ-PIPE-439
+    - REQ-PIPE-440
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 6): two layers, a default set (his example: primary identifiers must not be null) and a customised layer from the recipe. REJECTED reusing the recurring datasets' own checks - his word was SEPARATE, similar but not shared."
+    - "SETTLED by Keith 2026-09-27: write it tool-agnostically - 'it would depend on which tools we stabilise on after this POC'."
+    - "SETTLED by Keith 2026-11-21 (Q4.5 (b)): failing-row identifier keys exactly as recurring datasets carry them. REJECTED counts only, the recommendation."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q7 (a)): a missing declared table or an undeclared file is a failing default-layer check, and QA carries on. REJECTED (b) refusing the package before QA."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q8 (a)): the root file-checks.yaml applies; 'separate' governs the dataset checks. REJECTED (b) not applying it."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q6 (b)): an expected row count is checked when given, as an exact count, because the recipe describes this extract rather than a feed that drifts."
+    - "NOT IN SCOPE, by Keith's call 2026-09-27: lineage, and plans/wider.md #9's reconciliation and aggregation checks, which stay parked there."
+
+- id: REQ-TEST-437
+  title: "A real recipe package is run end to end through `mothman one-off` to a published page, and a not-yet-agreed dataset is run beside a calendared one, replacing REQ-PIPE-379 criterion 5"
+  date_written: "2026-11-21"
+  story: "As whoever maintains the pipeline, I want one test that takes a real recipe package from opening to a published page, so that the one-off shape cannot quietly stop working again."
+  moscow: must
+  status: not_started
+  source: "REQ-PIPE-379 criterion 5 (signed 2026-11-14), deferred by Keith 2026-11-18 to #141; Keith 2026-11-21 Q4.4 (b). Drafted by delivery-scoper 2026-11-21, v5. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL have a test that opens a committed synthetic fixture package - a recipe and at least three CSV files, one a derived product, one table with an expected row count, with a cross-table relationship between the derived table and a counted one - through `mothman one-off` into a temporary one-offs root, loads it into a test database, publishes it undecided, records a release decision and publishes it again, to a temporary destination."
+    - "THE SYSTEM SHALL have that test assert each table checked and recorded with no slot, no period and nothing marked missing, the derived table out of the rollup and labelled a derived product, the cross-table result counted on the counted table only, the row count checked, the first page carrying the undecided line and the second the decision line above the QA result, with no console error."
+    - "THE SYSTEM SHALL have that test assert that loading is refused before the folder is committed, that a second package with the same id is refused, that an id already under assets/ is refused, and that a drop without the typed id removes nothing while a drop with it removes the database, data/<id>/, reports/<id>/ and the dbt scratch."
+    - "THE SYSTEM SHALL have a second test that runs a `no_calendar: not-yet-agreed` dataset beside a calendared one on one recurring asset, and shows the calendared dataset's status and rollup unchanged in the rendered page."
+    - "THE SYSTEM SHALL assert, in each test, that the fixture holds at least one calendar-less dataset and at least one recorded result before asserting anything about them."
+    - "WHEN this requirement is built, THE SYSTEM SHALL retire REQ-PIPE-379 criterion 5, replaced_by this requirement."
+  non_functional_requirements:
+    - "COST: the test database and temporary folders, never a bootstrap and never the real one-offs/ tree; not marked critical."
+    - "PORTABILITY: no network and no gitignored artefact assumed present; the fixture is small synthetic test data, so it is not held for REQ-DOCS-259."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-435
+    - REQ-DASH-436
+    - REQ-PIPE-438
+    - REQ-PIPE-439
+    - REQ-PIPE-440
+    - REQ-QAC-441
+    - REQ-PIPE-442
+    - REQ-PIPE-443
+    - REQ-DASH-444
+    - REQ-DASH-447
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.4 (b)): the end-to-end test runs a real recipe package. REJECTED (a) the lifecycle only, the recommendation."
+    - "MOVED OUT OF REQ-PIPE-379: 379 is about one calendar mechanism, which is built; the proof belongs with the requirements that make the shape run."
+    - "GENERATES INTO A TEMPORARY ONE-OFFS ROOT, never the real one-offs/, by the rule tests/conftest.py's _no_test_files_a_real_delivery enforces for deliveries."
+    - "REUSE (delivery-architect): tests/real_asset.py's fixture-asset machinery."
+    - "THE not-yet-agreed CASE IS ADDED because REQ-PIPE-106's decisions record that its criteria 8, 13 and 14 were never exercised on a rendered page."

@@ -132,7 +132,10 @@ the weighting below, 2026-09-19).
 | **At-a-glance / scanning** | exec tier | `mothman` main menu | recognition over recall, Gestalt hierarchy, Hick's Law (don't overload the first screen), Von Restorff Effect (a failing check should visually stand out, not just be color-coded) |
 | **Investigating / drill-down** | dataset/column/check tiers | `mothman debug run-*`, real dbt/Soda output | progressive disclosure, flow state, Tesler's Law (complexity relocated here, not eliminated) |
 | **First-time use** | a new agency data owner's first visit | a new user's first `mothman` run | autonomy (real choice, not a forced path), Paradox of the Active User (smart defaults + inline hints, don't rely on docs being read), Jakob's Law (match existing conventions) |
-| **Routine daily use** | a steward's daily QA check-in | a steward's daily `mothman bdm qa` | Fogg model (minimize friction over motivation), consistency, Doherty Threshold (<400ms), Goal-Gradient Effect (wizard progress) |
+| **Routine daily use** | a data engineer's daily QA check-in | a data
+engineer's daily `mothman bdm qa` | Fogg model (minimize friction over
+motivation), consistency, Doherty Threshold (<400ms), Goal-Gradient
+Effect (wizard progress) |
 | **Error / failure states** | a failing check, a bad as-of state | a `ClickException`, a real dbt/Soda bug | non-punitive framing, avoiding learned helplessness, `clig.dev`'s own edge-case guidance (explain what broke + a realistic next step, never blame the user for an infra issue) |
 | **Configuration / setup** | editing a check's own lifecycle metadata | writing a new check, editing contract YAML | error prevention (confirm destructive actions), recognition over recall (follow existing patterns), Hick's Law |
 

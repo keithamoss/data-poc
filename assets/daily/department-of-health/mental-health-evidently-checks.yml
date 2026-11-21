@@ -1,0 +1,23 @@
+# The Mental Health collection's Evidently checks (REQ-QAC-350): two drift
+# checks on the one table, each against the last promoted supply.
+checks:
+  - check_id: daily.department-of-health.mental-health.mental-health-contacts.service_type.drift_psi_evidently
+    category: consistency
+    introduced_date: "2026-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: service_type
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []
+  - check_id: daily.department-of-health.mental-health.mental-health-contacts.referral_source.drift_psi_evidently
+    category: consistency
+    introduced_date: "2026-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: referral_source
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []

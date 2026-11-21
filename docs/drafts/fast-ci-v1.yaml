@@ -1,0 +1,95 @@
+# DRAFT by delivery-scoper, 2026-11-02 (Perth). A PROPOSAL - not signed off,
+# not applied. Validate: uv run mothman dashboard validate-requirements --draft <this file>
+requirements:
+  - id: REQ-TEST-375
+    title: "An interim fast CI set: a hand-picked critical pytest mark on every push, the full suite started by hand"
+    date_written: "2026-11-02"
+    story: "As Keith, paying for every push out of 2,000 private-repository Actions minutes a month, I want each push to run only a hand-picked set of the tests that guard this project's standing rules and core supply logic, in under five minutes, with the full suite and its coverage floor run locally before the push and on demand in CI, so that a push costs a few minutes rather than 80 to 145 while a broken rule still turns CI red."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #136 and his scoping answers, 2026-11-02; drafted by delivery-scoper the same day"
+    acceptance_criteria:
+      - "THE SYSTEM SHALL register a `critical` pytest marker in pyproject.toml's `markers`, described as the hand-picked set every push runs in CI."
+      - "THE SYSTEM SHALL apply the `critical` mark only by hand, to the modules and classes named in the list Keith signs off, and SHALL NOT derive it from measured duration or module kind."
+      - "IF a test carrying the `critical` mark also needs a deployment (carries or acquires `needs_deployment`) or drives a browser, THEN THE SYSTEM SHALL fail collection naming that test."
+      - "WHEN a commit is pushed to a watched branch, THE SYSTEM SHALL run `pytest -m \"critical and not needs_deployment\"` in a CI job that runs no bootstrap, installs no browser and enforces no coverage threshold."
+      - "WHEN a commit is pushed to a watched branch, THE SYSTEM SHALL run the JS test suite (`npm test`) as its own CI job, in parallel with the critical job."
+      - "IF the critical job's pytest step selects zero tests, or reports any skipped test, THEN THE SYSTEM SHALL fail that job."
+      - "IF the critical job's pytest step takes longer than its budget, THEN THE SYSTEM SHALL fail that job and print the step's measured duration and the slowest critical tests."
+      - "THE SYSTEM SHALL keep the full test workflow - both pytest halves, the bootstrap and its cache, the on-demand job and the coverage combine - and SHALL start it only by `workflow_dispatch`, never on push."
+      - "THE SYSTEM SHALL enforce pyproject.toml's `fail_under` in the local full gate (`mothman check`) and SHALL NOT enforce it in the push-triggered critical job."
+      - "WHEN `mothman check` runs the full gate, THE SYSTEM SHALL print a one-line result naming the tree's commit or diff state, the pass/fail/skip counts, the coverage figure and the elapsed time, in a form fit to paste into a commit message."
+      - "THE SYSTEM SHALL leave validate-config.yml's triggers and steps unchanged."
+      - "THE SYSTEM SHALL document, in CLAUDE.md in the same change, that push CI is the critical set only, that the full gate runs locally before every push, and how to start the full workflow by hand."
+    non_functional_requirements:
+      - "Performance: the critical job's pytest step SHALL run in under 5 minutes as measured on GitHub's own runner (the step's own timing in the Actions log), not in the sandbox. Proposed in-job budget 240s, leaving headroom under the 5 minutes for runner variance; the job's whole wall clock, setup included, is reported but not gated (see open questions)."
+      - "Honesty of the budget: the over-budget failure is a real CI step reading pytest's own elapsed time, so drift fails loudly on the push that caused it rather than being noticed weeks later in ci-usage."
+      - "Scalability: the set is a fixed, hand-picked list, so it does not grow with the suite; adding a test to it is a deliberate edit reviewed like any other, and the budget step is what stops the list creeping past 5 minutes as Linkage-style collections are added."
+      - "Reliability: the critical job needs PostgreSQL (several guards run against a per-worker test database) but never the supply database, a bootstrap or the bootstrap cache, so a cache miss cannot slow or break it."
+      - "Security: no new credential or secret; the critical job keeps the workflow's existing `permissions: contents: read` and the non-secret service-container password, and the credential guard (test_publish.py TestGitHubHoldsNoCredentialAndRunsNoBuild) is itself in the set."
+      - "Privacy: no critical test reads supply rows of the deployment database; the 'a build reads no supply rows' guards stay in the set so the rule is proven on every push, not only on a hand-started run."
+      - "Compatibility: the critical job runs through `uv run`, with `.python-version` pinning 3.11, exactly as test.yml does today; no Playwright install."
+      - "Maintainability: one new marker and one hand-kept list; the mark lives on the test modules themselves (module `pytestmark` or class decorator), never in a separate allowlist file that can drift from the tests."
+      - "Auditability: every push's commit message carries the local full-gate result line, and a hand-started full CI run is recorded in the Actions history against its commit."
+      - "Cost: target a push at roughly 5-10 billable minutes (critical job plus JS job) against today's ~80-145; a hand-started full run still costs the old figure and should be checked against `mothman github ci-usage` first."
+    decisions:
+      - "Keith 2026-11-02: the push CI set is a HAND-PICKED `critical` mark. Rejected: a measured `slow` mark (selects by cost rather than by what a test guards), and selecting whole module kinds."
+      - "Keith 2026-11-02: the delivery-scoper proposes the list against stated criteria with measured timings, and Keith signs the list off before it reaches CI."
+      - "Keith 2026-11-02: coverage `fail_under` is enforced in the LOCAL full gate, not in CI. Rejected: a lower coverage floor for the critical set in CI (a subset's coverage is not the suite's, so any floor there would be arbitrary)."
+      - "Keith 2026-11-02: the full test.yml - both halves, the bootstrap, coverage - becomes a workflow started BY HAND (workflow_dispatch). Rejected: a nightly schedule (over the monthly allowance at ~80-145 minutes a run), and dropping the full suite from CI entirely."
+      - "Keith 2026-11-02: the JS tests run ALONGSIDE as their own job, so the Python critical set has the whole five minutes."
+      - "Keith 2026-11-02: the full gate runs locally before every push, its result in the commit message."
+      - "Keith 2026-11-02: validate-config.yml stays as it is (it already runs the configuration gates themselves on push; the critical set carries the TESTS of those gates)."
+      - "Interim by design: this is the stop-gap ahead of the later test-time audit Keith asked for in running-thoughts #136, not a replacement for it."
+      - "Selection criteria for the list (proposed): tests guarding a standing rule (no supply rows read by a build, no credential in CI, status agrees with the tool's own verdict, the results store refuses what it must, the provisional/lifecycle/requirements/plans gates, the state-path guard, the bookkeeping wall) plus core filing, promotion, status, slot and arrival logic. Excluded: anything needing a deployment or a browser."
+    dependencies: []
+    open_questions:
+      - "What does 'under 5 minutes' measure - the pytest step alone, or the whole critical job including checkout, uv sync, PostgreSQL and dbt deps (roughly 1-2 extra minutes)? The draft gates the step and only reports the job."
+      - "What stops a red local full gate from being pushed anyway? Options: convention only (commit-message line), a pre-push hook that refuses unless the last `mothman check` result matches HEAD's tree and was green, or a CI step that refuses a push whose message lacks a full-gate line. Live evidence it matters: on 2026-11-02 the `work` tree fails test_publish.py::TestThereIsExactlyOnePublishPath (cli/worktree_snapshot.py, commit 24ebdc61, pushed with [skip ci])."
+      - "Runner size: GitHub's standard ubuntu-latest runner is 2 vCPUs for a PRIVATE repository (4 for public). The estimate below is given for both; which applies once the repository is private?"
+      - "Push trigger: test.yml and validate-config.yml watch `claude/**`, but this work happens on `work`. Should the critical job also watch `work`, or is `work` deliberately unwatched?"
+      - "Who may start the full workflow by hand, and when is it expected - before every sign-off of a `built` requirement, before a release-note-worthy push, or only when Keith asks?"
+      - "test_publish.py::TestNeitherHalfOfCIQuietlyStopsCovering asserts the two-halves split; it will need rewriting for a dispatch-only full workflow - in this requirement, or a follow-up?"
+
+proposed_critical_list:
+  measured: "2026-11-02 ~23:10 sandbox time (07:10 Perth), 4-core sandbox under load 6-10 from two concurrent builders, so every figure is an UPPER bound. MOTHMAN_TEST_DB_TAG=scopeci; the supply database never written."
+  command: "uv run pytest <list> --durations=0 -q -p no:cacheprovider -m \"not needs_deployment\""
+  result: "860 tests; 859 passed, 1 failed (a real current-tree failure, see open questions, not a selection fault). 0 skipped."
+  totals:
+    serial_sum_of_durations_4_workers: "299.6s (sum of every setup/call/teardown pytest reported, under contention)"
+    serial_sum_of_durations_2_workers: "210.1s"
+    wall_clock_n4_this_sandbox: "107s (pytest's own 104.65s)"
+    wall_clock_n2_this_sandbox: "118s (pytest's own 116.62s)"
+    estimate_4_core_runner: "about 1.5-2 minutes for the pytest step; plus ~1.5 minutes job setup"
+    estimate_2_core_runner: "about 2-3 minutes for the pytest step; plus ~1.5 minutes job setup"
+    note: "Per-module figures below are from the -n 4 run and are noisy: a worker's per-worker test-database setup lands on whichever test runs first on it. Treat each as indicative, the total as the number."
+  entries:
+    # Standing rules
+    - {tests: "tests/test_readers_read_no_supply_rows.py (8)", seconds: 25.9, criterion: "a build reads recorded QA results, never supply rows"}
+    - {tests: "tests/test_publisher_role.py (10)", seconds: 1.2, criterion: "the publisher role cannot reach supply rows or write"}
+    - {tests: "tests/test_publish.py::TestGitHubHoldsNoCredentialAndRunsNoBuild, ::TestThereIsExactlyOnePublishPath, ::TestTheGateCannotBeSkipped, ::TestThePublishedContentCannotMixWithTheSource", seconds: 13.4, criterion: "no credential in CI; one publish path; the gate cannot be skipped"}
+    - {tests: "tests/test_status_parity.py (69)", seconds: 5.2, criterion: "status agrees across the Python and JS implementations (non-browser half of the verdict rule)"}
+    - {tests: "tests/test_build_dashboard_data.py (18, not-needs_deployment)", seconds: 18.8, criterion: "each status agrees with the tool's own verdict at the build layer"}
+    - {tests: "tests/test_verdict_record.py (25)", seconds: 6.5, criterion: "verdicts are append-only and re-judged against their inputs"}
+    - {tests: "tests/test_qa_store.py (20)", seconds: 6.2, criterion: "the results store refuses what it must (incomplete runs invisible, tools cannot delete each other)"}
+    - {tests: "tests/test_validate_provisional.py (42)", seconds: 5.9, criterion: "the provisional gate"}
+    - {tests: "tests/test_validate_check_lifecycle.py (32), tests/test_check_lifecycle.py (40)", seconds: 14.3, criterion: "the check-lifecycle gate"}
+    - {tests: "tests/test_validate_requirements.py (95), tests/test_requirements_yaml.py (10)", seconds: 5.5, criterion: "the requirements gate"}
+    - {tests: "tests/test_plans_index.py (11), tests/test_plans_md.py (20)", seconds: 47.0, criterion: "the plans gate (the single slowest pick; test_every_parsed_entry_appears_in_the_index alone ~10s)"}
+    - {tests: "tests/test_state_paths_at_call_time.py (8)", seconds: 26.0, criterion: "the state-path guard (REQ-PIPE-342)"}
+    - {tests: "tests/test_arrivals.py (27)", seconds: 12.4, criterion: "the bookkeeping wall (TestTheGeneratorsBookkeepingIsWalledOff, TestNoRecordedResultCarriesBookkeeping) and arrival recognition"}
+    # Core logic
+    - {tests: "tests/test_filing.py (24), tests/test_filing_decisions.py (40), tests/test_refiling.py (13), tests/test_files_go_to_period.py (16)", seconds: 56.5, criterion: "core filing"}
+    - {tests: "tests/test_promotion.py (18), test_promotion_gate.py (16), test_promote_requires_filing.py (8), test_promotion_state.py (19), test_promotion_step.py (15), test_red_promoted.py (6)", seconds: 8.0, criterion: "core promotion"}
+    - {tests: "tests/test_dataset_status.py (16), tests/test_supply_status.py (1), tests/test_status_reads_values.py (17)", seconds: 0.2, criterion: "core status"}
+    - {tests: "tests/test_arrival_classification.py (14), tests/test_recorded_arrival_classification.py (14)", seconds: 14.4, criterion: "core arrival classification"}
+    - {tests: "tests/test_slots.py (27), tests/test_slot_state.py (17), tests/test_slot_holds.py (50), tests/test_period_overlay.py (20)", seconds: 18.0, criterion: "slots, holds and the period overlay"}
+    - {tests: "tests/test_decision_log.py (61)", seconds: 13.9, criterion: "the decision log and its one-transaction effects"}
+  deliberately_left_out:
+    - "Everything needing a deployment: all needs_deployment tests, including tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict - the strongest verdict guard, but it needs a bootstrap and a browser. It stays in the hand-started full run."
+    - "Every browser test (tests/test_dashboard_e2e.py) and anything installing Playwright."
+    - "on_demand and full_capture tests (bootstrap equivalence, full captures)."
+    - "The real-tool integration tests (tests/test_run_*_{bdm,cp}.py, dbt/Soda/datacontract/Evidently) - minutes each, guard tool wiring rather than a standing rule."
+    - "Generator, bootstrap, linkage-scenario and CLI/TUI suites - large and slow, not on the stated criteria."
+    - "tests/test_publish.py::TestTheArtifactSaysWhereItCameFrom (24.4s, provenance) and ::TestNeitherHalfOfCIQuietlyStopsCovering (asserts the two-halves CI split this requirement replaces)."
+    - "tests/test_run_schema_lifecycle.py (19.1s measured) - run-schema/disk tidy-up; a candidate if Keith wants it, it fits the budget."

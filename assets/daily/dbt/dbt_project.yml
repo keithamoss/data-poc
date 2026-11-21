@@ -1,0 +1,42 @@
+# Real dbt_project.yml, run for real by actual dbt-core + dbt-duckdb via
+# qa_tools/tools/run_dbt.py - see ../README.md. Nothing here is a
+# stand-in syntax; this is genuine dbt project structure, actually
+# executed by the real `dbt` CLI, not just described.
+
+# NAMED FOR ITS ASSET (REQ-QAC-368 criterion 1; Keith, 2026-11-02, C13), so
+# dbt's own logs and artefacts - every node's unique_id among them - say
+# which asset they came from.
+name: 'mothman_daily'
+version: '1.0.0'
+config-version: 2
+
+profile: 'mothman'
+
+model-paths: ["models"]
+# THE SHARED MACROS AND GENERIC TESTS (REQ-QAC-368 criterion 2, as amended by
+# Keith 2026-11-02, C12): read straight from dbt_shared/ at the repository
+# root, as this project's own. dbt resolves an unqualified generic test - the
+# `- matches_regex:` a schema file names - only in the root project, never in
+# an installed package, so a package would need a file forwarding each test
+# by name; read from here, a schema file names it as it always has, and no
+# check's compiled SQL or definition changes. One copy for every asset.
+macro-paths: ["../../../dbt_shared/macros"]
+test-paths: ["tests", "../../../dbt_shared/tests"]
+clean-targets: ["target", "dbt_packages"]
+
+# Every model is a staging view. Set for the whole project rather than per
+# folder since REQ-QAC-241 gave each collection a folder of its own
+# (models/<collection-id>/), so a new collection needs no line here.
+models:
+  mothman_daily:
+    +materialized: view
+
+# THE AUDIT SCHEMA, SHORT (REQ-PIPE-140): `--store-failures` puts each
+# failing test's rows in `<target schema>_<this>`. dbt's default is
+# `dbt_test__audit`, which left no room under PostgreSQL's 63-byte limit
+# for a re-run's `__r<N>` on a Birth Registrations run id - and PostgreSQL
+# truncates silently. Audit tables are found through each test's
+# relation_name in the manifest, never by schema name, so only the
+# tidy-up (supply_db.DBT_AUDIT_SUFFIX) needs to agree with this.
+data_tests:
+  +schema: audit
