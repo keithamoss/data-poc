@@ -4399,23 +4399,29 @@ function buildDatasetsOn(inPlaceOnDateStr, period = null){
   // carries its own "nodata" status from noDataDataset() above - its
   // (empty) columns list must never be re-derived over the top of that,
   // since worstOf([]) would silently default it back to "green".
+  // UNDER A CHOSEN PERIOD, ONLY THAT PERIOD (Keith, 2026-11-21, post-build-
+  // review #490 F1): a gap counts where its slot is the period's, a held or
+  // otherwise blocked supply where its receipt falls in the period's claim
+  // window. A gap or hold from another period does not turn this one red.
+  const blockerSource = period ? periodBlockerSource(period) : undefined;
   data.agencies.forEach(ag=>{
     ag.exhaustedCount = 0; ag.noSupplyCount = 0; ag.acceptedCount = 0; ag.refusedCount = 0;
     ag.collections.forEach(col=>{
       col.exhaustedCount = 0; col.noSupplyCount = 0; col.acceptedCount = 0; col.refusedCount = 0;
       col.datasets.forEach(ds=>{
         const ended = runway.exhausted[ds.id];
-        const blocked = blockerOpenInPlaceOn(ds.id, inPlaceOnDateStr);
+        const blocked = blockerOpenInPlaceOn(ds.id, inPlaceOnDateStr, blockerSource);
         // CLOSED WITH NO SUPPLY (REQ-DASH-133 criteria 4, 5 and 9): an
         // unmarked gap is RED and rolls up; an accepted one stays out of the
         // red and is shown quieter. A held, contested or unloadable supply
         // says THAT instead (criterion 1's exception), so it is checked first.
-        const gaps = closedGapsInPlaceOn(ds.closedSlots, inPlaceOnDateStr);
+        const gaps = closedGapsInPlaceOn(period ? (ds.closedSlots || []).filter(s=> s.period === period)
+          : ds.closedSlots, inPlaceOnDateStr);
         ds.noSupply = gaps.open.length ? groupGaps(gaps.open) : null;
         ds.acceptedGaps = gaps.accepted.length ? groupGaps(gaps.accepted) : null;
         if(ds.noSupply){ col.noSupplyCount = (col.noSupplyCount||0) + gapItemCount(ds); ag.noSupplyCount = (ag.noSupplyCount||0) + gapItemCount(ds); }
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
-        const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr);
+        const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr, blockerSource);
         // REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4): RED,
         // worded as our configuration problem, counted by kind on the cards
         // (criterion 7). Only on dates on or after the earliest period it
@@ -6697,7 +6703,13 @@ function xtCellText(row, view){
   if(!present.length) return null;
   const status = rollupStatuses(present.map(x=> x.h.status || "nodata"));
   const marks = XT_TOOLS.map(([t])=> !row.tools[t] ? "·" : cell[t] ? xtMark(cell[t].h) : "–").join(" ");
-  const noteSegs = present[0].p.note || [];
+  // UNDER A CHOSEN PERIOD, WHEN IT WAS RECORDED beside when what it read was
+  // received (Keith, 2026-11-21, post-build-review #490 F7): a verdict
+  // recorded weeks after the supply arrived says both.
+  const recordedAt = present[0].h && present[0].h.recorded_at;
+  const noteSegs = [...(present[0].p.note || []),
+    ...(typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD && recordedAt && (present[0].p.note || []).length
+      ? [{text: ` · recorded ${fmtDay(assetDateStrOf(recordedAt))}`}] : [])];
   // THE WORD IS THE WORST EVALUATED RESULT; where nothing in the cell could be
   // evaluated, it says so - the cell keeps its status (red, it counts) but
   // never reads "Fail".
@@ -7263,6 +7275,7 @@ function navUrl({dropArrival = true} = {}){
   // it on reload.
   if(!STATE.req) url.searchParams.delete("req");
   if(!STATE.panel) url.searchParams.delete("panel");
+  url.searchParams.delete(FOCUS_PARAM);
   // A NAVIGATION CARRIES ITS OWN SCENARIO JUMP OR NONE (REQ-DASH-208
   // criteria 5 and 8): a jump does not follow the reader to another page.
   withScenarioParam(url, STATE.scenarioJump && STATE.scenarioJump.id);
@@ -7343,7 +7356,10 @@ if(new URLSearchParams(location.search).has(PREVIOUS_DATE_PARAM)){
 function navigate(next, {scrollTop = true} = {}){
   // A jump's date belongs to the entry it was changed on (#202 F2).
   const {jumpedFrom, setPeriod, focusCollection, ...rest} = next || {};
-  STATE = next ? rest : next;
+  // AN ENTRY A PERIOD LINK ADDED IS MARKED (REQ-DASH-355 criterion 4 as
+  // amended by Keith, 2026-11-21): Back from it, or Forward into it, restores
+  // the period its own address holds.
+  STATE = next ? (setPeriod !== undefined ? {...rest, periodLink: true} : rest) : next;
   // A PERIOD LINK SETS THE PERIOD WITH THE NAVIGATION (REQ-DASH-367 criterion
   // 6), so the entry pushed below carries it and the one left keeps its own.
   if(setPeriod !== undefined){
@@ -7451,10 +7467,20 @@ window.addEventListener("popstate", (e)=>{
   } else if(STATE && STATE.scenarioJump && STATE.scenarioJump.to !== CURRENT_IN_PLACE_ON){
     setInPlaceOnQuietly(STATE.scenarioJump.to);
   }
-  // THE PERIOD IS NOT IN HISTORY (REQ-DASH-355 criteria 3 and 4): an older
-  // entry's address keeps the period on show rather than stepping back to
-  // the one it was made under.
-  if((periodFromUrl() || null) !== CURRENT_PERIOD) setPeriodInUrl(CURRENT_PERIOD);
+  // THE PERIOD CONTROL'S CHOICES ARE NOT IN HISTORY (REQ-DASH-355 criteria 3
+  // and 4): an older entry's address keeps the period on show rather than
+  // stepping back to the one it was made under. BUT A PERIOD LINK IS
+  // NAVIGATION (criterion 4 as amended by Keith, 2026-11-21): stepping out of
+  // or into the entry it added restores the period that entry's address
+  // holds, or none - the page as it was.
+  if((leaving && leaving.periodLink) || (STATE && STATE.periodLink)){
+    const want = periodFromUrl() || null;
+    if(want !== CURRENT_PERIOD){
+      CURRENT_PERIOD = want && baselinePeriod(want) ? want : null;
+      DATA = buildData(CURRENT_IN_PLACE_ON);
+      updatePeriodButtonLabel();
+    }
+  } else if((periodFromUrl() || null) !== CURRENT_PERIOD) setPeriodInUrl(CURRENT_PERIOD);
   renderFromState();
   if(CLOSE_PANEL_AFTER_POP){
     CLOSE_PANEL_AFTER_POP = false;
@@ -7997,6 +8023,20 @@ function receivedWhileOffSection(datasetId, inPlaceOnDateStr, source){
       </table>
       </div>
     </div>`;
+}
+// THE PERIOD A BLOCKED SUPPLY BELONGS TO: the slot whose claim window its
+// receipt fell in - the period a supply received then would be filed to - or,
+// on a cadence rule, the period its receipt date falls in.
+function blockerPeriod(b){
+  const day = assetDateStrOf(b.receivedAt || b.openedAt);
+  return day ? currentPeriodOn(b.datasetId, day).period : null;
+}
+// The blockers source with only those belonging to `period`, for a chosen
+// period's statuses (post-build-review #490 F1).
+function periodBlockerSource(period, source){
+  const src = outstandingSource(source);
+  if(!src) return src;
+  return {...src, blockers: (src.blockers || []).filter(b=> blockerPeriod(b) === period)};
 }
 function blockersOpenInPlaceOn(datasetId, inPlaceOnDateStr, source){
   return blockersFor(datasetId, source).filter(b=> !b.turnedOff
@@ -8653,6 +8693,12 @@ function outstandingItems(scope, id, source){
     if(data && data.agencies) items = inPlaceOnQueueItems(items, data);
   }
   if(!scope || !id) return items;
+  // SEVERAL COLLECTIONS AT ONCE - a period section's card (REQ-DASH-356
+  // criterion 5): an item in any of them, counted once.
+  if(scope === "collections"){
+    const ids = new Set(id);
+    return items.filter(i=> ids.has(i.collectionId) || (i.affects || []).some(a=> ids.has(a.collectionId)));
+  }
   const key = scope==="agency" ? "agencyId" : scope==="collection" ? "collectionId" : "datasetId";
   // AN ASSET-WIDE ITEM IN EVERY SCOPE IT AFFECTS (REQ-DASH-263 criteria 1 and
   // 2): a pending correction carries no ids of its own, only `affects`, so it
@@ -8965,9 +9011,12 @@ function renderExec(view){
     ${agreementNotice()}
     ${exhaustedNotice()}
     ${lowRunwayNotice()}
-    ${outstandingQueue()}
-    <div class="grid" id="agency-grid"></div>
+    ${CURRENT_PERIOD ? `<div class="grid" id="agency-grid"></div>${outstandingQueue()}`
+      : `${outstandingQueue()}<div class="grid" id="agency-grid"></div>`}
   `;
+  // A CHOSEN PERIOD'S SECTIONS COME FIRST, the whole-history queue after them
+  // (Keith, 2026-11-21, post-build-review #490 UX #3): choosing a period is a
+  // deliberate act, so what it asked for is not ten screens down.
   const grid = document.getElementById("agency-grid");
   // UNDER A CHOSEN PERIOD, TWO SECTIONS (REQ-DASH-356 criteria 4 and 5).
   if(CURRENT_PERIOD){
@@ -9051,8 +9100,14 @@ function periodSectionsOf(agencies){
   const name = periodWords(CURRENT_PERIOD);
   const split = derived => agencies.map(ag=>{
     const cols = ag.collections.filter(c=> collectionIsDerived(c.id) === derived);
-    return cols.length ? {...ag, collections: cols,
-      status: rollupStatuses(cols.map(c=> c.status))} : null;
+    // EACH CARD ROLLS UP ONLY ITS SECTION'S COLLECTIONS (REQ-DASH-356
+    // criterion 5; post-build-review #490 F1): its status, its counters and
+    // its 'waiting for a person' line, never the whole agency's.
+    const sum = key=> cols.reduce((n, c)=> n + (c[key] || 0), 0);
+    return cols.length ? {...ag, collections: cols, sectionOf: true,
+      status: rollupStatuses(cols.map(c=> c.status)),
+      exhaustedCount: sum("exhaustedCount"), noSupplyCount: sum("noSupplyCount"),
+      acceptedCount: sum("acceptedCount"), refusedCount: sum("refusedCount")} : null;
   }).filter(Boolean);
   const source = split(false), derived = split(true);
   const derivedNames = [...new Set(derived.flatMap(ag=> ag.collections.map(c=> c.name)))];
@@ -9060,6 +9115,18 @@ function periodSectionsOf(agencies){
     {key: "source", heading: `Source supplies for ${name}`, agencies: source},
     {key: "derived", heading: `${joinNames(derivedNames)} for ${name}`, agencies: derived},
   ].filter(s=> s.agencies.length);
+}
+// A CHOSEN PERIOD NOT YET OPEN FOR A COLLECTION, said on its agency's card
+// on the agencies list (REQ-DASH-355 criterion 9), one line per collection.
+function notOpenedLines(ag){
+  if(typeof CURRENT_PERIOD === "undefined" || !CURRENT_PERIOD) return "";
+  const name = periodWords(CURRENT_PERIOD);
+  return ag.collections.map(col=>{
+    const p = baselinePeriod(CURRENT_PERIOD) || collectionPeriods(col).find(x=> x.period === CURRENT_PERIOD) || null;
+    return p && !periodOpenedOn(col, p, CURRENT_IN_PLACE_ON)
+      ? `<div data-not-opened style="font-size:12.5px; color:var(--ink);">${escHtml(col.name)}: ${escHtml(name)} had not opened by ${fmtDay(CURRENT_IN_PLACE_ON)}.</div>`
+      : "";
+  }).join("");
 }
 function agencyCardHtml(ag){
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
@@ -9071,11 +9138,13 @@ function agencyCardHtml(ag){
     return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}' data-agency="${ag.id}">
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
+      ${ag.sectionOf ? notOpenedLines(ag) : ""}
       ${trend}
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}${refusedMarker(ag.refusedCount)}
       ${notGreen}
       ${notCountedMarker(ag.status, agDatasets)}
-      ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
+      ${ag.sectionOf ? outstandingMarker("collections", ag.collections.map(c=> c.id), undefined, ag.noSupplyCount)
+        : outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
       ${heldBackMarker(ag, true)}
       ${noPromotedMarker(ag)}
@@ -9176,9 +9245,8 @@ function renderAgency(view, agencyId){
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
-    ${outstandingQueue("agency", ag.id)}
-    ${CURRENT_PERIOD ? periodStepsHtml(ag) : ""}
-    <div id="collections"></div>
+    ${CURRENT_PERIOD ? `${periodStepsHtml(ag)}<div id="collections"></div>${outstandingQueue("agency", ag.id)}`
+      : `${outstandingQueue("agency", ag.id)}<div id="collections"></div>`}
   `;
   const wrap = document.getElementById("collections");
   // UNDER A CHOSEN PERIOD (REQ-DASH-367 criterion 1, REQ-DASH-356 criteria 4
@@ -10530,10 +10598,38 @@ function periodNav(agencyId, collectionId, period){
 // set and the date on show kept, so a middle-click opens the same thing.
 function periodLinkHtml(agencyId, collectionId, period, label){
   const nav = periodNav(agencyId, collectionId, period);
+  return `<a href="${escAttr(periodLinkHref(agencyId, collectionId, period))}" data-nav='${escAttr(JSON.stringify(nav))}' data-period-link>${label}</a>`;
+}
+// THE ADDRESS A CLICK LANDS ON (post-build-review #490 F4 and F5, Keith
+// 2026-11-21): navUrl()'s own drops - the arrival context, the panel, the
+// requirement and the scenario - so a middle-click opens what the click does,
+// and `focus=` naming the collection, so a new tab lands at its table as the
+// click does. A load reads `focus=` once and takes it out of the address.
+// A var, as PERIOD_PARAM is: links built in the first render read it.
+var FOCUS_PARAM = "focus";
+function periodLinkHref(agencyId, collectionId, period){
   const url = new URL(location.href);
+  ["from", "from-on", "via", "req", "panel", FOCUS_PARAM].forEach(k=> url.searchParams.delete(k));
+  withScenarioParam(url, null);
   url.searchParams.set(PERIOD_PARAM, String(period));
-  const href = url.pathname + url.search + stateToHash({tier:"agency", agencyId});
-  return `<a href="${escAttr(href)}" data-nav='${escAttr(JSON.stringify(nav))}' data-period-link>${label}</a>`;
+  if(collectionId) url.searchParams.set(FOCUS_PARAM, String(collectionId));
+  return url.pathname + url.search + stateToHash({tier:"agency", agencyId});
+}
+// A LOAD OF A PERIOD LINK'S ADDRESS: its collection's table brought into view
+// and its caption focused, as navigate() does for a click; `focus=` then
+// leaves the address, so a reload or a copied link does not jump again.
+function focusCollectionFromUrl(){
+  const url = new URL(location.href);
+  const id = url.searchParams.get(FOCUS_PARAM);
+  if(!id) return;
+  url.searchParams.delete(FOCUS_PARAM);
+  history.replaceState(STATE, "", url.pathname + url.search + url.hash);
+  if(!STATE || STATE.tier !== "agency") return;
+  const caption = document.getElementById(`composition-caption-${id}`);
+  const panel = document.querySelector(`#view [data-collection-panel="${CSS.escape(id)}"]`);
+  const target = caption || panel;
+  if(target && target.scrollIntoView) target.scrollIntoView({block: "start"});
+  if(caption) caption.focus({preventScroll: true});
 }
 // The same link from a dataset's own pages, where only its id is to hand.
 function periodLinkFor(datasetId, period, label){
@@ -12639,6 +12735,9 @@ function scenarioChipHref(entry){
   // A PERIOD'S SCENARIO CARRIES THE PERIOD (REQ-DASH-367 criterion 6), so a
   // middle-click or a cold load opens the same page the click does.
   if(target.nav.setPeriod) url.searchParams.set(PERIOD_PARAM, target.nav.setPeriod);
+  // ...AND ANY OTHER KEEPS THE PERIOD ON SHOW, as its click does (post-build-
+  // review #490 F4): navigate() leaves CURRENT_PERIOD as it is.
+  else if(typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD) url.searchParams.set(PERIOD_PARAM, CURRENT_PERIOD);
   const {setPeriod, focusCollection, ...state} = target.nav;
   return url.pathname + url.search + stateToHash(state);
 }
@@ -14133,6 +14232,7 @@ if(SCENARIO_ON_LOAD && "scrollRestoration" in history){
 }
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
+focusCollectionFromUrl();
 if(DEAD_SCENARIO_LINK){
   renderNotFound(document.getElementById("view"), "Page", "scenarios");
   describeRoute();

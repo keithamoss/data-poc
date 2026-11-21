@@ -16260,7 +16260,7 @@ twice. It deliberately did not re-find the `TypeError`.
      November 2020), so the readers' promotions are scripted for 9 February
      and TS-112b's link is 8 February; the bootstrap confirmed both.
 
-445. **[todo, 2026-11-16]** **[Dashboard UI]** **For Keith: a reader's
+445. **[done, 2026-11-16]** **[Dashboard UI]** **For Keith: a reader's
      cross-table row reads 'no Client Register in the warehouse' whether the
      Client Register is contested or rejected.** Seen on TS-112's readers on 1
      and 8 February 2017: the record carries the reason contested, then
@@ -16273,7 +16273,11 @@ twice. It deliberately did not re-find the `TypeError`.
      change for its own requirement - not changed here.
      - **KEITH, 2026-11-21: name the reason now** - 'Not evaluated: the Client
        Register is contested (two files)' / '... was rejected'. Words only; the
-       row's status stays #95's to settle. Built with groups C and D's answers.
+       row's status stays #95's to settle. BUILT 2026-11-21: the build folds
+       each unread table's recorded code into its read (`why`), and
+       pipeline/cross_table_grid.py says "- it is contested (two files)" or
+       "- its file was rejected"; tests/test_cross_table_grid.py, seen failing
+       first.
 
 446. **[done, 2026-11-16]** **[Testing & dev tooling]** **The container's
      environment carried stale MOTHMAN_ASSET and MOTHMAN_SUPPLY_DSN.** As the
@@ -16863,7 +16867,7 @@ twice. It deliberately did not re-find the `TypeError`.
        tests/test_singular_home_gate.py was RED (no such function) and is
        green; both new adapters name their singular tests.
 
-478. **[todo, 2026-11-18]** **[Pipeline & publishing]** **An annual dataset always reads as low on calendar runway.**
+478. **[done, 2026-11-18]** **[Pipeline & publishing]** **An annual dataset always reads as low on calendar runway.**
      Found adding the Cancer collection (REQ-QAC-348): the schedule gate
      warns "calendar 'quarterly' runs out first for 'cancer-notifications',
      which has only 1 future supply slot(s) left - its own last is 2027-Q3".
@@ -16875,6 +16879,9 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Not changed**: whether runway should be measured in time, or the
        threshold scale with how often a dataset is owed, is a product
        decision for Keith. The gate still passes.
+     - **BUILT 2026-11-21** with Keith's answer on #489 F2: a year of the
+       dataset's own supplies (REQ-PIPE-053 amended); tests/test_runway.py's
+       TestAYearOfItsOwnSupplies, seen failing first.
 
 479. **[done, 2026-11-18]** **[Testing & dev tooling]** **Adding two collections broke four test modules whose premises were the asset as it was.**
      Found running every module that reads the setting files after group C
@@ -17056,7 +17063,7 @@ twice. It deliberately did not re-find the `TypeError`.
        pills changes only the border; closed drawers' shadows bleed in at the
        right edge.
 
-485. **[todo, 2026-11-18]** **[Testing & dev tooling]** **A test's patches do not reach the bootstrap's stream processes, so a "stubbed" bootstrap of a two-collection asset ran for real.**
+485. **[done, 2026-11-18]** **[Testing & dev tooling]** **A test's patches do not reach the bootstrap's stream processes, so a "stubbed" bootstrap of a two-collection asset ran for real.**
      Found by the full gate on e94fdb72: tests/test_bootstrap_pin.py ran for
      over two hours in one chunk, against 65 seconds that morning, until the
      runner's own time limit stopped the gate. Its `stubbed` fixture replaces
@@ -17088,7 +17095,10 @@ twice. It deliberately did not re-find the `TypeError`.
        streams run one after another in the test's own process, so a stub
        always applies; a test that needs the real pool asks for it with a
        marker. Built in tests/ (an autouse conftest fixture), not as a
-       pytest check in product code. Built with groups C and D's answers.
+       pytest check in product code. BUILT 2026-11-21:
+       tests/conftest.py's `_streams_run_in_the_tests_own_process`, the
+       `real_stream_pool` marker (two tests in tests/test_assets.py ask for
+       it), tests/test_streams_in_process_under_test.py seen failing first.
 
 486. **[done, 2026-11-18]** **[QA pipeline]** **Mental Health's dbt check `contact_in_its_week` named no measure, so its dashboard figure would read only 'Value (count)'.**
      Found by the full gate on group C (tests/test_check_measures.py's
@@ -17122,7 +17132,7 @@ twice. It deliberately did not re-find the `TypeError`.
      test failed with the fix reverted and passes with it. A defect against
      a signed criterion with an obvious fix; no product decision.
 
-489. **[todo, 2026-11-18]** **[Collections]** **Group C post-build functional review (a6d20186) - what was found and done.**
+489. **[done, 2026-11-18]** **[Collections]** **Group C post-build functional review (a6d20186) - what was found and done.**
      The delivery critic checked REQ-QAC-348/350, REQ-GEN-349/351,
      REQ-PIPE-346, REQ-DASH-347, REQ-GEN-371 and REQ-DOCS-358's A2/A5/A6/A11/
      A17, and found every criterion met apart from these.
@@ -17165,7 +17175,7 @@ twice. It deliberately did not re-find the `TypeError`.
        the date-only view) and F7 (delivery folder prefixes shared across
        agencies) noted, not defects in group C.
 
-490. **[todo, 2026-11-18]** **[Dashboard]** **Group D post-build reviews (a6d20186): functional, UX and visual - what was found and done.**
+490. **[done, 2026-11-18]** **[Dashboard]** **Group D post-build reviews (a6d20186): functional, UX and visual - what was found and done.**
      Three critics on REQ-DASH-355/356/367. Fixed, each test-first where it
      was a defect:
      - **A period link opened without its statement** (functional and UX
@@ -17236,6 +17246,14 @@ twice. It deliberately did not re-find the `TypeError`.
        choice for headers).
      - Not asked, wording: 'held anything in <day>' and the Reason cell's
        repository path.
+     ALL BUILT 2026-11-21, recorded in REQ-DASH-355's, 356's and 209's
+     decisions. Two choices made in building, both minor: blocked supplies
+     belong to the period whose claim window their receipt fell in (a held
+     supply has no period of its own); and F7's 'recorded' is added to a
+     cross-table row only under a chosen period - outside one, nearly every
+     row reads an older partner, so it would be on every row. The Reason cell
+     is emptied only for an owed-nothing row (the line beneath says why);
+     the recorded reason itself is unchanged.
      Verified met by the functional critic: 355 c1-c8, c11; 356 c4-c8;
      367 c1-c7; REQ-DASH-209's amendments and 208 c2. Not verified: 355 c10
      and 356 c10 (one-off comparisons in evidence).

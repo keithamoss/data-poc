@@ -6806,6 +6806,15 @@ class TestALinkageVerdictUnderAChosenPeriod:
         assert self._shown(clean_page) != case["value"], "with no period the verdict is not on show"
         clean_page.evaluate("(p) => applyPeriod(p)", case["period"])
         assert self._shown(clean_page) == case["value"], case
+        # ON THE PAGE, NOT ONLY IN ITS MODEL (post-build-review #490 F7): the
+        # row reads the verdict's own percentage, and says both when what it
+        # read was received and when the verdict was recorded.
+        row = clean_page.evaluate("""(pct) => [...document.querySelectorAll('#view *')]
+            .filter(e=> e.textContent.includes(pct) && [...e.children].every(c=> !c.textContent.includes(pct)))
+            .map(e=> (e.closest('tr') || e.parentElement).textContent.replace(/\\s+/g, ' ').trim())[0] || null""",
+            f"{case['value']:.1f}%")
+        assert row, f"no row on the page reads {case['value']:.1f}%"
+        assert " received " in row and " · recorded " in row, row
 
 
 @pytest.mark.asset("daily")  # Mental Health is the daily asset's
@@ -10414,6 +10423,75 @@ class TestAPeriodLinkOpensWithItsStatement:
         text = " ".join(clean_page.locator("#in-place-on-past-notice").inner_text().split())
         assert text.startswith(f"Showing {self.PERIOD}"), text
         assert "in place in the warehouse on" not in text
+
+
+class TestKeithsAnswersOnThePeriodView:
+    """post-build-review #490 (Keith, 2026-11-21), on the real quarterly build:
+    a chosen period counts only its own gaps and blocked supplies (F1); a
+    period not yet open says so on the agencies list (REQ-DASH-355 criterion
+    9); the period's sections come before the queue (UX #3); Back after a
+    period link restores the page as it was (F8, criterion 4 as amended); a
+    period link's address is the click's, and a load of it lands at its
+    collection's table (F4, F5). Each test loads its own document."""
+
+    AGENCY, COLLECTION = "child-protection-family-support", "child-protection"
+
+    def _cold(self, page, html: Path, query: str, fragment: str = "/"):
+        page.goto(f"file://{html.resolve()}?{query}#{fragment}")
+        page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+
+    def _gap_periods(self, page):
+        return page.evaluate("""() => DATA.agencies.flatMap(ag=> ag.collections.flatMap(col=>
+            col.datasets.flatMap(ds=> (ds.noSupply || []).flatMap(g=> g.periods)))) """)
+
+    def test_a_periods_status_counts_only_its_own_gaps(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        everywhere = self._gap_periods(clean_page)
+        assert everywhere, "precondition: the real history has an unfilled period somewhere"
+        period = clean_page.evaluate("(gaps) => baselinePeriods().map(p=> p.period || p)"
+                                     ".filter(p=> !gaps.includes(p)).slice(-3)[0]", everywhere)
+        assert period, "precondition: a period with no gap of its own"
+        clean_page.evaluate("(p) => applyPeriod(p)", period)
+        assert self._gap_periods(clean_page) == [], (period, self._gap_periods(clean_page))
+
+    def test_an_unopened_period_says_so_on_the_agencies_list(self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html, "in-place-on=2026-08-15&period=2027-Q1")
+        lines = clean_page.locator("#view [data-period-section] [data-not-opened]")
+        assert lines.count() > 0
+        assert "2027-Q1 had not opened by" in lines.first.inner_text()
+
+    def test_the_periods_sections_come_before_the_queue(self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html, "period=2025-Q3")
+        order = clean_page.evaluate("""() => {
+            const s = document.querySelector('#view [data-period-section]');
+            const q = document.querySelector('#view .notice-queue');
+            return s && q ? !!(s.compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) : null; }""")
+        assert order is True, order
+
+    def test_back_after_a_period_link_restores_the_page_as_it_was(self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html, "in-place-on=2026-01-15", f"/agency/{self.AGENCY}")
+        clean_page.evaluate("(a) => navigate(periodNav(a[0], a[1], '2025-Q3'))", [self.AGENCY, self.COLLECTION])
+        assert clean_page.evaluate("CURRENT_PERIOD") == "2025-Q3"
+        clean_page.go_back()
+        clean_page.wait_for_function("() => CURRENT_PERIOD === null")
+        assert "period=" not in clean_page.evaluate("location.search")
+        clean_page.go_forward()
+        clean_page.wait_for_function("() => CURRENT_PERIOD === '2025-Q3'")
+
+    def test_a_period_links_address_is_the_clicks(self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html,
+                   "in-place-on=2026-01-15&from=cp-clients&from-on=2026-01-01&panel=activity",
+                   f"/agency/{self.AGENCY}")
+        href = clean_page.evaluate("(a) => periodLinkHref(a[0], a[1], '2025-Q3')", [self.AGENCY, self.COLLECTION])
+        assert "from=" not in href and "panel=" not in href, href
+        assert "period=2025-Q3" in href and f"focus={self.COLLECTION}" in href and "in-place-on=2026-01-15" in href
+
+    def test_a_load_of_a_period_links_address_lands_at_its_table(self, clean_page, built_dashboard_html):
+        self._cold(clean_page, built_dashboard_html,
+                   f"in-place-on=2026-01-15&period=2025-Q3&focus={self.COLLECTION}", f"/agency/{self.AGENCY}")
+        caption = clean_page.locator(f"#composition-caption-{self.COLLECTION}")
+        assert caption.evaluate("e => document.activeElement === e")
+        assert "focus=" not in clean_page.evaluate("location.search")
 
 
 @pytest.mark.shared_page

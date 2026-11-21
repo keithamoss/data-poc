@@ -145,6 +145,27 @@ releases:
               never shows another team's results. The archive taken before the
               assets were split has gone; the panel says when this asset's
               archive starts.
+          - headline: A chosen period counts only its own problems
+            components: ["Dashboard UI"]
+            description: >
+              With a period chosen, its Pass, Warn and Fail now count only that
+              period's gaps and held supplies, its sections come before the
+              list of things waiting for a person, and a period not yet open
+              says so on the agencies page. Back after a period link takes you
+              back to the page as it was.
+          - headline: Runway counts each dataset's own year
+            components: ["Pipeline & publishing"]
+            description: >
+              The "delivery dates are running out" warning now counts a year of
+              each dataset's own supplies - four for a quarterly dataset, one
+              for an annual one - so Cancer Notifications no longer sets it off
+              every day.
+          - headline: A period's table fits a phone
+            components: ["Dashboard UI"]
+            description: >
+              The table of what each dataset held in a period now stacks as
+              cards on a phone and leaves out a column nothing fills, and table
+              headings are easier to read.
           - headline: An unchanged dashboard isn't published again
             components: ["Pipeline & publishing"]
             description: >
