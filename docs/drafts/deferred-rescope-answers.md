@@ -83,3 +83,9 @@ requirements.yaml until each requirement is presented and signed.
   kind plugs in its own recipe reader and checks. Note for v5: ids still share one
   namespace with each other and with assets (`MOTHMAN_ASSET`, `supply_<name>`,
   `data/<name>`), so an id must be unique across every kind, not only within one.
+
+## Round 5, the reviews' questions
+
+- **UX Q1, header tools on a one-off page:** (a) removed - Plans, Requirements,
+  Release notes, Demo, Feedback, Leaderboard, Scenarios, Past snapshots, Recent
+  activity.
