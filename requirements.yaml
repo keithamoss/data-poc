@@ -19169,7 +19169,6 @@ requirements:
       - tests/test_environments.py
     implemented_by:
       - cli/dashboard.py::publish
-      - cli/dashboard.py::_publish
       - cli/common.py::offer_to_publish
       - cli/pipeline.py::run_command
       - dashboard/embed_dashboard_data.py::embed
@@ -19246,9 +19245,7 @@ requirements:
         THE SYSTEM SHALL keep writing the snapshot archive, so that a
         self-contained copy of what was published stays readable years
         later with nothing but a browser.
-      - >
-        THE SYSTEM SHALL name, in the artifact itself, the environment
-        it was built from.
+      - 'THE SYSTEM SHALL name, in the artifact itself, the data asset and the environment it was built from. AMENDED 2026-11-21 by REQ-PIPE-354 (A16).'
       - >
         IF the database is unreachable when a build is attempted, THEN
         THE SYSTEM SHALL fail without publishing, and SHALL leave the
@@ -24168,7 +24165,7 @@ requirements:
     - WHEN a one-off command that connects to a database runs, THE SYSTEM SHALL state the environment's label in one line before its own output.
     - THE SYSTEM SHALL write that line to standard error, so that a command's standard output is unchanged when piped.
     - WHEN the terminal asks a person to confirm a change to the database, THE SYSTEM SHALL name the environment in the same prompt, and WHERE the environment requires typed confirmation (REQ-PIPE-093 criterion 4), that prompt SHALL ask for the typed id in place of a yes or no.
-    - WHERE the environment's declared publishes property is false, THE SYSTEM SHALL append the words 'not production' to that statement, and SHALL NOT rely on colour alone.
+    - 'WHERE the environment is not the declared production environment (assets/environments.yaml''s `production: true`), THE SYSTEM SHALL append the words ''not production'' to that statement, whatever the environment publishes, and SHALL NOT rely on colour alone. AMENDED 2026-11-21 by Keith (REQ-PIPE-255 criterion 21 made the sandbox the publishing environment).'
     - THE SYSTEM SHALL keep those words when colour is disabled, when NO_COLOR is set, and when output is not a terminal.
     - "THE SYSTEM SHALL take the label from assets/environments.yaml for the environment actually resolved, and SHALL NOT echo back what a person typed. AMENDED 2026-11-15 by REQ-DOCS-358 (criterion 2, the blanket path rule)."
     - IF no environment resolves when the TUI starts, THEN THE SYSTEM SHALL show REQ-PIPE-093's refusal in place of the main menu.
@@ -24218,6 +24215,8 @@ requirements:
     - 'CRITERION 9 IS SATISFIED BY CONSTRUCTION, NOT YET OBSERVED: scripts/dev/record_cast.py
       drives the real TUI, so the next recording carries the toolbar. Recorded
       here rather than claimed as evidence.'
+    - '''NOT PRODUCTION'' KEYED ON PRODUCTION, NOT ON PUBLISHING (Keith, 2026-11-21, criterion 5 amended): REQ-PIPE-255 criterion 21 makes the sandbox the one environment that publishes, and keyed on publishing the sandbox would have read as production and production as not. A declared `production: true` property marks the production environment, at most one; the dashboard''s banner reads the same flag. REJECTED keeping it on publishes, and two separate markers.'
+
   - id: REQ-PIPE-110
     title: contract/calendar.yaml is the one place a delivery agreement lives
     date_written: '2026-09-28'
@@ -38283,13 +38282,13 @@ requirements:
       the dashboard can be hosted behind a sign-in without a paid GitHub plan, without GitHub ever building
       it or holding a database credential, and without identical deployments and snapshots piling up.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, scoped in conversation 2026-10-18 over two rounds of questions, then answers to delivery-scoper''s
       six questions the same day (sandbox as the one publisher; one snapshot per publish, publishing only
       when the content has changed - his own suggestion; publishing stays opt-in; no --force). Answers plans/dashboard.md
       #4 and the parked half of #2. Drafted by delivery-scoper 2026-10-18. A PROPOSAL, not signed.'
     acceptance_criteria:
-    - "THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site() builds - index.html, data/ with every data file and part it references (REQ-DASH-291, REQ-DASH-293), fonts/, vendor/, snapshots/ with every snapshot in the split form REQ-DASH-292 publishes it and a copy of fonts/ and vendor/ beside them, snapshots/manifest.json, and the _headers file of the last criterion - to a Cloudflare Pages project by direct upload."
+    - 'THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site() builds - index.html, data/ with every data file and part it references (REQ-DASH-291, REQ-DASH-293), fonts/, vendor/, snapshots/ with every snapshot in the selected asset''s archive (REQ-PIPE-354 criterion 8) in the split form REQ-DASH-292 publishes it and a copy of fonts/ and vendor/ beside them, snapshots/manifest.json, and the _headers file of the last criterion - to a Cloudflare Pages project by direct upload. AMENDED 2026-11-21 by REQ-PIPE-354 (A24).'
     - THE SYSTEM SHALL make that upload the transport inside cli/dashboard.py's existing publish(), replacing
       the push to the gh-pages branch rather than sitting beside it, so that `mothman dashboard publish`,
       the post-QA prompt and `mothman pipeline run --publish` still reach one publish path.
@@ -38305,9 +38304,7 @@ requirements:
     - IF CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is unset or empty, THEN THE SYSTEM SHALL refuse before
       building or uploading anything, naming each missing variable, in the same plain shape as the refusal
       for an unset MOTHMAN_ENVIRONMENT.
-    - THE SYSTEM SHALL take the Pages project name, its production branch name, the dashboard's address
-      and the expected Access sign-in domain from contract/data-asset.yaml, one site per data-asset deployment,
-      and SHALL NOT hardcode any of them in code.
+    - 'THE SYSTEM SHALL take the Pages project name, its production branch name, the dashboard''s address and the expected Access sign-in domain from the selected asset''s data-asset.yaml, one Cloudflare Pages project per asset (REQ-PIPE-354), and SHALL NOT hardcode any of them in code. AMENDED 2026-11-21 by REQ-PIPE-354 (A24).'
     - THE SYSTEM SHALL pass the project name and the configured production branch to wrangler explicitly
       on every upload, so that a publish from a checkout on any git branch makes a production deployment
       and never a preview deployment.
@@ -38342,7 +38339,7 @@ requirements:
     - WHEN the dashboard is built twice in a row from unchanged recorded results, unchanged configuration
       and an unchanged template, THE SYSTEM SHALL produce the same fingerprint both times, and the test
       suite SHALL prove it.
-    - "WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in dashboard/snapshots/, computed the same way from that snapshot's decompressed page with its inlined data files read back out (REQ-DASH-292), THE SYSTEM SHALL archive no snapshot, upload nothing, print one line saying the dashboard is unchanged since that snapshot's publish and when it happened, and exit zero."
+    - 'WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in the selected asset''s archive, computed the same way from that snapshot''s decompressed page with its inlined data files read back out (REQ-DASH-292), THE SYSTEM SHALL archive no snapshot, upload nothing, print one line saying the dashboard is unchanged since that snapshot''s publish and when it happened, and exit zero. AMENDED 2026-11-21 by REQ-PIPE-354 (A24).'
     - WHEN the fingerprint differs, or no snapshot is archived yet, THE SYSTEM SHALL archive one snapshot,
       prepare the site and upload it, in that order, and SHALL compare before archiving so that an unchanged
       build never leaves a snapshot behind.
@@ -38356,10 +38353,7 @@ requirements:
       results are recorded, THEN THE SYSTEM SHALL keep those results and the locally built dashboard, report
       that the results are recorded and the published site is unchanged, name `mothman dashboard publish`
       as the retry, and exit non-zero.
-    - WHEN the test suite runs, THE SYSTEM SHALL drive `mothman dashboard publish` end to end against a
-      stub wrangler placed first on PATH that records its arguments and environment, including an unchanged
-      second publish that invokes the stub zero times, and SHALL NOT need a Cloudflare account, a token
-      or network access.
+    - 'WHEN the test suite runs, THE SYSTEM SHALL drive `mothman dashboard publish` end to end against a stub wrangler placed first on PATH that records its arguments and environment, including an unchanged second publish that invokes the stub zero times, and SHALL NOT need a Cloudflare account, a token or network access, and SHALL publish under each asset. AMENDED 2026-11-21 by REQ-PIPE-354 (A24).'
     - WHEN this requirement is built, THE SYSTEM SHALL contain no code that pushes the dashboard to a git
       branch, and `mothman dashboard publish` SHALL carry no option naming a git branch.
     - "THE SYSTEM SHALL write at the site's root a Cloudflare Pages _headers file giving every path under /data/ and /snapshots/ the response headers Cross-Origin-Resource-Policy: same-origin and X-Content-Type-Options: nosniff, so that no other website can load a data file with a <script> tag."
@@ -38438,6 +38432,28 @@ requirements:
     - "REQ-DASH-291"
     - "REQ-DASH-292"
     - "REQ-DASH-293"
+    linked_tests:
+    - tests/test_cloudflare_publish.py
+    - tests/test_publish.py
+    - tests/test_snapshot_dashboard.py
+    implemented_by:
+    - cli/dashboard.py::publish
+    - cli/dashboard.py::publish_refusal
+    - cli/dashboard.py::publish_after_a_run
+    - cli/dashboard.py::report_built_sizes
+    - cli/dashboard.py::built_sizes
+    - dashboard/hosting.py::hosting
+    - dashboard/hosting.py::find_wrangler
+    - dashboard/hosting.py::wrangler
+    - dashboard/hosting.py::credentials_refusal
+    - dashboard/hosting.py::redact
+    - dashboard/hosting.py::measure
+    - dashboard/hosting.py::deploy_args
+    - dashboard/hosting.py::upload
+    - dashboard/snapshot_dashboard.py::newest_snapshot
+    - qa_tools/common/environments.py::all_environments
+    evidence:
+    - '2026-11-21, against the stub wrangler first on PATH and a local HTTP stub, no Cloudflare account, token or network (criterion 30): tests/test_cloudflare_publish.py 29 passed - refusals before anything is built for an environment that does not publish, each missing credential named, wrangler not installed (naming `npm ci`) and an asset with no hosting; an unpinned wrangler asked only its version and nothing archived; the upload names the asset''s project, the production branch and the commit, passes the token and account in the environment only with WRANGLER_SEND_METRICS=false, prints both URLs and archives one snapshot; an unchanged second publish invokes the stub zero times and archives nothing, a changed one publishes again; each asset publishes to its own project; a failed upload shows wrangler''s words with the token redacted and is not retried; the dry run invokes nothing; the 25 MiB refusal and 20 MiB warning; the failed-publish-after-a-run message. TestEndToEnd, on the real quarterly build from the deployment database: the build twice gives the same fingerprint (criterion 23), and the second real publish invokes the stub zero times. tests/test_publish.py 48 passed (one publish path, the gate before the upload, no git push, no --branch option). wrangler 4.158.0 pinned exactly in package.json (the newest release at least two weeks old).'
     decisions:
     - NO PAID GITHUB PLAN (Keith, 2026-10-18). Private GitHub Pages needs a paid plan and Keith will not
       get one; GitHub Copilot does not provide it. He already uses Cloudflare.
@@ -38529,6 +38545,11 @@ requirements:
     - "AMENDED 2026-10-24 (Keith, approving delivery-scoper's wording at the sign-off of REQ-DASH-291 to 293, dash-split amendments A1 to A7): criteria 1, 22, 24 and 26 and the scale NFR now speak of the split site - data files and parts, split snapshots, a per-file size print - the ceiling open question became the decision above, and REQ-DASH-291, 292 and 293 became dependencies. WAS criterion 1: THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site() builds - index.html, fonts/, vendor/, snapshots/ with every decompressed snapshot, and snapshots/manifest.json - to a Cloudflare Pages project by direct upload. WAS criterion 22: THE SYSTEM SHALL compute a content fingerprint for each build - a SHA-256 over the built index.html with its build-provenance stamp and every embedded generated_at value replaced by fixed placeholders, together with every file under fonts/ and vendor/ - and SHALL exclude snapshots/ from it, because the archive only changes as a result of publishing. WAS criterion 24: WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in dashboard/snapshots/, computed the same way from that snapshot's decompressed page, THE SYSTEM SHALL archive no snapshot, upload nothing, print one line saying the dashboard is unchanged since that snapshot's publish and when it happened, and exit zero. WAS criterion 26: WHEN every dashboard build finishes (`mothman dashboard embed`, `mothman dashboard rebuild`, `mothman pipeline run` and the publish itself), THE SYSTEM SHALL print the built page's size, and WHEN it is 20 MiB or more THE SYSTEM SHALL warn, naming the size and the 25 MiB limit, so that the ceiling is watched during development and not first met at a publish (Keith, 2026-10-18). WAS NFR 14: SCALE - THE 25 MIB CEILING IS CLOSER THAN IT LOOKS. index.html is at 59% of Cloudflare Pages' 25 MiB per-file limit with two collections; at roughly thirty collections on the quarterly asset it will not fit. This requirement only refuses loudly and warns early; solving it is a separate piece of work (see open questions). WAS open question 1: THE 25 MIB CEILING, WATCHED RATHER THAN SOLVED (Keith, 2026-10-18): index.html is 14.7 MB with two collections and grows with the data embedded, so it will not fit at roughly thirty. Every build now prints the size and warns from 20 MiB; when the warning fires, Keith and the session talk about splitting the embedded data into sibling files or serving the page from somewhere without the limit. Not owned by any requirement yet, on purpose."
     - "BUILT AHEAD IN SPRINT E, 2026-10-24, with REQ-DASH-291 to 293 (this requirement stays not_started): criterion 26's per-file size print and both warnings (dashboard/data_files.py::size_report, printed by every embed), and criterion 22's fingerprint as functions nothing calls yet (dashboard/data_files.py::fingerprint, dashboard/snapshot_dashboard.py::page_fingerprint and ::snapshot_fingerprint), proven equal between a build and the snapshot that archived it (tests/test_snapshot_dashboard.py::test_a_snapshot_fingerprints_the_same_as_the_page_it_archived). VOLATILE_CONSTS blanks BUILT_AT, BUILD_PROVENANCE and SNAPSHOT_MANIFEST - the last added because a snapshot carries the manifest as it stood before it. publish() still pushes to gh-pages. A FIELD THE FINGERPRINT CANNOT YET IGNORE: an open arrival's waitedSeconds changes on every build, so criterion 23 cannot hold until Keith decides where an open wait is measured (REQ-DASH-291's unmet criterion)."
     - "AMENDED 2026-10-25 (Keith, post-build-review #268 (b), (c), (d)), BUILT AHEAD in prepare_deploy_site() and dashboard/data_files.py's fingerprint (this requirement stays not_started). (b) A _headers file at the site root gives /data/* and /snapshots/* Cross-Origin-Resource-Policy: same-origin and X-Content-Type-Options: nosniff: since REQ-DASH-291 a data file is a script any other website could include, and the browser now refuses that cross-site load - beside REQ-PIPE-257's SameSite=Lax on the Access cookie, not instead of it. /snapshots/* covers each split snapshot's <name>.data/ files. It is written afresh on every prepare, and cleared with the rest of the site's own names. It is not in the fingerprint: it changes nothing a reader sees. (c) fonts/ and vendor/ are copied under snapshots/ too, because a snapshot at snapshots/<name>.html asks for them relative to itself; wrangler uploads by content hash, so the second copy is not re-sent. NOT inlined into the archived snapshot (#268 E2, Keith). (d) The fingerprint blanks the commit in every GITHUB_LINKS address (blob/<sha>/, tree/<sha>/): every source link names the commit the build ran at, as the build stamp does, so a code-only commit rendering the same page read as changed; a link to another file or line still changes it. And the waitedSeconds field the BUILT AHEAD decision above named is gone (REQ-PIPE-080 criterion 10 amended, REQ-DASH-291 #268 (a)). WAS criterion 1: THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site() builds - index.html, data/ with every data file and part it references (REQ-DASH-291, REQ-DASH-293), fonts/, vendor/, snapshots/ with every snapshot in the split form REQ-DASH-292 publishes it, and snapshots/manifest.json - to a Cloudflare Pages project by direct upload. WAS criterion 22: THE SYSTEM SHALL compute a content fingerprint for each build - a SHA-256 over the built index.html with its build-provenance stamp and every embedded generated_at value replaced by fixed placeholders, together with every data file and part it references and every file under fonts/ and vendor/ - and SHALL exclude snapshots/ from it, because the archive only changes as a result of publishing. Criterion 32 (the _headers file) is new, added last so no other criterion's number moves."
+    - 'WRANGLER FOUND ON PATH, THEN node_modules/.bin, AND REFUSED UNLESS IT IS THE PINNED VERSION (built 2026-11-21): criterion 30 puts a stub first on PATH and criterion 4 forbids an unpinned wrangler, so whichever is found must report package.json''s exact version. Only its presence is checked before a build (criterion 5) - running it then would invoke the stub on an unchanged publish, which criterion 30 forbids; its version is asked just before anything is archived.'
+    - 'THE SIGN-IN AND SIZE CHECKS COME BEFORE THE SNAPSHOT IS ARCHIVED (built 2026-11-21): criterion 25 orders archive, prepare, upload; a refusal by REQ-PIPE-257''s pre-upload check, the size limit or the version check after archiving would leave a snapshot of a publish that never happened, so those run first, on the built page and its data files.'
+    - 'THE SANDBOX PUBLISHES, AND IS STILL NOT PRODUCTION (Keith, 2026-11-21): criterion 21 made `sandbox` the one publishing environment; REQ-TEST-114 criterion 5 keyed "not production" on publishing, which would have made the sandbox read as production and production as not. Amended there to key on a declared `production: true` property instead.'
+    - 'THE PUBLISH WRITES ITS SITE UNDER THE BUILD''S OWN DIRECTORY when one is given (built 2026-11-21): `_site/` beside `--out-dir`''s page, and every step reads the page the build wrote rather than a path bound at import - so the end-to-end test never touches the repository''s own tree.'
+    - 'PUBLISHING PAUSES UNTIL CLOUDFLARE IS LIVE (Keith, 2026-11-21): this replaces the gh-pages push, so the GitHub Pages dashboard stops updating until the Pages projects, the token, Access and the network allow-list exist. Every publish is refused meanwhile, at the latest by the placeholder sign-in domain.'
     open_questions:
     - WHETHER DIRECT-UPLOAD DEPLOYMENTS COUNT AGAINST THE FREE PLAN'S 500 A MONTH. Not verifiable from this
       sandbox. Check in the Cloudflare dashboard after the first week of publishing.
@@ -38544,29 +38565,26 @@ requirements:
       so that a missing, disabled or misconfigured Access policy is caught by the tool rather than found
       by a stranger.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, scoped in conversation 2026-10-18 (Cloudflare Access one-time code to the allow-listed
       work emails of a handful of named team members), then answering delivery-scoper's question 4 the same
       day (option A - by hand in the console from a committed runbook). Drafted by delivery-scoper 2026-10-18.
       A PROPOSAL, not signed.
     acceptance_criteria:
-    - THE SYSTEM SHALL require Cloudflare Access sign-in for the Pages project's production hostname, <project>.pages.dev,
-      and for every deployment and branch-alias hostname under *.<project>.pages.dev.
+    - 'THE SYSTEM SHALL require Cloudflare Access sign-in for each asset''s Pages project''s production hostname, <project>.pages.dev, and for every deployment and branch-alias hostname under *.<project>.pages.dev, under its own Access applications and policy. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     - THE SYSTEM SHALL offer One-time PIN as the only sign-in method on those Access applications.
-    - THE SYSTEM SHALL admit only email addresses listed one by one in the Access policy, and SHALL NOT
-      admit by email domain, by an Everyone rule, or by a Bypass or Service Auth rule.
+    - 'THE SYSTEM SHALL admit only email addresses listed one by one in each asset''s own Access policy, and SHALL NOT admit by email domain, by an Everyone rule, or by a Bypass or Service Auth rule. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     - WHERE a custom domain is attached to the Pages project, THE SYSTEM SHALL protect it with its own Access
       application under the same policy.
     - THE SYSTEM SHALL keep the allow-listed email addresses in Cloudflare only, and SHALL NOT commit any
       of them to the repository.
-    - "THE SYSTEM SHALL carry a committed runbook, docs/dashboard-hosting.md, giving every console step that creates the Pages project, creates the least-privilege API token, enables One-time PIN, creates both Access applications and the policy, sets the session duration, sets each Access application's CF_Authorization cookie to SameSite=Lax explicitly, and adds and removes a person."
+    - 'THE SYSTEM SHALL carry a committed runbook, docs/dashboard-hosting.md, giving every console step that creates the Pages project, creates the least-privilege API token, enables One-time PIN, creates both Access applications and the policy, sets the session duration, sets each Access application''s CF_Authorization cookie to SameSite=Lax explicitly, and adds and removes a person, every step given once per asset project. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     - 'THE SYSTEM SHALL include in that runbook the one-time setup for publishing from a Claude Code cloud
       session: where CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set as the cloud environment''s
       secrets, beside MOTHMAN_ENVIRONMENT and the database variables, and that api.cloudflare.com, *.pages.dev
       and the account''s cloudflareaccess.com sign-in domain must be allow-listed for a session to publish
       or verify - all three refused by the session proxy as measured 2026-10-18.'
-    - THE SYSTEM SHALL take the Access sign-in domain it expects (the account's <team>.cloudflareaccess.com)
-      from contract/data-asset.yaml beside the project name.
+    - 'THE SYSTEM SHALL take the Access sign-in domain it expects (the account''s <team>.cloudflareaccess.com) from the selected asset''s data-asset.yaml beside the project name. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     - WHEN a publish is about to upload, THE SYSTEM SHALL request the production hostname with no credentials
       and without following redirects, and SHALL upload only if the answer is a redirect to the configured
       sign-in domain.
@@ -38576,13 +38594,11 @@ requirements:
     - WHEN an upload completes, THE SYSTEM SHALL request the new deployment's own hash URL the same way,
       and IF that URL is not behind the sign-in, THEN THE SYSTEM SHALL exit non-zero naming the URL as reachable
       without sign-in.
-    - THE SYSTEM SHALL provide `mothman dashboard verify-access`, which runs the same check against the
-      production hostname and the most recent deployment's URL without uploading anything, and exits non-zero
-      if either is reachable without sign-in.
+    - 'THE SYSTEM SHALL provide `mothman dashboard verify-access`, which runs the same check against the selected asset''s project - its production hostname and the most recent deployment''s URL - without uploading anything, and exits non-zero if either is reachable without sign-in. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     - WHEN the test suite runs, THE SYSTEM SHALL exercise both checks against a local HTTP stub answering
       with a sign-in redirect, a 200 dashboard, a redirect elsewhere, a 404 and a refused connection, with
       no network access.
-    - "WHEN this requirement is first built, THE SYSTEM SHALL be verified once from an environment that can reach Cloudflare: an unauthenticated curl of the production URL and of a deployment URL each returning the Access sign-in redirect; the CF_Authorization cookie set by a real sign-in carrying SameSite=Lax on both Access applications; and one allow-listed person other than Keith signing in and seeing the dashboard. The evidence records who and when, not the email address."
+    - 'WHEN this requirement is first built, THE SYSTEM SHALL be verified once from an environment that can reach Cloudflare: an unauthenticated curl of the production URL and of a deployment URL each returning the Access sign-in redirect; the CF_Authorization cookie set by a real sign-in carrying SameSite=Lax on both Access applications; and one allow-listed person other than Keith signing in and seeing the dashboard. The evidence records who and when, not the email address, for each asset''s project. AMENDED 2026-11-21 by REQ-PIPE-354 (A25).'
     non_functional_requirements:
     - 'SECURITY - THE PAGES TOGGLE IS NOT ENOUGH, and this is the trap the criteria exist for. Cloudflare''s
       own docs: Settings > Enable access policy ''will only protect your preview deployments ... and not
@@ -38622,6 +38638,26 @@ requirements:
     - "SECURITY - CROSS-SITE SCRIPT INCLUSION. Since REQ-DASH-291 the dashboard's data is in .js files, and any other website can include a .js file with a <script> tag and read what it defines. SameSite=Lax withholds the Access cookie from that cross-site subresource request, so the hostile page gets the sign-in redirect rather than the data, while top-level navigations - a reader following a link - still carry it."
     dependencies:
     - REQ-PIPE-255
+    unmet_criteria:
+    - criterion: Criteria 1 to 5 - Access configured on each asset's project (both applications, One-time PIN only, a named email allow-list, any custom domain protected, the emails kept in Cloudflare).
+      why: Console configuration by Keith from docs/dashboard-hosting.md (decided 2026-10-18, option A), not code; the Pages projects and the Zero Trust team do not exist yet. mothman checks the outcome before and after every upload and refuses until it holds.
+      owner: Keith, in the Cloudflare console
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 14 - the one-time live verification from an environment that can reach Cloudflare, for each asset's project.
+      why: Needs the configured projects, a token and the session's network allow-listed for api.cloudflare.com, *.pages.dev and the cloudflareaccess.com domain.
+      owner: Keith, with a session that can reach Cloudflare
+      blocked_by:
+        unowned: true
+    linked_tests:
+    - tests/test_cloudflare_publish.py
+    implemented_by:
+    - dashboard/access_check.py::check
+    - cli/dashboard.py::publish
+    - cli/dashboard.py::verify_access_command
+    - dashboard/hosting.py::latest_deployment_url
+    evidence:
+    - '2026-11-21: tests/test_cloudflare_publish.py - the check against a local HTTP stub answering with the sign-in redirect, a 200, a redirect elsewhere, a 404 and a refused connection (criterion 13); an unprotected production address uploads nothing and leaves no snapshot (criteria 9 and 10, each kind said); the placeholder sign-in domain refuses every publish; a deployment reachable without sign-in exits non-zero naming it (criterion 11); `mothman dashboard verify-access` passes when both are behind the sign-in and fails when the deployment is open, uploading nothing (criterion 12). docs/dashboard-hosting.md committed with every console step per asset project, SameSite=Lax set explicitly, and the cloud-session setup (criteria 6 and 7). Each asset''s data-asset.yaml carries hosting.access_domain (criterion 8), CHANGE-ME.cloudflareaccess.com until Keith''s team exists.'
     decisions:
     - CLOUDFLARE ACCESS ONE-TIME CODE TO NAMED WORK EMAILS (Keith, 2026-10-18), for a handful of named people
       in his team.
@@ -38649,6 +38685,8 @@ requirements:
       the new site is public. This is why REQ-PIPE-255's first live publish waits on this requirement.
     - "SAMESITE=LAX, SET EXPLICITLY (Keith, 2026-10-24, answering delivery-scoper's Q5 on REQ-DASH-291). Cloudflare's own page (developers.cloudflare.com/cloudflare-one/identity/authorization-cookie/) offers None, Lax and Strict as a per-application setting and does not state a default for CF_Authorization, so Lax is set explicitly rather than relied on. Lax withholds the cookie from a cross-site <script src> subresource - the case that matters - and sends it only on top-level navigations. REJECTED Strict: the same page warns it can cause ERR_TOO_MANY_REDIRECTS. REJECTED None: it would send the cookie with a hostile page's script request. REJECTED accepting the risk for synthetic data."
     - "AMENDED 2026-10-24 (Keith, approving delivery-scoper's wording at the sign-off of REQ-DASH-291, dash-split amendments B1 to B4): the runbook sets each Access application's CF_Authorization cookie to SameSite=Lax explicitly, and the first-build check verifies it, because REQ-DASH-291 moves the data into .js files any site can include. WAS criterion 6: THE SYSTEM SHALL carry a committed runbook, docs/dashboard-hosting.md, giving every console step that creates the Pages project, creates the least-privilege API token, enables One-time PIN, creates both Access applications and the policy, sets the session duration, and adds and removes a person. WAS criterion 14: WHEN this requirement is first built, THE SYSTEM SHALL be verified once from an environment that can reach Cloudflare: an unauthenticated curl of the production URL and of a deployment URL each returning the Access sign-in redirect, and one allow-listed person other than Keith signing in and seeing the dashboard. The evidence records who and when, not the email address."
+    - 'A PLACEHOLDER SIGN-IN DOMAIN UNTIL THE TEAM EXISTS (Keith, 2026-11-21): hosting.access_domain is CHANGE-ME.cloudflareaccess.com, so the pre-upload check refuses every publish - nothing can go public before Access is in place, which the 2026-10-18 decision ''Access before the first real upload'' asks for.'
+    - 'A 404 IS NOT THE SIGN-IN (built 2026-11-21): only a redirect to the configured domain, or a host under it, counts as protected; any other answer, a 404 included, is said and refused, as criterion 10''s "cannot be made" reads for an answer that proves nothing.'
     open_questions: []
   - id: REQ-GHUB-258
     title: Links to the dashboard are built from a configured address, not a hardcoded github.io URL
@@ -38659,13 +38697,12 @@ requirements:
     story: As a person following a link from a QA ticket, I want it to open the private dashboard, so that
       making the repository private does not leave every ticket pointing at a site that no longer exists.
     moscow: must
-    status: not_started
+    status: built
     source: 'Found by delivery-scoper 2026-10-18 while scoping Keith''s private-hosting work (Keith, 2026-10-18):
       qa_tools/common/ticket_check_summary.py:46 hardcodes DASHBOARD_BASE_URL = "https://keithamoss.github.io/data-poc/",
       and check_url() builds every ticket''s dashboard link from it. A PROPOSAL, not signed.'
     acceptance_criteria:
-    - THE SYSTEM SHALL take the published dashboard's address from contract/data-asset.yaml, beside the
-      Pages project name, and SHALL NOT hardcode a dashboard address in product code.
+    - 'THE SYSTEM SHALL take each asset''s published dashboard address from that asset''s data-asset.yaml, beside its Pages project name, and SHALL NOT hardcode a dashboard address in product code. AMENDED 2026-11-21 by REQ-PIPE-354 (A26).'
     - WHEN a ticket body links to a check, dataset or slot on the dashboard, THE SYSTEM SHALL build that
       link from the configured address.
     - IF the stated environment turns ticketing on and no dashboard address is configured, THEN THE SYSTEM
@@ -38680,6 +38717,14 @@ requirements:
       Verify that once, live, because it is the one part a stub cannot prove.
     dependencies:
     - REQ-PIPE-255
+    linked_tests:
+    - tests/test_ticket_check_summary.py
+    implemented_by:
+    - qa_tools/common/ticket_check_summary.py::dashboard_address
+    - qa_tools/common/ticket_check_summary.py::check_url
+    - qa_tools/common/environments.py::for_connection
+    evidence:
+    - '2026-11-21: tests/test_ticket_check_summary.py 19 passed - each asset''s ticket links start at its own hosting.address (data-poc-quarterly / data-poc-daily), the hardcoded keithamoss.github.io constant is gone, and an environment that turns ticketing on with no address configured is refused before connecting, naming hosting.address. Criterion 4 holds by construction: nothing rewrites a ticket already written.'
     decisions:
     - THE ADDRESS LIVES IN contract/data-asset.yaml (Keith, 2026-10-18, by way of his answer that hosting
       configuration is one site per data-asset deployment).
@@ -38689,6 +38734,7 @@ requirements:
     - OLD TICKETS STAY AS THEY ARE (Keith, 2026-10-18, at sign-off). Issues written before the flip keep
       their github.io links; those issues sit in the private repository after the flip and nobody outside
       it follows them. Rewriting old ticket bodies was proposed as out of scope and Keith confirmed it.
+    - 'THE ADDRESS IS hosting.address, BESIDE THE PROJECT NAME (built 2026-11-21): one place per asset for where its dashboard lives, read by the publish''s output and the tickets alike.'
     open_questions: []
   - id: REQ-TEST-260
     title: Sessions push far less often, CI's measured usage is a command away, and a private repository's
@@ -38861,22 +38907,15 @@ requirements:
     acceptance_criteria:
     - THE SYSTEM SHALL carry, in docs/dashboard-hosting.md, a pre-flip checklist naming every precondition
       below, for Keith to complete before he changes the repository's visibility.
-    - THE SYSTEM SHALL NOT have the repository made private until REQ-PIPE-255, REQ-PIPE-257 and REQ-GHUB-258
-      are built, a real publish is serving the current dashboard and every snapshot from the private host,
-      and an allow-listed person other than Keith has signed in to it.
+    - 'THE SYSTEM SHALL NOT have the repository made private until REQ-PIPE-255, REQ-PIPE-257 and REQ-GHUB-258 are built, a real publish is serving each asset''s current dashboard and its snapshots from its own private project, and an allow-listed person other than Keith has signed in to each. AMENDED 2026-11-21 by REQ-PIPE-354 (A27).'
     - THE SYSTEM SHALL NOT have the repository made private until REQ-TEST-260 is built and `mothman github
       ci-usage --days 7`, run over a full working week under its push-cadence rule, reports a figure that
       scales to at most 2,000 billable minutes a month.
     - THE SYSTEM SHALL NOT have the repository made private until it is confirmed that the agent sessions
       this project is worked in can still clone and push it.
-    - 'WHEN the repository has been made private, THE SYSTEM SHALL be verified: an anonymous request for
-      the repository and for keithamoss.github.io/data-poc each returning 404, `mothman dashboard verify-access`
-      passing, and a test.yml run on the private repository completing.'
+    - 'WHEN the repository has been made private, THE SYSTEM SHALL be verified: an anonymous request for the repository and for keithamoss.github.io/data-poc each returning 404, `mothman dashboard verify-access` passing for each asset, and a test.yml run on the private repository completing. AMENDED 2026-11-21 by REQ-PIPE-354 (A27).'
     - 'WHEN the flip is verified, THE SYSTEM SHALL have the gh-pages branch deleted, since nothing publishes to it; the pre-split publishes it holds are no longer in any committed archive (REQ-DASH-373) and remain in the main branch''s git history, and every later publish is in its asset''s archive. AMENDED 2026-11-21 by REQ-DASH-373.'
-    - WHEN this requirement is built, THE SYSTEM SHALL state, in CLAUDE.md, README.md and docs/project-context-for-agents.md,
-      that the repository is private, where the dashboard is hosted, how a person is given access, and which
-      environment variables a publishing environment needs, and SHALL contain no statement that the repository
-      is public or that the dashboard is at keithamoss.github.io.
+    - 'WHEN this requirement is built, THE SYSTEM SHALL state, in CLAUDE.md, README.md and docs/project-context-for-agents.md, that the repository is private, where each asset''s dashboard is hosted, how a person is given access, and which environment variables a publishing environment needs, and SHALL contain no statement that the repository is public or that the dashboard is at keithamoss.github.io. AMENDED 2026-11-21 by REQ-PIPE-354 (A27).'
     - WHEN this requirement is built, THE SYSTEM SHALL remove plans/dashboard.md items 2 and 4, moving anything
       they hold that no requirement carries into these requirements' decisions first.
     non_functional_requirements:
@@ -48908,13 +48947,6 @@ requirements:
     - REQ-PIPE-363
     - REQ-PIPE-092
     - REQ-PIPE-255
-    unmet_criteria:
-    - criterion: Criterion 5 - the setting replaced by each asset's own Pages project keys, and removed.
-      why: It is REQ-PIPE-255's change, made when each asset gets its own Cloudflare Pages project; until then the setting is how the daily publish is held.
-      owner: REQ-PIPE-255
-      blocked_by:
-        requirements:
-        - REQ-PIPE-255
     linked_tests:
     - tests/test_publish_per_asset.py
     - tests/test_snapshot_dashboard.py
@@ -48926,6 +48958,7 @@ requirements:
     - qa_tools/common/schemas.py::DataAsset
     evidence:
     - '2026-11-21: tests/test_publish_per_asset.py, 6 passed - the daily asset''s publish exits non-zero naming REQ-PIPE-255 and `mothman dashboard rebuild`, builds nothing and leaves a bare stub remote with no refs; `pipeline run --publish` is refused before any step of the run; the quarterly asset''s publish pushes gh-pages to the stub remote; only quarterly holds the setting; the site carries only the selected asset''s snapshot folder; no workflow calls a publish. Four of the six failed against 9fc54c56, the commit before (the two that passed there: the quarterly publish, which already proceeded, and no workflow publishing, already true). tests/test_snapshot_dashboard.py 42 passed with the site path moved to snapshots/<asset>/.'
+    - '2026-11-21, criterion 5: publish_to_gh_pages removed from the quarterly data-asset.yaml and the schema in the change that built REQ-PIPE-255, replaced by each asset''s hosting: block (pages_project, production_branch, address, access_domain); tests/test_publish_per_asset.py asserts each asset names its own project and neither file holds the setting.'
     decisions:
     - 'THE SPLIT FIRST, THE DAILY PUBLISH REFUSED IN BETWEEN (Keith, 2026-10-31, sign-off Q2 (b)): both assets would otherwise push to the one gh-pages branch and one would overwrite the other. REJECTED (a), building the hosting first for today''s one asset.'
     - 'A SETTING IN EACH ASSET''S data-asset.yaml, NOT CODE (Keith, 2026-10-31, v3 item 2 (a)): only the quarterly asset holds it until REQ-PIPE-255 gives the daily asset its own project. REJECTED a check of the asset''s name in the publish command.'
@@ -48934,6 +48967,7 @@ requirements:
     - 'ONLY THE SELECTED ASSET''S SNAPSHOTS ARE DEPLOYED (architect v3 NIT): prepare_deploy_site copies all of dashboard/snapshots/ today.'
     - 'THE REFUSAL LIVES IN publish() ITSELF (built 2026-11-21): every route to a publish - the command, `pipeline run --publish`, the wizard''s prompt and any future automated job - calls the one function, so one check covers them all (criterion 3); `pipeline run --publish` also asks before the run, so nothing is processed only to be refused.'
     - 'THE STUB REMOTE IS A REAL BARE REPOSITORY (built 2026-11-21, criterion 6): "pushes nothing" is read from the remote''s own refs, not from a mock having been called.'
+    - 'THE SETTING REPLACED BY THE HOSTING KEYS (built 2026-11-21, criterion 5): an asset with no hosting: block is now what is refused, in the same words of where to look and that `mothman dashboard rebuild` builds it for viewing.'
     open_questions: []
   - id: REQ-DASH-373
     title: The snapshot archive taken before the split is deleted from the tree, not rewritten out of git history; each asset's archive starts at its first publish after the split and says so when empty
@@ -48961,13 +48995,6 @@ requirements:
     - REQ-PIPE-342
     - REQ-DASH-013
     - REQ-DASH-292
-    unmet_criteria:
-    - criterion: Criterion 3, in part - REQ-PIPE-255's unchanged-site check reading the selected asset's folder only.
-      why: That check is not built yet; when it is, it reads dashboard/snapshot_dashboard.asset_snapshots_dir(), as every other reader now does.
-      owner: REQ-PIPE-255
-      blocked_by:
-        requirements:
-        - REQ-PIPE-255
     linked_tests:
     - tests/test_snapshot_archive.py
     - tests/test_snapshot_dashboard.py
@@ -48986,6 +49013,7 @@ requirements:
     - qa_tools/common/schemas.py::DataAsset
     evidence:
     - '2026-11-21: the eight pre-split dashboard/snapshots/*.html.gz files and manifest.json removed from the tree (git rm; no history rewritten, no force-push). tests/test_snapshot_archive.py 9 passed (each asset''s folder, its snapshots_from date, a local sync and a snapshot reading only the selected asset''s folder, the archive holding only per-asset folders); tests-js/snapshot-archive.test.js 3 passed (the settled empty-state words, links into snapshots/<asset>/); the real-browser TestAnEmptyArchiveSaysWhenItStarts passed on the built quarterly page, asserting ''Snapshots start from this asset''s first publish after the split, Saturday, 21 November 2026.'' - against the template before the change the panel read ''No snapshots yet — run mothman pipeline run --snapshot''. CLAUDE.md''s three statements amended with C1''s signed wording; A40, A41 and A42 applied.'
+    - '2026-11-21, criterion 3''s last reader: REQ-PIPE-255''s unchanged-site check (snapshot_dashboard.newest_snapshot) reads the selected asset''s archive only; tests/test_cloudflare_publish.py''s unchanged publish compares against dashboard/snapshots/<asset>/.'
     decisions:
     - 'DELETED, NOT SERVED (Keith, 2026-10-31, sign-off Q3, his own answer beyond the options offered): overrides CLAUDE.md''s ''snapshots accumulate and are never deleted'' for that archive only. REJECTED (a) serving it with the quarterly site only, (b) with both sites, and (c) keeping it in the repository unserved.'
     - 'GIT HISTORY NOT REWRITTEN - Q7 CLOSED (Keith, 2026-10-31, v3 Q7 (a)): deleted from the tree only. REJECTED purging history with a force-push.'
@@ -49000,7 +49028,7 @@ requirements:
     date_written: '2026-10-31'
     story: As someone given access to one team's register, I want that asset's dashboard on a site of its own, behind its own sign-in, showing only its own asset, so that the two teams' registers are as separate as their data, and a link I saved before the split still tells me where to go.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -49035,6 +49063,24 @@ requirements:
     - REQ-GHUB-258
     - REQ-PIPE-372
     - REQ-DASH-373
+    linked_tests:
+    - tests-js/asset-identity.test.js
+    - tests/test_dashboard_e2e.py
+    - tests/test_cloudflare_publish.py
+    - tests/test_publish_per_asset.py
+    - tests/test_snapshot_archive.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::movedEntryForRoute
+    - dashboard/qa-reporting-dashboard.template.html::movedHref
+    - dashboard/qa-reporting-dashboard.template.html::renderMovedNotice
+    - dashboard/qa-reporting-dashboard.template.html::renderNotFound
+    - dashboard/qa-reporting-dashboard.template.html::feedbackEvidence
+    - dashboard/qa-reporting-dashboard.template.html::routeHeldHere
+    - dashboard/qa-reporting-dashboard.template.html::renderDemo
+    - dashboard/embed_dashboard_data.py::embed
+    - qa_tools/common/schemas.py::DataAsset
+    evidence:
+    - '2026-11-21: tests-js/asset-identity.test.js 8 passed (the masthead ''Quarterly data asset · Quality Assurance'' and the title; the moved notice''s words, its link to the daily address keeping the route and in-place-on and dropping period=, cmp= and panel=, the sign-in line; the not-found page otherwise; a Feedback card''s link kept where moved_to covers it, the label alone where nothing does; the Demo caption). Real-browser, on the built quarterly page: TestAMovedCollectionSaysWhereItWent (criterion 7: the line, the link and its parameters, the title, the announcement, no navigation) and TestTheDemoSaysWhereItWasRecorded (criterion 10) passed. Criterion 5: TestTheUpload::test_each_asset_publishes_to_its_own_project names data-poc-quarterly and data-poc-daily to the stub wrangler.'
     decisions:
     - 'ONE CLOUDFLARE PROJECT PER ASSET, EACH WITH ITS OWN ACCESS ALLOW-LIST (Keith, 2026-10-31, architect Q1 (a)): matches the two-team target and removes per-path publishing. It SUPERSEDES v1''s ''two dashboards on one site, /quarterly/ and /daily/'' (Keith''s earlier (a), which predated knowing REQ-PIPE-255 uploads a whole tree). REJECTED (b), one combined project rebuilt from both databases on every publish.'
     - TODAY'S PROJECT BECOMES THE QUARTERLY ASSET'S; THE DAILY ASSET GETS A NEW ONE; NO LANDING PAGE AND NO REDIRECT SCRIPT; AN OLD BIRTH REGISTRATIONS LINK SHOWS A ONE-LINE NOTICE (Keith, 2026-10-31, old address (a)). REJECTED (b), new projects for both with a linking page at today's address. This drops v1's landing page and old-link redirect, and with them UX MUST 5 and UX Q2.
@@ -49050,6 +49096,9 @@ requirements:
     - 'THE DEMO TAB ON BOTH SITES, CAPTIONED ON QUARTERLY (Keith, 2026-11-01, (b)): DEMO_CAST records the Birth Registrations wizard, which answers ''No such command'' on the quarterly asset. REJECTED (a), the daily site only until re-recorded.'
     - 'THEME AND WHAT''S NEW READ-STATE ARE PER SITE (dashboard UX v3 NIT): both live in localStorage, which is per origin, so neither carries from one asset''s dashboard to the other''s. Accepted, not built around.'
     - "NO ASSET SWITCHER (Keith, 2026-10-31, #131): one dashboard switching between assets was REJECTED because it mixes both assets into one build; each asset's dashboard is built only from its own database."
+    - 'THE DEMO''S ASSET IS THE RECORDING''S OWN FACT, NOT CODE (built 2026-11-21, criterion 10): dashboard/demos/qa_wizard.yaml says the cast was recorded on the daily asset and carries the settled caption; any other asset''s build captions the tab, so no code names an asset.'
+    - 'A ROUTE THIS ASSET DOES NOT HOLD IS READ FROM THE EMBEDDED HIERARCHY (built 2026-11-21, criterion 11): its agency, collection and dataset ids against HIERARCHY; with none embedded (the raw template) every route counts as held.'
+    - 'PROJECT NAMES (Keith, 2026-11-21): data-poc-quarterly and data-poc-daily, production branch main, at <project>.pages.dev.'
     open_questions: []
   - id: REQ-DASH-355
     title: A global period control sits beside the date control, is carried in the URL and across navigation, and with no period chosen every page renders as it did before the change
@@ -49404,24 +49453,17 @@ requirements:
     - "THE SWEEP'S THREE AMBIGUOUS CRITERIA ANSWERED (Keith, 2026-11-15, after the critic's review of fe3f5671): REQ-PIPE-190 c1 names the two contracts' real paths (assets/quarterly/child-protection-family-support/ and assets/daily/registry-services/); REQ-TEST-252 c15 reads 'the repository's own assets/, data/ or reports/'; REQ-QAC-294 c3 reads 'assets/<asset>/synthetic/synthetic_inputs.yaml (today the quarterly asset's)', its stale 'moving with the asset split to ... contract/<asset>/' note dropped. Each marked AMENDED by REQ-DOCS-358, and criterion 2 is met. With them the sweep amended 127 criteria, and 39 still name an old form: the 37 recorded above that were not ambiguous, plus REQ-TEST-252 c15 (now naming only the whole data/ and reports/ trees) and REQ-QAC-294 c3, whose clause 'kept at the top of contract/ among the asset-wide files - added to validate_collections.ASSET_WIDE ... by amendment A8' is outside Keith's wording and left for him."
     - "REQ-PIPE-240 c9 (Keith's wording, 2026-11-15): the scenario register's exemptions are INJECTIONS, INHERITING_DATASET and CORRECTION_RIDERS - the third had been added to validate_collections.SCENARIO_EXEMPT_NAMES without the criterion following."
     unmet_criteria:
-    - criterion: "Criterion 1, the LATER amendments still to apply - A16, A24, A25, A26 and A27 (hosting). A2, A5, A6, A11 and A17 (weekday participation) and A28 to A35 (the period control) were applied 2026-11-18 with REQ-PIPE-346, REQ-DASH-347, REQ-DASH-355 and REQ-DASH-367; A40's snapshots half, A41, A42 and C1/E6 2026-11-21 with REQ-DASH-373."
-      why: "Each is applied in the change that builds the requirement it serves (criterion 1), and those are the split's features, which come after #134's core and the speed batch (decisions-2026-11-01, 'Finishing the split'). The sweep's snapshot-archive criteria wait here too."
-      owner: "REQ-PIPE-354"
-      blocked_by:
-        requirements:
-        - REQ-PIPE-354
     - criterion: "Criterion 3, its hosting notes - CLAUDE.md's 'The repo is public ... GitHub Pages hosting depends on that' bullet (E15)."
-      why: "Nothing about hosting has changed until REQ-PIPE-354 is built; REQ-DOCS-259 criterion 7 rewrites the bullet when it moves (G9)."
-      owner: "REQ-PIPE-354"
+      why: "REQ-PIPE-354 was built 2026-11-21, but the bullet stays true until the repository is made private and the gh-pages site retired; REQ-DOCS-259 criterion 7 rewrites it when it moves (G9)."
+      owner: "REQ-DOCS-259"
       blocked_by:
         requirements:
-        - REQ-PIPE-354
+        - REQ-DOCS-259
     - criterion: "Criterion 4, plans/running-thoughts.md #131 and #134's configuration half (#109 came out 2026-11-18, its Cancer and weekly collections built)."
-      why: "Each comes out once the last requirement it feeds is built: #131 feeds the period control and weekdays, built 2026-11-18, and hosting (REQ-PIPE-354; REQ-DASH-373 built 2026-11-21); #134's configuration half REQ-GEN-371's eras.yaml, built 2026-11-18, and stays until REQ-DASH-394 (Keith, 2026-11-18)."
-      owner: "REQ-PIPE-354, REQ-DASH-394"
+      why: "Every requirement #131 feeds is built (the period control and weekdays 2026-11-18, the hosting REQ-PIPE-354 and REQ-DASH-373 2026-11-21); it comes out once its decisions are checked as carried into REQ-DASH-355/356/367 and REQ-PIPE-354, a pass of its own. #134's configuration half stays until REQ-DASH-394 (Keith, 2026-11-18)."
+      owner: "REQ-DASH-394 (and the #131 carry-over check)"
       blocked_by:
         requirements:
-        - REQ-PIPE-354
         - REQ-DASH-394
     linked_tests:
     - tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_declaring_dataset_with_no_calendar

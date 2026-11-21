@@ -111,11 +111,33 @@ intro: >
 releases:
   - date: "2026-11-21"
     summary: >
-      Each data asset now keeps its own snapshot archive, and only the
-      quarterly asset publishes until each asset has hosting of its own.
+      Each data asset now publishes to its own private site, keeps its own
+      snapshot archive and says which asset it is. A collection that moved to
+      the other asset says where it went.
     changes:
+      - category: New
+        items:
+          - headline: Publishing goes to a private Cloudflare site
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman dashboard publish` now uploads each asset's dashboard to
+              its own Cloudflare Pages project, behind a sign-in, and checks the
+              sign-in before and after every upload. Until the sign-in is set up
+              (`docs/dashboard-hosting.md`), every publish stops and says why,
+              and the GitHub Pages site no longer updates.
+          - headline: A moved collection says where it went
+            components: ["Dashboard UI"]
+            description: >
+              Opening a link to Birth Registrations on the quarterly dashboard
+              now says it has moved to the daily asset's dashboard, with a link
+              to the same page there, rather than "not found".
       - category: Improved
         items:
+          - headline: The dashboard says which asset it is
+            components: ["Dashboard UI"]
+            description: >
+              The masthead and the browser tab now name the data asset, so two
+              open dashboards can't be mistaken for each other.
           - headline: A snapshot archive for each asset
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >
@@ -123,13 +145,12 @@ releases:
               never shows another team's results. The archive taken before the
               assets were split has gone; the panel says when this asset's
               archive starts.
-          - headline: The daily asset's publish waits for its own hosting
+          - headline: An unchanged dashboard isn't published again
             components: ["Pipeline & publishing"]
             description: >
-              `mothman dashboard publish` for the daily asset now stops before
-              building anything and says why, rather than overwriting the
-              quarterly dashboard. `mothman dashboard rebuild` still builds it
-              for you to view.
+              A publish whose content matches the newest snapshot now uploads
+              nothing and archives nothing, so the archive holds only real
+              changes.
   - date: "2026-11-18"
     summary: >
       You can choose one period and see every page as it stood for it, a
