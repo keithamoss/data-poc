@@ -63,3 +63,12 @@ requirements.yaml until each requirement is presented and signed.
 7. **A declared table missing or an undeclared file present:** (a) failing
    default-layer checks; QA carries on.
 8. **The root `file-checks.yaml`:** (a) applies to extractions.
+
+## Round 3, on deferred-rescope-v3.yaml
+
+1. **Commit the generated folder before loading:** (a) yes - loading is refused
+   until it is committed. AND (Keith's own addition): the one-offs live apart from
+   the enduring assets - **`extractions/<id>/` at the repository root**, beside
+   `assets/`, holding the extraction template and one folder per extraction.
+   Selected by MOTHMAN_ASSET and given its own database as any asset is, but never
+   listed by the enduring-asset loops in CI or the session-start hook.
