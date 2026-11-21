@@ -10455,6 +10455,22 @@ class TestRunTimesOnTheBuiltPage:
         assert clean_page.locator('.supply-history [data-unit-trend="run-time"]').count() == 1
 
 
+class TestTheSupplyHistoryFitsAPhone:
+    """post-build-review #493 nit: at 390px the supply-cycle label's caption
+    ('supplies with no period yet, two files for one table, ...') was held on
+    one line, 715px wide, and the whole page scrolled sideways. The cycle
+    table itself scrolls inside its own frame, as it should."""
+
+    def test_the_page_does_not_scroll_sideways(self, clean_page, built_dashboard_html):
+        clean_page.set_viewport_size({"width": 390, "height": 844})
+        _goto(clean_page, built_dashboard_html, _CP_CLIENTS)
+        got = clean_page.evaluate("""() => ({
+          labels: document.querySelectorAll('.supply-cycle-label').length,
+          page: document.documentElement.scrollWidth - innerWidth})""")
+        assert got["labels"], "precondition: a supply cycle with its label"
+        assert got["page"] <= 0, got
+
+
 class TestAPeriodLinkOpensWithItsStatement:
     """REQ-DASH-355 criterion 6 on a COLD LOAD (post-build review of group D,
     2026-11-18, found by the functional and UX critics both): a shared link,
