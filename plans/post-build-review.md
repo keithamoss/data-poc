@@ -17137,6 +17137,20 @@ twice. It deliberately did not re-find the `TypeError`.
        months, or all" to "the months or weekdays, or all" and "a list of
        some months needs" to "a list of some needs" - beyond the signed
        amendment's text. Sensible, but requirement text he did not sign.
+     - **KEITH, 2026-11-21, on F2: a year of the dataset's own supplies.**
+       First recommended "count in time"; corrected before building, because
+       it would not fix an annual dataset (its runway is always under a
+       year on a calendar authored a year ahead) and reverses REQ-PIPE-053
+       c1, signed. Chosen instead: still slots, threshold is the number of
+       slots the dataset owes in `runway_warning_years` (1) - 4 quarterly, 1
+       annual, 52 weekly. REQ-PIPE-053's authored-list criterion amended in
+       his approved wording; `runway_warning_slots: 4` becomes
+       `runway_warning_years: 1`.
+     - **KEITH, 2026-11-21, on F4: revert to the signed text.** REQ-PIPE-181
+       c8's two unsigned phrases put back ('the months, or all' and 'a list
+       of some months needs'); A11's signed change stands.
+     - **KEITH, 2026-11-21, on F3: leave it** - true when written; history
+       is not rewritten.
      - F6 (TS-116's 'No supply' from the next day rather than its due time -
        the date-only view) and F7 (delivery folder prefixes shared across
        agencies) noted, not defects in group C.
@@ -17189,6 +17203,29 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Visual #9**: table headers at --ink-faint (2.81:1), as #49 left them.
      - The visual critic also noted: 'held anything in Tuesday, 17 November'
        on the daily page, and a Reason cell naming a repository path.
+     KEITH'S ANSWERS, 2026-11-21 (to build):
+     - **Status scope: only that period.** A chosen period's status counts
+       gaps and held supplies inside P only; a period not yet open says so
+       rather than Fail. Not asked, because they are misses against signed
+       criteria: section cards roll up only their own section (356 c5), and
+       the agencies list carries the 'had not opened' line (355 c9).
+     - **UX #3: period first.** With a period chosen, its sections come
+       before the whole-history queue.
+     - **F8: Back restores.** 355 c4 gains, in his approved wording: "A link
+       that sets a period is navigation and adds an entry as any other link
+       does, so Back returns to the page as it was, with the period it had
+       then or none."
+     - **F4/F5: fix both** - each period link's href matches what a click
+       does, and a new-tab open lands at its collection's table.
+     - **F7: both times, labelled** ('Received 3 Feb · recorded 10 Mar');
+       its test reads the page's text (coverage, not asked).
+     - **Visual #3: cards on phones**, and a column empty on every row of
+       the asset is left out.
+     - **Visual #7 and #9: both** - the period button gets 🗓, and table
+       headers move to --ink-muted across the dashboard (reverses #49's
+       choice for headers).
+     - Not asked, wording: 'held anything in <day>' and the Reason cell's
+       repository path.
      Verified met by the functional critic: 355 c1-c8, c11; 356 c4-c8;
      367 c1-c7; REQ-DASH-209's amendments and 208 c2. Not verified: 355 c10
      and 356 c10 (one-off comparisons in evidence).
