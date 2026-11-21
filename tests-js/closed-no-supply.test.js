@@ -245,3 +245,20 @@ describe("a queue item leads to its dataset (#123 B5)", () => {
     expect(root.querySelector("a[data-nav]")).toBeNull();
   });
 });
+
+describe("a gap counted in what the dataset owes (post-build-review #493 M3)", () => {
+  // Keith, 2026-11-21, and the same words as filing_queue.Gap.describe().
+  it.each([
+    [["2026-09-21", "2026-09-28", "2026-10-05"], "3 Mondays with no supply, "],
+    [["2026-09-21", "2026-09-23", "2026-09-25", "2026-09-28"], "4 owed days with no supply, "],
+    [["2026-09-21", "2026-09-22", "2026-09-23"], "3 days with no supply, "],
+    [["2026-09-21"], "1 day with no supply, "],
+    [["2026-Q1", "2026-Q2"], "2 periods with no supply, "],
+  ])("%j reads %s", (periods, words) => {
+    const dashboard = loadDashboard();
+    try {
+      expect(dashboard.window.gapText({periods, marks: [], allMarks: [], rejected: null}).startsWith(words)).toBe(true);
+    } finally { dashboard.close(); }
+  });
+});
+

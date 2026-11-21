@@ -140,6 +140,27 @@ releases:
               upload, say - left the snapshot behind, so trying again said the
               dashboard was unchanged and uploaded nothing. It now takes the
               snapshot back, and the retry publishes.
+          - headline: The run-time trend shows what your checks took
+            components: ["Dashboard UI"]
+            description: >
+              The trend now scales to the runs that finished, so one long
+              failed try no longer flattens the rest; that try sits on the top
+              edge, marked off the scale. A supply whose checks never ran says
+              Not checked rather than a run time, and each row shows its own
+              arrival's time.
+          - headline: A retried check says how every earlier try ended
+            components: ["Dashboard UI"]
+            description: >
+              The note on a check that needed more than one try now names each
+              failed try before it, oldest first, so a 45-minute timeout two
+              tries back is not hidden. Each try is listed once, with its date
+              once.
+          - headline: Missed supplies are counted in what the dataset owes
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A weekly dataset's missed supplies now read "9 Mondays with no
+              supply" rather than "9 days" across two months, and its first
+              days with nothing to stand on are one item, in date order.
           - headline: The schedule warning agrees with the repository's check
             components: ["Dashboard UI"]
             description: >

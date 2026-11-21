@@ -186,7 +186,32 @@ describe("a run that needed another try (414)", () => {
     expect(html).toContain("Checked on the ninth try");
     expect(html).toContain("and 3 more");
     expect(html).toContain("mothman supply failures");
-    expect((html.match(/<li>Try /g) || []).length).toBe(6);
+    expect((html.match(/<li value="/g) || []).length).toBe(6);
+    // EACH LINE KEEPS ITS OWN TRY'S NUMBER where some are left out (#493 M6).
+    expect([...html.matchAll(/<li value="(\d+)"/g)].map(m=> m[1])).toEqual(["1", "5", "6", "7", "8", "9"]);
+  });
+
+  it("names every failed try before the success, oldest first (#493 M6, wording approved by Keith)", () => {
+    const w = load();
+    const three = run(1, 3_000, {attempts: tries({outcome: "TIMED-OUT", ms: 2_700_000},
+      {outcome: "CRASHED", ms: 3_000}, {outcome: "COMPLETED", ms: 3_000})});
+    expect(w.triesNote(three, null)).toContain(
+      "Checked on the third try - the first timed out after 45m, the second crashed after 3s");
+    const five = run(1, 3_000, {attempts: tries({outcome: "CRASHED", ms: 3_000},
+      {outcome: "TIMED-OUT", ms: 2_700_000}, {outcome: "CRASHED", ms: 2_000},
+      {outcome: "CRASHED", ms: 1_000}, {outcome: "COMPLETED", ms: 3_000})});
+    expect(w.triesNote(five, null)).toContain(
+      "Checked on the fifth try - 4 tries before it failed, the longest timed out after 45m");
+  });
+
+  it("gives each line its number once and its date once where it began and ended that day (#493 M6)", () => {
+    const w = load();
+    const line = w.tryLine({number: 1, began_at: "2026-03-01T01:09:00+00:00",
+      ended_at: "2026-03-01T01:54:00+00:00", outcome: "TIMED-OUT", run_time_ms: 2_700_000});
+    expect(line).not.toMatch(/^Try /);
+    const days = line.match(/\d{1,2} [A-Z][a-z]+ \d{4}/g) || [];
+    expect(days.length).toBe(1);
+    expect(line).toMatch(/ended \d{1,2}:\d{2}[ap]m - timed out after 45m/);
   });
 
   it("judges each try as at the date on show: begun and not ended reads not finished", () => {
@@ -234,7 +259,7 @@ describe("a supply that could not be checked (415)", () => {
   it("says each ending, the tool, how many tries, and the next step", () => {
     const w = load();
     const said = w.couldNotCheckWords(B, "2026-03-20");
-    expect(said).toContain("its newest try failed in dbt-core on");
+    expect(said).toContain("its newest try failed in dbt-core at");
     expect(said).toContain("could not be checked on 3 tries");
     expect(said).toContain("Nothing is yet known about this supply's data");
     expect(said).toContain("The next processing pass retries it");

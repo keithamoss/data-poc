@@ -10416,7 +10416,10 @@ class TestRunTimesOnTheBuiltPage:
         note.locator("summary").click()
         assert note.evaluate("d => d.open") is True
         assert clean_page.evaluate("() => [location.href, history.length]") == before
-        assert "Try 1:" in note.inner_text() and "Try 2:" in note.inner_text()
+        # ONE NUMBER A LINE (post-build-review #493 M6): the list numbers each
+        # try by its own number, and no line repeats it as 'Try <n>:'.
+        assert note.locator("li").evaluate_all("els => els.map(e => e.value)") == [1, 2]
+        assert "Try 1:" not in note.inner_text()
 
     @pytest.mark.fresh_load  # a page of its own, written for this case
     def test_a_supply_whose_only_try_crashed_reads_could_not_be_checked(

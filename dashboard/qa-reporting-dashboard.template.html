@@ -8102,7 +8102,10 @@ function blockerSays(b){
 // be checked says the pass retries it - never 'until a person resolves it'.
 function blockedBannerLead(b){
   if(b.kind === "could-not-check")
-    return `${escHtml(blockerLabel(b))} — our check of this dataset's own supply did not finish; the next processing pass retries it, and a person can reject the supply if it keeps failing.`;
+    // WHOSE FAILURE IT IS, FIRST (post-build-review #493 M2; Keith, 2026-11-21):
+    // the red Fail stays, and its first line says the fault is ours. The next
+    // step is said once, in the words beneath (M1).
+    return `${escHtml(blockerLabel(b))} — our pipeline could not check this supply; this is not a problem with the supplier's data.`;
   return `${escHtml(blockerLabel(b))} — this dataset's own supply is not checked ${blockerUntil(b)}.`;
 }
 function blockerUntil(b){
@@ -8247,6 +8250,19 @@ function groupGaps(slots){
   });
   return groups;
 }
+// WHAT THE DATASET OWES, IN ITS OWN UNIT (post-build-review #493 M3; Keith,
+// 2026-11-21): consecutive days are days; days all on one weekday are that
+// weekday ('Mondays'); any other run of owed days is 'owed days'; one day is a
+// day. filing_queue._owed_unit says the same for the queue.
+function owedUnit(days){
+  if(days.length === 1) return "day";
+  const at = days.map(d=> new Date(`${d}T00:00:00Z`));
+  const span = Math.round((at[at.length-1] - at[0]) / 86400000) + 1;
+  if(span === days.length) return "days";
+  const wd = new Set(at.map(d=> (d.getUTCDay() + 6) % 7));
+  if(wd.size === 1) return `${WEEKDAY_FULL[[...wd][0]]}s`;
+  return "owed days";
+}
 function gapText(group){
   if(group.rejected){
     const r = group.rejected;
@@ -8258,11 +8274,10 @@ function gapText(group){
     return `${fmtPeriodOrDay(group.periods[0])}: ${what} by ${r.actor}, ${fmtInstant(r.at)}${r.reason ? ` ("${r.reason}")` : ""}`;
   }
   const daily = /^\d{4}-\d{2}-\d{2}$/.test(group.periods[0]);
-  const unit = daily ? "day" : "period";
   const n = group.periods.length;
   const span = n === 1 ? fmtPeriodOrDay(group.periods[0])
     : `${fmtPeriodOrDay(group.periods[0])} to ${fmtPeriodOrDay(group.periods[n-1])}`;
-  return `${n} ${pluralize(n, unit)} with no supply, ${span}`;
+  return `${n} ${daily ? owedUnit(group.periods) : pluralize(n, "period")} with no supply, ${span}`;
 }
 // The gap, in words, beside a dataset whose current run is otherwise
 // fine - the red pill must never be left to say it alone (criterion 11).
@@ -9762,11 +9777,25 @@ function triesAsAt(attempts, on){
   return ((attempts && attempts.tries) || []).filter(t=> !on || !t.began_at || assetDateStrOf(t.began_at) <= on)
     .map(t=> endedBy(t.ended_at, on) && t.outcome ? t : {...t, unfinished: true});
 }
+// ONE NUMBER AND ONE DATE A LINE (post-build-review #493 M6, wording approved
+// by Keith 2026-11-21): the list item carries the try's number, and a try that
+// began and ended on one day names that day once - 'began 1 May 2025, 9:09am,
+// ended 9:54am - timed out after 45m'.
+function tryClock(value){
+  const p = assetParts(value);
+  return `${p.hour % 12 || 12}:${String(p.minute).padStart(2, "0")}${p.hour < 12 ? "am" : "pm"}`;
+}
+function tryDayClock(value){
+  const p = assetParts(value);
+  return `${p.day} ${_MONTH_FULL[p.month-1]} ${p.year}, ${tryClock(value)}`;
+}
 function tryLine(t){
   if(t.unfinished)
-    return `Try ${t.number}: began ${escHtml(fmtInstant(t.began_at))}, not finished${t.ended_at ? "" : " - its end and its run time are unknown"}`;
+    return `began ${escHtml(tryDayClock(t.began_at))}, not finished${t.ended_at ? "" : " - its end and its run time are unknown"}`;
   const took = t.run_time_ms != null ? ` after ${escHtml(fmtElapsed(t.run_time_ms / 1000))}` : "";
-  return `Try ${t.number}: began ${escHtml(fmtInstant(t.began_at))}, ended ${escHtml(fmtInstant(t.ended_at))} - ${escHtml(tryEndedWords(t))}${took}${t.tool && t.outcome !== "TOOL-ERROR" ? ` (${escHtml(t.tool)})` : ""}${t.error_type ? ` · ${escHtml(t.error_type)}` : ""}`;
+  const sameDay = t.began_at && t.ended_at && assetDateStrOf(t.began_at) === assetDateStrOf(t.ended_at);
+  const ended = sameDay ? tryClock(t.ended_at) : tryDayClock(t.ended_at);
+  return `began ${escHtml(tryDayClock(t.began_at))}, ended ${escHtml(ended)} - ${escHtml(tryEndedWords(t))}${took}${t.tool && t.outcome !== "TOOL-ERROR" ? ` (${escHtml(t.tool)})` : ""}${t.error_type ? ` · ${escHtml(t.error_type)}` : ""}`;
 }
 // 'Checked on the second try - the first timed out after 45m' (414 criterion
 // 1), the SUMMARY OF A NATIVE DISCLOSURE, closed by default, whose body lists
@@ -9784,11 +9813,24 @@ function triesNote(r, on){
   // (post-build-review #404): a run reopened after it completed needed no
   // 'another try'.
   if(!before || (!before.unfinished && before.outcome === "COMPLETED")) return "";
-  const said = !before ? "another try"
-    : before.unfinished || before.run_time_ms == null
-    ? `the ${tryOrdinal(before.number)} did not finish`
-    : `the ${tryOrdinal(before.number)} ${tryEndedWords(before)} after ${fmtElapsed(before.run_time_ms / 1000)}`;
-  const items = tries.map((t, i)=> (i === 1 && a.left_out ? `<li data-tries-left-out>and ${a.left_out} more</li>` : "") + `<li>${tryLine(t)}</li>`).join("");
+  // EVERY FAILED TRY BEFORE THE SUCCESS, OLDEST FIRST (post-build-review #493
+  // M6, wording approved by Keith 2026-11-21): naming only the try just
+  // before hid a 45-minute timeout two tries back. Four or more are counted,
+  // the longest named.
+  const one = t=> t.unfinished || t.run_time_ms == null
+    ? `the ${tryOrdinal(t.number)} did not finish`
+    : `the ${tryOrdinal(t.number)} ${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms / 1000)}`;
+  const failedBefore = tries.slice(0, -1).filter(t=> t.unfinished || t.outcome !== "COMPLETED");
+  let said;
+  if(a.count - 1 >= 4 || a.left_out){
+    const timed = failedBefore.filter(t=> !t.unfinished && t.run_time_ms != null);
+    const longest = timed.length ? timed.reduce((m, t)=> t.run_time_ms > m.run_time_ms ? t : m) : null;
+    said = `${a.count - 1} tries before it failed` + (longest
+      ? `, the longest ${tryEndedWords(longest)} after ${fmtElapsed(longest.run_time_ms / 1000)}` : "");
+  } else {
+    said = failedBefore.map(one).join(", ");
+  }
+  const items = tries.map((t, i)=> (i === 1 && a.left_out ? `<li data-tries-left-out style="list-style:none;">and ${a.left_out} more</li>` : "") + `<li value="${t.number}">${tryLine(t)}</li>`).join("");
   return `<details class="tries-note" data-tries-note title="Our check of this supply needed another try; this is not about the supplier's delivery" style="color:var(--ink-muted); font-size:12px;">
       <summary>Checked on the ${tryOrdinal(a.count)} try - ${escHtml(said)}</summary>
       <ol style="margin:4px 0 0 18px; padding:0;">${items}</ol>
@@ -9926,11 +9968,14 @@ function runTimeTrend(datasetId, on, given, source){
 // check began <time> and has not finished'; after, how it ended, its tool and
 // when; and what is known, what happens next and what a person can do. The
 // error's type is left to the try list (criterion 3).
-function couldNotCheckWords(b, on){
+// `underBanner`: the words beneath the banner, whose lead already says
+// 'Could not be checked' - so they are not said twice (#493 M1).
+function couldNotCheckWords(b, on, {underBanner = false} = {}){
   const t = b.tries || {};
   const ended = t.outcome && endedBy(t.endedAt, on);
+  // AT a time, never 'on 9:09am' (#493 M1).
   const how = ended
-    ? `its newest try ${tryEndedWords({outcome: t.outcome, tool: t.tool})} on ${fmtInstant(t.endedAt)}`
+    ? `its newest try ${tryEndedWords({outcome: t.outcome, tool: t.tool})} at ${fmtInstant(t.endedAt)}`
     : `a check began ${fmtInstant(t.beganAt)} and has not finished`;
   // HOW MANY HAD FAILED BY THE DATE ON SHOW (post-build-review #405; 415
   // criterion 6), from each failed try's own end.
@@ -9939,11 +9984,12 @@ function couldNotCheckWords(b, on){
   // as earlier tries (PROVISIONAL, 2026-11-16).
   const many = ended ? (failed > 1 ? ` It could not be checked on ${failed} tries.` : "")
     : failed ? ` ${failed} earlier ${pluralize(failed, "try", "tries")} did not finish.` : "";
-  return `Could not be checked - ${how}.${many} Nothing is yet known about this supply's data. `
+  const opening = underBanner ? how.charAt(0).toUpperCase() + how.slice(1) : `Could not be checked - ${how}`;
+  return `${opening}.${many} Nothing is yet known about this supply's data. `
     + `The next processing pass retries it; a person can reject the supply if it keeps failing.`;
 }
-function blockerReasonOn(b, on){
-  return b && b.kind === "could-not-check" ? escHtml(couldNotCheckWords(b, on)) : null;
+function blockerReasonOn(b, on, opts){
+  return b && b.kind === "could-not-check" ? escHtml(couldNotCheckWords(b, on, opts)) : null;
 }
 function supplyRowStatus(datasetId, entry, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
@@ -10971,7 +11017,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="notice-exhausted" role="status" data-blocked="${ds.blocked.kind}">
         <b>${blockedBannerLead(ds.blocked)}</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          <span data-recorded-text>${blockerReasonOn(ds.blocked, CURRENT_IN_PLACE_ON) || withCode(ds.blocked.reason)}</span><br><br>
+          <span data-recorded-text>${blockerReasonOn(ds.blocked, CURRENT_IN_PLACE_ON, {underBanner: true}) || withCode(ds.blocked.reason)}</span><br><br>
           ${ds.blocked.kind === "agreement-refused" ? "New supplies are held and not checked" : ds.blocked.kind === "could-not-check" ? `The supply arrived ${fmtInstant(ds.blocked.receivedAt || ds.blocked.openedAt)}` : ds.blocked.count > 1 ? `${ds.blocked.count} supplies are waiting - ${escHtml(blockerReceivedText(ds.blocked))}` : `Received <b style="display:inline">${fmtInstant(ds.blocked.openedAt)}</b>`}. Every
           check on this dataset's own data reads <b style="display:inline">No data</b> for this
           period: none of them ran, and no earlier supply's result stands in for it.${heldCrossTableSentence(ds)}

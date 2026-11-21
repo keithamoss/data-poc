@@ -42,13 +42,32 @@ describe("#401: a crashed re-check of an OLDER supply", () => {
     expect(w.checkStatus({current_status: "green", blockedThisPeriod: true})).toBe("nodata");
   });
 
-  it("has a banner of its own: the pass retries it, and no 'Received <openedAt>'", () => {
+  it("has a banner of its own whose first line says it is ours, not the supplier's (#493 M2)", () => {
+    // Keith, 2026-11-21: keep the red Fail, and lead with whose failure it is.
     const w = load();
     const lead = w.blockedBannerLead({...CNC(), count: 1});
     expect(lead).toContain("Could not be checked");
-    expect(lead).toContain("the next processing pass retries it");
+    expect(lead).toContain("our pipeline could not check this supply");
+    expect(lead).toContain("this is not a problem with the supplier's data");
     expect(lead).not.toContain("until a person resolves it");
     expect(lead).not.toContain("Received");
+  });
+
+  it("says each thing once under the banner, the next step in its body (#493 M1)", () => {
+    const w = load();
+    const lead = w.blockedBannerLead({...CNC(), count: 1});
+    const body = w.couldNotCheckWords(CNC(), "2026-06-10", {underBanner: true});
+    expect(lead).not.toContain("retries it");
+    expect(body).toContain("The next processing pass retries it");
+    expect(body).not.toContain("Could not be checked");
+    expect(body).toMatch(/^Its newest try /);
+  });
+
+  it("says a try ended AT a time, never 'on 9:09am' (#493 M1)", () => {
+    const w = load();
+    const said = w.couldNotCheckWords(CNC(), "2026-06-10");
+    expect(said).toMatch(/its newest try [a-z -]+ at /);
+    expect(said).not.toMatch(/its newest try [a-z -]+ on \d/);
   });
 });
 
