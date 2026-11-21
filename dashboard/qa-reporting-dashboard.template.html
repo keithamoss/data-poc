@@ -4882,7 +4882,7 @@ function unitTrendBlock(series, o){
       ${yLabels}${xLabels}
     </svg>
     ${n < 2 ? `<div class="not-green-faint">One QA run so far</div>` : ""}
-    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}" aria-expanded="false" aria-controls="${id}-table">View as table</button></div>
     <div class="trend-scroll" id="${id}-table" hidden>
       <table class="trend-table">
         <thead><tr><th>Run date</th><th>Failing</th><th>Warning</th><th>Not passing</th></tr></thead>
@@ -4900,6 +4900,8 @@ document.addEventListener("click", e=>{
   if(!t) return;
   t.hidden = !t.hidden;
   btn.textContent = t.hidden ? "View as table" : "Hide table";
+  // SAID TO A SCREEN READER TOO (post-build-review #493 nit).
+  btn.setAttribute("aria-expanded", t.hidden ? "false" : "true");
 });
 
 // DATASETS NOT GREEN, ON AN AGENCY CARD AND A COLLECTION HEADING
@@ -7487,6 +7489,7 @@ window.addEventListener("popstate", (e)=>{
     if(STATE && STATE.panel) return closePanelInPlace();
   }
   if(leaving && leaving.panel === "requirements" && !(STATE && STATE.panel)) returnFocusToRequirementOpener();
+  if(leaving && leaving.panel && !(STATE && STATE.panel)) returnFocusToPanelOpener();
   returnFocusToCheckOpener(leaving);
 });
 
@@ -9953,7 +9956,7 @@ function runTimeTrend(datasetId, on, given, source){
       <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W-padR}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1"/>
       ${line}${points}${hollow}${yLabels}${xLabels}
     </svg>
-    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}" aria-expanded="false" aria-controls="${id}-table">View as table</button></div>
     <div class="trend-scroll" id="${id}-table" hidden>
       <table class="trend-table" data-run-time-table>
         <thead><tr><th>Checked</th><th>Run time</th><th>Tries that did not finish</th><th>Slow</th></tr></thead>
@@ -12202,10 +12205,26 @@ function openPanel(name, opts){
     url.searchParams.delete("req");
     history.pushState(STATE, "", url.pathname + url.search + location.hash);
   }
+  // FOCUS MOVES INTO A PANEL A PERSON OPENED, and back to what opened it on
+  // close (post-build-review #493 nit): it had stayed on the header button,
+  // behind the drawer. A requirement link keeps its own (REQ_OPENER).
+  const opener = pushHistory && document.activeElement && !document.activeElement.closest(".drawer")
+    ? document.activeElement : null;
   PANEL_RENDER[name]();
   hideAllPanelsDom();
   showPanelDom(name);
   if(name === "requirements" && STATE.req) showRequirement(STATE.req);
+  if(opener && !REQ_OPENER){
+    PANEL_OPENER = opener;
+    const close = document.getElementById(`${name}-panel-close`);
+    if(close) close.focus({preventScroll: true});
+  }
+}
+let PANEL_OPENER = null;
+function returnFocusToPanelOpener(){
+  const el = PANEL_OPENER;
+  PANEL_OPENER = null;
+  if(el && document.contains(el)) el.focus({preventScroll: true});
 }
 // User-initiated close (X, backdrop, Escape): same back()-not-hide()
 // pattern closeDrawer()/closeCheckPanel() already use, for the same
@@ -12235,6 +12254,7 @@ function closePanelInPlace(){
   history.replaceState(STATE, "", navUrl({dropArrival:false}));
   hideAllPanelsDom();
   returnFocusToRequirementOpener();
+  returnFocusToPanelOpener();
 }
 document.getElementById("snapshots-btn").addEventListener("click", ()=> openPanel("snapshots"));
 document.getElementById("snapshots-backdrop").addEventListener("click", closePanel);
@@ -13631,7 +13651,7 @@ function renderDemo(view){
         <div class="view-sub">A real recording of the actual <code>mothman</code> CLI/TUI - the Quality Assurance wizard, run for real against real synthetic Birth Registrations data. Not a mockup: every keystroke and every line of output below is what actually happened, captured with a real pseudo-terminal (see <code>scripts/dev/record_cast.py</code>).</div>
       </div>
     </div>
-    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${escHtml(DEMO_CAPTION)}</div>` : ""}
+    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${withCode(DEMO_CAPTION)}</div>` : ""}
     <div id="demo-player-container" style="max-width:900px;"></div>
   `;
   const container = document.getElementById("demo-player-container");

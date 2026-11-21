@@ -81,6 +81,14 @@ describe("the Demo caption (criterion 10)", () => {
     expect(view.querySelector("[data-demo-caption]").textContent)
       .toBe("Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily");
   });
+  it("styles the command it names as code, its words unchanged (#493 nit)", () => {
+    dashboard = built({ caption: "Recorded on the daily asset: these commands are run with `MOTHMAN_ASSET=daily`" });
+    const view = dashboard.window.document.getElementById("view");
+    dashboard.window.renderDemo(view);
+    const cap = view.querySelector("[data-demo-caption]");
+    expect(cap.querySelector("code").textContent).toBe("MOTHMAN_ASSET=daily");
+    expect(cap.textContent).toBe("Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily");
+  });
   it("is absent on the recording's own asset", () => {
     dashboard = built({ caption: null });
     const view = dashboard.window.document.getElementById("view");

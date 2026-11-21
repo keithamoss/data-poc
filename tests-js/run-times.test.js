@@ -93,6 +93,20 @@ describe("the run-time trend (413)", () => {
     expect(html).toContain("above the top are tries longer than the scale");
   });
 
+  it("says whether its table is open, for a screen reader (#493 nit)", () => {
+    const w = load();
+    const html = w.runTimeTrend(DS, null, [run(1, 1000), run(2, 2000)]);
+    expect(html).toMatch(/data-toggle-unit-table="[^"]+" aria-expanded="false" aria-controls="[^"]+-table"/);
+    const host = w.document.createElement("div");
+    host.innerHTML = html;
+    w.document.body.appendChild(host);
+    const btn = host.querySelector("[data-toggle-unit-table]");
+    btn.click();
+    expect(btn.getAttribute("aria-expanded")).toBe("true");
+    btn.click();
+    expect(btn.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("is nowhere for a dataset with no runTimes - never made up", () => {
     const w = load();
     expect(w.runTimeTrend(DS, null, [])).toBe("");
