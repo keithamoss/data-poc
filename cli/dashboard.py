@@ -296,6 +296,25 @@ def rebuild_command() -> None:
 PAGES_BRANCH = "gh-pages"
 
 
+def publish_refusal() -> str | None:
+    """Why the selected asset may not publish through today's one path, or
+    None where it may (REQ-PIPE-372 criteria 1 to 3): read from its own
+    data-asset.yaml's `publish_to_gh_pages`, never from its name. Every
+    route to a publish asks this before building anything - the command,
+    `mothman pipeline run --publish` and any automated job, which can only
+    publish by calling publish()."""
+    from asset_model import assets, config_yaml
+
+    chosen = assets.selected()
+    doc = config_yaml.load(chosen.data_asset_yaml) or {}
+    if doc.get("publish_to_gh_pages") is True:
+        return None
+    return (f"The {chosen.name} asset's dashboard is not published yet: it gets hosting of its "
+            f"own when REQ-PIPE-255 is built, and until then only an asset whose data-asset.yaml "
+            f"says publish_to_gh_pages: true publishes to the {PAGES_BRANCH} branch. "
+            f"`mothman dashboard rebuild` builds it for viewing here.")
+
+
 def publish(*, dry_run: bool = False, branch: str | None = None) -> None:
     """Build the dashboard, gate it, and publish it. THE one publish path
     (REQ-PIPE-092 criteria 10, 11 and 15).
@@ -322,6 +341,12 @@ def publish(*, dry_run: bool = False, branch: str | None = None) -> None:
     build stamp says when it was built is honest, and an empty one that
     replaced it would not be.
     """
+    # REFUSED BEFORE ANYTHING IS BUILT, WRITTEN OR PUSHED, and non-zero
+    # (REQ-PIPE-372 criterion 2): a script or a loop over assets must not
+    # read a refusal as a publish.
+    refused = publish_refusal()
+    if refused:
+        raise click.ClickException(refused)
     branch = branch or PAGES_BRANCH
     from pathlib import Path as _Path
 

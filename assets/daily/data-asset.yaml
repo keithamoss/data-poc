@@ -118,6 +118,13 @@ postgres_major: 16
 # never sets it.
 synthetic: true
 
+# THIS ASSET'S SNAPSHOT ARCHIVE STARTS HERE (REQ-DASH-373 criterion 4, key
+# SETTLED by Keith 2026-11-01): dashboard/snapshots/daily/ holds every
+# publish from this date. The archive taken before the asset split showed
+# both assets' results on one page and was deleted that day, at Keith's call;
+# git history still holds it. The snapshots panel's empty state names it.
+snapshots_from: 2026-11-21
+
 # WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
 # values, strictest first:
 #   hold                     - never promoted automatically; it waits,

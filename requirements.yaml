@@ -893,6 +893,7 @@ requirements:
         Snapshots are committed and accumulate, deliberately unlike every other generated artifact in this repo, because their whole purpose is to still exist years later.
       - >
         Each snapshot is fully self-contained and openable from a plain file:// path with no server and no network, so it survives the tooling that produced it.
+      - 'SUPERSEDED FOR THE PRE-SPLIT ARCHIVE ONLY (REQ-DASH-373 criterion 7, Keith 2026-10-31, applied 2026-11-21): the decision above that snapshots ''are committed and accumulate'' still holds for each asset''s archive under dashboard/snapshots/<asset>/; the eight snapshots taken before the asset split, each showing both assets'' results, were deleted from the tree in REQ-DASH-373''s change, and git history keeps them.'
     implemented_by:
       - dashboard/snapshot_dashboard.py::take_snapshot
       - dashboard/snapshot_dashboard.py::sync_local_snapshots
@@ -14909,9 +14910,7 @@ requirements:
     - 'THE SYSTEM SHALL label the date control "In the warehouse on" rather than "As of", and SHALL NOT use wording that can be
       read as what was known at that date. AMENDED 2026-10-23 by REQ-DASH-277 (Keith, 2026-10-22: say where); it read ''In place
       on''.'
-    - 'THE SYSTEM SHALL state, in the date control''s own panel, that the view uses everything known today including decisions made since, and SHALL name the snapshot archive as the way to see what the page itself said on a past date.
-
-      '
+    - 'THE SYSTEM SHALL state, in the date control''s own panel, that the view uses everything known today including decisions made since, and SHALL name this asset''s snapshot archive as the way to see what the page itself said on a past date since the asset''s first publish after the split (REQ-DASH-373). AMENDED 2026-11-21 by REQ-DASH-373.'
     - 'WHERE a date other than the current one is selected, THE SYSTEM SHALL state that same distinction on the page itself, so that a reader arriving by a link with a past date already set meets it without opening the panel.
 
       '
@@ -18263,7 +18262,7 @@ requirements:
       - >
         THE SYSTEM SHALL rebuild the dashboard's own result documents
         from that schema, with no tool re-run.
-      - "THE SYSTEM SHALL keep code, assets/ (each asset's configuration, check definitions, dbt project, adapters and synthetic configuration), dbt_shared/, plans/*.md, CHANGELOG.yaml and dashboard/snapshots/*.html.gz in the repository. AMENDED 2026-11-15 by REQ-PIPE-342."
+      - 'THE SYSTEM SHALL keep code, assets/ (each asset''s configuration, check definitions, dbt project, adapters and synthetic configuration), dbt_shared/, plans/*.md, CHANGELOG.yaml and each asset''s dashboard/snapshots/<asset>/*.html.gz in the repository. AMENDED 2026-11-15 by REQ-PIPE-342. AMENDED 2026-11-21 by REQ-DASH-373.'
       - >
         THE SYSTEM SHALL either migrate today's committed history into
         that schema or regenerate it, and SHALL NOT leave the two as
@@ -38873,8 +38872,7 @@ requirements:
     - 'WHEN the repository has been made private, THE SYSTEM SHALL be verified: an anonymous request for
       the repository and for keithamoss.github.io/data-poc each returning 404, `mothman dashboard verify-access`
       passing, and a test.yml run on the private repository completing.'
-    - WHEN the flip is verified, THE SYSTEM SHALL have the gh-pages branch deleted, since nothing publishes
-      to it and every publish it holds is also in the committed snapshot archive.
+    - 'WHEN the flip is verified, THE SYSTEM SHALL have the gh-pages branch deleted, since nothing publishes to it; the pre-split publishes it holds are no longer in any committed archive (REQ-DASH-373) and remain in the main branch''s git history, and every later publish is in its asset''s archive. AMENDED 2026-11-21 by REQ-DASH-373.'
     - WHEN this requirement is built, THE SYSTEM SHALL state, in CLAUDE.md, README.md and docs/project-context-for-agents.md,
       that the repository is private, where the dashboard is hosted, how a person is given access, and which
       environment variables a publishing environment needs, and SHALL contain no statement that the repository
@@ -48888,7 +48886,7 @@ requirements:
     date_written: '2026-10-31'
     story: As whoever publishes the dashboards between the move and the new hosting, I want the daily asset's publish refused plainly, so that it can never overwrite the quarterly asset's dashboard on the one gh-pages branch, and a script can never mistake a refusal for a publish.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48910,19 +48908,39 @@ requirements:
     - REQ-PIPE-363
     - REQ-PIPE-092
     - REQ-PIPE-255
+    unmet_criteria:
+    - criterion: Criterion 5 - the setting replaced by each asset's own Pages project keys, and removed.
+      why: It is REQ-PIPE-255's change, made when each asset gets its own Cloudflare Pages project; until then the setting is how the daily publish is held.
+      owner: REQ-PIPE-255
+      blocked_by:
+        requirements:
+        - REQ-PIPE-255
+    linked_tests:
+    - tests/test_publish_per_asset.py
+    - tests/test_snapshot_dashboard.py
+    implemented_by:
+    - cli/dashboard.py::publish_refusal
+    - cli/dashboard.py::publish
+    - cli/pipeline.py::run_command
+    - dashboard/snapshot_dashboard.py::prepare_deploy_site
+    - qa_tools/common/schemas.py::DataAsset
+    evidence:
+    - '2026-11-21: tests/test_publish_per_asset.py, 6 passed - the daily asset''s publish exits non-zero naming REQ-PIPE-255 and `mothman dashboard rebuild`, builds nothing and leaves a bare stub remote with no refs; `pipeline run --publish` is refused before any step of the run; the quarterly asset''s publish pushes gh-pages to the stub remote; only quarterly holds the setting; the site carries only the selected asset''s snapshot folder; no workflow calls a publish. Four of the six failed against 9fc54c56, the commit before (the two that passed there: the quarterly publish, which already proceeded, and no workflow publishing, already true). tests/test_snapshot_dashboard.py 42 passed with the site path moved to snapshots/<asset>/.'
     decisions:
     - 'THE SPLIT FIRST, THE DAILY PUBLISH REFUSED IN BETWEEN (Keith, 2026-10-31, sign-off Q2 (b)): both assets would otherwise push to the one gh-pages branch and one would overwrite the other. REJECTED (a), building the hosting first for today''s one asset.'
     - 'A SETTING IN EACH ASSET''S data-asset.yaml, NOT CODE (Keith, 2026-10-31, v3 item 2 (a)): only the quarterly asset holds it until REQ-PIPE-255 gives the daily asset its own project. REJECTED a check of the asset''s name in the publish command.'
     - 'NON-ZERO, POINTING TO `mothman dashboard rebuild` (Keith, 2026-11-01): a script cannot mistake a refusal for a publish. REJECTED exiting zero with a notice, which never turns a loop red but cannot tell ''published'' from ''refused''.'
     - 'AUTOMATED PUBLISHES GATED BY CONFIG (delivery-scoper''s reading of ''CI''s publish step limited to quarterly by config'', signed with v4): criterion 3. Nothing publishes automatically today, so it binds the future.'
     - 'ONLY THE SELECTED ASSET''S SNAPSHOTS ARE DEPLOYED (architect v3 NIT): prepare_deploy_site copies all of dashboard/snapshots/ today.'
+    - 'THE REFUSAL LIVES IN publish() ITSELF (built 2026-11-21): every route to a publish - the command, `pipeline run --publish`, the wizard''s prompt and any future automated job - calls the one function, so one check covers them all (criterion 3); `pipeline run --publish` also asks before the run, so nothing is processed only to be refused.'
+    - 'THE STUB REMOTE IS A REAL BARE REPOSITORY (built 2026-11-21, criterion 6): "pushes nothing" is read from the remote''s own refs, not from a mock having been called.'
     open_questions: []
   - id: REQ-DASH-373
     title: The snapshot archive taken before the split is deleted from the tree, not rewritten out of git history; each asset's archive starts at its first publish after the split and says so when empty
     date_written: '2026-10-31'
     story: As someone given access to one team's register, I want that asset's snapshot archive to hold only pages built from its own asset, so that no archived page shows me the other team's results, and an empty archive tells me when it will start.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-11-01'
@@ -48943,11 +48961,39 @@ requirements:
     - REQ-PIPE-342
     - REQ-DASH-013
     - REQ-DASH-292
+    unmet_criteria:
+    - criterion: Criterion 3, in part - REQ-PIPE-255's unchanged-site check reading the selected asset's folder only.
+      why: That check is not built yet; when it is, it reads dashboard/snapshot_dashboard.asset_snapshots_dir(), as every other reader now does.
+      owner: REQ-PIPE-255
+      blocked_by:
+        requirements:
+        - REQ-PIPE-255
+    linked_tests:
+    - tests/test_snapshot_archive.py
+    - tests/test_snapshot_dashboard.py
+    - tests/test_publish_per_asset.py
+    - tests-js/snapshot-archive.test.js
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/snapshot_dashboard.py::asset_snapshots_dir
+    - dashboard/snapshot_dashboard.py::archive_settings
+    - dashboard/snapshot_dashboard.py::take_snapshot
+    - dashboard/snapshot_dashboard.py::sync_local_snapshots
+    - dashboard/snapshot_dashboard.py::prepare_deploy_site
+    - dashboard/embed_dashboard_data.py::embed
+    - dashboard/qa-reporting-dashboard.template.html::renderSnapshotsPanel
+    - dashboard/qa-reporting-dashboard.template.html::snapshotHref
+    - qa_tools/common/schemas.py::DataAsset
+    evidence:
+    - '2026-11-21: the eight pre-split dashboard/snapshots/*.html.gz files and manifest.json removed from the tree (git rm; no history rewritten, no force-push). tests/test_snapshot_archive.py 9 passed (each asset''s folder, its snapshots_from date, a local sync and a snapshot reading only the selected asset''s folder, the archive holding only per-asset folders); tests-js/snapshot-archive.test.js 3 passed (the settled empty-state words, links into snapshots/<asset>/); the real-browser TestAnEmptyArchiveSaysWhenItStarts passed on the built quarterly page, asserting ''Snapshots start from this asset''s first publish after the split, Saturday, 21 November 2026.'' - against the template before the change the panel read ''No snapshots yet — run mothman pipeline run --snapshot''. CLAUDE.md''s three statements amended with C1''s signed wording; A40, A41 and A42 applied.'
     decisions:
     - 'DELETED, NOT SERVED (Keith, 2026-10-31, sign-off Q3, his own answer beyond the options offered): overrides CLAUDE.md''s ''snapshots accumulate and are never deleted'' for that archive only. REJECTED (a) serving it with the quarterly site only, (b) with both sites, and (c) keeping it in the repository unserved.'
     - 'GIT HISTORY NOT REWRITTEN - Q7 CLOSED (Keith, 2026-10-31, v3 Q7 (a)): deleted from the tree only. REJECTED purging history with a force-push.'
     - 'ONE DELIBERATE DELETION, NOT A PRECEDENT (C1, signed as drafted, 2026-10-31): the signed CLAUDE.md wording says the deletion licenses no other deletion.'
     - 'THE EMPTY STATE SAYS WHEN THE ARCHIVE STARTS (dashboard UX v3 SHOULD): today''s wording is developer instructions; the date comes from the snapshots_from key (delivery-scoper''s choice, signed with v4; the scoper''s reason: a shallow CI clone has no git log to derive it from).'
+    - 'ONE ADDRESS FOR A SNAPSHOT, LOCALLY AND ON THE SITE (built 2026-11-21): snapshots/<asset>/<name>.html - prepare_deploy_site places the archive at the path the repository keeps it at, so the picker''s one link (snapshotHref) resolves on both. REJECTED keeping the site flat at snapshots/<name>.html, which would need the local page and the site to build different links.'
+    - 'THE ARCHIVE''S ASSET AND START DATE ARE EMBEDDED WITH THE BUILD (built 2026-11-21): SNAPSHOT_ARCHIVE = {asset, from}, set by embed_dashboard_data from data-asset.yaml''s snapshots_from - so a local rebuild''s empty panel names the date too, where SNAPSHOT_MANIFEST is embedded only by a snapshot or a publish.'
+    - 'snapshots_from IS 2026-11-21, THE DAY OF THE DELETION''S CHANGE (built 2026-11-21, criterion 4''s "the date of the split''s change"): the split''s structural change landed 2026-11-01 without the deletion, and the archive starts from the change that deletes the pre-split one.'
     open_questions: []
   - id: REQ-PIPE-354
     title: Each asset has its own Cloudflare Pages project and Access allow-list, built and published only from its own asset's database; today's project becomes the quarterly asset's, and an old Birth Registrations link says where it went
@@ -49358,13 +49404,12 @@ requirements:
     - "THE SWEEP'S THREE AMBIGUOUS CRITERIA ANSWERED (Keith, 2026-11-15, after the critic's review of fe3f5671): REQ-PIPE-190 c1 names the two contracts' real paths (assets/quarterly/child-protection-family-support/ and assets/daily/registry-services/); REQ-TEST-252 c15 reads 'the repository's own assets/, data/ or reports/'; REQ-QAC-294 c3 reads 'assets/<asset>/synthetic/synthetic_inputs.yaml (today the quarterly asset's)', its stale 'moving with the asset split to ... contract/<asset>/' note dropped. Each marked AMENDED by REQ-DOCS-358, and criterion 2 is met. With them the sweep amended 127 criteria, and 39 still name an old form: the 37 recorded above that were not ambiguous, plus REQ-TEST-252 c15 (now naming only the whole data/ and reports/ trees) and REQ-QAC-294 c3, whose clause 'kept at the top of contract/ among the asset-wide files - added to validate_collections.ASSET_WIDE ... by amendment A8' is outside Keith's wording and left for him."
     - "REQ-PIPE-240 c9 (Keith's wording, 2026-11-15): the scenario register's exemptions are INJECTIONS, INHERITING_DATASET and CORRECTION_RIDERS - the third had been added to validate_collections.SCENARIO_EXEMPT_NAMES without the criterion following."
     unmet_criteria:
-    - criterion: "Criterion 1, the LATER amendments still to apply - A16, A24, A25, A26, A27, A40's snapshots half, A41, A42 and C1/E6 (hosting and the snapshot archive). A2, A5, A6, A11 and A17 (weekday participation) and A28 to A35 (the period control) were applied 2026-11-18 with REQ-PIPE-346, REQ-DASH-347, REQ-DASH-355 and REQ-DASH-367."
+    - criterion: "Criterion 1, the LATER amendments still to apply - A16, A24, A25, A26 and A27 (hosting). A2, A5, A6, A11 and A17 (weekday participation) and A28 to A35 (the period control) were applied 2026-11-18 with REQ-PIPE-346, REQ-DASH-347, REQ-DASH-355 and REQ-DASH-367; A40's snapshots half, A41, A42 and C1/E6 2026-11-21 with REQ-DASH-373."
       why: "Each is applied in the change that builds the requirement it serves (criterion 1), and those are the split's features, which come after #134's core and the speed batch (decisions-2026-11-01, 'Finishing the split'). The sweep's snapshot-archive criteria wait here too."
-      owner: "REQ-PIPE-354, REQ-DASH-373"
+      owner: "REQ-PIPE-354"
       blocked_by:
         requirements:
         - REQ-PIPE-354
-        - REQ-DASH-373
     - criterion: "Criterion 3, its hosting notes - CLAUDE.md's 'The repo is public ... GitHub Pages hosting depends on that' bullet (E15)."
       why: "Nothing about hosting has changed until REQ-PIPE-354 is built; REQ-DOCS-259 criterion 7 rewrites the bullet when it moves (G9)."
       owner: "REQ-PIPE-354"
@@ -49372,12 +49417,11 @@ requirements:
         requirements:
         - REQ-PIPE-354
     - criterion: "Criterion 4, plans/running-thoughts.md #131 and #134's configuration half (#109 came out 2026-11-18, its Cancer and weekly collections built)."
-      why: "Each comes out once the last requirement it feeds is built: #131 feeds the period control and weekdays, built 2026-11-18, and hosting (REQ-PIPE-354, REQ-DASH-373); #134's configuration half REQ-GEN-371's eras.yaml, built 2026-11-18, and stays until REQ-DASH-394 (Keith, 2026-11-18)."
-      owner: "REQ-PIPE-354, REQ-DASH-373, REQ-DASH-394"
+      why: "Each comes out once the last requirement it feeds is built: #131 feeds the period control and weekdays, built 2026-11-18, and hosting (REQ-PIPE-354; REQ-DASH-373 built 2026-11-21); #134's configuration half REQ-GEN-371's eras.yaml, built 2026-11-18, and stays until REQ-DASH-394 (Keith, 2026-11-18)."
+      owner: "REQ-PIPE-354, REQ-DASH-394"
       blocked_by:
         requirements:
         - REQ-PIPE-354
-        - REQ-DASH-373
         - REQ-DASH-394
     linked_tests:
     - tests/test_cross_collection_reads.py::TestADeclaredReadAcrossCollectionsIsGated::test_a_declaring_dataset_with_no_calendar

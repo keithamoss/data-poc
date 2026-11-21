@@ -46,6 +46,7 @@ honestly stops the build rather than being quietly rendered wrong.
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import (BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr,
@@ -677,6 +678,15 @@ class DataAsset(_Strict):
     #: criterion 8). Defaults to False: an asset that never said it was
     #: synthetic is treated as real, which is the direction that refuses.
     synthetic: bool = False
+    #: Whether this asset publishes through today's one publish path, to
+    #: the gh-pages branch (REQ-PIPE-372 criterion 1, key SETTLED by Keith
+    #: 2026-11-01). Only the quarterly asset holds it until REQ-PIPE-255
+    #: gives each asset hosting of its own; absent, a publish is refused.
+    publish_to_gh_pages: bool = False
+    #: The date this asset's snapshot archive starts from (REQ-DASH-373
+    #: criterion 4, key SETTLED by Keith 2026-11-01): the day the pre-split
+    #: archive was deleted. Read for the snapshots panel's empty state.
+    snapshots_from: date | None = None
     #: REQUIRED, with no default (REQ-PIPE-122 criterion 9): an asset
     #: that says nothing about amber is a configuration error, never a
     #: quiet "promote".

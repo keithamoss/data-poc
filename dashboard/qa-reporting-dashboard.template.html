@@ -1216,8 +1216,9 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
       you pick - or the newest one still awaiting a decision - and its
       results. It uses <b>everything known today</b>: a decision written down
       after that date still counts if it took effect by then, and one that
-      took effect after it does not. To see what this page itself said on a past date, open the
-      <b>snapshot archive</b> (🕐 Past snapshots). A dataset with nothing
+      took effect after it does not. To see what this page itself said on a past date, open
+      <b>this asset's snapshot archive</b> (🕐 Past snapshots), kept from its first publish after
+      the asset split. A dataset with nothing
       supplied by that date shows as <b>No data</b>, never a misleading
       blank, Pass or Fail. Applies to the whole data asset at once.
     </div>
@@ -2785,6 +2786,11 @@ function assembleCollectionData(){
 }
 const COLLECTION_DATA = null;
 const SNAPSHOT_MANIFEST = [];
+// THE SELECTED ASSET'S ARCHIVE (REQ-DASH-373 criteria 3 and 5), embedded with
+// the build: {asset, from} - the folder the picker's links name,
+// snapshots/<asset>/<name>.html, and the date the archive starts from. Null in
+// the raw template, whose links then name snapshots/<name>.html.
+const SNAPSHOT_ARCHIVE = null;
 // SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/calendar.yaml
 // at build time. Every AUTHORED calendar, its warning threshold, its
 // last authored period, and the dates each dataset on it actually owes
@@ -11829,22 +11835,27 @@ document.getElementById("check-panel-close").addEventListener("click", closeChec
 // tab, to a separate static file), not a state this app's own back
 // button would ever step through.
 //
-// Each link points at a plain, relative `snapshots/<name>.html` path -
-// resolves correctly on the published GitHub Pages site (.github/
-// workflows/deploy-pages.yml decompresses every .html.gz into
-// _site/snapshots/ at deploy time specifically for this), but will 404
-// if this dashboard is opened locally via file:// straight from a clone,
-// since dashboard/snapshots/ only ever holds the gzipped originals -
-// known, accepted: this picker's own scoping (plans/dashboard.md #5) was
-// explicitly "needs to work on the live public site now", not local
-// convenience: `gunzip dashboard/snapshots/<file>.html.gz` still works
-// for that, same as before this panel existed.
+// Each link points at a relative `snapshots/<asset>/<name>.html` path
+// (snapshotHref, REQ-DASH-373): the selected asset's archive is kept at
+// dashboard/snapshots/<asset>/, and prepare_deploy_site places it at the same
+// path on the site, so a link resolves on both once sync_local_snapshots()
+// has decompressed the local copies.
+// ONE ADDRESS FOR A SNAPSHOT, locally and on the site: snapshots/<asset>/
+// <name>.html (REQ-DASH-373 criterion 3) - prepare_deploy_site places each
+// asset's archive at the same relative path the repository keeps it at.
+function snapshotHref(name){
+  const asset = SNAPSHOT_ARCHIVE && SNAPSHOT_ARCHIVE.asset;
+  return asset ? `snapshots/${encodeURIComponent(asset)}/${name}` : `snapshots/${name}`;
+}
 function renderSnapshotsPanel(){
   const body = document.getElementById("snapshots-panel-body");
   if(!SNAPSHOT_MANIFEST.length){
-    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
-      No snapshots yet — run <code>mothman pipeline run --snapshot</code>
-      to archive one (see plans/dashboard.md #5).
+    // WHEN THE ARCHIVE STARTS, not a developer instruction (REQ-DASH-373
+    // criterion 5, wording SETTLED by Keith 2026-11-01).
+    const from = SNAPSHOT_ARCHIVE && SNAPSHOT_ARCHIVE.from;
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);" data-snapshots-empty>
+      ${from ? `Snapshots start from this asset's first publish after the split, ${escHtml(fmtDay(from))}.`
+        : "No snapshots yet."}
     </div>`;
     return;
   }
@@ -11863,7 +11874,7 @@ function renderSnapshotsPanel(){
           <div class="date">${fmtInstant(s.taken_at)}</div>
           <div class="sub">commit ${s.commit_sha} · ${sizeKb} KB compressed</div>
         </div>
-        <a href="snapshots/${name}" target="_blank" rel="noopener">Open ›</a>
+        <a href="${escAttr(snapshotHref(name))}" target="_blank" rel="noopener">Open ›</a>
       </div>`;
   }).join("");
   body.innerHTML = intro + rows;
@@ -13549,8 +13560,9 @@ function renderInPlaceOnPastNotice(){
   if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
   notice.innerHTML = `Showing what was <b>in place in the warehouse on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
-    everything known today - including decisions written down since, where they took effect by then. The
-    snapshot archive (🕐 Past snapshots) shows what this page itself said then.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
+    everything known today - including decisions written down since, where they took effect by then. This
+    asset's snapshot archive (🕐 Past snapshots) shows what this page itself said then, from its first
+    publish after the asset split.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
 }
 function renderInPlaceOnRangeNotice(){
   renderInPlaceOnPastNotice();

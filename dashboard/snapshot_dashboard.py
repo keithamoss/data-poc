@@ -93,9 +93,32 @@ from typing import Optional
 from dashboard import data_files
 
 DASHBOARD_HTML = Path(__file__).parent / "qa-reporting-dashboard.html"
-SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
+#: Every asset's archive sits under here, one folder per asset (REQ-DASH-373
+#: criterion 3): dashboard/snapshots/<asset>/, each with its own manifest.
+SNAPSHOTS_ROOT = Path(__file__).parent / "snapshots"
 FONTS_DIR = Path(__file__).parent / "fonts"
 VENDOR_DIR = Path(__file__).parent / "vendor"
+
+
+def asset_snapshots_dir(asset: str | None = None) -> Path:
+    """The selected asset's own archive (REQ-DASH-373 criterion 3) - every
+    reader of the archive reads this folder only, so one asset's pages can
+    never be listed, synced or published with another's."""
+    from asset_model import assets
+
+    return SNAPSHOTS_ROOT / (asset or assets.selected().name)
+
+
+def archive_settings() -> dict:
+    """What the page needs to link into and describe the selected asset's
+    archive: its folder's name and the date it starts from (REQ-DASH-373
+    criteria 3 to 5; `snapshots_from` in data-asset.yaml)."""
+    from asset_model import assets, config_yaml
+
+    chosen = assets.selected()
+    doc = config_yaml.load(chosen.data_asset_yaml) or {}
+    starts = doc.get("snapshots_from")
+    return {"asset": chosen.name, "from": str(starts) if starts else None}
 
 
 def _git_short_sha(cwd: Path) -> str:
@@ -116,7 +139,7 @@ def _git_short_sha(cwd: Path) -> str:
         return "nogit"
 
 
-def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSHOTS_DIR,
+def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path | None = None,
                    now: Optional[datetime] = None) -> Path:
     """Gzips a copy of `html_path` (the fully re-embedded dashboard, real
     data already baked in by embed_dashboard_data.py) into `snapshots_dir`,
@@ -139,6 +162,7 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     about the one just taken - see `_embed_snapshot_manifest`. Requires
     `html_path` to already contain a `const SNAPSHOT_MANIFEST = ...;`
     placeholder line; raises if it doesn't."""
+    snapshots_dir = snapshots_dir or asset_snapshots_dir()
     if not html_path.exists():
         raise FileNotFoundError(
             f"{html_path} doesn't exist - run dashboard/embed_dashboard_data.py first "
@@ -237,7 +261,7 @@ def snapshot_fingerprint(gz_path: Path, fonts_dir: Path = FONTS_DIR,
     return data_files.fingerprint(html, gz_path.parent, [fonts_dir, vendor_dir])
 
 
-def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR, fonts_dir: Path = FONTS_DIR,
+def sync_local_snapshots(snapshots_dir: Path | None = None, fonts_dir: Path = FONTS_DIR,
                          vendor_dir: Path = VENDOR_DIR) -> list[Path]:
     """Decompresses every `*.html.gz` in `snapshots_dir` that doesn't
     already have a local `.html` sibling, so the live dashboard's "past
@@ -253,6 +277,7 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR, fonts_dir: Path = 
     `.html` paths newly written (empty list if nothing needed it, or if
     `snapshots_dir` doesn't exist at all - e.g. no snapshot has ever been
     taken)."""
+    snapshots_dir = snapshots_dir or asset_snapshots_dir()
     if not snapshots_dir.exists():
         return []
     # THE FONTS AND PLAYER BESIDE THEM, as on the published site (Keith,
@@ -272,7 +297,7 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR, fonts_dir: Path = 
 
 
 def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
-                         snapshots_dir: Path = SNAPSHOTS_DIR,
+                         snapshots_dir: Path | None = None,
                          fonts_dir: Path = FONTS_DIR, vendor_dir: Path = VENDOR_DIR,
                          budget: int | None = None) -> None:
     """Builds the `_site/` tree `.github/workflows/deploy-pages.yml`
@@ -327,6 +352,9 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     landing in _site/snapshots/. `html_path` on disk is untouched by
     this - only the site copy gets the embed, same one-way relationship
     as embed_dashboard_data.py's own gitignored build output."""
+    # THE SELECTED ASSET'S ARCHIVE ONLY (REQ-PIPE-372 criterion 4, REQ-DASH-373
+    # criterion 3): a local snapshot of another asset cannot reach this site.
+    snapshots_dir = snapshots_dir or asset_snapshots_dir()
     site_dir.mkdir(parents=True, exist_ok=True)
     # EVERYTHING THE SITE IS MADE OF IS CLEARED FIRST (post-build-review #268
     # D1): `mothman dashboard publish` reuses `_site/`, and a data file or a
@@ -363,7 +391,9 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
 
     if not snapshots_dir.exists():
         return
-    site_snapshots_dir = site_dir / "snapshots"
+    # AT THE SAME ADDRESS AS IN THE REPOSITORY, snapshots/<asset>/<name>.html,
+    # so the picker's one link resolves on the site and from a local build.
+    site_snapshots_dir = site_dir / "snapshots" / snapshots_dir.name
     site_snapshots_dir.mkdir(parents=True, exist_ok=True)
     # FONTS AND THE PLAYER BESIDE THE SNAPSHOTS TOO (Keith, 2026-10-25,
     # post-build-review #268 (c)). A snapshot at snapshots/<name>.html asks

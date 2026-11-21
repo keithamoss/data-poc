@@ -57,6 +57,13 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
 
     from . import dashboard as dashboard_cli
 
+    # A PUBLISH THIS ASSET MAY NOT MAKE IS REFUSED BEFORE THE RUN, not after
+    # it (REQ-PIPE-372 criterion 2): nothing is processed only to be refused.
+    if do_publish:
+        refused = dashboard_cli.publish_refusal()
+        if refused:
+            raise click.ClickException(refused)
+
     # REFUSED OVER RECORDED HISTORY (REQ-PIPE-144 criterion 39), before
     # anything is run, for the reason bootstrap --force is: a re-run adds to
     # the history rather than replacing it. The refusal is the pipeline's own

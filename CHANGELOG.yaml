@@ -109,6 +109,27 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-21"
+    summary: >
+      Each data asset now keeps its own snapshot archive, and only the
+      quarterly asset publishes until each asset has hosting of its own.
+    changes:
+      - category: Improved
+        items:
+          - headline: A snapshot archive for each asset
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Past snapshots now belong to one data asset each, so a snapshot
+              never shows another team's results. The archive taken before the
+              assets were split has gone; the panel says when this asset's
+              archive starts.
+          - headline: The daily asset's publish waits for its own hosting
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman dashboard publish` for the daily asset now stops before
+              building anything and says why, rather than overwriting the
+              quarterly dashboard. `mothman dashboard rebuild` still builds it
+              for you to view.
   - date: "2026-11-18"
     summary: >
       You can choose one period and see every page as it stood for it, a

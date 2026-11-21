@@ -7379,7 +7379,9 @@ def a_snapshot_of_the_built_page(built_dashboard_html, tmp_path_factory):
 
     work = tmp_path_factory.mktemp("snapshot")
     copy = _copy_of_the_built_page(built_dashboard_html, work / "dashboard")
-    archived = snapshot_dashboard.take_snapshot(html_path=copy, snapshots_dir=work / "snapshots")
+    # AN ASSET'S OWN ARCHIVE FOLDER, as dashboard/snapshots/<asset>/ (REQ-DASH-373).
+    archive = work / "snapshots" / "quarterly"
+    archived = snapshot_dashboard.take_snapshot(html_path=copy, snapshots_dir=archive)
     alone = work / "alone"
     alone.mkdir()
     import gzip
@@ -7387,10 +7389,10 @@ def a_snapshot_of_the_built_page(built_dashboard_html, tmp_path_factory):
     with gzip.open(archived, "rb") as f:
         (alone / "snapshot.html").write_bytes(f.read())
     site = work / "_site"
-    snapshot_dashboard.prepare_deploy_site(site, html_path=copy, snapshots_dir=work / "snapshots",
+    snapshot_dashboard.prepare_deploy_site(site, html_path=copy, snapshots_dir=archive,
                                            fonts_dir=built_dashboard_html.parent / "fonts",
                                            vendor_dir=built_dashboard_html.parent / "vendor")
-    split = site / "snapshots" / archived.with_suffix("").name
+    split = site / "snapshots" / "quarterly" / archived.with_suffix("").name
     yield {"alone": alone / "snapshot.html", "split": split, "site": site}
     shutil.rmtree(work, ignore_errors=True)
 
@@ -7475,7 +7477,7 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         # 2026-10-25, #268 (c)), so nothing is filtered here: no console
         # error at all, and the fonts were actually asked for and found.
         assert served["errors"] == []
-        assert any("/snapshots/fonts/" in u for u in served["requests"]), served["requests"]
+        assert any("/snapshots/quarterly/fonts/" in u for u in served["requests"]), served["requests"]
 
 
 @pytest.mark.shared_page
@@ -10412,3 +10414,19 @@ class TestAPeriodLinkOpensWithItsStatement:
         text = " ".join(clean_page.locator("#in-place-on-past-notice").inner_text().split())
         assert text.startswith(f"Showing {self.PERIOD}"), text
         assert "in place in the warehouse on" not in text
+
+
+@pytest.mark.shared_page
+class TestAnEmptyArchiveSaysWhenItStarts:
+    """REQ-DASH-373 criterion 5, on the real build: with no snapshot in the
+    selected asset's archive, the Past snapshots panel names the date the
+    archive starts from, in the words Keith settled - asserted as text, not
+    only as an absence of console errors."""
+
+    def test_the_panel_names_the_date_from_snapshots_from(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        _open_a_drawer(clean_page)
+        body = clean_page.locator("#snapshots-panel-body")
+        text = " ".join(body.inner_text().split())
+        assert text == ("Snapshots start from this asset's first publish after the split, "
+                        "Saturday, 21 November 2026."), text

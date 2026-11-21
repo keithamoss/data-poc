@@ -118,6 +118,20 @@ postgres_major: 16
 # never sets it.
 synthetic: true
 
+# THIS ASSET'S SNAPSHOT ARCHIVE STARTS HERE (REQ-DASH-373 criterion 4, key
+# SETTLED by Keith 2026-11-01): dashboard/snapshots/quarterly/ holds every
+# publish from this date. The archive taken before the asset split showed
+# both assets' results on one page and was deleted that day, at Keith's call;
+# git history still holds it. The snapshots panel's empty state names it.
+snapshots_from: 2026-11-21
+
+# THIS ASSET PUBLISHES TO THE gh-pages BRANCH (REQ-PIPE-372 criterion 1, key
+# SETTLED by Keith 2026-11-01) - today's one publish path. Only this asset
+# holds it: both assets publishing to one branch would overwrite each other,
+# so the daily asset's publish is refused until REQ-PIPE-255 gives each asset
+# its own Cloudflare Pages project, when this key is replaced (criterion 5).
+publish_to_gh_pages: true
+
 # WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
 # values, strictest first:
 #   hold                     - never promoted automatically; it waits,

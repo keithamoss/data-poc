@@ -766,6 +766,12 @@ def embed() -> None:
     # criterion 12), through the one reader of `synthetic: true`.
     html = _replace_const(html, "ASSET_SYNTHETIC",
                           json.dumps(asset_time.declared_synthetic()))
+    # THE SELECTED ASSET'S OWN SNAPSHOT ARCHIVE (REQ-DASH-373 criteria 3 and
+    # 5): its folder, which the picker's links name, and the date it starts.
+    from dashboard.snapshot_dashboard import archive_settings
+
+    html = _replace_const(html, "SNAPSHOT_ARCHIVE",
+                          json.dumps(archive_settings(), separators=(",", ":")))
 
     outstanding_now = outstanding.survey().as_record()
     html = _replace_const(html, "OUTSTANDING",
