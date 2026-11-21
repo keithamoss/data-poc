@@ -22,8 +22,8 @@ should also flip sprints 9 and 10 from `blocked`.
 
 ## Class B - retire or mark met (needs Keith: these touch requirements.yaml's claims)
 
-| id | criterion | proposal | citation |
-|---|---|---|---|
+| criterion | proposal | citation |
+|---|---|---|
 | DASH-070 c1 (held by assignment rule) | mark met | `outstanding.py:350` `_from_holds` |
 | DASH-070 c1 (closed unfilled slot) | mark met | `outstanding.py:447` `_from_unfilled_periods` |
 | DASH-070 c9 (uncertain-filing qualifier) | retire, and c1's "under ambiguity" clause | REQ-PIPE-065 c1/c2 retired by REQ-PIPE-131 |
