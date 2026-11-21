@@ -6185,3 +6185,15 @@ could never have computed it), and it belongs with batch 5's check work.
      database with a live connection (pg_stat_activity), or skip tagged ones
      whose tag a running pytest carries. Not scoped.
 
+
+143. **[todo, 2026-11-21]** **[Docs & process]** **Once the project is stable: a big requirements clean-up - strip out the parts of requirements that only modify other requirements.**
+     Keith, 2026-11-21, on signing the one-offs batch: "Once we stabilise this
+     project I think there's a big requirement cleanup we can do to strip out
+     bits of requirements that just modify other requirements." The register
+     now carries many criteria that only amend another requirement's
+     ("AMENDED ... by REQ-X", restated criteria, "MOVED to", unmet entries
+     repointed), so a requirement's real behaviour is spread across several
+     entries. Not scoped: when "stable" is, whether amendments are folded into
+     the requirement they change (and the amending criterion retired), and
+     how `decisions:` keeps the history once the cross-references go. Scope
+     with Keith before starting.

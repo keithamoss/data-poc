@@ -116,3 +116,13 @@ requirements.yaml until each requirement is presented and signed.
   deferred-rescope-amendments-v5.yaml - enduring assets by name, one-offs as a
   count per kind ("Set it to one of: daily, quarterly - or one of 37 extractions
   (mothman one-off list)"); `mothman one-off open` and `list` exempt.
+
+## Sign-off
+
+- **Keith, 2026-11-21: "All of the one offs sound good. Approved."** - every
+  requirement in deferred-rescope-v5.yaml (REQ-GHUB-433, REQ-PIPE-434, 435,
+  REQ-DASH-436, REQ-PIPE-438, 446, 442, 443, REQ-DASH-444, 447, REQ-PIPE-439,
+  440, REQ-QAC-441, REQ-TEST-437) and every amendment in
+  deferred-rescope-amendments-v5.yaml, after reading the sign-off pack
+  (https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE). To be applied to
+  requirements.yaml once the group C/D gate has run, with `mothman check --docs`.
