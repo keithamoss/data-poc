@@ -1846,7 +1846,7 @@ comparisons against the expected-supply sequence.
    blocker does not bite here either. If QA ever moves earlier than 15,
    this split stops holding and both halves have to move together.
 
-9. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Slot
+9. **[in-progress, 2026-11-21]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
    claimable (Threads E and H). *(The rule was REPLACED 2026-10-04 by
@@ -1879,7 +1879,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **Promotion and
+11. **[blocked, 2026-11-21]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **off-cycle
     arrival gate** - a supply arriving in a period its dataset does not
@@ -1938,7 +1938,7 @@ comparisons against the expected-supply sequence.
     "promotion and rejection" reads like a complete set of outcomes and
     is not.
 
-12. **[in-progress, 2026-09-28]** **[Pipeline & publishing]** **The decision
+12. **[blocked, 2026-11-21]** **[Pipeline & publishing]** **The decision
     log, and the GitHub Issues write path.** Append-only; who, when,
     what, which, why; automated decisions recorded the same way with the
     rule as actor; demotion stickiness; **re-filing** (confirmed in
