@@ -9131,6 +9131,11 @@ function renderNotFound(view, what, id){
 // pushes, so Back still goes where the reader came from rather than
 // through the broken link they just arrived on.
 function forgetStaleSegment(what, id, patch){
+  // A ROUTE UNDER SOMETHING THAT MOVED TO ANOTHER ASSET IS NOT STALE
+  // (REQ-PIPE-354 criterion 6; post-build-review #492 F2): its column and
+  // check are on the other dashboard, so the moved notice is the one line,
+  // and the address stays as it is for that notice's link.
+  if(movedEntryForRoute()) return;
   STATE = {...STATE, ...patch};
   history.replaceState(STATE, "", navUrl({dropArrival: false}));
   const view = document.getElementById("view");

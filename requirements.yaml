@@ -38342,7 +38342,8 @@ requirements:
     - 'WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in the selected asset''s archive, computed the same way from that snapshot''s decompressed page with its inlined data files read back out (REQ-DASH-292), THE SYSTEM SHALL archive no snapshot, upload nothing, print one line saying the dashboard is unchanged since that snapshot''s publish and when it happened, and exit zero. AMENDED 2026-11-21 by REQ-PIPE-354 (A24).'
     - WHEN the fingerprint differs, or no snapshot is archived yet, THE SYSTEM SHALL archive one snapshot,
       prepare the site and upload it, in that order, and SHALL compare before archiving so that an unchanged
-      build never leaves a snapshot behind.
+      build never leaves a snapshot behind, and SHALL remove that snapshot again if the publish stops
+      before the upload succeeds. AMENDED 2026-11-21 (Keith, post-build-review #492).
     - "WHEN every dashboard build finishes (`mothman dashboard embed`, `mothman dashboard rebuild`, `mothman pipeline run` and the publish itself), THE SYSTEM SHALL print the size of the built page and of each data file and part it references, and WHEN any one of them is 20 MiB or more THE SYSTEM SHALL warn, naming the file, its size and the 25 MiB limit, so that the ceiling is watched per file during development and not first met at a publish (Keith, 2026-10-18; per file since REQ-DASH-291, 2026-10-24). REQ-DASH-293's 10 MiB budget warning is printed by the same step."
     - THE SYSTEM SHALL offer no flag, variable or setting that publishes, or archives a snapshot for, a
       build whose fingerprint is unchanged.
@@ -38550,6 +38551,7 @@ requirements:
     - 'THE SANDBOX PUBLISHES, AND IS STILL NOT PRODUCTION (Keith, 2026-11-21): criterion 21 made `sandbox` the one publishing environment; REQ-TEST-114 criterion 5 keyed "not production" on publishing, which would have made the sandbox read as production and production as not. Amended there to key on a declared `production: true` property instead.'
     - 'THE PUBLISH WRITES ITS SITE UNDER THE BUILD''S OWN DIRECTORY when one is given (built 2026-11-21): `_site/` beside `--out-dir`''s page, and every step reads the page the build wrote rather than a path bound at import - so the end-to-end test never touches the repository''s own tree.'
     - 'PUBLISHING PAUSES UNTIL CLOUDFLARE IS LIVE (Keith, 2026-11-21): this replaces the gh-pages push, so the GitHub Pages dashboard stops updating until the Pages projects, the token, Access and the network allow-list exist. Every publish is refused meanwhile, at the latest by the placeholder sign-in domain.'
+    - "A PUBLISH THAT STOPS AFTER ARCHIVING TAKES ITS SNAPSHOT BACK (Keith, 2026-11-21, post-build-review #492 F1): archiving before a failed upload, or before the site's size refusal, left a snapshot behind, and every retry then read the build as unchanged and uploaded nothing - with no flag to override, by design. Criterion 25 amended in his approved wording; snapshot_dashboard.withdraw_snapshot removes the file and its manifest entry and re-embeds the page's manifest. REJECTED archiving only after a successful upload: the site carries the archive, so the new snapshot would be missing from the site until the next publish."
     open_questions:
     - WHETHER DIRECT-UPLOAD DEPLOYMENTS COUNT AGAINST THE FREE PLAN'S 500 A MONTH. Not verifiable from this
       sandbox. Check in the Cloudflare dashboard after the first week of publishing.
@@ -49081,6 +49083,12 @@ requirements:
     - qa_tools/common/schemas.py::DataAsset
     evidence:
     - '2026-11-21: tests-js/asset-identity.test.js 8 passed (the masthead ''Quarterly data asset · Quality Assurance'' and the title; the moved notice''s words, its link to the daily address keeping the route and in-place-on and dropping period=, cmp= and panel=, the sign-in line; the not-found page otherwise; a Feedback card''s link kept where moved_to covers it, the label alone where nothing does; the Demo caption). Real-browser, on the built quarterly page: TestAMovedCollectionSaysWhereItWent (criterion 7: the line, the link and its parameters, the title, the announcement, no navigation) and TestTheDemoSaysWhereItWasRecorded (criterion 10) passed. Criterion 5: TestTheUpload::test_each_asset_publishes_to_its_own_project names data-poc-quarterly and data-poc-daily to the stub wrangler.'
+    unmet_criteria:
+      - criterion: "Criteria 3 and 4 - each asset's Pages project configured with its own Access applications and allow-list, and the daily asset's new project."
+        why: "Console configuration by Keith from docs/dashboard-hosting.md, the same steps as REQ-PIPE-257 criteria 1 to 5: the Pages projects and the Zero Trust team do not exist yet. Recorded 2026-11-21 (Keith, post-build-review #492 F3) - the build had claimed them met."
+        owner: "Keith, in the Cloudflare console"
+        blocked_by:
+          unowned: true
     decisions:
     - 'ONE CLOUDFLARE PROJECT PER ASSET, EACH WITH ITS OWN ACCESS ALLOW-LIST (Keith, 2026-10-31, architect Q1 (a)): matches the two-team target and removes per-path publishing. It SUPERSEDES v1''s ''two dashboards on one site, /quarterly/ and /daily/'' (Keith''s earlier (a), which predated knowing REQ-PIPE-255 uploads a whole tree). REJECTED (b), one combined project rebuilt from both databases on every publish.'
     - TODAY'S PROJECT BECOMES THE QUARTERLY ASSET'S; THE DAILY ASSET GETS A NEW ONE; NO LANDING PAGE AND NO REDIRECT SCRIPT; AN OLD BIRTH REGISTRATIONS LINK SHOWS A ONE-LINE NOTICE (Keith, 2026-10-31, old address (a)). REJECTED (b), new projects for both with a linking page at today's address. This drops v1's landing page and old-link redirect, and with them UX MUST 5 and UX Q2.

@@ -72,6 +72,22 @@ describe("REQ-DASH-094 - a build says which environment it came from", () => {
     expect(el.textContent).toContain("Production");
   });
 
+  it("keys 'not production' on production, so a publishing sandbox still says it (REQ-TEST-114 c5 as amended)", () => {
+    // post-build-review #492 F7: the sandbox publishes since REQ-PIPE-255, and
+    // is still not production - the fixtures above carry no `production`
+    // field, so only the fallback to `publishes` was ever exercised.
+    dashboard = withProvenance({ environment: { id: "sandbox", label: "Claude Code sandbox",
+      publishes: true, production: false }, commit: "abc1234def" });
+    const el = dashboard.window.document.getElementById("clock-text");
+    expect(el.closest(".live").classList.contains("non-production")).toBe(true);
+    expect(el.textContent.toLowerCase()).toContain("not production");
+    dashboard.close();
+    dashboard = withProvenance({ environment: { id: "prod", label: "Production",
+      publishes: false, production: true }, commit: "abc1234def" });
+    const prod = dashboard.window.document.getElementById("clock-text");
+    expect(prod.closest(".live").classList.contains("non-production")).toBe(false);
+  });
+
   it("says so plainly when the build recorded NO environment", () => {
     // Criterion 6, and the real regression this file exists for: before
     // this change the page rendered nothing at all in that case, so an

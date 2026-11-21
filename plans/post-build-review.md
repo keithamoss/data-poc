@@ -17229,3 +17229,51 @@ twice. It deliberately did not re-find the `TypeError`.
      Verified met by the functional critic: 355 c1-c8, c11; 356 c4-c8;
      367 c1-c7; REQ-DASH-209's amendments and 208 c2. Not verified: 355 c10
      and 356 c10 (one-off comparisons in evidence).
+
+492. **[done, 2026-11-21]** **[Pipeline & publishing]** **[Dashboard UI]** **Post-build functional critic on group E (724752c4) and group F (9fc54c56): a failed upload blocked every retry.**
+     Every finding checked against the code before being written up; each
+     defect's test seen failing first.
+     - **F1, DEFECT, FIXED (Keith's call on the wording)**: `publish()` archived the
+       snapshot before the upload, and a failed upload (or the site's size
+       refusal after archiving) left it behind - every retry then read the
+       build as unchanged and uploaded nothing, with no flag to override. Keith
+       chose to keep the order and take the snapshot back: REQ-PIPE-255 c25
+       amended ("...and SHALL remove that snapshot again if the publish stops
+       before the upload succeeds"), `snapshot_dashboard.withdraw_snapshot`.
+       tests/test_cloudflare_publish.py's TestAFailedPublishLeavesNoSnapshot.
+       My first site-over-the-limit test passed for the wrong reason - the
+       page's own size check refused before anything was archived - and was
+       made to step past it and to assert the withdrawal happened.
+     - **F2, DEFECT, FIXED**: a column or check deep link under a moved dataset
+       (every ticket check link, REQ-GHUB-258) showed a contradictory "this
+       column no longer exists" notice above the moved one and rewrote the
+       address; `forgetStaleSegment` now returns for a moved route (REQ-PIPE-354
+       c6). TestAMovedCollectionSaysWhereItWent's check-link test.
+     - **F3, register, Keith**: REQ-PIPE-354 c3/c4 (Access per project, the daily
+       project) were claimed met; they are his console steps. Recorded unmet.
+     - **F4, coverage**: c13/c14 through `publish()` - TestSizesThroughThePublish
+       (a page over the limit refused before archiving; a near-limit file
+       warned and still published).
+     - **F5, coverage**: `verify-access`'s failure paths - four tests.
+     - **F6, register, for Keith**: REQ-PIPE-372's evidence describes git-push
+       tests deleted with the move to Cloudflare, and c6 (a stub git remote) is
+       moot under c5. Not edited - a register claim - flagged to Keith.
+     - **F7, coverage**: "not production" keyed on `production` in the page -
+       tests-js/build-environment.test.js now has a publishing sandbox.
+     - **Nits fixed**: an incomplete `hosting:` block names what is missing
+       rather than raising KeyError; the deployment address must be this
+       project's (`<id>.<project>.pages.dev`). CLAUDE.md's snapshots row was
+       already fixed in Keith's approved wording (wip/groupCD). **Not changed**:
+       the placeholder access domain refused only after a full build (safe;
+       an earlier refusal would be a new behaviour); no `--commit-dirty`;
+       unknown query parameters kept by the moved link (as specified).
+     - **Found while fixing, a test-isolation defect in E's own tests**:
+       test_cloudflare_publish's `built` fixture set MOTHMAN_DASHBOARD_OUT
+       through build_output.use() and ended with monkeypatch.delenv, which
+       recorded the scratch path as the value to restore - every later test in
+       the process embedded into a dead folder. Seen as two
+       TestTheArtifactSaysWhereItCameFrom failures when the modules ran in that
+       order (they ran apart under xdist's loadgroup). Fixed by setting it
+       through monkeypatch first.
+     - Group F verified: 413 c11, 414 c8, 415 c10 met; #488's fix verified, and
+       its test fails against the reverted fix.

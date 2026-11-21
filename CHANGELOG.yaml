@@ -131,6 +131,15 @@ releases:
               Opening a link to Birth Registrations on the quarterly dashboard
               now says it has moved to the daily asset's dashboard, with a link
               to the same page there, rather than "not found".
+      - category: Fixed
+        items:
+          - headline: A publish that fails can be tried again
+            components: ["Pipeline & publishing"]
+            description: >
+              A publish that stopped after archiving its snapshot - a failed
+              upload, say - left the snapshot behind, so trying again said the
+              dashboard was unchanged and uploaded nothing. It now takes the
+              snapshot back, and the retry publishes.
       - category: Improved
         items:
           - headline: The dashboard says which asset it is
