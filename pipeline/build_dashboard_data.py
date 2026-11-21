@@ -274,6 +274,18 @@ def _supply_read(record: dict, table: str) -> str | None:
 _SHOWN_ELSEWHERE = (qa_store.READ, qa_store.HELD)
 
 
+def _reads_with_why(record: dict) -> dict | None:
+    """The record's reads, each table it could not read carrying the reason
+    code the record gives for it (`unrunnable_codes`) as `why` - for the page
+    to say contested or rejected (post-build-review #445)."""
+    reads = record.get("reads")
+    codes = record.get("unrunnable_codes") or {}
+    if not reads or not codes:
+        return reads
+    return {t: ({**r, "why": codes[t]} if t in codes and r.get("state") != qa_store.READ else r)
+            for t, r in reads.items()}
+
+
 def _contested_read(read: dict | None) -> bool:
     """An ABSENT read of a table two files claim, naming them - about that
     contested pair, so it reaches the pair's page as REQ-DASH-264 criterion 3's
@@ -568,7 +580,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         recorded_set = _member_set(r)
         if recorded_set:
             slot["member_set"][r["run_id"]] = recorded_set
-        slot["reads"][r["run_id"]] = r.get("reads")
+        slot["reads"][r["run_id"]] = _reads_with_why(r)
         slot["at"][r["run_id"]] = r.get("run_timestamp")
         slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         # WHICH TABLE IT COULD NOT READ, AND WHY, from the record's structured

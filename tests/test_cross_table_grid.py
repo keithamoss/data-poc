@@ -87,6 +87,29 @@ class TestTheCell:
         assert got["bucket"] == g.WAREHOUSE
         assert g.words_of(got["note"]) == "no Client Register in the warehouse for 2024-Q3"
 
+    def test_a_contested_partner_says_so(self):
+        """post-build-review #445 (Keith, 2026-11-21): the row names why the
+        partner is not in the warehouse, from the record's reason."""
+        entry = _entry(None)
+        entry["reads"]["cp_clients"]["why"] = "contested"
+        got = _place(entry, _slots())
+        assert g.words_of(got["note"]) == (
+            "no Client Register in the warehouse for 2024-Q3 - it is contested (two files)")
+        assert g.words_of(got["sentence"]).endswith(" - it is contested (two files)")
+
+    def test_a_rejected_partner_says_so(self):
+        entry = _entry(None)
+        entry["reads"]["cp_clients"]["why"] = "rejected"
+        got = _place(entry, _slots())
+        assert g.words_of(got["note"]) == (
+            "no Client Register in the warehouse for 2024-Q3 - its file was rejected")
+
+    def test_any_other_reason_keeps_the_plain_words(self):
+        entry = _entry(None)
+        entry["reads"]["cp_clients"]["why"] = "not-yet-due"
+        assert g.words_of(_place(entry, _slots())["note"]) == (
+            "no Client Register in the warehouse for 2024-Q3")
+
     def test_an_inherited_partner_is_carried_forward(self):
         slots = _slots(**{"cp-clients": [{"at": "2024-08-01T09:00:00+08:00", "slot": P,
                                           "held_as": "inherited", "holder": C1,
@@ -259,3 +282,24 @@ class TestOwedWords:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+class TestTheBuildCarriesTheReason:
+    """post-build-review #445: the build folds each unread table's recorded
+    reason code into its read, which is what the note above reads."""
+
+    def test_an_unread_table_carries_its_code(self):
+        from pipeline import build_dashboard_data as b
+
+        record = {"reads": {"cp_clients": {"state": "ABSENT", "supply_id": None},
+                            "cp_notifications": {"state": "READ", "supply_id": N2}},
+                  "unrunnable_codes": {"cp_clients": "rejected"}}
+        got = b._reads_with_why(record)
+        assert got["cp_clients"]["why"] == "rejected"
+        assert "why" not in got["cp_notifications"]
+
+    def test_a_record_with_no_codes_is_unchanged(self):
+        from pipeline import build_dashboard_data as b
+
+        reads = {"cp_clients": {"state": "ABSENT", "supply_id": None}}
+        assert b._reads_with_why({"reads": reads}) is reads

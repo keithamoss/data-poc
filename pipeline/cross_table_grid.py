@@ -173,6 +173,12 @@ def _left(log, supply: str, when: datetime):
     return None
 
 
+#: The words for why a partner was not in the warehouse, by the reason code a
+#: record carries for it (qa_tools.common.period_schema) - the two #445 named.
+_WHY_ABSENT = {"contested": "it is contested (two files)",
+               "rejected": "its file was rejected"}
+
+
 def _reads_of(entry: dict, own_table: str) -> dict[str, dict]:
     return {t: r for t, r in (entry.get("reads") or {}).items() if t != own_table}
 
@@ -195,10 +201,15 @@ def place(entry: dict, *, dataset_id: str, own_table: str, period: str | None, w
             "state") in (qa_store.READ, qa_store.HELD) else None
         if other_supply is None:
             states.append("none")
+            # WHY, WHERE THE RECORD SAYS (post-build-review #445, Keith
+            # 2026-11-21): the partner contested or rejected, from the reason
+            # the build folds into the read; the row's status stays #95's.
+            why = _WHY_ABSENT.get(read.get("why"))
+            tail = [text(f" - {why}")] if why else []
             notes.append([text("no "), dataset_segment(other),
-                          text(f" in the warehouse for {_period(period)}")])
+                          text(f" in the warehouse for {_period(period)}"), *tail])
             sentences.append([text("Read against: no "), dataset_segment(other),
-                              text(f" in place in the warehouse for {_period(period)}")])
+                              text(f" in place in the warehouse for {_period(period)}"), *tail])
             continue
         held_as, holder, stands_on = slots.at(other, period, when)
         left = _left(log, other_supply, when)
