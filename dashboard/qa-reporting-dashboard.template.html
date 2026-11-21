@@ -708,7 +708,10 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .supply-cycle-label{display:flex; flex-wrap:wrap; align-items:baseline; column-gap:8px; row-gap:2px; font-size:13px; color:var(--ink-muted); margin-bottom:8px;}
 /* A LONG 'For <period> · ...' HEADING WRAPS AS A UNIT (visual critic on
    REQ-DASH-326, 3): the count and the pill drop under it whole. */
-.supply-cycle-label > span{white-space:nowrap;}
+/* Each part moves to the next line whole; one wider than the row wraps
+   inside itself rather than pushing the page sideways at phone width
+   (post-build-review #493 nit - it was white-space:nowrap). */
+.supply-cycle-label > span{min-width:0;}
 .supply-cycle-label b{color:var(--ink);}
 
 .col-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(196px,1fr)); gap:10px; margin-block:8px 30px;}
@@ -10657,11 +10660,22 @@ function wireSupplyHistorySection(container){
   // (REQ-DASH-414 criterion 8): opening a run's tries opens them, and never
   // also moves the page to the row's date - which re-rendered the row and
   // closed the details before they were seen.
-  container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
+  container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>{
     tr.addEventListener("click", e=>{
       if(e.target && e.target.closest && e.target.closest("a, details")) return;
       applyInPlaceOn(tr.dataset.runDate);
-    }));
+    });
+    // FROM THE KEYBOARD TOO (post-build-review #493 nit): in the tab order,
+    // Enter or Space on the row itself does what a click does; a key pressed
+    // on a link or disclosure inside it is theirs.
+    tr.tabIndex = 0;
+    tr.addEventListener("keydown", e=>{
+      if(e.key !== "Enter" && e.key !== " ") return;
+      if(e.target !== tr) return;
+      e.preventDefault();
+      applyInPlaceOn(tr.dataset.runDate);
+    });
+  });
 }
 
 /* ---- A period's composition (REQ-DASH-209) ------------------------------

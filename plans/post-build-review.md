@@ -17371,12 +17371,28 @@ twice. It deliberately did not re-find the `TypeError`.
        list item carries its try's number as its value, so a list with tries
        left out still numbers truly). REQ-DASH-413 gains criterion 12;
        decisions on 413, 414, 415, 347 and REQ-PIPE-098.
-     - **Nits still to do**: the period banner on a moved page with ?period=;
-       the moved link's text is the bare URL; an ambiguous comma in the
-       not-owed weekday row; raw dataset ids in held-supply headlines and the
-       calendar notice; hollow markers labelled only by tooltip; 'View as
-       table' lacks aria-expanded; the snapshots panel leaves focus on its
-       trigger; the demo caption's MOTHMAN_ASSET not code-styled. Probably
-       older: the supply-cycle table scrolls sideways at 390px; a supply row
-       is not keyboard-reachable; an empty current cycle hides the newest
-       tries note behind 'Show all history'.
+     - **Nits, 2026-11-21 (branch wip/nits493, each against a test seen
+       failing first unless said)**: a moved page drops this asset's period
+       statement; 'View as table' says aria-expanded; a header panel takes
+       focus on opening and gives it back on close (all of them, not only
+       snapshots); the Demo caption shows its command as code, words
+       unchanged; an owed-nothing run puts a colon, not a comma, before its
+       dates; the held-supply and closed-unfilled queue headlines name the
+       dataset, not its id; a clickable supply row is in the tab order and
+       answers Enter and Space; the cycle label's caption wraps at 390px
+       (the page was 731px wide - a real-browser test, measured failing on
+       the pre-fix build rather than run red).
+     - **Found on the way, a test-isolation defect, FIXED**: test_could_not_
+       check.py left its unfinished runs in qa.run, each an open 'could not
+       be checked' blocker, so test_dataset_blockers.py's TestOpenFromThe
+       ReceiptInstant failed 8 tests whenever it ran after it on a worker -
+       on the gate's tree too, before any of tonight's changes. The full gate
+       never paired them. The module now clears what it raised on teardown.
+     - **Left, with the reason**: the runway notice keeps the calendar's and
+       the dataset's ids - it is about editing calendar.yaml and names both in
+       the file's own words; hollow trend markers stay labelled by the axis
+       title and the table, which say each in words. **For Keith**: the moved
+       notice's link text is its bare address, beside wording he settled on
+       2026-11-01 - new words there are his call. **Not yet looked at**: an
+       empty current cycle hides the newest tries note behind 'Show all
+       history'.
