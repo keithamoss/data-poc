@@ -38,3 +38,10 @@ requirements.yaml until each requirement is presented and signed.
   typed confirmation; never automatic.
 - **Q4.7, mixing:** (a) a `never` dataset lives only on an extraction deployment
   of its own; a recurring asset's configuration refuses one.
+
+## An addition, mid-draft
+
+- Keith: "maybe it doesn't have a database." Confirmed: explore an extraction with
+  **no ephemeral database at all** as a real option beside sprint 29's
+  ephemeral-database-plus-TUI requirement. Not decided; the scoper drafts both
+  shapes and one settling question.
