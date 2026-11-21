@@ -9795,19 +9795,41 @@ function triesNote(r, on){
       <div style="margin-top:4px;"><code>mothman supply failures</code> shows each try's full error.</div>
     </details>`;
 }
+// A SUPPLY WHOSE DATASET CHECKS NEVER RAN (post-build-review #493 H3; Keith,
+// 2026-11-21): its arrival run recorded file checks only - it could not be
+// loaded, or it was one of two files waiting for a choice - so its run time
+// is not how long our checks took. Said as not checked, and kept off the
+// trend. From the recorded blockers, never from how short the run was.
+function rowsNotCheckedWhy(r, datasetId, source){
+  if(!r || r.scope !== "arrival" || !r.supply_id) return null;
+  const b = blockersFor(datasetId, source).find(b=> b.supply === r.supply_id
+    && (b.kind === "refused" || b.kind === "contested"));
+  if(!b) return null;
+  return b.kind === "refused" ? "its file could not be loaded"
+    : "two files arrived for it and one had to be chosen";
+}
 // A ROW'S OWN RUN TIME, its tries and its re-checks' run times (413 criterion
 // 2, 414 criterion 1): the row's ARRIVAL run in its Status cell; each later
 // whole-supply or readers-only run of the same supply in its re-check words.
-function runTimeNotes(datasetId, entry, on, given){
-  const own = runTimeEntry(datasetId, entry.run_id, given);
-  const supply = own ? own.supply_id : null;
+function runTimeNotes(datasetId, entry, on, given, source){
+  const inPlace = runTimeEntry(datasetId, entry.run_id, given);
+  const supply = inPlace ? inPlace.supply_id : null;
+  // THE ARRIVAL'S OWN RUN IN THE STATUS CELL, whatever run the row is keyed on
+  // (post-build-review #493 H1): a correction leaves the row on the run in
+  // place, a full re-check `<run>__r1`, whose time is a re-check's and is said
+  // in the re-check words below.
+  const own = inPlace && inPlace.scope !== "arrival" && supply
+    ? (runTimesOf(datasetId, given).find(r=> r.supply_id === supply && r.scope === "arrival") || inPlace)
+    : inPlace;
   const parts = [];
-  const took = runTimeText(own, on);
+  const notChecked = rowsNotCheckedWhy(own, datasetId, source);
+  const took = notChecked ? "" : runTimeText(own, on);
+  if(notChecked) parts.push(`<span class="run-time-note" data-run-time data-rows-not-checked style="color:var(--ink-muted); font-size:12px;">Not checked - ${escHtml(notChecked)}</span>`);
   if(took) parts.push(`<span class="run-time-note" data-run-time style="color:var(--ink-muted); font-size:12px;">Checked ${took}</span>`);
   const tries = triesNote(own, on);
   if(tries) parts.push(tries);
   if(supply){
-    runTimesOf(datasetId, given).filter(r=> r.supply_id === supply && r.run_id !== entry.run_id
+    runTimesOf(datasetId, given).filter(r=> r.supply_id === supply && r.run_id !== (own || inPlace).run_id
         && r.scope !== "arrival" && !r.not_checked && (!own || r.rank > own.rank)).forEach(r=>{
       const t = runTimeText(r, on);
       if(t) parts.push(`<span class="run-time-note" data-recheck-run-time style="color:var(--ink-muted); font-size:12px;">· re-checked ${escHtml(fmtDay(r.ended_at))} ${t}</span>`);
@@ -9824,8 +9846,20 @@ function runTimeNotes(datasetId, entry, on, given){
 // ended by the date on show. In unitTrendBlock's own frame, with its 'View as
 // table' - local view state, never a route (criterion 9).
 const WHOLE_SUPPLY_SCOPES = ["arrival", "full"];
-function runTimeSeries(datasetId, on, given){
-  return runTimesOf(datasetId, given).filter(r=> WHOLE_SUPPLY_SCOPES.indexOf(r.scope) !== -1)
+// The trend's top: the first whole duration at or above the longest finished
+// run whose half is a whole duration too (#493 M5) - 2s, 4s, 10s, 20s, 30s,
+// 1m, 2m, 4m, 10m, 20m, 30m, 1h, then doubling.
+function runTimeScaleMax(ms){
+  const steps = [2, 4, 10, 20, 30, 60, 120, 240, 600, 1200, 1800, 3600].map(s=> s * 1000);
+  const found = steps.find(v=> v >= ms);
+  if(found) return found;
+  let top = steps[steps.length - 1];
+  while(top < ms) top *= 2;
+  return top;
+}
+function runTimeSeries(datasetId, on, given, source){
+  return runTimesOf(datasetId, given).filter(r=> WHOLE_SUPPLY_SCOPES.indexOf(r.scope) !== -1
+      && !rowsNotCheckedWhy(r, datasetId, source))
     .slice().sort((a, b)=> a.rank - b.rank)
     .map(r=> ({run: r,
       time: r.run_time_ms != null && endedBy(r.ended_at, on) ? r.run_time_ms : null,
@@ -9833,8 +9867,8 @@ function runTimeSeries(datasetId, on, given){
         && t.run_time_ms != null)}))
     .filter(p=> p.time != null || p.failed.length);
 }
-function runTimeTrend(datasetId, on, given){
-  const series = runTimeSeries(datasetId, on, given);
+function runTimeTrend(datasetId, on, given, source){
+  const series = runTimeSeries(datasetId, on, given, source);
   if(!runTimesOf(datasetId, given).length) return "";
   const head = `<div class="unit-trend-title">How long our checks took</div>`;
   if(series.filter(p=> p.time != null).length < 2)
@@ -9842,16 +9876,26 @@ function runTimeTrend(datasetId, on, given){
   const id = "utrend"+(chartSeq++);
   const n = series.length;
   const W=480, H=150, padL=48, padR=12, padT=14, padB=22;
-  const max = Math.max(...series.map(p=> Math.max(p.time || 0, ...p.failed.map(t=> t.run_time_ms))), 1);
+  // SCALED TO THE RUNS THAT FINISHED (post-build-review #493 H2; Keith,
+  // 2026-11-21): one 45-minute try had flattened every 2-4s run onto zero. A
+  // failed try longer than the scale sits on its top edge, marked off the
+  // scale in words. The top is a whole duration whose half is too, so no tick
+  // reads 'under 1s' (M5).
+  const max = runTimeScaleMax(Math.max(...series.map(p=> p.time || 0), 1));
   const x = i=> n===1 ? padL + (W-padL-padR)/2 : padL + i*(W-padL-padR)/(n-1);
   const y = v=> H-padB - (v/max)*(H-padT-padB);
   const filled = series.map((p, i)=> p.time != null ? [i, p] : null).filter(Boolean);
   const line = filled.length > 1 ? `<path d="${filled.map(([i, p], k)=> `${k ? "L" : "M"}${x(i).toFixed(1)},${y(p.time).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--ink-muted)" stroke-width="1.5"/>` : "";
   const points = filled.map(([i, p])=> `<circle cx="${x(i).toFixed(1)}" cy="${y(p.time).toFixed(1)}" r="3" fill="var(--ink-muted)" data-run-point="${escAttr(p.run.run_id)}"><title>${escHtml(`Checked in ${fmtElapsed(p.time/1000)}${p.run.slow ? " - slow" : ""}`)}</title></circle>`
     + (p.run.slow ? `<circle cx="${x(i).toFixed(1)}" cy="${y(p.time).toFixed(1)}" r="7" fill="none" stroke="var(--ink)" stroke-width="1.5" data-slow-ring/><text x="${x(i).toFixed(1)}" y="${(y(p.time)-10).toFixed(1)}" font-size="9.5" text-anchor="middle" fill="var(--ink)" font-weight="600">slow</text>` : "")).join("");
+  let offScale = false;
   const hollow = series.flatMap((p, i)=> p.failed.map(t=> {
-    const words = `${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms/1000)}`;
-    return `<circle cx="${(x(i)+5).toFixed(1)}" cy="${y(t.run_time_ms).toFixed(1)}" r="4" fill="var(--paper)" stroke="var(--ink-muted)" stroke-width="1.5" data-failed-try aria-label="${escAttr(words)}"><title>${escHtml(words)}</title></circle>`;
+    const off = t.run_time_ms > max;
+    if(off) offScale = true;
+    const words = `${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms/1000)}${off ? " - off the scale" : ""}`;
+    const cy = y(Math.min(t.run_time_ms, max));
+    const caret = off ? `<path d="M${(x(i)+1).toFixed(1)},${(cy-6).toFixed(1)} L${(x(i)+5).toFixed(1)},${(cy-11).toFixed(1)} L${(x(i)+9).toFixed(1)},${(cy-6).toFixed(1)}" fill="none" stroke="var(--ink-muted)" stroke-width="1.5" aria-hidden="true"/>` : "";
+    return `${caret}<circle cx="${(x(i)+5).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--paper)" stroke="var(--ink-muted)" stroke-width="1.5" data-failed-try${off ? " data-off-scale" : ""} aria-label="${escAttr(words)}"><title>${escHtml(words)}</title></circle>`;
   })).join("");
   const yLabels = [0, 0.5, 1].map(f=> `<text x="${padL-6}" y="${(y(max*f)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${escHtml(f ? fmtElapsed(max*f/1000) : "0s")}</text>`).join("");
   const xLabels = xAxisTicks(n, x, i=> series[i].run.ended_at ? shortDay(assetDateStrOf(series[i].run.ended_at)) : "", H-6);
@@ -9861,7 +9905,7 @@ function runTimeTrend(datasetId, on, given){
   const rows = series.slice().reverse().map(p=> `<tr data-run="${escAttr(p.run.run_id)}"><td>${p.run.ended_at ? fmtDay(p.run.ended_at) : "—"}</td><td class="num">${p.time != null ? escHtml(fmtElapsed(p.time/1000)) : "—"}</td><td>${p.failed.map(t=> escHtml(`${tryEndedWords(t)} after ${fmtElapsed(t.run_time_ms/1000)}`)).join("; ")}</td><td>${escHtml(p.time != null ? slowText(p.run) : "")}</td></tr>`).join("");
   return `<div class="unit-trend" data-unit-trend="run-time">
     ${head}
-    <div class="chart-axis-title">Run time - hollow markers are tries that did not finish</div>
+    <div class="chart-axis-title">Run time - hollow markers are tries that did not finish${offScale ? "; those marked ^ above the top are tries longer than the scale" : ""}</div>
     <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block; overflow:visible;" role="img" aria-label="${escAttr(label)}">
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${y(0).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
       <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W-padR}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1"/>

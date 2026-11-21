@@ -17345,7 +17345,9 @@ twice. It deliberately did not re-find the `TypeError`.
        "crashed on 9:09am" -> "at"; mixed dashes.
      - **Keith's calls, 2026-11-21**: (H2) an off-scale marker for a run beyond
        the trend's scale; (H3) a supply we could not check says "not checked"
-       and stays off the trend; (M2) keep the red Fail and its rollup, the
+       and stays off the trend; a supply whose dataset checks never ran counts - one
+       that could not be loaded and a contested pair's file waiting for a choice
+       alike (Keith, 2026-11-21); (M2) keep the red Fail and its rollup, the
        banner's first line saying our pipeline could not check the supply and
        that this is not a problem with the supplier's data; (M3/M4) count what
        the dataset owes in its own unit ("9 Mondays with no supply"); (M6) the
