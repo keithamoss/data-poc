@@ -55,17 +55,20 @@
 
 calendars:
   - name: quarterly
-    # HOW FEW FUTURE SLOTS LEFT BEFORE WE SAY SO (REQ-PIPE-053).
-    # Counted in SLOTS, never in months - three months of runway on a
-    # quarterly calendar is ONE slot, which is already too late to act
-    # on. Four is a year of quarterly supplies: long enough that
-    # "please send next year's dates" is a calm request.
+    # HOW MANY YEARS OF EACH DATASET'S OWN SUPPLIES LEFT BEFORE WE SAY SO
+    # (REQ-PIPE-053, amended by Keith 2026-11-21). Still counted in SLOTS,
+    # never in months - three months of runway on a quarterly calendar is
+    # ONE slot, which is already too late to act on - but each dataset's own:
+    # a year is 4 slots for a quarterly dataset, 2 for one owed twice a year
+    # and 1 for an annual one, so an annual dataset with its next supply
+    # still to come is not warned about. A year is long enough that "please
+    # send next year's dates" is a calm request.
     #
     # Deliberately NOT inside `versions:` - the dates and the claim
     # window are the supplier agreement and are effective-dated; this
     # is an operational threshold for when WE want telling that they
     # are running out.
-    runway_warning_slots: 4
+    runway_warning_years: 1
     description: >
       Four authored delivery dates a year, anchored on the 1st of
       February, May, August and November, shared by every quarterly

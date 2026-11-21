@@ -476,10 +476,11 @@ class CalendarConfig(_Strict):
     name: NonEmptyStr
     description: NonEmptyStr
     versions: list[CalendarVersionConfig] = Field(min_length=1)
-    # REQ-PIPE-053. Unversioned on purpose - the dates and the claim
-    # window are the supplier agreement; this is an operational
-    # threshold for when we want telling that they are running out.
-    runway_warning_slots: int | None = Field(default=None, ge=1)
+    # REQ-PIPE-053 (amended 2026-11-21: years of each dataset's own supplies).
+    # Unversioned on purpose - the dates and the claim window are the supplier
+    # agreement; this is an operational threshold for when we want telling
+    # that they are running out.
+    runway_warning_years: int | None = Field(default=None, ge=1)
     #: Declared corrections to this calendar's frozen items (REQ-PIPE-111).
     corrections: list["Correction"] = Field(default_factory=list)
 

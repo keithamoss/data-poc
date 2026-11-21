@@ -184,12 +184,13 @@ class Calendar:
     name: str
     description: str
     versions: tuple[CalendarVersion, ...]   # newest effective_from last
-    # How few future slots left before the runway warning fires
-    # (REQ-PIPE-053). NOT versioned, unlike the dates and the claim
-    # window: those are the supplier agreement, and this is an
+    # How many YEARS of each dataset's own supplies left before the runway
+    # warning fires (REQ-PIPE-053, amended 2026-11-21: 4 slots a year for a
+    # quarterly dataset, 1 for an annual). NOT versioned, unlike the dates and
+    # the claim window: those are the supplier agreement, and this is an
     # operational threshold for when WE want telling. None takes
     # qa_tools.common.runway's own default.
-    runway_warning_slots: int | None = None
+    runway_warning_years: int | None = None
 
     def version_in_force(self, on: date) -> CalendarVersion:
         """The version a supply due on `on` is judged against.
@@ -409,15 +410,21 @@ def parse_calendar(raw: dict) -> Calendar:
     if not versions:
         raise ScheduleConfigError(f"calendar {name!r} has no versions")
     versions.sort(key=lambda v: v.effective_from)
-    runway = raw.get("runway_warning_slots")
+    if "runway_warning_slots" in raw:
+        raise ScheduleConfigError(
+            f"calendar {name!r}: runway_warning_slots is no longer read. Write "
+            f"runway_warning_years instead - how many years of each dataset's own supplies "
+            f"left before the warning (4 slots a year for a quarterly dataset, 1 for an "
+            f"annual) - for example `runway_warning_years: 1` (REQ-PIPE-053).")
+    runway = raw.get("runway_warning_years")
     if runway is not None and (not isinstance(runway, int) or isinstance(runway, bool)
                                 or runway < 1):
         raise ScheduleConfigError(
-            f"calendar {name!r}: runway_warning_slots is {runway!r}. It counts SLOTS, so it "
-            f"has to be a whole number of at least 1 - a threshold of 0 is a warning that "
-            f"only ever fires once the schedule has already run out.")
+            f"calendar {name!r}: runway_warning_years is {runway!r}. It has to be a whole "
+            f"number of at least 1 - a threshold of 0 is a warning that only ever fires once "
+            f"the schedule has already run out.")
     return Calendar(name=name, description=(raw.get("description") or "").strip(),
-                    versions=tuple(versions), runway_warning_slots=runway)
+                    versions=tuple(versions), runway_warning_years=runway)
 
 
 def agreement_to_read(agreement=None):

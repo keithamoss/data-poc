@@ -218,10 +218,11 @@ class TestTheThresholdIsConfigurable:
         contract_dir = tmp_path / "contract"
         shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
-        next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 1
+        next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_years"] = 2
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        # Two slots left, threshold now 1 - so no longer low.
-        assert runway.low_runway(date(2026, 9, 23)) == []
+        # Two years of four slots a year (this module's premise) - eight.
+        assert runway.calendar_runway("quarterly", date(2026, 9, 23)).threshold == 8
+        assert runway.low_runway(BEFORE_ANY_RUNOUT) == []
 
     def test_a_threshold_of_zero_is_rejected(self, tmp_path, monkeypatch):
         """A threshold that only fires once the schedule has already run
@@ -232,9 +233,64 @@ class TestTheThresholdIsConfigurable:
         contract_dir = tmp_path / "contract"
         shutil.copytree(asset_folders.real_folder(), contract_dir)
         doc = agreement_split.merged_view(contract_dir)
-        next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_slots"] = 0
+        next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_years"] = 0
         agreement_split.repoint(monkeypatch, contract_dir, doc)
-        with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_slots"):
+        with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_years"):
+            schedule.calendars()
+
+
+class TestAYearOfItsOwnSupplies:
+    """post-build-review #478 and #489 F2 (Keith, 2026-11-21): the threshold is
+    a number of YEARS of the dataset's OWN supplies - 4 slots for a quarterly
+    dataset, 1 for an annual, 2 for one owed twice a year - still counted in
+    slots (REQ-PIPE-053 criterion 1). An annual dataset on a calendar authored
+    a year ahead always has one slot or none, so a fixed count of the
+    calendar's slots warned about it every day."""
+
+    AS_OF = date(2026, 11, 21)
+
+    def test_each_dataset_owes_its_own_years_worth(self, monkeypatch):
+        monkeypatch.undo()  # the real asset, Cancer Notifications included
+        assert runway.dataset_threshold("cancer-notifications") == 1
+        assert runway.dataset_threshold("cp-case-workers") == 2
+        assert runway.dataset_threshold("cp-clients") == 4
+
+    def test_an_annual_dataset_with_one_slot_left_is_not_what_warns(self, monkeypatch):
+        monkeypatch.undo()
+        r = runway.calendar_runway("quarterly", self.AS_OF)
+        assert r.driving_dataset != "cancer-notifications", r
+
+    def test_an_annual_dataset_with_no_slot_left_still_warns(self, monkeypatch):
+        """Past its last owed round it has none of a year's one, so it is low."""
+        monkeypatch.undo()
+        r = runway.calendar_runway("quarterly", date(2027, 8, 2))
+        lows = {d: n for d, n in r.per_dataset}
+        assert lows["cancer-notifications"] == 0
+        assert r.is_low
+
+    def test_more_years_scale_every_threshold(self, tmp_path, monkeypatch):
+        import shutil
+
+        monkeypatch.undo()
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
+        doc = agreement_split.merged_view(contract_dir)
+        next(c for c in doc["calendars"] if c["name"] == "quarterly")["runway_warning_years"] = 2
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
+        assert runway.dataset_threshold("cancer-notifications") == 2
+        assert runway.dataset_threshold("cp-clients") == 8
+
+    def test_the_old_slot_count_is_refused_by_name(self, tmp_path, monkeypatch):
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(asset_folders.real_folder(), contract_dir)
+        doc = agreement_split.merged_view(contract_dir)
+        cal = next(c for c in doc["calendars"] if c["name"] == "quarterly")
+        cal.pop("runway_warning_years", None)
+        cal["runway_warning_slots"] = 4
+        agreement_split.repoint(monkeypatch, contract_dir, doc)
+        with pytest.raises(schedule.ScheduleConfigError, match="runway_warning_years"):
             schedule.calendars()
 
 

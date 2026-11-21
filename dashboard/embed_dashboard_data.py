@@ -607,7 +607,7 @@ def embed() -> None:
                         # The asset's configuration folder, for every other
                         # file the page names (critic finding 7, the split).
                         "configDir": _assets.config_dir(),
-                        "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
+                        "defaultYears": runway.DEFAULT_WARNING_YEARS,
                         "calendars": []}
     for cal in schedule.calendars():
         if cal.current.is_cadence_rule:
@@ -651,10 +651,13 @@ def embed() -> None:
                               "lastPeriod": owed[-1].name if owed else None,
                               "lastDate": owed[-1].date.isoformat() if owed else None,
                               "endsOn": ends.isoformat() if ends else None,
-                              "offGaps": gaps})
+                              "offGaps": gaps,
+                              # ITS OWN YEAR'S WORTH (REQ-PIPE-053, amended
+                              # 2026-11-21): the slots left below which it is low.
+                              "threshold": runway.dataset_threshold(entry.dataset_id)})
         schedule_runway["calendars"].append({
             "name": cal.name,
-            "threshold": cal.runway_warning_slots or runway.DEFAULT_WARNING_SLOTS,
+            "years": cal.runway_warning_years or runway.DEFAULT_WARNING_YEARS,
             "lastPeriod": periods[-1].name if periods else None,
             "lastDate": periods[-1].date.isoformat() if periods else None,
             "datasets": datasets,

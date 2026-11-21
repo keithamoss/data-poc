@@ -4132,27 +4132,30 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
     const counted = (cal.datasets||[]).filter(ds=> !inGap(ds, true));
     const owing = counted.filter(ds=> !turningOff(ds));
     const drivers = owing.length ? owing : counted;
-    const fewest = drivers.length
-      ? Math.min(...drivers.map(ds=> (ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length))
-      : null;
-    if(fewest!==null && fewest < cal.threshold){
-      // WHOSE NUMBER IS IT. `fewest` is a minimum across datasets, so a
-      // message naming only the calendar pairs it with the CALENDAR's
-      // last period - a number and a date belonging to different
-      // objects, which nobody can reconcile against the config. Same
-      // correction the CLI's own warning needed
-      // (post-build-review #22 and #2).
-      const driver = drivers
-        .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length}))
-        .filter(x=> x.remaining === fewest)
-        .sort((a,b)=> String(a.ds.id).localeCompare(String(b.ds.id)))[0];
+    // EACH DATASET AGAINST ITS OWN YEAR'S WORTH (REQ-PIPE-053, amended by
+    // Keith 2026-11-21): 4 slots for a quarterly dataset, 1 for an annual.
+    // A build from before the amendment carries only the calendar's number.
+    const ownThreshold = ds=> (ds.threshold != null ? ds.threshold : cal.threshold);
+    // WHOSE NUMBER IS IT. The driver is the dataset furthest below its own
+    // threshold, so a message naming only the calendar would pair its count
+    // with the CALENDAR's last period - a number and a date belonging to
+    // different objects, which nobody can reconcile against the config.
+    // Same correction the CLI's own warning needed (post-build-review #22
+    // and #2). Ties: the fewest left, then the id - as runway.py orders it.
+    const driver = drivers
+      .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length,
+                 threshold: ownThreshold(ds)}))
+      .sort((a,b)=> (a.remaining - a.threshold) - (b.remaining - b.threshold)
+        || a.remaining - b.remaining || String(a.ds.id).localeCompare(String(b.ds.id)))[0];
+    const fewest = driver ? driver.remaining : null;
+    if(driver && driver.remaining < driver.threshold){
       // TURNING OFF FOR GOOD, AND AUTHORED (REQ-DASH-180 criterion 17 as
       // amended by Keith, 2026-10-15): the warning stays, but says no more
       // dates are needed for it. Its effective_to, else null.
       const forGood = driver && turningOff(driver.ds);
       out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
                      lastDate:cal.lastDate, datasetCount:(cal.datasets||[]).length,
-                     threshold:cal.threshold,
+                     threshold:driver.threshold,
                      drivingTurnsOffAfter: forGood ? forGood.effectiveTo : null,
                      drivingDataset: driver ? driver.ds.id : null,
                      drivingLastPeriod: driver ? (driver.ds.lastPeriod || cal.lastPeriod) : null,

@@ -25,6 +25,13 @@ whole point of the unit rather than a detail. Three months of runway on
 a quarterly calendar is ONE slot, which is already too late to act on.
 Months mislead precisely where the cost is highest.
 
+THE THRESHOLD IS A YEAR OF EACH DATASET'S OWN SUPPLIES (Keith,
+2026-11-21, post-build-review #478 and #489 F2): `runway_warning_years`
+years of the slots that dataset owes - 4 for a quarterly dataset, 2 for
+one owed twice a year, 1 for an annual one. A fixed count of the
+calendar's slots warned about an annual dataset every day, because on a
+calendar authored a year ahead it never has more than one slot left.
+
 RUNWAY IS A PROPERTY OF THE CALENDAR, not of the dataset. Thirty
 datasets on one authored calendar run out on the same day, so thirty
 warnings would be one fact repeated thirty times - which is exactly
@@ -46,25 +53,26 @@ from datetime import date
 from asset_model import hierarchy, schedule
 from asset_model import assets as _assets
 
-# How few future slots left before we say so. A year of quarterly
-# supplies, which is the smallest window in which "ask the agency for
-# next year's dates" is a calm request rather than an emergency.
+# How many years of each dataset's own supplies left before we say so -
+# the smallest window in which "ask the agency for next year's dates" is
+# a calm request rather than an emergency.
 #
-# A calendar may override it. There is no per-DATASET override on
-# purpose: the thing running out is the calendar's date list, and
-# thirty datasets disagreeing about when to mention it would be thirty
-# opinions about one fact.
-DEFAULT_WARNING_SLOTS = 4
+# A calendar may override it. There is no per-DATASET setting on purpose:
+# each dataset's threshold follows from how often it is owed, so thirty
+# datasets never need thirty settings.
+DEFAULT_WARNING_YEARS = 1
 
 
 @dataclass(frozen=True)
 class CalendarRunway:
     """How much life one calendar has left, as at a date.
 
-    `remaining` is the FEWEST future slots any dataset on this calendar
-    has, not the calendar's own period count - a dataset taking two
-    months of four runs out twice as fast, and it is the first one to
-    run out that decides when this is worth saying.
+    `remaining` and `threshold` are the DRIVING dataset's: the one
+    furthest below its own year's worth of slots (the fewest left, for
+    datasets owed alike), not the calendar's own period count - a dataset
+    taking two months of four runs out twice as fast, and it is the first
+    one to run short that decides when this is worth saying. `per_dataset`
+    is every counted dataset's (id, slots left).
     """
 
     calendar_name: str
@@ -81,6 +89,7 @@ class CalendarRunway:
     driving_dataset: str | None = None
     driving_last_period: str | None = None
     driving_last_date: date | None = None
+    per_dataset: tuple[tuple[str, int], ...] = ()
 
     @property
     def is_low(self) -> bool:
@@ -118,8 +127,30 @@ def _calendar_name(dataset_id: str) -> str | None:
         return None
 
 
-def _threshold(calendar: schedule.Calendar) -> int:
-    return getattr(calendar, "runway_warning_slots", None) or DEFAULT_WARNING_SLOTS
+def _years(calendar: schedule.Calendar) -> int:
+    return getattr(calendar, "runway_warning_years", None) or DEFAULT_WARNING_YEARS
+
+
+def slots_a_year(dataset_id: str) -> int:
+    """How many slots this dataset owes in a year: those it owes in the
+    twelve months ending at its OWN last owed period, at least one. Its own
+    last rather than the calendar's, so a dataset turning off for good keeps
+    the rate it was owed at - its line still says no more dates are needed
+    (REQ-DASH-180 criterion 17) - rather than reading as owed less."""
+    from datetime import timedelta
+
+    owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
+    if not owed:
+        return 1
+    since = owed[-1].date - timedelta(days=365)
+    return max(1, len([p for p in owed if p.date > since]))
+
+
+def dataset_threshold(dataset_id: str) -> int:
+    """The slots left below which this dataset is low: its calendar's
+    `runway_warning_years` of its own supplies (REQ-PIPE-053, amended
+    2026-11-21)."""
+    return _years(schedule.calendar_for_dataset(dataset_id)) * slots_a_year(dataset_id)
 
 
 def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
@@ -162,10 +193,13 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
     counted = len(per_dataset) + len(turning_off)
     per_dataset = per_dataset or turning_off
 
-    # min() on the count alone, with the dataset id as a tie-break, so
-    # the same configuration always names the same dataset rather than
-    # whichever one the hierarchy happened to list first.
-    driver = min(per_dataset, key=lambda x: (x[0], x[1])) if per_dataset else None
+    # THE ONE FURTHEST BELOW ITS OWN YEAR'S WORTH drives (Keith,
+    # 2026-11-21): slots left less its own threshold, then the count, then
+    # the dataset id as a tie-break, so the same configuration always names
+    # the same dataset rather than whichever one the hierarchy listed first.
+    thresholds = {e[1]: dataset_threshold(e[1]) for e in per_dataset}
+    driver = (min(per_dataset, key=lambda x: (x[0] - thresholds[x[1]], x[0], x[1]))
+              if per_dataset else None)
     driving_last = driver[2] if driver else None
 
     return CalendarRunway(
@@ -174,12 +208,13 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
         last_period=periods[-1].name if periods else None,
         last_date=periods[-1].date if periods else None,
         dataset_count=counted,
-        threshold=_threshold(calendar),
+        threshold=thresholds[driver[1]] if driver else _years(calendar),
         driving_dataset=driver[1] if driver else None,
         driving_last_period=driving_last.name if driving_last else None,
         # THE ROUND ITS LAST SLOT IS DUE ON (critic finding 9), never the
         # period's own date, which at files_go_to_period N is N rounds later.
         driving_last_date=(driving_last.round_date or driving_last.date) if driving_last else None,
+        per_dataset=tuple((e[1], e[0]) for e in per_dataset),
     )
 
 
