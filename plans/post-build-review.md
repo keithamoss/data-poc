@@ -17350,6 +17350,14 @@ twice. It deliberately did not re-find the `TypeError`.
        that this is not a problem with the supplier's data; (M3/M4) count what
        the dataset owes in its own unit ("9 Mondays with no supply"); (M6) the
        tries note's signed summary to name how the last try ended, one number
-       and one date per try inside - exact amended wording of REQ-DASH-414's
-       summary to go to Keith before building.
+       and one date per try inside. WORDING APPROVED by Keith 2026-11-21 for
+       REQ-DASH-414 c1: name each failed try before the success, oldest
+       first - two tries unchanged ('Checked on the second try - the first
+       timed out after 45m'); three: 'Checked on the third try - the first
+       timed out after 45m, the second crashed after 3s'; four or more:
+       'Checked on the fifth try - 4 tries before it failed, the longest
+       timed out after 45m'. And c2: each line drops its 'Try <n>:' prefix
+       (the list numbers it) and gives the date once where a try began and
+       ended on the same day ('began 1 May 2025, 9:09am, ended 9:54am - timed
+       out after 45m'). To apply to requirements.yaml with the fixes.
      - Nits as listed in the report; built with the fixes above.
