@@ -214,7 +214,7 @@ describe("the period composition before and after a slot is due (UX critic M4, M
     w.eval("CURRENT_IN_PLACE_ON = '2026-01-25'");
     const row = w.compositionRow(r, "2026-Q2", "2026-01-25");
     expect(row.kind).toBe("open");
-    const cells = w.compositionCells({ id: "a" }, { id: "c" }, row);
+    const cells = w.compositionCells({ id: "a" }, { id: "c" }, row).join("");
     expect(cells).toContain("Open for files");
     expect(cells).toContain(w.fmtInstant(Q2.due));
     expect(cells).not.toContain("Not supplied");
@@ -226,7 +226,7 @@ describe("the period composition before and after a slot is due (UX critic M4, M
   it("says 'Not owed yet' once, never 'Not owed — Not owed yet'", () => {
     const { w } = load();
     const cells = w.compositionCells({ id: "a" }, { id: "c" },
-      { kind: "notowed", word: "Not owed yet", label: "Not owed yet — owes from 2026-Q1, first due x" });
+      { kind: "notowed", word: "Not owed yet", label: "Not owed yet — owes from 2026-Q1, first due x" }).join("");
     expect(cells).toContain("<b>Not owed yet</b>");
     expect(cells).not.toContain("Not owed — Not owed yet");
     expect(cells).toContain("owes from 2026-Q1");

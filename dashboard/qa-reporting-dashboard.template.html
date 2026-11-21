@@ -603,12 +603,29 @@ a.snapshots-btn{text-decoration:none; color:inherit; display:inline-flex; align-
 .collection-title{display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
 .collection-title h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
 .dataset-table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); overflow:hidden;}
+/* TABLE HEADERS AT --ink-muted (Keith, 2026-11-21, post-build-review #490
+   visual #9): 11px headers at --ink-faint measured 2.81:1, under WCAG AA's
+   4.5:1. This reverses #49's choice for table headers only. */
 .dataset-table th{
-  text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint);
+  text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-muted);
   font-weight:700; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--surface-alt);
 }
 .dataset-table td{padding:12px 14px; border-bottom:1px solid var(--line); font-size:13.5px; vertical-align:middle;}
 .dataset-table tr:last-child td{border-bottom:none;}
+/* THE COMPOSITION TABLE AS CARDS ON A PHONE (Keith, 2026-11-21, post-build-
+   review #490 visual #3): about three phone-widths wide as a table, so each
+   row stacks as label: value pairs, its empty cells left out. */
+@media (max-width:640px){
+  .composition-table thead{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);}
+  .composition-table, .composition-table tbody, .composition-table tr, .composition-table td{display:block; width:auto;}
+  .composition-table tr{border-bottom:1px solid var(--line); padding:8px 0;}
+  .composition-table tr:last-child{border-bottom:none;}
+  .composition-table td{border-bottom:none; padding:3px 14px;}
+  .composition-table td[data-empty]{display:none;}
+  .composition-table td::before{content:attr(data-label); display:block; font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--ink-muted); font-weight:700;}
+  .composition-table caption{display:block; padding:0 14px 6px !important;}
+}
 .dataset-table tbody tr{cursor:pointer;}
 .dataset-table tbody tr:hover{background:var(--surface-alt);}
 /* ROWS THAT GO NOWHERE LOOK LIKE IT (#121 D4): a pointer and a hover fill on
@@ -1111,7 +1128,7 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="in-place-on-btn" type="button">📅 <span id="in-place-on-btn-word">In the warehouse on</span>: <span id="in-place-on-btn-label">…</span></button>
       <!-- THE PERIOD CONTROL (REQ-DASH-355 criterion 1): beside the date
            control, and like it a filter over the whole page. -->
-      <button class="snapshots-btn" id="period-btn" type="button" aria-haspopup="dialog">🗂 <span id="period-btn-label">Period: all current</span></button>
+      <button class="snapshots-btn" id="period-btn" type="button" aria-haspopup="dialog">🗓 <span id="period-btn-label">Period: all current</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
@@ -10612,8 +10629,8 @@ function compositionCells(ag, col, row){
       : COMPOSITION_WORD[row.kind];
     const lead = `${word} — `;
     if(label.startsWith(lead)) label = label.slice(lead.length);
-    return `<td><b>${word}</b> <span style="color:var(--ink-muted);">— ${escHtml(label)}</span></td>
-      <td></td><td></td><td></td><td></td><td></td><td></td>`;
+    return [`<b>${word}</b> <span style="color:var(--ink-muted);">— ${escHtml(label)}</span>`,
+            "", "", "", "", "", ""];
   }
   const e = row.entry;
   const from = row.from ? ` from ${periodLinkHtml(ag.id, col.id, row.from, escHtml(fmtPeriodName(row.from) || fmtPeriodOrDay(row.from)))}` : "";
@@ -10625,14 +10642,22 @@ function compositionCells(ag, col, row){
     : row.ack.given ? `Acknowledged by ${escHtml(row.ack.actor || "")}, ${fmtInstant(row.ack.at)}`
     : "Not acknowledged";
   const why = row.owedLabel ? `<div style="color:var(--ink-muted); font-size:12px;" data-owed-nothing-sub>${escHtml(row.owedLabel)}</div>` : "";
-  return `<td><b>${COMPOSITION_WORD[row.kind]}</b>${from}${why}</td>
-      <td>${row.receivedAt ? fmtInstant(row.receivedAt) : ""}</td>
-      <td>${fmtInstant(e.at)}</td>
-      <td>${who}</td>
-      <td>${escHtml(e.reason || "")}</td>
-      <td>${row.promotedOn ? pill(row.promotedOn, "sm") : ""}</td>
-      <td>${ack}</td>`;
+  // NOT SAID TWICE (post-build-review #490, the visual critic): a period it
+  // owes nothing in is inherited with the pipeline's own reason, which names
+  // the calendar file by its repository path - the line above already says
+  // why in the page's words, so the Reason cell is left empty for it.
+  return [`<b>${COMPOSITION_WORD[row.kind]}</b>${from}${why}`,
+          row.receivedAt ? fmtInstant(row.receivedAt) : "",
+          fmtInstant(e.at),
+          who,
+          row.owedLabel ? "" : escHtml(e.reason || ""),
+          row.promotedOn ? pill(row.promotedOn, "sm") : "",
+          ack];
 }
+// THE COMPOSITION TABLE'S COLUMNS, after Dataset - one heading per cell
+// compositionCells returns, in its order.
+const COMPOSITION_COLUMNS = ["Holds", "Received", "Decided", "Who decided", "Reason",
+                             "Status when promoted", "Acknowledgement"];
 // HAS A PERIOD OPENED BY THE DATE (REQ-DASH-326 criterion 8): once any of the
 // collection's slots for it has opened its claim window - at
 // files_go_to_period 1 a quarter before the period's own date - or, where no
@@ -10668,18 +10693,24 @@ function compositionPanelHtml(ag, col, period, dateStr){
   const count = `${rows.length} ${pluralize(rows.length, "dataset")}: `
     + counts.map(([k, n])=> `${n} ${COMPOSITION_WORD[k].toLowerCase()}`).join(", ");
   const nothing = !rows.some(r=> HELD_KINDS.has(r.row.kind))
-    ? `<p data-nothing-held>No dataset of ${escHtml(col.name)} held anything in ${escHtml(name)} at the end of ${fmtDay(dateStr)}.</p>` : "";
+    ? `<p data-nothing-held>No dataset of ${escHtml(col.name)} held anything ${/^\d{4}-\d{2}-\d{2}$/.test(String(period)) ? "on" : "in"} ${escHtml(name)} at the end of ${fmtDay(dateStr)}.</p>` : "";
   const caption = `${col.name} · ${name} — what each dataset held at the end of ${fmtDay(dateStr)}`;
+  // A COLUMN EMPTY ON EVERY ROW IS LEFT OUT (Keith, 2026-11-21, post-build-
+  // review #490 visual #3) - Acknowledgement, on every quarterly row today.
+  // Holds always stays: every row has one.
+  const cells = rows.map(r=> ({...r, out: compositionCells(ag, col, r.row)}));
+  const shown = COMPOSITION_COLUMNS.map((_, i)=> i)
+    .filter(i=> i === 0 || cells.some(c=> c.out[i] !== ""));
   return `<p data-composition-count>${escHtml(count)}</p>${nothing}
     <div class="overflow-x" data-testid="period-composition">
-    <table class="dataset-table static-rows">
+    <table class="dataset-table static-rows composition-table">
       <caption id="composition-caption-${escAttr(col.id)}" tabindex="-1" style="text-align:left; font-size:12.5px; color:var(--ink-muted); padding:0 0 6px;">${escHtml(caption)}</caption>
-      <thead><tr><th>Dataset</th><th>Holds</th><th>Received</th><th>Decided</th><th>Who decided</th><th>Reason</th><th>Status when promoted</th><th>Acknowledgement</th></tr></thead>
-      <tbody>${rows.map(({ds, row})=>{
+      <thead><tr><th>Dataset</th>${shown.map(i=> `<th>${COMPOSITION_COLUMNS[i]}</th>`).join("")}</tr></thead>
+      <tbody>${cells.map(({ds, row, out})=>{
         const nav = {tier:"dataset", agencyId: ag.id, collectionId: col.id, datasetId: ds.id};
         return `<tr data-kind="${row.kind}" data-dataset="${escAttr(ds.id)}">
-          <td><a class="dataset-name dataset-link" href="${escAttr(navHref(nav))}" data-nav='${escAttr(JSON.stringify(nav))}'>${escHtml(ds.name)}</a></td>
-          ${compositionCells(ag, col, row)}</tr>`;
+          <td data-label="Dataset"><a class="dataset-name dataset-link" href="${escAttr(navHref(nav))}" data-nav='${escAttr(JSON.stringify(nav))}'>${escHtml(ds.name)}</a></td>
+          ${shown.map(i=> `<td data-label="${escAttr(COMPOSITION_COLUMNS[i])}"${out[i] ? "" : " data-empty"}>${out[i]}</td>`).join("")}</tr>`;
       }).join("")}</tbody>
     </table></div>`;
 }

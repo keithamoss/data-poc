@@ -167,6 +167,55 @@ describe("the view (criteria 3, 4, 8, 12 and 14)", () => {
   });
 });
 
+describe("post-build-review #490 (Keith, 2026-11-21)", () => {
+  const view = (w, date = "2026-03-01", period = "2026-Q1")=>{
+    const div = w.document.createElement("div");
+    div.innerHTML = w.compositionPanelHtml(w.eval("DATA.agencies[0]"), COL, period, date);
+    return div;
+  };
+  const heads = div => [...div.querySelectorAll("thead th")].map(th => th.textContent.trim());
+
+  it("leaves out a column empty on every row (visual #3)", () => {
+    const w = load();
+    expect(heads(view(w))).toContain("Acknowledgement");
+    const noAck = RAW.substituted.acknowledgements;
+    delete RAW.substituted.acknowledgements;
+    try {
+      const div = view(w);
+      expect(heads(div)).not.toContain("Acknowledgement");
+      expect(heads(div)).toContain("Holds");
+      // Every row has the same cells as the heading row.
+      for(const tr of div.querySelectorAll("tbody tr")) expect(tr.children.length).toBe(heads(div).length);
+    } finally { RAW.substituted.acknowledgements = noAck; }
+  });
+
+  it("labels every cell for the phone's stacked cards, and marks the empty ones (visual #3)", () => {
+    const w = load();
+    const row = view(w).querySelector('tr[data-kind="notsupplied"]');
+    const labels = [...row.querySelectorAll("td")].map(td => td.dataset.label);
+    expect(labels[0]).toBe("Dataset");
+    expect(labels).toContain("Holds");
+    expect(row.querySelectorAll("td[data-empty]").length).toBeGreaterThan(0);
+  });
+
+  it("leaves an owed-nothing row's Reason empty, since the line beneath says why", () => {
+    const w = load();
+    const div = view(w);
+    const i = heads(div).indexOf("Reason");
+    const cell = div.querySelector('tr[data-kind="inherited"]').children[i];
+    expect(cell.textContent).toBe("");
+  });
+
+  it("says 'on' a day and 'in' a quarter where nothing is held", () => {
+    const w = load();
+    w.rawRealDatasetById = id => ({id, slotTimeline: []});
+    expect(view(w).querySelector("[data-nothing-held]").textContent).toContain("held anything in 2026-Q1");
+    w.periodWords = () => "Tuesday, 17 November";
+    expect(view(w, "2026-11-18", "2026-11-17").querySelector("[data-nothing-held]").textContent)
+      .toContain("held anything on Tuesday, 17 November");
+  });
+});
+
 describe("its address (criteria 6 and 13)", () => {
   it("round-trips through the route", () => {
     const w = load();
