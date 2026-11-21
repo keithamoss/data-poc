@@ -1,0 +1,190 @@
+# v6 (2026-11-21): v5 as signed by Keith that day, plus the three post-sign-off
+# reviews (docs/drafts/deferred-rescope-reviews-v5.md) and Keith's answers to
+# them. Every requirement here is a PROPOSAL until Keith re-signs it. Every
+# change from v5 carries a "v6:" decision naming the finding or answer behind it;
+# docs/drafts/deferred-rescope-v6-changes.md lists them in plain English.
+- id: REQ-GHUB-433
+  title: "The processing pass reads new slot-ticket comments from GitHub and hands each to the GitHub filing route once, so a comment reaches the decision log without GitHub Actions reaching the database"
+  date_written: "2026-11-21"
+  story: "As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database."
+  moscow: should
+  status: not_started
+  source: "Keith, delivery-architect triage of REQ-GHUB-082 criterion 1, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H's drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21; SETTLED as polling by Keith the same day (Q2.1 (a)); v5 signed by Keith 2026-11-21; v6 folds in the post-sign-off reviews (architect C, dashboard UX 433 c12, CLI UX C6) and Keith's answers. v6, PROPOSAL until re-signed."
+  acceptance_criteria:
+    - "WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL, as a stage before ticket reconciliation, read the comments on the asset's ticket repository that it has not yet handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by its creation time."
+    - "THE SYSTEM SHALL read them with two repository-level paged listings per pass - the repository's issue comments updated since the creation instant of the newest comment it has already handled (all of them, on a pass with none handled), and the slot tickets with their labels, which say each ticket's slot - and SHALL NOT make a request per ticket."
+    - "THE SYSTEM SHALL read those comments by an outbound request from inside the environment that holds the asset's database, and SHALL NOT require any inbound connection to that environment."
+    - "THE SYSTEM SHALL record the id of every comment it has handled in the asset's own database, and SHALL NOT keep that record in the repository or on local disk."
+    - "THE SYSTEM SHALL hand any one comment id to the handler at most once, whatever GitHub's listing returns again, so that a pass re-run after a failure, or a comment edited later, does not raise a decision twice."
+    - "THE SYSTEM SHALL leave out every comment authored by the identity the service itself posts as, so that its own replies and reconciliations are never read as commands."
+    - "THE SYSTEM SHALL give each decision raised the comment's GitHub creation instant as its effective_at."
+    - "IF reading or handling comments fails partway through a pass, THEN THE SYSTEM SHALL keep every id handled so far, SHALL report the stage as failed in the pass's exit status naming the cause (the GitHub call that failed, or the comment whose handling failed), and SHALL read the rest on the next pass."
+    - "THE SYSTEM SHALL take each comment's author from GitHub's own record of who posted it, and SHALL NOT read an author from the comment's body (REQ-GHUB-082 criterion 4)."
+    - "WHERE a comment is on a ticket whose slot is not a dataset of the selected asset, THE SYSTEM SHALL neither handle it nor reply to it."
+    - "WHERE the environment's ticketing is off, THE SYSTEM SHALL read no comments and SHALL say so in one line of the pass's report."
+    - "THE SYSTEM SHALL say, in every slot ticket's reconciled body, that commands posted on it are acted on at the next processing pass, and how often passes run as the environment's own configuration declares it, never a figure written into code, so that nobody re-posts a command that has not yet been read. SETTLED by Keith 2026-11-21 (round 6 Q1 (a))."
+    - "THE SYSTEM SHALL delete the disabled .github/workflows/ticket-sync.yml in the same change, and SHALL close REQ-GHUB-082 criterion 1's unmet entry citing this requirement."
+    - "WHEN the stage finishes, THE SYSTEM SHALL report in the pass's report how many comments it read, how many decisions it raised and how many it refused, and SHALL NOT report the stage as 'nothing to process' when it read comments that raised nothing."
+  non_functional_requirements:
+    - "COMPATIBILITY: the environment already calls GitHub outbound for ticket reconciliation (ticket_reconciler.service_from_env), so this adds reads over the same route and the same credential; no new network path is opened."
+    - "SECURITY: the credential is read-and-write on one repository's issues only, never contents; a comment's authority still comes from its GitHub author being in people.yaml, never from the poller."
+    - "SECURITY: when the repository goes private (REQ-DOCS-259), commenting already needs repository access; the people.yaml allowlist stays the gate either way."
+    - "SCALABILITY: two paged listings per pass, independent of the number of tickets, well inside GitHub's per-token rate limit at about 30 collections an asset."
+    - "RELIABILITY: a GitHub outage delays decisions until the next pass and never loses one; handled ids only grow over comments actually handled."
+    - "LATENCY: a comment is acted on at the next processing pass, so the scheduler's interval is the response time, and criterion 12 tells the person so."
+    - "STATE: the handled-comment ids are state, so they live in the database."
+    - "ROLLOUT COST: criterion 12 changes every slot ticket's body, so the first reconciliation after it lands rewrites every open ticket once - one GitHub write and one notification per open ticket, once - and never again unless the declared interval changes."
+  dependencies:
+    - REQ-GHUB-082
+    - REQ-PIPE-151
+    - REQ-PIPE-083
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q2.1 (a)): POLLED BY THE PROCESSING PASS. The environment already calls GitHub outbound to reconcile tickets, so polling adds no new path or credential. A scheduled Lambda is the scheduler that already calls `mothman pipeline process` (REQ-PIPE-151), so it is not a separate option."
+    - "REJECTED a webhook into the environment: an inbound endpoint, a public address and secret verification for each of two separated environments, to save at most one scheduler interval on a decision that is not urgent."
+    - "REJECTED reviving ticket-sync.yml with database access: a runner with a route to the database breaks REQ-PIPE-089/092's line."
+    - "REJECTED retiring the GitHub route and keeping the terminal one: it reverses Keith's 2026-09-22 'not PoC-only' and 2026-09-26 'both routes first-class' decisions."
+    - "HANDLED IDS, NOT A TIME MARKER (delivery-architect, v4 review): GitHub's `since` filters on UPDATED time, so an edited old comment returns in a later listing; a time high-water mark would either re-raise it or skip a comment created earlier but listed later. Recording ids is the only exactly-once."
+    - "TWO LISTINGS (delivery-architect): ticket_github.comments() reads one ticket and returns bodies only, and a comment says nothing about its slot; the slot is the ticket's label, so the issue listing is the second read."
+    - "DRAIN THE BACKLOG, carried from Thread H (2026-09-22): each pass reads everything unhandled rather than reacting to one event; applied serially, oldest first, last wins."
+    - "ONE ASSET PER ENVIRONMENT READS ONLY ITS OWN SLOTS: both assets name the same ticket_repository today, so each ignores the other's tickets in silence."
+    - "CRITERION 12 IS THE UX REVIEW'S (delivery-dashboard-ux, 2026-11-21): a command that is not acted on at once reads as ignored and gets posted again."
+    - "SETTLED by Keith 2026-11-21 (round 6 Q1 (a)): the ticket says commands are acted on at the next pass and how often passes run, with no last-pass time. REJECTED showing when a pass last ran: that time changes every pass, so REQ-PIPE-083's reconciler - which writes a ticket only when its state changes - would rewrite every open ticket on every pass. What says a command WAS read is already there: a decision taken shows in the reconciled ticket (REQ-GHUB-082 criterion 8) and a refusal is replied to directly (criterion 23)."
+    - "v6, THE LISTING ANCHOR (delivery-architect post-sign-off finding C): v5's 'updated since the oldest unhandled comment' named an instant the pass cannot know before it has listed. The anchor is the creation instant of the newest comment already handled: every comment not yet handled was created after it or edited since, and either way has been updated since it, so the listing is a superset and the handled ids make it exactly-once."
+    - "v6, NO CUT-OVER CRITERION (Keith 2026-11-21, architect Q-A1: 'No one has used GitHub, this is still a local poc.'): the first pass, with nothing handled, reads every comment on the repository, and there is no comment history to replay. REJECTED (a) marking every comment before the deploy handled without acting, and (b) acting only on comments since ticket-sync was disabled - both answer a history that does not exist."
+    - "v6, THE ROLLOUT NFR (delivery-architect finding C): stated so the one-time rewrite of every open ticket is expected rather than read as a fault."
+    - "v6, HOW OFTEN COMES FROM CONFIGURATION (delivery-dashboard-ux post-sign-off, 433 c12): an interval written into the ticket code would go false the day a deployment's scheduler changes."
+    - "v6, CRITERION 14 AND THE NAMED CAUSE IN CRITERION 8 (delivery-cli-ux C6): a pass that read three comments and raised nothing must not read as idle, and a failed stage must say what failed."
+    - "v6, ONE-OFFS NEVER USE GITHUB (Keith 2026-11-21): that rule is REQ-PIPE-446's; this stage cannot reach a one-off, because `mothman pipeline process` is refused while a one-off is selected (REQ-PIPE-446 criterion 9)."
+  open_questions:
+    - "Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. A deployment decision; it does not change what is built."
+    - "Where the environment declares its processing interval for criterion 12 (assets/environments.yaml is the likely home), and what the ticket says where an environment declares none. A build decision; it does not change the settled wording."
+
+- id: REQ-PIPE-434
+  title: "A supply for a dataset with no calendar is filed to no period, never held for placing, and checked when it arrives"
+  date_written: "2026-11-21"
+  story: "As whoever runs QA on a one-off, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately); plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; unchanged in v6. Buildable at once (Keith, round 5, architect Q1). v6, PROPOSAL until re-signed."
+  acceptance_criteria:
+    - "WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing."
+    - "THE SYSTEM SHALL NOT hold such a supply for a person to place (REQ-PIPE-064), because no period exists to place it in."
+    - "WHEN such a supply is staged, THE SYSTEM SHALL run its dataset's active checks over it in the same pass as any other arrival, against a run view of the newest version of each no-calendar table (REQ-PIPE-106)."
+    - "THE SYSTEM SHALL NOT compute a claim window, lateness, runway, a missing slot or a schedule-ended hold for such a dataset, and SHALL NOT report any of them as failing for want of a calendar."
+  non_functional_requirements:
+    - "SCALABILITY: no work per period, so the cost is per arrival only."
+    - "RELIABILITY: a supply that cannot be loaded or checked reads could-not-load or could-not-check as for any arrival, and is never silently skipped."
+    - "MAINTAINABILITY: one rule at the filing boundary, asked of the declaration (sample_data.is_sample, which stays the ROUTING question for both no_calendar values - REQ-PIPE-438), not a branch per caller."
+  dependencies:
+    - REQ-PIPE-106
+  decisions:
+    - "BOTH no_calendar VALUES ARE FILED THE SAME WAY (delivery-scoper): neither has a period, so filing, holding and lateness cannot differ; what the record COUNTS for differs, and that is REQ-PIPE-438's."
+    - "THE DEFECT, from #141 (2026-11-18), confirmed by the delivery-architect at filing.py:446-469: NoCalendarAgreed is not a ValueError, so file_arrivals' handlers missed it; past that the supply was held as waiting for a person to place it, so no tool checked it."
+    - "REJECTED holding a no-period supply for a person: there is nothing a person could choose."
+    - "REJECTED inventing a pseudo-period (the receipt date, or one period per one-off) so the ordinary filing path runs: it would put a period into the arithmetic REQ-PIPE-106 criterion 5 excludes by construction."
+    - "v6: no criterion changed. The MAINTAINABILITY NFR now says is_sample stays the routing question, because REQ-PIPE-438 v6 splits routing from counted state (delivery-architect finding G)."
+
+- id: REQ-PIPE-435
+  title: "A person records one release-or-withhold decision for a whole one-off, with a reason, in an append-only table the publisher can read; nothing about it is ever promoted"
+  date_written: "2026-11-21"
+  story: "As the person accountable for handing a one-off's data to a project, I want to record whether it is released or withheld, and why, so that there is a named, dated account of who let the data go - or stopped it."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.2 (b) and round 2 Q4 (a); plans/running-thoughts.md #141 (the promotion gate raises); the delivery-architect's v4 review (a new qa table, not decision_log). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-cli-ux G1, G5 and C2 and Keith's answers (copy nothing; never GitHub; --id). Shared by every one-off kind. v6, PROPOSAL until re-signed."
+  acceptance_criteria:
+    - "WHEN every dataset of a one-off has a recorded outcome for its checks - a could-not-load or could-not-check result counting as one (PROVISIONAL, question 4 of the v6 changes) - THE SYSTEM SHALL offer, in the `mothman one-off` TUI and as `mothman one-off decide --id <id>`, one decision for the whole one-off - release or withhold."
+    - "WHEN a person records that decision, THE SYSTEM SHALL append it to an append-only table of one-off decisions in the qa schema with the person as actor, the instant, the decision and their reason, and SHALL refuse it without a reason."
+    - "THE SYSTEM SHALL grant the publisher role read on that table (REQ-PIPE-092), and SHALL grant no role update or delete on it."
+    - "IF the person is not named in the people.yaml of the one-off's kind template (one-offs/<kind>/_template/people.yaml), read at the moment of deciding, or is a placeholder, THEN THE SYSTEM SHALL refuse the decision and say why."
+    - "THE SYSTEM SHALL NOT accept a decision for a single dataset of a one-off, only for the whole one-off."
+    - "WHERE more than one decision has been recorded for a one-off, THE SYSTEM SHALL treat the latest as standing, and SHALL keep and show every earlier one."
+    - "THE SYSTEM SHALL NOT put a supply for a `no_calendar` dataset to the promotion gate; IF the gate is asked about one, THEN THE SYSTEM SHALL refuse it as having no period, and SHALL NOT raise NoCalendarAgreed."
+    - "THE SYSTEM SHALL NOT open a ticket for a one-off, nor accept its decision from GitHub, by REQ-PIPE-446's rule that one-offs never use GitHub."
+    - "THE SYSTEM SHALL record the decision only, and SHALL NOT itself move, copy or send a one-off's data to anyone."
+    - "WHEN a person decides, THE SYSTEM SHALL take the steps in filing_tui.apply_decision's order - the actor from git identity, then any refusal, then the reason, then a confirmation - each with a flag form (`--decision release|withhold`, `--reason`, `--yes` for the confirmation), and SHALL show, before the confirmation, the one-off's QA summary (each dataset's QA result, with every dataset that could not be loaded or checked named) and the decision in force, or that there is none."
+    - "WHEN a decision is recorded for a one-off whose page is already published, THE SYSTEM SHALL say that the published page still shows the earlier state until the one-off is published again, and SHALL name the publish command."
+  non_functional_requirements:
+    - "OBSERVABILITY / COMPLIANCE: the database is dropped once the work is done (REQ-PIPE-442), so the latest published page is the only lasting copy of every decision; REQ-DASH-444 carries them, and criterion 11 and REQ-PIPE-443's stale-page warning are what keep a decision from being dropped unpublished without anyone being told."
+    - "SECURITY: the same identity rules as a filing decision - a named, non-placeholder person, the actor from git identity on the terminal."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.2 (b)): one release-or-withhold decision for the WHOLE one-off, with actor and reason. REJECTED (a) report only, the v1 recommendation, and (c) a decision per dataset."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q4 (a)): recorded only - the system never moves data. REJECTED (b) withholding blocking a hand-over step."
+    - "ITS OWN TABLE, NOT THE DECISION LOG (delivery-architect, v4 review): decision_log entries are keyed to a dataset's slot and carry filing semantics; a release has neither. An append-only qa table read by the publisher is what puts it on the page without the build reading anything else."
+    - "TERMINAL ONLY: GitHub tickets are per slot (REQ-PIPE-083) and a one-off has none; this is not a breach of REQ-GHUB-082's two-route parity, which governs filing decisions."
+    - "LAST WINS, ALL KEPT, carried from Thread H's rule for filing decisions: a withheld one-off can be released after discussion, and both entries stay visible."
+    - "v6, PEOPLE.YAML IS READ LIVE FROM THE KIND'S TEMPLATE (Keith 2026-11-21, answering CLI Q4: 'copy nothing'): criterion 4 named 'the one-off's people.yaml', a copy made at open, so a decider added after open failed the digest check (delivery-cli-ux G5). REJECTED the reviewer's recommendation (a), keeping a copied people.yaml outside the digest: it would still leave a stale copy per folder."
+    - "v6, NEVER GITHUB (Keith 2026-11-21: 'One offs should never use GitHub.'): criterion 8 now rests on REQ-PIPE-446's stated rule rather than on this requirement alone."
+    - "v6, CRITERION 10 IS apply_decision's FLOW (delivery-cli-ux C2): one order for every recorded decision in mothman, so a person who has filed a supply already knows this one; the QA summary is shown because the decision is about it."
+    - "PROVISIONAL, v6 (delivery-cli-ux C2 asked to say it): a could-not-load or could-not-check result counts as an outcome, so such a one-off can be decided - withholding is the expected answer, and releasing one is a person's recorded call with a reason. The alternative is a one-off that can never be decided while one table will not load. Question 4 of the v6 changes."
+    - "v6, CRITERION 11 (delivery-cli-ux G1): a decision recorded after the last publish is otherwise invisible on the page and lost at drop."
+
+- id: REQ-DASH-436
+  title: "The dashboard builds and reads correctly for no-calendar datasets, and a one-off's page drops every control and route that only means something for a schedule or a removed tool"
+  date_written: "2026-11-21"
+  story: "As a reader of a one-off's dashboard, I want each dataset's checks and supplies shown without any schedule language or controls, so that I see what was checked rather than a page that failed to build, calls everything missing or offers buttons that do nothing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 (2026-11-18); sprint 29 point 8; delivery-dashboard-ux's v4 review findings 6 and 10. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off A, C and D. Buildable at once (Keith, round 5). v6, PROPOSAL until re-signed."
+  acceptance_criteria:
+    - "WHEN the dashboard is built for an asset or one-off holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() (build_dashboard_data.py) or any other cadence read."
+    - "THE SYSTEM SHALL list such a dataset's supplies by receipt instant, and SHALL NOT show a period, a slot, a due date or lateness for it; WHERE a one-off's declared table did not arrive, THE SYSTEM SHALL show that dataset as Fail, from its failing default-layer result (REQ-QAC-441 criterion 3), and SHALL NOT show it as No data."
+    - "THE SYSTEM SHALL show such a dataset's checks with their real verdicts, on a rendered page."
+    - "WHERE a dataset of a one-off has arrived but has no recorded check outcome yet, THE SYSTEM SHALL show it as 'Not yet checked' - a dataset-level status of its own in STATUS_WORDS and status-cases.json, distinct from the check-level `notchecked` ('Not checked'), drawn in the same dashed, muted style - leave it out of the rollup with that reason, and SHALL NOT show it as No data."
+    - "WHERE the page is built for a folder under one-offs/, THE SYSTEM SHALL NOT show the in-the-warehouse date, the period control or its tier, trends, sparklines, run comparison or the supply-history list."
+    - "IF a link into a one-off's page carries an in-place-on date, a period, a `cmp=` comparison or a `?panel=` naming a removed tool, or names a removed tool's route - #/plans, #/demo, #/scenarios or #/feedback - THEN THE SYSTEM SHALL open the nearest view that exists without them, show a notice naming what this page does not have, and SHALL NOT show a blank page."
+    - "THE SYSTEM SHALL roll such datasets up as REQ-PIPE-438 decides, and SHALL NOT decide it a second time here."
+  non_functional_requirements:
+    - "COMPATIBILITY: the built page opens from file:// with no network, as every dashboard does."
+    - "PERFORMANCE: a one-off is tens of tables with one supply each; no budget beyond the existing build."
+    - "CORRECTNESS: 'Not yet checked' is a status, so it changes with every other status implementation under REQ-PIPE-438's item-74 parity NFR."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-438
+  decisions:
+    - "KEYED ON THE FOLDER ROOT, NOT ON EVERY DATASET DECLARING no_calendar (delivery-dashboard-ux): a recurring asset can hold a not-yet-agreed dataset and must keep its schedule controls; a one-off never needs them. The root is the one fact that says which."
+    - "'NOT YET CHECKED' IS ITS OWN STATE (delivery-dashboard-ux, finding 6): publishing at any time (REQ-PIPE-443) means a page can go out before QA finishes; No data says nothing arrived, which would be false."
+    - "THE ROLLUP LIVES IN ONE PLACE: REQ-PIPE-438 amends REQ-PIPE-106, and this requirement follows it."
+    - "v6, A DECLARED TABLE THAT NEVER ARRIVED IS FAIL (delivery-dashboard-ux post-sign-off A): v5's criterion 2 forbade 'anything marked missing', while REQ-QAC-441 criterion 3 makes that table a failing result; read literally the page would have shown grey No data for the one failure that matters most. REJECTED showing it as No data, which reads as nothing owed."
+    - "v6, 'NOT YET CHECKED' IS A DATASET STATUS OF ITS OWN (delivery-dashboard-ux C): v5 borrowed the `.pill.notchecked` style, whose words are the check-level 'Not checked' (REQ-DASH-299 criterion 17). REJECTED reusing `notchecked`, which would make two different facts read alike."
+    - "v6, REMOVED TOOLS' ROUTES (delivery-dashboard-ux D): REQ-DASH-444 removes the tools from the header, but #/plans, #/demo, #/scenarios, #/feedback, ?panel= and cmp= still resolve from a pasted link; criterion 6 now covers them with the same notice as a stray date."
+
+- id: REQ-PIPE-438
+  title: "A `never` dataset's results are real quality history and roll up within its one-off - except a dataset declared derived; REQ-PIPE-106's not-counted rules apply to `not-yet-agreed` only; an asset under assets/ refuses `never`"
+  date_written: "2026-11-21"
+  story: "As a reader of a one-off's dashboard, I want its tables' verdicts to count and roll up, so that the page answers whether the data is fit to release rather than reading 'Not counted' throughout."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off B and G and delivery-dashboard-ux B, C and the display-words point. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. v6, PROPOSAL until re-signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only."
+    - "THE SYSTEM SHALL record the QA results of a dataset declaring `no_calendar: never` as agreed results, unless calendar.yaml declares that dataset `derived: true` beside its `no_calendar`, whose results are recorded in development; THE SYSTEM SHALL read `derived:` from calendar.yaml only."
+    - "THE SYSTEM SHALL roll a `never` dataset's verdicts up into its collection and its one-off, as for any dataset with a calendar, and SHALL leave a derived dataset's out."
+    - "WHERE a cross-table check spans a derived dataset and a counted one, THE SYSTEM SHALL record its result as agreed, share it with every participating dataset (share_cross_table_results), count it toward each counted participant's status only, and exclude it from each derived participant's; WHERE every participant is derived, THE SYSTEM SHALL record it in development."
+    - "THE SYSTEM SHALL label a derived dataset in words as 'Derived product, not counted in the <kind>'s status', <kind> being the kind's display word (REQ-PIPE-446 criterion 2), never its folder name, and SHALL name derived products in the line that says what was not counted."
+    - "THE SYSTEM SHALL NOT label a `never` dataset row by row as a one-off; the page says that once (REQ-DASH-444)."
+    - "THE SYSTEM SHALL show the no-schedule marker and tooltip (unagreedMarker()) for a `not-yet-agreed` dataset only, SHALL show none on a `never` dataset, and SHALL remove the tooltip's wording about `never`."
+    - "IF an asset under assets/ declares a dataset `no_calendar: never` or `derived`, THEN the schedule gate of `mothman check` SHALL fail, naming the dataset; the calendar loader SHALL NOT refuse it itself."
+    - "IF a one-off declares a dataset `no_calendar: not-yet-agreed` or with a calendar, THEN the schedule gate of `mothman check` SHALL fail, naming the dataset, and so SHALL a one-off's load, which runs its kind's gates (REQ-PIPE-442 criterion 3)."
+  non_functional_requirements:
+    - "CORRECTNESS: every status implementation changes together - the template's rollup and unagreedMarker(), dataset_status.py, sample_data.state_for_participants, build_dashboard_data.share_cross_table_results, status-cases.json and REQ-DASH-436's 'Not yet checked' state - with one test driving the same inputs through each (the item-74 lesson)."
+    - "MAINTAINABILITY: sample_data is split along the line criterion 2 draws - is_sample stays the ROUTING question (no period, both no_calendar values, REQ-PIPE-434), and supply_state answers the COUNTED question (in development for `not-yet-agreed` and `derived`, agreed otherwise); no caller asks one for the other."
+    - "SCALABILITY: the refusals are per dataset, so they cost nothing extra at 30 collections."
+  dependencies:
+    - REQ-PIPE-106
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.1 (a)): a one-off's QA IS the deliverable, so its verdicts count. REJECTED (b), REQ-PIPE-106 as built, under which an all-`never` folder reads 'Not counted' at every level."
+    - "WHY 106 GOT THIS WRONG: its 'one mechanism, two exits' (2026-09-27) gave both exits the check-development semantics, and sprint 29 point 5 - only DERIVED products are excluded - implied otherwise. Nobody reconciled the two until 2026-11-21."
+    - "A `derived:` DECLARATION OF ITS OWN (delivery-architect, v4 finding 5): once `never` is counted, routing (the no-period schema) and state (in development) come apart, and `not-yet-agreed` is refused in a one-off, so a derived product needs a key that says only that."
+    - "SETTLED by Keith 2026-11-21 (round 5 architect Q3 (a)): a cross-table check over a derived and a counted table counts on the counted side and is excluded only from the derived product's - one new rule. Today state_for_participants records the whole result in development if any participant has no calendar; that rule stays for not-yet-agreed, where it protects an agreed dataset from a check under development."
+    - "SETTLED by Keith 2026-11-21 (Q4.7 (a)): `never` lives only under one-offs/; an asset under assets/ refuses it. REJECTED allowing both."
+    - "THE WORDS ARE THE UX REVIEW'S (findings 7 to 9): derived products had no words; the current tooltip would become false; a marker on 30 rows is noise."
+    - "WHAT STAYS FROM 106 for `never`: criteria 4 and 5 (the no-period schema, excluded from period arithmetic by construction) and the hierarchy criteria 11 to 15. Criterion 17's discard is superseded for a one-off by dropping it (REQ-PIPE-442)."
+    - "v6, `derived:` LIVES IN calendar.yaml ONLY (delivery-architect post-sign-off B): v5 declared it in data-asset.yaml (REQ-PIPE-440 criterion 2) and read it here as 'its configuration', so two files could disagree. It sits beside `no_calendar`, which the one calendar loader already reads. REJECTED data-asset.yaml as its home: the hierarchy says where a dataset sits, the calendar says how its supplies count."
+    - "v6, THE SCHEDULE GATE OWNS THE REFUSALS (delivery-architect B): criteria 8 and 9 said 'the system shall refuse', which a loader-level raise would satisfy and which would then break every reader of a bad folder, the dashboard build included. The gate names the dataset; the loader reads what it is given."
+    - "v6, HOW CRITERION 4 WORKS (delivery-architect G): record the result agreed, share it with every participant as share_cross_table_results already does, and count it only where the participant is counted. All participants derived means nothing counted it, so in development. This is the mechanism under Keith's round 5 answer, not a new rule."
+    - "v6, THE MARKER IS FOR NOT-YET-AGREED ONLY (delivery-dashboard-ux B): v5's criterion 6 removed the marker from `never` rows while criterion 7 rewrote its tooltip for them, leaving a tooltip with nothing to hang on. REJECTED keeping a `never` sentence in the tooltip."
+    - "v6, THE KIND'S DISPLAY WORD (delivery-dashboard-ux smaller points): '<kind>' in criterion 5 is the plug-in's display word ('extraction'), never the folder name."
+

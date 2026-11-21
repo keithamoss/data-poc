@@ -6197,3 +6197,16 @@ could never have computed it), and it belongs with batch 5's check work.
      the requirement they change (and the amending criterion retired), and
      how `decisions:` keeps the history once the cross-references go. Scope
      with Keith before starting.
+
+144. **[todo, 2026-11-21]** **[Pipeline & publishing]** **[Dashboard UI]** **Once the one-off build is done: walk Keith through a worked mock one-off, end to end, with every file it prepares.**
+     Keith, 2026-11-21: "When we're done with the one-off build work, I'd
+     like you to show me a worked-up mock example of what a one-off looks
+     like, and show me all the files and stuff that are actually prepared
+     for it." So: a synthetic recipe package (the REQ-TEST-437 fixture is
+     the natural one) taken through `mothman one-off open`, commit and push,
+     load, decide and publish; then shown to him - the generated
+     one-offs/extraction/<id>/ folder file by file (what each is, what
+     generated it, what reads it), what lives outside it (the kind's
+     template, the database, data/<id>/, reports/<id>/), and the published
+     page undecided and then decided. Probably an artifact. After the
+     build, not before - the folder's shape is still moving in v6.
