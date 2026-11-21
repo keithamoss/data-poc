@@ -17337,15 +17337,17 @@ twice. It deliberately did not re-find the `TypeError`.
        (`loadingdone`, armed even when nothing is loading yet), unless the
        reader has moved. New test holds the font files until after the jump -
        seen failing first on TS-38, TS-66, TS-87.
-     - **H1, DEFECT, to fix**: a supply-cycle row keyed on a full re-check
+     - **H1, DEFECT, FIXED** (test seen failing first): a supply-cycle row keyed on a full re-check
        (`__r1`) shows the re-check's time as the arrival's ("Checked in 8s ·
        slow" on ED Presentations' 10 Oct 2013 row; the arrival took 793ms).
-     - **M5, DEFECT, to fix**: the run-time axis labels a middle tick "under 1s".
-     - **M1, wording, to fix**: the could-not-be-checked banner says it twice;
+     - **M5, DEFECT, FIXED** (test seen failing first; ticks are whole durations, the top 2s, 4s, 10s ... 1h, then doubling): the run-time axis labels a middle tick "under 1s".
+     - **M1, wording, FIXED**: the could-not-be-checked banner says it twice;
        "crashed on 9:09am" -> "at"; mixed dashes.
      - **Keith's calls, 2026-11-21**: (H2) an off-scale marker for a run beyond
        the trend's scale; (H3) a supply we could not check says "not checked"
-       and stays off the trend; (M2) keep the red Fail and its rollup, the
+       and stays off the trend; a supply whose dataset checks never ran counts - one
+       that could not be loaded and a contested pair's file waiting for a choice
+       alike (Keith, 2026-11-21); (M2) keep the red Fail and its rollup, the
        banner's first line saying our pipeline could not check the supply and
        that this is not a problem with the supplier's data; (M3/M4) count what
        the dataset owes in its own unit ("9 Mondays with no supply"); (M6) the
@@ -17360,4 +17362,21 @@ twice. It deliberately did not re-find the `TypeError`.
        (the list numbers it) and gives the date once where a try began and
        ended on the same day ('began 1 May 2025, 9:09am, ended 9:54am - timed
        out after 45m'). To apply to requirements.yaml with the fixes.
-     - Nits as listed in the report; built with the fixes above.
+     - **Built 2026-11-21, each against a test seen failing first**: H2 (scale
+       to finished runs, off-scale caret), H3 (not checked, off the trend - from
+       the recorded blockers), M2 (banner's first line), M3 (owed units, the
+       queue and the page alike: tests/test_gap_words.py), M4 (one inheritance-
+       refusal item per dataset, in date order: tests/test_inheritance_refusal_
+       items.py), M6 (REQ-DASH-414 c1/c2 amended in the approved words; each
+       list item carries its try's number as its value, so a list with tries
+       left out still numbers truly). REQ-DASH-413 gains criterion 12;
+       decisions on 413, 414, 415, 347 and REQ-PIPE-098.
+     - **Nits still to do**: the period banner on a moved page with ?period=;
+       the moved link's text is the bare URL; an ambiguous comma in the
+       not-owed weekday row; raw dataset ids in held-supply headlines and the
+       calendar notice; hollow markers labelled only by tooltip; 'View as
+       table' lacks aria-expanded; the snapshots panel leaves focus on its
+       trigger; the demo caption's MOTHMAN_ASSET not code-styled. Probably
+       older: the supply-cycle table scrolls sideways at 390px; a supply row
+       is not keyboard-reachable; an empty current cycle hides the newest
+       tries note behind 'Show all history'.

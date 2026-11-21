@@ -73,9 +73,53 @@ describe("the run-time trend (413)", () => {
     expect(w.runTimeSeries(DS, on, runs).map(p=> p.run.run_id)).toEqual(["r1", "r2"]);
   });
 
+  it("labels its axis in whole durations, never 'under 1s' (post-build-review #493 M5)", () => {
+    const w = load();
+    const html = w.runTimeTrend(DS, null, [run(1, 700), run(2, 1_200)]);
+    const ticks = [...html.matchAll(/font-family="IBM Plex Mono, monospace">([^<]*)</g)].map(m=> m[1]);
+    expect(ticks).toEqual(["0s", "1s", "2s"]);
+  });
+
+  it("scales to the runs that finished, marking a longer failed try off the scale (#493 H2)", () => {
+    // Keith, 2026-11-21: one 45-minute try had flattened every 2-4s run onto zero.
+    const w = load();
+    const retried = run(3, 3_000, {attempts: tries(
+      {outcome: "TIMED-OUT", ms: 2_700_000}, {outcome: "COMPLETED", ms: 3_000})});
+    const html = w.runTimeTrend(DS, null, [run(1, 2_000), run(2, 4_000), retried]);
+    const ticks = [...html.matchAll(/font-family="IBM Plex Mono, monospace">([^<]*)</g)].map(m=> m[1]);
+    expect(ticks).toEqual(["0s", "2s", "4s"]);
+    expect(html).toContain("data-off-scale");
+    expect(html).toContain("timed out after 45m - off the scale");
+    expect(html).toContain("above the top are tries longer than the scale");
+  });
+
   it("is nowhere for a dataset with no runTimes - never made up", () => {
     const w = load();
     expect(w.runTimeTrend(DS, null, [])).toBe("");
+  });
+});
+
+describe("a supply whose dataset checks never ran (post-build-review #493 H3)", () => {
+  // Keith, 2026-11-21: one that could not be loaded and a contested pair's
+  // file waiting for a choice alike say 'Not checked' and stay off the trend.
+  const blockers = {blockers: [
+    {kind: "refused", datasetId: DS, supply: `${DS}@k2`},
+    {kind: "contested", datasetId: DS, supply: `${DS}@k3`}]};
+  const runs = () => [run(1, 2_000), run(2, 74), run(3, 52), run(4, 2_500)];
+
+  it("is left off the run-time trend", () => {
+    const w = load();
+    expect(w.runTimeSeries(DS, null, runs(), blockers).map(p=> p.run.run_id)).toEqual(["r1", "r4"]);
+  });
+
+  it("says Not checked, and why, in its Status cell rather than a run time", () => {
+    const w = load();
+    const refused = w.runTimeNotes(DS, {run_id: "r2"}, null, runs(), blockers);
+    expect(refused).toContain("Not checked - its file could not be loaded");
+    expect(refused).not.toContain("Checked in");
+    const contested = w.runTimeNotes(DS, {run_id: "r3"}, null, runs(), blockers);
+    expect(contested).toContain("Not checked - two files arrived for it and one had to be chosen");
+    expect(w.runTimeNotes(DS, {run_id: "r1"}, null, runs(), blockers)).toContain("Checked in 2s");
   });
 });
 
@@ -93,6 +137,18 @@ describe("a row's own run time (413 criterion 2)", () => {
     const runs = [run(1, 192_000), run(2, 7_500_000, {scope: "full", supply_id: `${DS}@k1`})];
     expect(w.runTimeNotes(DS, {run_id: "r1"}, null, runs)).toContain("re-checked");
     expect(w.runTimeNotes(DS, {run_id: "r1"}, null, runs)).toContain("in 2h 05m");
+  });
+
+  it("keeps the arrival's own time in the Status cell when the row carries a re-check's run", () => {
+    // post-build-review #493 H1: a correction leaves the row keyed on the run
+    // in place, the full re-check `<run>__r1`, and its 8s read as the 793ms
+    // arrival's own 'Checked in'.
+    const w = load();
+    const runs = [run(1, 793, {run_id: "a", supply_id: `${DS}@k`}),
+                  run(9, 8_372, {run_id: "a__r1", scope: "full", supply_id: `${DS}@k`})];
+    const said = w.runTimeNotes(DS, {run_id: "a__r1"}, null, runs);
+    expect(said).toMatch(/data-run-time [^>]*>Checked in under 1s</);
+    expect(said).toMatch(/data-recheck-run-time[^>]*>· re-checked [^<]* in 8s</);
   });
 
   it("says nothing where a run has no run time", () => {
@@ -130,7 +186,32 @@ describe("a run that needed another try (414)", () => {
     expect(html).toContain("Checked on the ninth try");
     expect(html).toContain("and 3 more");
     expect(html).toContain("mothman supply failures");
-    expect((html.match(/<li>Try /g) || []).length).toBe(6);
+    expect((html.match(/<li value="/g) || []).length).toBe(6);
+    // EACH LINE KEEPS ITS OWN TRY'S NUMBER where some are left out (#493 M6).
+    expect([...html.matchAll(/<li value="(\d+)"/g)].map(m=> m[1])).toEqual(["1", "5", "6", "7", "8", "9"]);
+  });
+
+  it("names every failed try before the success, oldest first (#493 M6, wording approved by Keith)", () => {
+    const w = load();
+    const three = run(1, 3_000, {attempts: tries({outcome: "TIMED-OUT", ms: 2_700_000},
+      {outcome: "CRASHED", ms: 3_000}, {outcome: "COMPLETED", ms: 3_000})});
+    expect(w.triesNote(three, null)).toContain(
+      "Checked on the third try - the first timed out after 45m, the second crashed after 3s");
+    const five = run(1, 3_000, {attempts: tries({outcome: "CRASHED", ms: 3_000},
+      {outcome: "TIMED-OUT", ms: 2_700_000}, {outcome: "CRASHED", ms: 2_000},
+      {outcome: "CRASHED", ms: 1_000}, {outcome: "COMPLETED", ms: 3_000})});
+    expect(w.triesNote(five, null)).toContain(
+      "Checked on the fifth try - 4 tries before it failed, the longest timed out after 45m");
+  });
+
+  it("gives each line its number once and its date once where it began and ended that day (#493 M6)", () => {
+    const w = load();
+    const line = w.tryLine({number: 1, began_at: "2026-03-01T01:09:00+00:00",
+      ended_at: "2026-03-01T01:54:00+00:00", outcome: "TIMED-OUT", run_time_ms: 2_700_000});
+    expect(line).not.toMatch(/^Try /);
+    const days = line.match(/\d{1,2} [A-Z][a-z]+ \d{4}/g) || [];
+    expect(days.length).toBe(1);
+    expect(line).toMatch(/ended \d{1,2}:\d{2}[ap]m - timed out after 45m/);
   });
 
   it("judges each try as at the date on show: begun and not ended reads not finished", () => {
@@ -178,7 +259,7 @@ describe("a supply that could not be checked (415)", () => {
   it("says each ending, the tool, how many tries, and the next step", () => {
     const w = load();
     const said = w.couldNotCheckWords(B, "2026-03-20");
-    expect(said).toContain("its newest try failed in dbt-core on");
+    expect(said).toContain("its newest try failed in dbt-core at");
     expect(said).toContain("could not be checked on 3 tries");
     expect(said).toContain("Nothing is yet known about this supply's data");
     expect(said).toContain("The next processing pass retries it");

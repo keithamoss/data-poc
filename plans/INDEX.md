@@ -1292,6 +1292,7 @@ one when this line suggests it matters.
 - **#492** `done` 2026-11-21 - Post-build functional critic on group E (724752c4) and group F (9fc54c56): a failed upload blocked every retry. Every...
   - *touches:* `tests/test_cloudflare_publish.py`
 - **#493** `in-progress` 2026-11-21 - Catch-up UX critic on E, F and the timing batch, and two defects the C/D gate found. The critic's report...
+  - *touches:* `tests/test_gap_words.py`
 
 ## plans/road-testing.md
 

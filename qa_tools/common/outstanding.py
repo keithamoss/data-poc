@@ -707,16 +707,30 @@ def _from_inheritance_refusals() -> list[Item]:
               f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
         return items
 
+    # ONE ITEM PER DATASET, ITS PERIODS IN DATE ORDER (post-build-review #493
+    # M4): a weekly dataset's first days before any supply it could stand on
+    # had read as four separate items, out of order.
+    by_dataset: dict[str, list[str]] = {}
     for entry in refused:
+        by_dataset.setdefault(entry.dataset_id, []).append(entry.period)
+    for dataset_id, periods in by_dataset.items():
         try:
-            dataset = hierarchy.dataset(entry.dataset_id)
+            dataset = hierarchy.dataset(dataset_id)
         except hierarchy.UnknownDatasetError:
             continue
-        shown = display_time.format_period(entry.period)
+        periods = sorted(set(periods))
+        first, last = (display_time.format_period(p) for p in (periods[0], periods[-1]))
+        if len(periods) == 1:
+            shown, owed = first, f"Nothing is owed for {first}, so the period"
+        else:
+            from qa_tools.common.filing_queue import _is_day, _owed_unit
+            unit = _owed_unit(periods) if all(_is_day(p) for p in periods) else "periods"
+            shown = f"{len(periods)} {unit}, {first} to {last}"
+            owed = "Nothing is owed for any of them, so each"
         items.append(Item(
             kind=INHERITANCE_REFUSED, severity=WARNING, blocking=False,
             headline=f"{dataset.dataset_name} has no table at all for {shown}",
-            detail=(f"Nothing is owed for {shown}, so the period would normally "
+            detail=(f"{owed} would normally "
                      f"stand on this dataset's most recent supply - and no "
                      f"earlier period holds one to stand on. The table is "
                      f"genuinely absent, for a reason of ours rather than the "

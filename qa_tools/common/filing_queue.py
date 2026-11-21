@@ -507,12 +507,30 @@ class Gap:
         # (REQ-DASH-071's display standard) - never ISO, which the queue
         # carries verbatim onto the dashboard.
         daily = all(_is_day(p) for p in self.periods)
-        unit = "day" if daily else "period"
-        what = unit if self.count == 1 else f"{unit}s"
+        what = _owed_unit(self.periods) if daily else ("period" if self.count == 1 else "periods")
         name = _day_text if daily else str
         span = (name(self.periods[0]) if self.count == 1
                 else f"{name(self.periods[0])} to {name(self.periods[-1])}")
         return f"{self.count} {what} with no supply, {span}"
+
+
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def _owed_unit(days) -> str:
+    """WHAT THE DATASET OWES, COUNTED IN ITS OWN UNIT (post-build-review #493
+    M3; Keith, 2026-11-21): consecutive days are days; days all on one weekday
+    are that weekday ('Mondays'); any other run of owed days is 'owed days'.
+    One day is a day. The page's gapText() says the same."""
+    from datetime import date
+    got = [date.fromisoformat(d) for d in days]
+    if len(got) == 1:
+        return "day"
+    if (got[-1] - got[0]).days + 1 == len(got):
+        return "days"
+    if len({d.weekday() for d in got}) == 1:
+        return f"{_WEEKDAYS[got[0].weekday()]}s"
+    return "owed days"
 
 
 def _is_day(period: str) -> bool:

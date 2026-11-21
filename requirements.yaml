@@ -19698,398 +19698,202 @@ requirements:
       THE DATE ON SHOW, by the file's own receipt (qa.delivery_file), never by
       when a pass ran - the same rule every in-place-on judgement uses.
   - id: REQ-PIPE-098
-    title: "A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born"
-    date_written: "2026-09-26"
-    story: >
-      As someone querying the warehouse for the current quarter, I
-      want an annual dataset that is not due this quarter to resolve
-      to the supply that is still current, so that a dataset nobody
-      owes anything for does not read as a missing table.
+    title: A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born
+    date_written: '2026-09-26'
+    story: 'As someone querying the warehouse for the current quarter, I want an annual dataset that is not due this quarter to resolve to the supply that is still current, so that a dataset nobody owes anything for does not read as a missing table.
+
+      '
     moscow: must
     status: built
     implemented_by:
-      - qa_tools/common/inheritance.py::inherit_into
-      - qa_tools/common/inheritance.py::inherited
-      - qa_tools/common/inheritance.py::refusals
-      - qa_tools/common/inheritance.py::Inherited
-      - qa_tools/common/inheritance.py::Refused
-      - qa_tools/common/period_schema.py::open_period
-      - qa_tools/common/period_schema.py::opened
-      - asset_model/schedule.py::date_of
-      - qa_tools/common/decision_log.py::INHERIT
-      - qa_tools/common/decision_log.py::INHERIT_REFUSED
-      - qa_tools/common/outstanding.py::INHERITANCE_REFUSED
-      - qa_tools/common/promotion.py::should_promote
+    - qa_tools/common/inheritance.py::inherit_into
+    - qa_tools/common/inheritance.py::inherited
+    - qa_tools/common/inheritance.py::refusals
+    - qa_tools/common/inheritance.py::Inherited
+    - qa_tools/common/inheritance.py::Refused
+    - qa_tools/common/period_schema.py::open_period
+    - qa_tools/common/period_schema.py::opened
+    - asset_model/schedule.py::date_of
+    - qa_tools/common/decision_log.py::INHERIT
+    - qa_tools/common/decision_log.py::INHERIT_REFUSED
+    - qa_tools/common/outstanding.py::INHERITANCE_REFUSED
+    - qa_tools/common/promotion.py::should_promote
     linked_tests:
-      - tests/test_inheritance.py::TestOpeningAPeriodIsARecordedEvent
-      - tests/test_inheritance.py::TestADatasetThatOwesNothingInheritsWhatIsCurrent
-      - tests/test_inheritance.py::TestNothingToStandOnIsRefusedRatherThanFabricated
-      - tests/test_inheritance.py::TestItPointsOnlyAtARealPromotedTable
-      - tests/test_inheritance.py::TestInheritanceIsNotSubstitution
-      - tests/test_inheritance.py::TestOpeningOnePeriodLeavesOthersAlone
-      - tests/test_inheritance.py::TestASupplyArrivingIntoAnInheritedPeriodWaitsForAPerson
-      - tests/test_inheritance.py::TestInheritingRunsNoChecks
+    - tests/test_inheritance.py::TestOpeningAPeriodIsARecordedEvent
+    - tests/test_inheritance.py::TestADatasetThatOwesNothingInheritsWhatIsCurrent
+    - tests/test_inheritance.py::TestNothingToStandOnIsRefusedRatherThanFabricated
+    - tests/test_inheritance.py::TestItPointsOnlyAtARealPromotedTable
+    - tests/test_inheritance.py::TestInheritanceIsNotSubstitution
+    - tests/test_inheritance.py::TestOpeningOnePeriodLeavesOthersAlone
+    - tests/test_inheritance.py::TestASupplyArrivingIntoAnInheritedPeriodWaitsForAPerson
+    - tests/test_inheritance.py::TestInheritingRunsNoChecks
+    - tests/test_inheritance_refusal_items.py
     evidence:
-      - >
-        Built 2026-09-28, overnight. `qa_tools/common/inheritance.py`,
-        two new decision-log actions, one new table - `qa.period`, whose
-        row is what makes "first created" a FACT rather than an
-        inference from the schema being present - and schema version 8
-        -> 9. 21 tests in tests/test_inheritance.py.
+    - 'Built 2026-09-28, overnight. `qa_tools/common/inheritance.py`, two new decision-log actions, one new table - `qa.period`, whose row is what makes "first created" a FACT rather than an inference from the schema being present - and schema version 8 -> 9. 21 tests in tests/test_inheritance.py.
 
-      - >
-        THE TABLE EXISTS BECAUSE THE INFERENCE IS WRONG IN A SPECIFIC
-        WAY, and it is worth saying which: "does the schema exist"
-        cannot tell a period opened a second ago from one opened last
-        year whose schema was dropped and rebuilt. The second would
-        inherit all over again, from whatever is current NOW rather
-        than from what was current THEN - a period quietly rewriting
-        its own past, which is the one thing a period must never do.
+      '
+    - 'THE TABLE EXISTS BECAUSE THE INFERENCE IS WRONG IN A SPECIFIC WAY, and it is worth saying which: "does the schema exist" cannot tell a period opened a second ago from one opened last year whose schema was dropped and rebuilt. The second would inherit all over again, from whatever is current NOW rather than from what was current THEN - a period quietly rewriting its own past, which is the one thing a period must never do.
 
-      - >
-        CRITERION 17 NEEDED ITS OWN REFUSAL rather than riding on the
-        filled-slot one, and the reason is criterion 7. A SUBSTITUTED
-        period counts as filled, so a supply arriving into one is
-        already caught by "the slot is already filled". An INHERITED
-        period deliberately does not count as filled - nothing was owed
-        - so without a refusal of its own the rule would promote
-        straight over the inherited view and nobody would be asked.
+      '
+    - 'CRITERION 17 NEEDED ITS OWN REFUSAL rather than riding on the filled-slot one, and the reason is criterion 7. A SUBSTITUTED period counts as filled, so a supply arriving into one is already caught by "the slot is already filled". An INHERITED period deliberately does not count as filled - nothing was owed - so without a refusal of its own the rule would promote straight over the inherited view and nobody would be asked.
 
-      - >
-        A SCHEMA MIGRATION FAULT FOUND AND FIXED HERE, worth recording
-        because it will recur otherwise: the `action` column's list of
-        known values was an INLINE CHECK, which PostgreSQL names for
-        itself. `CREATE TABLE IF NOT EXISTS` does nothing to an existing
-        table, so a database created before the list grew kept the old
-        constraint and refused the new action while a fresh one accepted
-        it. The list now lives in a NAMED constraint that is dropped and
-        re-added on every ensure_schema, and the old generated name is
-        dropped too.
+      '
+    - 'A SCHEMA MIGRATION FAULT FOUND AND FIXED HERE, worth recording because it will recur otherwise: the `action` column''s list of known values was an INLINE CHECK, which PostgreSQL names for itself. `CREATE TABLE IF NOT EXISTS` does nothing to an existing table, so a database created before the list grew kept the old constraint and refused the new action while a fresh one accepted it. The list now lives in a NAMED constraint that is dropped and re-added on every ensure_schema, and the old generated name is dropped too.
 
-      - >
-        `supply` ON THE DECISION LOG LOST ITS NOT NULL, narrowly.
-        Criterion 10 asks for a refused inheritance to be RECORDED, and
-        the thing it could not find IS a supply - so there is nothing
-        honest to put in the column. Every other action still requires
-        one, enforced by a CHECK that names `inherit-refused` as the
-        single exception, and decision_log refuses a refusal that DOES
-        carry a supply for the same reason.
+      '
+    - '`supply` ON THE DECISION LOG LOST ITS NOT NULL, narrowly. Criterion 10 asks for a refused inheritance to be RECORDED, and the thing it could not find IS a supply - so there is nothing honest to put in the column. Every other action still requires one, enforced by a CHECK that names `inherit-refused` as the single exception, and decision_log refuses a refusal that DOES carry a supply for the same reason.
+
+      '
     signed_off:
       by: Keith
-      date: "2026-09-28"
-    source: >
-      Keith, plans/running-thoughts.md #45 (2026-09-26) - the third
-      item in the batch-5 brief, found while naming REQ-PIPE-084 from
-      his own question about datasets on the quarterly asset that
-      deliver only once a year.
+      date: '2026-09-28'
+    source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - the third item in the batch-5 brief, found while naming REQ-PIPE-084 from his own question about datasets on the quarterly asset that deliver only once a year.
+
+      '
     acceptance_criteria:
-      - "WHEN a period's schema is first created, and again WHEN the first supply of a collection at a different period offset (REQ-PIPE-320) is filed to it, THE SYSTEM SHALL INHERIT, for each dataset of the collections at the filing collection's offset that the schedule says does not participate in that period or is turned off in it (REQ-PIPE-179 criterion 22), that dataset's most recent promoted supply - creating in the period's schema a view that resolves the dataset's logical name to it; and WHERE no collection at an offset files to the period, as REQ-PIPE-323 criterion 3 gives. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32. AMENDED 2026-10-30 by REQ-PIPE-323."
-      - "THE SYSTEM SHALL create such a view only at the moment criterion 1 makes its offset group's inheritances, and SHALL NOT create one later by any automatic rule. AMENDED 2026-10-30 by REQ-PIPE-323."
-      - >
-        THE SYSTEM SHALL treat the creation of a period's schema as a
-        distinguishable, recorded event, so that "first created" is a
-        fact rather than an inference from the schema being present.
-      - 'THE SYSTEM SHALL create a period''s schema on the first FILING to it (REQ-PIPE-271), or on an explicit instruction to open
-        it, whichever comes first, and SHALL NOT require an arrival before a period can exist - using the SAME creation mechanism
-        for both, so that a period opened by instruction is indistinguishable from one opened by a filing. AMENDED 2026-10-23 by
-        REQ-PIPE-271 (Keith, 2026-10-20: ''inherit when the quarter is filed, not when it is first promoted''). It read: ''THE SYSTEM
-        SHALL create a period"s schema either on the first promotion into it or on an explicit instruction to open it, and SHALL
-        NOT require an arrival before a period can exist - using the SAME creation mechanism for both, so that a period opened by
-        instruction is indistinguishable from one created by a first promotion.
+    - WHEN a period's schema is first created, and again WHEN the first supply of a collection at a different period offset (REQ-PIPE-320) is filed to it, THE SYSTEM SHALL INHERIT, for each dataset of the collections at the filing collection's offset that the schedule says does not participate in that period or is turned off in it (REQ-PIPE-179 criterion 22), that dataset's most recent promoted supply - creating in the period's schema a view that resolves the dataset's logical name to it; and WHERE no collection at an offset files to the period, as REQ-PIPE-323 criterion 3 gives. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32. AMENDED 2026-10-30 by REQ-PIPE-323.
+    - THE SYSTEM SHALL create such a view only at the moment criterion 1 makes its offset group's inheritances, and SHALL NOT create one later by any automatic rule. AMENDED 2026-10-30 by REQ-PIPE-323.
+    - 'THE SYSTEM SHALL treat the creation of a period''s schema as a distinguishable, recorded event, so that "first created" is a fact rather than an inference from the schema being present.
 
-        '''
-      - >
-        THE SYSTEM SHALL determine non-participation from the schedule
-        alone, and SHALL NOT infer it from the absence of a supply.
-      - >
-        THE SYSTEM SHALL record the reason the schedule states for
-        that non-participation alongside the view.
-      - >
-        THE SYSTEM SHALL treat such a slot as not owed, and SHALL NOT
-        report it as awaiting a supply, as overdue, or as a missing
-        table.
-      - >
-        THE SYSTEM SHALL record each automatic inheritance in the
-        decision log with the rule as the actor.
-      - >
-        IF a dataset does not participate and has no earlier promoted
-        supply to stand on, THEN THE SYSTEM SHALL create no view and
-        SHALL NOT fabricate an empty table.
-      - >
-        WHEN inheritance is refused for want of an earlier supply, THE
-        SYSTEM SHALL record that refusal in the decision log with the
-        rule as the actor, and SHALL surface it at WARNING prominence
-        where a person will see it - so that an attempt which could not
-        complete is visible rather than silent.
-      - >
-        THE SYSTEM SHALL attribute an inherited period's check results
-        to the run that earned them, and SHALL NOT re-run QA to
-        produce a second set.
-      - >
-        THE SYSTEM SHALL keep inheritance distinct from substitution,
-        so that a period standing in by a person's decision and a
-        period nobody owed a supply for are never the same state.
-      - >
-        THE SYSTEM SHALL NOT change what any other period resolves to
-        when creating these views.
-      - >
-        THE SYSTEM SHALL point an inherited view only at a physical
-        PROMOTED table, and SHALL NEVER point it at a period that is
-        itself inherited or substituted.
-      - >
-        THE SYSTEM SHALL implement that inheritance as a DATABASE VIEW
-        in the period's own schema, and SHALL NOT copy the data.
-      - THE SYSTEM SHALL make the inherited view visible to anything querying the period, by naming it the table's plain base name (REQ-PIPE-129) - the same name a promoted table carries there, so a reader queries the period the same way whichever answers it.
-      - >
-        IF a supply for that dataset arrives into a period that has
-        been inherited, THEN THE SYSTEM SHALL hold it for a person,
-        SHALL NOT replace the view automatically, and SHALL NOT discard
-        it.
+      '
+    - 'THE SYSTEM SHALL create a period''s schema on the first FILING to it (REQ-PIPE-271), or on an explicit instruction to open it, whichever comes first, and SHALL NOT require an arrival before a period can exist - using the SAME creation mechanism for both, so that a period opened by instruction is indistinguishable from one opened by a filing. AMENDED 2026-10-23 by REQ-PIPE-271 (Keith, 2026-10-20: ''inherit when the quarter is filed, not when it is first promoted''). It read: ''THE SYSTEM SHALL create a period"s schema either on the first promotion into it or on an explicit instruction to open it, and SHALL NOT require an arrival before a period can exist - using the SAME creation mechanism for both, so that a period opened by instruction is indistinguishable from one created by a first promotion.
+
+      '''
+    - 'THE SYSTEM SHALL determine non-participation from the schedule alone, and SHALL NOT infer it from the absence of a supply.
+
+      '
+    - 'THE SYSTEM SHALL record the reason the schedule states for that non-participation alongside the view.
+
+      '
+    - 'THE SYSTEM SHALL treat such a slot as not owed, and SHALL NOT report it as awaiting a supply, as overdue, or as a missing table.
+
+      '
+    - 'THE SYSTEM SHALL record each automatic inheritance in the decision log with the rule as the actor.
+
+      '
+    - 'IF a dataset does not participate and has no earlier promoted supply to stand on, THEN THE SYSTEM SHALL create no view and SHALL NOT fabricate an empty table.
+
+      '
+    - 'WHEN inheritance is refused for want of an earlier supply, THE SYSTEM SHALL record that refusal in the decision log with the rule as the actor, and SHALL surface it at WARNING prominence where a person will see it - so that an attempt which could not complete is visible rather than silent.
+
+      '
+    - 'THE SYSTEM SHALL attribute an inherited period''s check results to the run that earned them, and SHALL NOT re-run QA to produce a second set.
+
+      '
+    - 'THE SYSTEM SHALL keep inheritance distinct from substitution, so that a period standing in by a person''s decision and a period nobody owed a supply for are never the same state.
+
+      '
+    - 'THE SYSTEM SHALL NOT change what any other period resolves to when creating these views.
+
+      '
+    - 'THE SYSTEM SHALL point an inherited view only at a physical PROMOTED table, and SHALL NEVER point it at a period that is itself inherited or substituted.
+
+      '
+    - 'THE SYSTEM SHALL implement that inheritance as a DATABASE VIEW in the period''s own schema, and SHALL NOT copy the data.
+
+      '
+    - THE SYSTEM SHALL make the inherited view visible to anything querying the period, by naming it the table's plain base name (REQ-PIPE-129) - the same name a promoted table carries there, so a reader queries the period the same way whichever answers it.
+    - 'IF a supply for that dataset arrives into a period that has been inherited, THEN THE SYSTEM SHALL hold it for a person, SHALL NOT replace the view automatically, and SHALL NOT discard it.
+
+      '
     non_functional_requirements:
-      - >
-        CORRECTNESS DEPENDS ON THE RECORDED-BIRTH EVENT, and today
-        there is nothing to hang it on: ensure_period_schema() is a
-        bare CREATE SCHEMA IF NOT EXISTS that returns the schema name
-        and no indication of whether it created anything, and its only
-        real caller is a test. Without criterion 3 the "only at birth"
-        rule is unenforceable and will be re-derived as "whenever we
-        notice", which is the continuous sweep this design explicitly
-        rejects.
-      - >
-        THIS RESTS ON CONFIG THAT IS BEING RESHAPED, and the shape it
-        lands on is the one to build against: a dataset declares
-        `participates: {slots: [...], reason: ...}` in the asset's own
-        calendar file, plus a `not_expected:` list for one-off
-        exceptions carrying their own per-period reason. Criterion 6's
-        "the reason the schedule states" resolves to the per-period
-        reason where one exists and to the standing participation
-        reason otherwise - because a twice-yearly dataset's reason is a
-        property of the AGREEMENT, true of every skipped period, while
-        "no Q1 file, ERP migration" is an exception to it.
+    - 'CORRECTNESS DEPENDS ON THE RECORDED-BIRTH EVENT, and today there is nothing to hang it on: ensure_period_schema() is a bare CREATE SCHEMA IF NOT EXISTS that returns the schema name and no indication of whether it created anything, and its only real caller is a test. Without criterion 3 the "only at birth" rule is unenforceable and will be re-derived as "whenever we notice", which is the continuous sweep this design explicitly rejects.
 
-        WHAT IS THERE TODAY IS THE EVIDENCE THAT THIS IS A REAL GAP
-        rather than a refinement: `delivery_months: [February, August]`
-        is really on cp-case-workers and nothing but one test assertion
-        reads it, while not_expected_periods() is fully implemented WITH
-        its mandatory reason and appears in no contract at all. Somebody
-        has already written down that Case Workers skips two quarters,
-        the system does nothing with it, and the half that carries a
-        reason has never been used.
-      - >
-        SCALE: a period's birth creates up to one object and one log
-        entry per dataset - up to 30 on the quarterly asset, and
-        roughly 104 a year for a daily dataset that does not
-        participate at weekends. Small, and both worth knowing before
-        anything renders the whole log or counts objects per schema.
-        The measured catalogue cost is ~14 KB per schema-plus-table
-        before a single row exists.
-      - >
-        NO BACKGROUND SWEEP, and that is the point rather than a
-        simplification: "automatic where valid", applied continuously,
-        has no trigger - something would have to keep re-scanning for
-        newly-valid inheritances, which is the same no-cron problem
-        REQ-PIPE-083 is already stuck on.
-      - >
-        A view binds to the OBJECT rather than the name on PostgreSQL,
-        so every inherited view is a real dependency on a promoted
-        physical table - which is what makes REQ-PIPE-084 criterion
-        11's refusal load-bearing and REQ-PIPE-099's un-inherit
-        necessary.
-    dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
+      '
+    - 'THIS RESTS ON CONFIG THAT IS BEING RESHAPED, and the shape it lands on is the one to build against: a dataset declares `participates: {slots: [...], reason: ...}` in the asset''s own calendar file, plus a `not_expected:` list for one-off exceptions carrying their own per-period reason. Criterion 6''s "the reason the schedule states" resolves to the per-period reason where one exists and to the standing participation reason otherwise - because a twice-yearly dataset''s reason is a property of the AGREEMENT, true of every skipped period, while "no Q1 file, ERP migration" is an exception to it.
+
+      WHAT IS THERE TODAY IS THE EVIDENCE THAT THIS IS A REAL GAP rather than a refinement: `delivery_months: [February, August]` is really on cp-case-workers and nothing but one test assertion reads it, while not_expected_periods() is fully implemented WITH its mandatory reason and appears in no contract at all. Somebody has already written down that Case Workers skips two quarters, the system does nothing with it, and the half that carries a reason has never been used.
+
+      '
+    - 'SCALE: a period''s birth creates up to one object and one log entry per dataset - up to 30 on the quarterly asset, and roughly 104 a year for a daily dataset that does not participate at weekends. Small, and both worth knowing before anything renders the whole log or counts objects per schema. The measured catalogue cost is ~14 KB per schema-plus-table before a single row exists.
+
+      '
+    - 'NO BACKGROUND SWEEP, and that is the point rather than a simplification: "automatic where valid", applied continuously, has no trigger - something would have to keep re-scanning for newly-valid inheritances, which is the same no-cron problem REQ-PIPE-083 is already stuck on.
+
+      '
+    - 'A view binds to the OBJECT rather than the name on PostgreSQL, so every inherited view is a real dependency on a promoted physical table - which is what makes REQ-PIPE-084 criterion 11''s refusal load-bearing and REQ-PIPE-099''s un-inherit necessary.
+
+      '
+    dependencies:
+    - REQ-PIPE-087
+    - REQ-PIPE-084
+    - REQ-PIPE-049
     open_questions: []
     unmet_criteria:
-      - criterion: "Criterion 4, in part - the explicit instruction to open a period. Openings by promotion and by substitution are built; no command or function a person can call opens a period before its first promotion."
-        why: "Found reviewing the withdrawn REQ-PIPE-261 draft (delivery-architect, 2026-10-19): open_period is reached only from promotion.py and substitution.py, and nothing in cli/ opens one. Reopened at Keith's answer to REQ-PIPE-262's Q2 ('Reopen as unmet'), unowned until something needs a period opened early. Asked again the night of 2026-10-19 whether to build `mothman supply open-period` overnight: Keith chose 'Leave until needed' - the command's wording, prompts and refusals want his sign-off first."
-        owner: "nobody yet - Keith, 2026-10-19"
-        blocked_by:
-          unowned: true
-      - criterion: >
-          All seventeen criteria are met by the code, and NONE of them
-          is exercised by this repository's own configuration: no
-          dataset declares a `not_expected` period, so inheritance never
-          fires on the real corpus. Every test states the schedule's
-          answer rather than reading it from contract/data-asset.yaml.
-        why: >
-          Declaring that a dataset is genuinely not due in some period
-          is a domain claim about a supplier's obligations, not a test
-          fixture. It belongs with Keith and with the generator's
-          scenario register (REQ-GEN-044), which is where the awkward
-          supply shapes get real instances.
+    - criterion: Criterion 4, in part - the explicit instruction to open a period. Openings by promotion and by substitution are built; no command or function a person can call opens a period before its first promotion.
+      why: 'Found reviewing the withdrawn REQ-PIPE-261 draft (delivery-architect, 2026-10-19): open_period is reached only from promotion.py and substitution.py, and nothing in cli/ opens one. Reopened at Keith''s answer to REQ-PIPE-262''s Q2 (''Reopen as unmet''), unowned until something needs a period opened early. Asked again the night of 2026-10-19 whether to build `mothman supply open-period` overnight: Keith chose ''Leave until needed'' - the command''s wording, prompts and refusals want his sign-off first.'
+      owner: nobody yet - Keith, 2026-10-19
+      blocked_by:
+        unowned: true
+    - criterion: 'All seventeen criteria are met by the code, and NONE of them is exercised by this repository''s own configuration: no dataset declares a `not_expected` period, so inheritance never fires on the real corpus. Every test states the schedule''s answer rather than reading it from contract/data-asset.yaml.
 
-          FLAGGED RATHER THAN LEFT IMPLICIT because this project was
-          bitten by the opposite habit the same night:
-          outstanding._from_closed_slots() sat behind a guard that made
-          it unreachable, carried two faults, and ran for the first time
-          on the evening the guard stopped holding
-          (plans/post-build-review.md #63). A rule nothing exercises is
-          a rule nobody has seen work.
-        owner: >
-          Keith, for the domain claim; REQ-GEN-044 for the instance.
-        blocked_by:
-          requirements: [REQ-GEN-044]
+        '
+      why: 'Declaring that a dataset is genuinely not due in some period is a domain claim about a supplier''s obligations, not a test fixture. It belongs with Keith and with the generator''s scenario register (REQ-GEN-044), which is where the awkward supply shapes get real instances.
+
+        FLAGGED RATHER THAN LEFT IMPLICIT because this project was bitten by the opposite habit the same night: outstanding._from_closed_slots() sat behind a guard that made it unreachable, carried two faults, and ran for the first time on the evening the guard stopped holding (plans/post-build-review.md #63). A rule nothing exercises is a rule nobody has seen work.
+
+        '
+      owner: 'Keith, for the domain claim; REQ-GEN-044 for the instance.
+
+        '
+      blocked_by:
+        requirements:
+        - REQ-GEN-044
     decisions:
-      - >
-        THREE CRITERIA BACKPORTED FROM REQ-PIPE-084 by the mirror-check
-        Keith asked for, 2026-09-28, each of which substitution stated
-        and inheritance only implied. The view SHALL NOT COPY the data,
-        which is the whole point of the mechanism. It is VISIBLE TO
-        ANYTHING QUERYING BY THE LOGICAL NAME, which is the
-        downstream-consumer promise this requirement's story makes and
-        had no criterion behind. And a supply ARRIVING INTO AN
-        INHERITED PERIOD is held for a person rather than silently
-        replacing the view - REQ-PIPE-099's decisions had recorded that
-        as falling out of REQ-PIPE-075 criterion 4, which is true and
-        left one disposition explicit while the other relied on a
-        reader knowing.
-      - >
-        CRITERION 1 NOW NAMES THE ACT (Keith, 2026-09-28, after this
-        requirement was signed). It defined the mechanism - create a
-        view resolving a logical name - without ever saying INHERIT,
-        while criteria 8 and 10 both speak of "inheritance" as though
-        the term had been introduced. A reader meeting criterion 1
-        first had to infer that this was the thing the rest of the
-        requirement, REQ-PIPE-099 and REQ-DASH-100 all call by name.
-        The rule is unchanged; only the wording is.
-      - >
-        AN INHERITED VIEW NEVER STANDS ON A STAND-IN EITHER (Keith,
-        2026-09-28, asking for the same criterion REQ-PIPE-084 gained
-        so chains cannot form here either). Criterion 1's "most recent
-        PROMOTED supply" already implies it, and implication is what
-        this pair of requirements has twice now been caught relying on:
-        REQ-PIPE-084 decision 10 said chains never form "by
-        construction" and nothing made the system hold it. Both
-        dispositions now state it as a rule rather than leave it as a
-        property somebody has to know.
-      - >
-        THE OPEN QUESTION IS CLOSED, AND THE ANSWER IS NEITHER OPTION
-        THAT WAS DRAFTED (Keith, 2026-09-28). It asked whether an
-        inherited period shows the earlier run's results attributed, or
-        no results with a statement that nothing was owed. His answer:
-        the dataset appears with its ordinary card and its real status,
-        carrying an `inherited` badge - and drilling in does NOT render
-        those checks as though they belonged to the period being
-        viewed. It takes the reader to the period that earned them,
-        made plain. So criterion 11 stands unchanged - results are
-        attributed, never re-run - and what his answer adds is a
-        DISPLAY rule, which lands on REQ-DASH-100 rather than here.
-      - >
-        THE REASON HAS SOMEWHERE TO LIVE ONLY AFTER THE CALENDAR MOVE
-        (Keith, 2026-09-28, asking where in configuration it is stored
-        - the answer today being nowhere). `delivery_months:` carries
-        no reason field and `not_expected:` is in no contract, so
-        criterion 6 currently has nothing to read. The calendar
-        requirement drafted next gives it two homes, standing and
-        one-off, and non-functional 2 records which resolves first.
-      - >
-        BOTH TRIGGERS USE ONE MECHANISM (criterion 4, Keith,
-        2026-09-28). A period opened by a person from the CLI or TUI
-        and one created by a first promotion must be indistinguishable
-        afterwards - it is a different way to ask, never a different
-        thing done. Stated because "open a period" is the path a human
-        invokes, which is exactly the one that drifts.
-      - >
-        A REFUSED INHERITANCE IS A WARNING, NOT A SILENCE (criterion
-        10, Keith, 2026-09-28). The original criterion said "SHALL say
-        why", too vague to build: it is now a decision-log entry with
-        the rule as actor, surfaced at warning prominence. His
-        reasoning is that a person should be able to see the system
-        TRIED something and could not - which a missing view on its own
-        never tells anybody.
-      - >
-        CREATION IS AUTOMATIC ONLY AT THE MOMENT A PERIOD SCHEMA IS
-        BORN, and only where the schedule says the dataset does not
-        participate (Keith, 2026-09-26, narrowing his own first
-        answer: "it feels like the automatic inheritance should only
-        happen when the schema is first created... any other
-        inheritance would be per-dataset and by operator command").
-        The narrowing is the better rule because pinned to schema
-        birth it is one well-defined moment with complete information,
-        and after that the schema changes only by deliberate act.
-      - >
-        THAT LINE IS WHAT MAKES AUTOMATION SAFE, because it means
-        inheritance is never a judgement: a dataset that does not
-        participate INHERITS, while one that participates and has not
-        delivered is awaiting-supply, then overdue, then possibly
-        SUBSTITUTED by a person. Different states, no overlap.
-      - >
-        TWO TRIGGERS, and the second is not a convenience but the only
-        thing covering a real case: automatic creation falls out
-        naturally at the first promotion into a period, but a quarter
-        where only annual datasets are due may see NO arrivals, so the
-        schema would never exist and a consumer querying that period
-        gets nothing. Hence an explicit command to OPEN a period.
-      - >
-        THE STANDING-IN TABLE IS A REAL VIEW IN THE PERIOD SCHEMA
-        rather than a resolution performed at read time
-        (REQ-PIPE-084's own decision, Keith's own lean: a complete set
-        of tables and views in each period schema is nicer for a human
-        looking at the database directly and easier for machines).
-        EVERY PERIOD SCHEMA THEREFORE HOLDS A COMPLETE SET, one object
-        per dataset.
-      - >
-        WHICH IS WHY THIS NEEDS NO NEW REASON CODE, and the item
-        shrank the same evening it was found: `missing-table` recovers
-        its real meaning, because an annual dataset standing on
-        February HAS an object in Q3. What was left to specify was
-        when the view is created and what it points at, not how to
-        report its absence. Recorded because the first version of this
-        item was about a missing reason code, and a later session
-        reading only that would build the wrong thing.
-      - >
-        Rejected folding this into REQ-PIPE-084, which would merge an
-        automatic structural state with a deliberate human decision -
-        the very distinction REQ-DASH-085 exists to keep visible. The
-        word `inherited` was deliberately NOT spent on 084 for this
-        reason, even though Keith leaned toward it there first.
-      - >
-        CHAINS NEVER FORM BY CONSTRUCTION, carried over from
-        REQ-PIPE-084: a period may reach any earlier period that
-        received a real supply, so there is no traversal to implement
-        and no cycle to prevent. The inherited case is what settled it
-        - an annual dataset delivering in February needs Q4 to stand
-        on Q1, three periods back but a single hop.
-      - >
-        RESULTS ARE REFERENCED RATHER THAN RE-RUN, following
-        REQ-PIPE-084's own decision: the bytes are identical, so a
-        re-run would record duplicate results in history that only
-        grows, and would put a row of fresh green results under a
-        period where nothing arrived.
-      - >
-        A NEWLY-ADDED DATASET WITH NO EARLIER SUPPLY IS NOT THIS
-        REQUIREMENT'S PROBLEM, and Keith's reframing of it is better
-        than the edge case it looked like. His first answer stands as
-        the rule - you would not add a dataset to config until you
-        knew a supply was about to arrive, because config is the
-        statement of what is OWED - and the real answer for the case
-        where somebody does anyway is a PRE-AGREEMENT lifecycle stage
-        and the `sample` schema, which nothing in this model has yet
-        and which is deliberately unscoped (see REQ-PIPE-087's own
-        open question). Criterion 9 refuses rather than inventing a
-        state.
-      - >
-        AMENDED 2026-09-28: THE TWO RULES HAVE SINCE CONVERGED. Keith
-        changed substitution to stand on any PROMOTED supply as well,
-        so the contrast this decision draws no longer holds. It is kept
-        for its reasoning about inheritance rather than for the
-        difference it asserts. Both dispositions now stand on a
-        promoted supply; what still differs is that a PERSON CHOOSES
-        which one for a substitution, while inheritance takes the most
-        recent automatically.
+    - 'THREE CRITERIA BACKPORTED FROM REQ-PIPE-084 by the mirror-check Keith asked for, 2026-09-28, each of which substitution stated and inheritance only implied. The view SHALL NOT COPY the data, which is the whole point of the mechanism. It is VISIBLE TO ANYTHING QUERYING BY THE LOGICAL NAME, which is the downstream-consumer promise this requirement''s story makes and had no criterion behind. And a supply ARRIVING INTO AN INHERITED PERIOD is held for a person rather than silently replacing the view - REQ-PIPE-099''s decisions had recorded that as falling out of REQ-PIPE-075 criterion 4, which is true and left one disposition explicit while the other relied on a reader knowing.
 
-        INHERITANCE STANDS ON THE MOST RECENT PROMOTED SUPPLY, NOT THE
-        MOST RECENT GREEN ONE (Keith, 2026-09-26), confirming
-        criterion 1 as drafted and deliberately NOT copying
-        REQ-PIPE-084 criterion 1's rule for substitution. The two
-        situations differ: a substitution replaces a supply that WAS
-        owed and never came, where a person choosing a stand-in can
-        reasonably be held to a green one, whereas inheritance shows
-        what the dataset actually last delivered - and a period that
-        held an amber supply held an amber supply. REJECTED: most
-        recent green, which reads as the safer option and is not,
-        because it silently skips past the real most-recent state and
-        can leave a non-participating dataset standing on nothing at
-        all where its last green supply is far behind or never
-        existed.
+      '
+    - 'CRITERION 1 NOW NAMES THE ACT (Keith, 2026-09-28, after this requirement was signed). It defined the mechanism - create a view resolving a logical name - without ever saying INHERIT, while criteria 8 and 10 both speak of "inheritance" as though the term had been introduced. A reader meeting criterion 1 first had to infer that this was the thing the rest of the requirement, REQ-PIPE-099 and REQ-DASH-100 all call by name. The rule is unchanged; only the wording is.
+
+      '
+    - 'AN INHERITED VIEW NEVER STANDS ON A STAND-IN EITHER (Keith, 2026-09-28, asking for the same criterion REQ-PIPE-084 gained so chains cannot form here either). Criterion 1''s "most recent PROMOTED supply" already implies it, and implication is what this pair of requirements has twice now been caught relying on: REQ-PIPE-084 decision 10 said chains never form "by construction" and nothing made the system hold it. Both dispositions now state it as a rule rather than leave it as a property somebody has to know.
+
+      '
+    - 'THE OPEN QUESTION IS CLOSED, AND THE ANSWER IS NEITHER OPTION THAT WAS DRAFTED (Keith, 2026-09-28). It asked whether an inherited period shows the earlier run''s results attributed, or no results with a statement that nothing was owed. His answer: the dataset appears with its ordinary card and its real status, carrying an `inherited` badge - and drilling in does NOT render those checks as though they belonged to the period being viewed. It takes the reader to the period that earned them, made plain. So criterion 11 stands unchanged - results are attributed, never re-run - and what his answer adds is a DISPLAY rule, which lands on REQ-DASH-100 rather than here.
+
+      '
+    - 'THE REASON HAS SOMEWHERE TO LIVE ONLY AFTER THE CALENDAR MOVE (Keith, 2026-09-28, asking where in configuration it is stored - the answer today being nowhere). `delivery_months:` carries no reason field and `not_expected:` is in no contract, so criterion 6 currently has nothing to read. The calendar requirement drafted next gives it two homes, standing and one-off, and non-functional 2 records which resolves first.
+
+      '
+    - 'BOTH TRIGGERS USE ONE MECHANISM (criterion 4, Keith, 2026-09-28). A period opened by a person from the CLI or TUI and one created by a first promotion must be indistinguishable afterwards - it is a different way to ask, never a different thing done. Stated because "open a period" is the path a human invokes, which is exactly the one that drifts.
+
+      '
+    - 'A REFUSED INHERITANCE IS A WARNING, NOT A SILENCE (criterion 10, Keith, 2026-09-28). The original criterion said "SHALL say why", too vague to build: it is now a decision-log entry with the rule as actor, surfaced at warning prominence. His reasoning is that a person should be able to see the system TRIED something and could not - which a missing view on its own never tells anybody.
+
+      '
+    - 'CREATION IS AUTOMATIC ONLY AT THE MOMENT A PERIOD SCHEMA IS BORN, and only where the schedule says the dataset does not participate (Keith, 2026-09-26, narrowing his own first answer: "it feels like the automatic inheritance should only happen when the schema is first created... any other inheritance would be per-dataset and by operator command"). The narrowing is the better rule because pinned to schema birth it is one well-defined moment with complete information, and after that the schema changes only by deliberate act.
+
+      '
+    - 'THAT LINE IS WHAT MAKES AUTOMATION SAFE, because it means inheritance is never a judgement: a dataset that does not participate INHERITS, while one that participates and has not delivered is awaiting-supply, then overdue, then possibly SUBSTITUTED by a person. Different states, no overlap.
+
+      '
+    - 'TWO TRIGGERS, and the second is not a convenience but the only thing covering a real case: automatic creation falls out naturally at the first promotion into a period, but a quarter where only annual datasets are due may see NO arrivals, so the schema would never exist and a consumer querying that period gets nothing. Hence an explicit command to OPEN a period.
+
+      '
+    - 'THE STANDING-IN TABLE IS A REAL VIEW IN THE PERIOD SCHEMA rather than a resolution performed at read time (REQ-PIPE-084''s own decision, Keith''s own lean: a complete set of tables and views in each period schema is nicer for a human looking at the database directly and easier for machines). EVERY PERIOD SCHEMA THEREFORE HOLDS A COMPLETE SET, one object per dataset.
+
+      '
+    - 'WHICH IS WHY THIS NEEDS NO NEW REASON CODE, and the item shrank the same evening it was found: `missing-table` recovers its real meaning, because an annual dataset standing on February HAS an object in Q3. What was left to specify was when the view is created and what it points at, not how to report its absence. Recorded because the first version of this item was about a missing reason code, and a later session reading only that would build the wrong thing.
+
+      '
+    - 'Rejected folding this into REQ-PIPE-084, which would merge an automatic structural state with a deliberate human decision - the very distinction REQ-DASH-085 exists to keep visible. The word `inherited` was deliberately NOT spent on 084 for this reason, even though Keith leaned toward it there first.
+
+      '
+    - 'CHAINS NEVER FORM BY CONSTRUCTION, carried over from REQ-PIPE-084: a period may reach any earlier period that received a real supply, so there is no traversal to implement and no cycle to prevent. The inherited case is what settled it - an annual dataset delivering in February needs Q4 to stand on Q1, three periods back but a single hop.
+
+      '
+    - 'RESULTS ARE REFERENCED RATHER THAN RE-RUN, following REQ-PIPE-084''s own decision: the bytes are identical, so a re-run would record duplicate results in history that only grows, and would put a row of fresh green results under a period where nothing arrived.
+
+      '
+    - 'A NEWLY-ADDED DATASET WITH NO EARLIER SUPPLY IS NOT THIS REQUIREMENT''S PROBLEM, and Keith''s reframing of it is better than the edge case it looked like. His first answer stands as the rule - you would not add a dataset to config until you knew a supply was about to arrive, because config is the statement of what is OWED - and the real answer for the case where somebody does anyway is a PRE-AGREEMENT lifecycle stage and the `sample` schema, which nothing in this model has yet and which is deliberately unscoped (see REQ-PIPE-087''s own open question). Criterion 9 refuses rather than inventing a state.
+
+      '
+    - 'AMENDED 2026-09-28: THE TWO RULES HAVE SINCE CONVERGED. Keith changed substitution to stand on any PROMOTED supply as well, so the contrast this decision draws no longer holds. It is kept for its reasoning about inheritance rather than for the difference it asserts. Both dispositions now stand on a promoted supply; what still differs is that a PERSON CHOOSES which one for a substitution, while inheritance takes the most recent automatically.
+
+      INHERITANCE STANDS ON THE MOST RECENT PROMOTED SUPPLY, NOT THE MOST RECENT GREEN ONE (Keith, 2026-09-26), confirming criterion 1 as drafted and deliberately NOT copying REQ-PIPE-084 criterion 1''s rule for substitution. The two situations differ: a substitution replaces a supply that WAS owed and never came, where a person choosing a stand-in can reasonably be held to a green one, whereas inheritance shows what the dataset actually last delivered - and a period that held an amber supply held an amber supply. REJECTED: most recent green, which reads as the safer option and is not, because it silently skips past the real most-recent state and can leave a non-participating dataset standing on nothing at all where its last green supply is far behind or never existed.
+
+      '
+    - 'post-build-review #493 M4 (2026-11-21): criterion 10''s refusals are one queue item per dataset, its periods in date order, counted in what it owes; a weekly dataset''s first four days had read as four items, Thursday last.'
   - id: REQ-PIPE-099
     title: "Inherit and un-inherit are operator actions, and un-inherit is what frees a blocked withdrawal"
     date_written: "2026-09-26"
@@ -47922,6 +47726,7 @@ requirements:
     - tests-js/weekday-labels.test.js
     - tests/test_weekday_participation.py
     - tests/test_dashboard_e2e.py
+    - tests/test_gap_words.py
     implemented_by:
     - dashboard/qa-reporting-dashboard.template.html::weekdayCycleWord
     - dashboard/qa-reporting-dashboard.template.html::cadenceLabel
@@ -47934,6 +47739,7 @@ requirements:
     - WORDING FOLLOWS REQ-DASH-182 CRITERION 8'S FREQUENCY WORDS (delivery-scoper; SETTLED by Keith 2026-11-01 with v4), with 'Weekdays' for Monday to Friday (UX NIT) rather than '5 days a week'.
     - 'THE PERIOD VIEW AND THIS ROW AGREE (UX SHOULD, the 356/347 clash): on a not-owed day the composition table''s kind is ''Inherited from <Monday>'' and its sub-line is this requirement''s ''Not owed — it supplies only on Mondays'' (REQ-DASH-356 criterion 8). One sentence, two places.'
     - 'WEEKDAYS UNDER THEIR OWN KEY (built 2026-11-18): an owed-nothing row and an SLA version carry weekdays (Monday 0) beside months, never months holding day numbers, so a reader that knows only months reads nothing rather than the wrong thing.'
+    - 'Keith 2026-11-21 (post-build-review #493 M3): a gap is counted in what the dataset owes - consecutive days ''days'', days all on one weekday that weekday (''9 Mondays with no supply''), any other run ''owed days'', one day ''a day'' - by filing_queue._owed_unit and the page''s owedUnit() alike, from the gap''s own dates. A weekly dataset''s nine missed Mondays had read ''9 days'' across 57.'
     open_questions: []
   - id: REQ-QAC-348
     title: The quarterly asset gains Department of Health's Cancer collection, one annual dataset owed in the August round through participates as built, with its contract and checks
@@ -52050,6 +51856,7 @@ requirements:
     - 'THE SYSTEM SHALL add no route, path segment or query parameter: the trend''s table toggle is local view state, as ''View as table'' is today (dashboard finding 10).'
     - THE SYSTEM SHALL leave every dataset's, supply's and check's Pass/Warn/Fail as it is with or without a slow run.
     - THE SYSTEM SHALL have JS tests of the trend's order by rank, the hollow markers' words, the slow ring and ' · slow' text, the table's rows and too-few wording, the Status-cell placement (nothing in Timing), the as-of clip and the too-little-history sentence; and real-browser tests on the built dashboard that a real dataset's supply history shows the trend, including on a could-not-be-checked page, with zero console errors.
+    - 'THE SYSTEM SHALL scale the run-time trend to the runs that finished - its top the first of 2s, 4s, 10s, 20s, 30s, 1m, 2m, 4m, 10m, 20m, 30m and 1h, doubling beyond, at or above the longest, so every tick is a whole duration and none reads ''under 1s'' - and SHALL draw a failed try longer than that on the top edge, marked by a caret and in words ''off the scale'', the axis title saying so; SHALL keep off the trend, and say ''Not checked - <why>'' in its Status cell in place of a run time, an arrival run whose supply''s dataset checks never ran (it could not be loaded, or it was one of two files waiting for a choice); and SHALL show in the Status cell the time of the supply''s ARRIVAL run whatever run its row is keyed on, a full re-check''s in the re-check note. AMENDED 2026-11-21 (Keith, post-build-review #493).'
     non_functional_requirements:
     - 'UX BAR (Keith, the standing ''level Apple goes for'' bar): the trend sits below the ''is my dataset OK'' answer, at the head of the section the maintainer reads per-run facts in, and a second full-size chart never competes with the verdict (dashboard finding 5).'
     - 'PERFORMANCE: drawn from data already on the page, lazily with the rest of the dataset''s page; no extra fetch.'
@@ -52060,27 +51867,20 @@ requirements:
     - REQ-PIPE-412
     - REQ-TEST-416
     decisions:
-    - BOTH A TREND AND A TIME PER RUN, AND THE CLI TOO (T2, SETTLED by Keith 2026-11-14). REJECTED dashboard only; REJECTED CLI
-      and logs only.
-    - 'AT THE HEAD OF THE SUPPLY HISTORY (TR6, SETTLED by Keith 2026-11-14): below the verdict, and present on blocked and could-not-be-checked
-      pages, where #120''s story - a run growing, then timing out - matters most. REJECTED beside the column trend near the top
-      (it competes with the verdict); REJECTED collapsed behind ''Run times'' (no longer obvious at a glance).'
-    - 'FAILED TRIES AS HOLLOW MARKERS (TR8, SETTLED by Keith 2026-11-14): otherwise a run that grew and then timed out drops off
-      the chart at the moment that matters. REJECTED completed runs only.'
-    - 'THE STATUS CELL, NOT TIMING (dashboard finding 3, verified: SUPPLY_CYCLE_HEAD line 9525, waitedChip''s bare duration and
-      waitedTitle''s own warning that a bare duration beside an arrival reads as the arrival''s): facts about our check sit together.'
-    - '''SLOW'' OUTSIDE THE STATUS GRAMMAR (dashboard finding 4): every pill in the Status cell is about the verdict, so slow
-      is a bold word, and the trend is neutral ink.'
-    - 'NO ROLLUPS (dashboard finding 4): at about thirty collections an aggregated slow count beside a status pill would become
-      a status in all but name.'
-    - 'A ROW''S TIME IS ITS ARRIVAL RUN''S (dashboard finding 6): supply-history rows are supplies; re-check runs, which TA Q2
-      puts on the trend, are said in the row''s existing re-check note.'
+    - BOTH A TREND AND A TIME PER RUN, AND THE CLI TOO (T2, SETTLED by Keith 2026-11-14). REJECTED dashboard only; REJECTED CLI and logs only.
+    - 'AT THE HEAD OF THE SUPPLY HISTORY (TR6, SETTLED by Keith 2026-11-14): below the verdict, and present on blocked and could-not-be-checked pages, where #120''s story - a run growing, then timing out - matters most. REJECTED beside the column trend near the top (it competes with the verdict); REJECTED collapsed behind ''Run times'' (no longer obvious at a glance).'
+    - 'FAILED TRIES AS HOLLOW MARKERS (TR8, SETTLED by Keith 2026-11-14): otherwise a run that grew and then timed out drops off the chart at the moment that matters. REJECTED completed runs only.'
+    - 'THE STATUS CELL, NOT TIMING (dashboard finding 3, verified: SUPPLY_CYCLE_HEAD line 9525, waitedChip''s bare duration and waitedTitle''s own warning that a bare duration beside an arrival reads as the arrival''s): facts about our check sit together.'
+    - '''SLOW'' OUTSIDE THE STATUS GRAMMAR (dashboard finding 4): every pill in the Status cell is about the verdict, so slow is a bold word, and the trend is neutral ink.'
+    - 'NO ROLLUPS (dashboard finding 4): at about thirty collections an aggregated slow count beside a status pill would become a status in all but name.'
+    - 'A ROW''S TIME IS ITS ARRIVAL RUN''S (dashboard finding 6): supply-history rows are supplies; re-check runs, which TA Q2 puts on the trend, are said in the row''s existing re-check note.'
     - NO FABRICATED TIMES ON MOCK DATASETS (docs/project-context-for-agents.md, 'What's real vs illustrative').
-    - 'PROVISIONAL (2026-11-16): a re-check''s run time is its own muted note after the row''s status (''· re-checked <day> in
-      <d>''), beside rather than inside the existing re-check words.'
-    - 'PROVISIONAL (2026-11-16): the trend''s x labels are the day each run''s newest try ended; its y labels 0, half and the
-      largest time shown, in the shared format.'
+    - 'PROVISIONAL (2026-11-16): a re-check''s run time is its own muted note after the row''s status (''· re-checked <day> in <d>''), beside rather than inside the existing re-check words.'
+    - 'PROVISIONAL (2026-11-16): the trend''s x labels are the day each run''s newest try ended; its y labels 0, half and the largest time shown, in the shared format.'
     - 'THE BROWSER CASES ARE WRITTEN INTO ONE REAL DATASET''S RECORD (2026-11-18): the real corpus records no run that needed another try and none that crashed, so the retried and crashed tests rewrite cp-clients'' runTimes or OUTSTANDING''s blockers in the real build, every other byte unchanged - the same approach as _with_blockers. REJECTED recording a crash into a scratch copy of the deployment database, which costs a bootstrap per run for the same page.'
+    - 'AMENDED by Keith 2026-11-21 (post-build-review #493 H2): one 45-minute failed try flattened every 2-4s run onto zero; the trend scales to the runs that finished and a longer failed try is marked off the scale. REJECTED a log scale, and scaling that dropped the failed try.'
+    - 'AMENDED by Keith 2026-11-21 (#493 H3): a supply whose dataset checks never ran - could not be loaded, or a contested pair''s file waiting for a choice - is not checked, and its run time (a file check''s, ~70ms) is not how long our checks took. Judged from the recorded blockers, never from how short a run was. REJECTED limiting it to could-not-load.'
+    - '#493 M5: a scale whose half is a whole duration, so no middle tick reads ''under 1s''; #493 H1: a correction leaves a row keyed on its full re-check `<run>__r1`, whose 8s read as the 793ms arrival''s own time.'
     linked_tests:
     - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
@@ -52089,16 +51889,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::runTimeNotes
     - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
     evidence:
-    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
-      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
-      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
-      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
-      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
-      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
-      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
-      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
-      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
-      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s 2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js 23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
     - '2026-11-18: criterion 11''s browser half, once both deployment databases were rebuilt at schema 51 the same day: tests/test_dashboard_e2e.py''s TestRunTimesOnTheBuiltPage drives the real quarterly build - cp-clients'' supply history opens with ''How long our checks took'' and its points, each row''s run time in its Status cell - and, on the build with one could-not-check blocker written into OUTSTANDING, the trend still heads a ''Could not be checked'' page; clean_page asserts zero console errors on every one. 3 passed.'
     open_questions: []
     signed_off:
@@ -52112,8 +51903,8 @@ requirements:
     status: built
     source: 'Keith, #121 (''it should also be obvious somewhere that it did time out or crash. Maybe that one for the UX review'') and F2 (SETTLED 2026-11-14), TA Q8, review answers TR3, TR7, TR10; drafted by delivery-scoper 2026-11-14 (v1), revised v2 the same day with dashboard UX findings 2, 6-9 and the architect''s N8. A PROPOSAL, not signed. Signed by Keith 2026-11-14 as timing-attempts v2 (docs/drafts/timing-attempts-v2.yaml), after the architect, dashboard and CLI UX reviews.'
     acceptance_criteria:
-    - 'WHEN a run completed on its second or later try, THE SYSTEM SHALL say on its supply-history row - in the Status cell for its arrival run, in the re-check note for a re-check - ''Checked on the <ordinal> try - the <ordinal> <ended> after <duration>'', where <ended> is ''timed out'', ''crashed'', ''failed in <tool>'' or ''was stopped'' and <duration> comes from the shared JS duration function (REQ-TEST-416 criterion 4): ''Checked on the second try - the first timed out after 45m''; WHERE the earlier try has no recorded end, ''Checked on the second try - the first did not finish''; and SHALL NOT use the word ''attempt'', which stays the resupply''s word (TA Q8, TR10, N8).'
-    - THE SYSTEM SHALL render that note as the summary of a native details element, closed by default, whose body lists the run's tries as REQ-PIPE-411 criterion 3 emits them - the first, the newest five and 'and <n> more' - each with its number, when it began and ended, how it ended in words, its tool, its run time and its error's type, and a line naming `mothman supply failures` for the full error; opening it SHALL NOT change the URL (TR3, TR7, dashboard findings 7, 9, 10).
+    - 'WHEN a run completed on its second or later try, THE SYSTEM SHALL say on its supply-history row - in the Status cell for its arrival run, in the re-check note for a re-check - ''Checked on the <ordinal> try - '' followed by each failed try before it, oldest first, as ''the <ordinal> <ended> after <duration>'', joined by commas, where <ended> is ''timed out'', ''crashed'', ''failed in <tool>'' or ''was stopped'' and <duration> comes from the shared JS duration function (REQ-TEST-416 criterion 4): two tries ''Checked on the second try - the first timed out after 45m'', three ''Checked on the third try - the first timed out after 45m, the second crashed after 3s''; WHERE four or more tries came before it, ''<n> tries before it failed, the longest <ended> after <duration>'' (''Checked on the fifth try - 4 tries before it failed, the longest timed out after 45m''); WHERE an earlier try has no recorded end, ''the <ordinal> did not finish''; and SHALL NOT use the word ''attempt'', which stays the resupply''s word (TA Q8, TR10, N8). AMENDED 2026-11-21 (Keith, post-build-review #493).'
+    - 'THE SYSTEM SHALL render that note as the summary of a native details element, closed by default, whose body lists the run''s tries as REQ-PIPE-411 criterion 3 emits them - the first, the newest five and ''and <n> more'' - each list item numbered with its own try''s number and not repeating it in its text, saying when it began and ended - the date once where both fall on one day: ''began 1 May 2025, 9:09am, ended 9:54am - timed out after 45m'' - how it ended in words, its tool, its run time and its error''s type, and a line naming `mothman supply failures` for the full error; opening it SHALL NOT change the URL (TR3, TR7, dashboard findings 7, 9, 10). AMENDED 2026-11-21 (Keith, post-build-review #493).'
     - THE SYSTEM SHALL style the note as the existing muted re-check note, never in a status colour, with the title 'Our check of this supply needed another try; this is not about the supplier's delivery' (dashboard finding 7).
     - IF a try has no recorded end, THEN THE SYSTEM SHALL say its end and its run time are unknown, never show a time for it.
     - 'WHILE a date is on show in the as-of picker, THE SYSTEM SHALL judge each try as at that date: a try that had not begun is not shown; a try that had begun and not ended reads ''began <time>, not finished'', with no outcome, end or run time; only a try that had ended shows how (dashboard finding 2).'
@@ -52131,24 +51922,17 @@ requirements:
     - REQ-TEST-418
     decisions:
     - A SHORT NOTE PLUS THE LIST (F2, SETTLED by Keith 2026-11-14). REJECTED the list only; REJECTED lifting the supply to Warn.
-    - '''SECOND TRY'', NOT ''ATTEMPT'' (TA Q8, SETTLED by Keith 2026-11-14): ''attempt'' stays the resupply''s word (''Resupply,
-      attempt N'', template line 9464). REJECTED ''Check attempt 2 succeeded''; REJECTED F2''s words as given. The dashboard reviewer
-      confirmed the two read clearly apart: a pill in How it got here against muted prose in Status.'
-    - '''45m'', NOT ''45 min'' (TR10, SETTLED by Keith 2026-11-14): TA Q8''s sentence reads ''...the first timed out after 45m''
-      in the shared compact format. REJECTED words (''45 min'').'
-    - 'THE NOTE IS THE DISCLOSURE (dashboard finding 7, verified: details.file-passed and .category-group are the page''s existing
-      pattern): one click target where v1 had two; no run-level detail panel exists, so the row holds it.'
+    - '''SECOND TRY'', NOT ''ATTEMPT'' (TA Q8, SETTLED by Keith 2026-11-14): ''attempt'' stays the resupply''s word (''Resupply, attempt N'', template line 9464). REJECTED ''Check attempt 2 succeeded''; REJECTED F2''s words as given. The dashboard reviewer confirmed the two read clearly apart: a pill in How it got here against muted prose in Status.'
+    - '''45m'', NOT ''45 min'' (TR10, SETTLED by Keith 2026-11-14): TA Q8''s sentence reads ''...the first timed out after 45m'' in the shared compact format. REJECTED words (''45 min'').'
+    - 'THE NOTE IS THE DISCLOSURE (dashboard finding 7, verified: details.file-passed and .category-group are the page''s existing pattern): one click target where v1 had two; no run-level detail panel exists, so the row holds it.'
     - 'BOUNDED, AND THE REST IN mothman (TR3, TR7): the first try says how it started, the newest five how it is going.'
-    - 'EACH TRY JUDGED AS AT THE DATE ON SHOW (dashboard finding 2): v1''s ''attempts that began by that date'' would have shown
-      an outcome from after the date; in a replay one quarterly run spans about 6.3 simulated days, so this is not an edge case.'
-    - '''DID NOT FINISH'' (the architect, N8): a try killed without a signal has no end, so ''after <duration>'' cannot be filled
-      in.'
-    - 'PROVISIONAL (2026-11-16): the note is shown only once the completing try had ended by the date on show; before that the
-      row shows no tries note.'
+    - 'EACH TRY JUDGED AS AT THE DATE ON SHOW (dashboard finding 2): v1''s ''attempts that began by that date'' would have shown an outcome from after the date; in a replay one quarterly run spans about 6.3 simulated days, so this is not an edge case.'
+    - '''DID NOT FINISH'' (the architect, N8): a try killed without a signal has no end, so ''after <duration>'' cannot be filled in.'
+    - 'PROVISIONAL (2026-11-16): the note is shown only once the completing try had ended by the date on show; before that the row shows no tries note.'
     - 'NO NOTE UNLESS THE TRY BEFORE FAILED (post-build-review #404), as the terminal says it.'
-    - 'Criterion 6 is held at the build, where verdicts are made (TestAFailedTryNeverRaisesAStatus, #408), replacing a vacuous
-      JS assertion.'
+    - 'Criterion 6 is held at the build, where verdicts are made (TestAFailedTryNeverRaisesAStatus, #408), replacing a vacuous JS assertion.'
     - 'A DISCLOSURE INSIDE A CLICKABLE ROW IS NOT THE ROW''S CLICK (defect found by criterion 8''s browser test, 2026-11-18): the supply-history row''s click handler skipped links but not a details element, so opening a run''s tries moved the page to the row''s date, re-rendered it and closed the details - and wrote in-place-on to the address. The handler now leaves a click inside a details element alone, as it does a link (post-build-review #488).'
+    - 'AMENDED by Keith 2026-11-21 (post-build-review #493 M6), wording approved: the summary named only the try just before the success, which hid a 45-minute timeout two tries back; it now names every failed try before it, oldest first, and counts four or more with the longest named. Inside, ''Try <n>:'' beside the list''s own number and each full date twice are gone; each list item carries its try''s number as its value, so a list with tries left out still numbers them truly. REJECTED (Keith): a count-only form for three or more (''2 tries before it failed, the longest ...'').'
     linked_tests:
     - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
@@ -52157,21 +51941,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::triesAsAt
     - dashboard/qa-reporting-dashboard.template.html::tryLine
     evidence:
-    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
-      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
-      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
-      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
-      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
-      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
-      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
-      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
-      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
-      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
-    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
-      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
-      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
-      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
-      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s 2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js 23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases, test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line, test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test 91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     - '2026-11-18: criterion 8''s browser half (TestRunTimesOnTheBuiltPage): the real build with cp-clients'' newest arrival given two tries, the first timed out; the closed summary reads ''Checked on the second try - the first timed out after 45m'', and opening it leaves location.href and history.length unchanged. Its first run found the defect in this requirement''s decisions: the row''s own click moved the page to the row''s date, re-rendering it and closing the details; seen failing with the template''s fix reverted and passing with it.'
     open_questions: []
     signed_off:
@@ -52204,32 +51975,19 @@ requirements:
     - REQ-DASH-414
     - REQ-DASH-148
     decisions:
-    - '''COULD NOT BE CHECKED'' AND THE GREY ''NO DATA'' (TR5, SETTLED by Keith 2026-11-14): leads on the banner, the row, the
-      queue item and BLOCKER_LABEL, exactly as a failed load (REQ-DASH-148 criterion 2). SUPERSEDES F3''s ''Not checked - ...''
-      and ''No result''. REJECTED keeping F3''s words; REJECTED the label with ''No result''.'
-    - 'WHY NOT F3''S WORDS (dashboard finding 1, verified: STATUS_WORDS.notchecked at line 2256, defined by notCheckedNote as
-      ''neither a Fail nor a result, and does not count toward this dataset''s status''; ''No result'' is only the cross-table
-      grid''s word): the same label would have meant two things on one page, one of them ''does not count''.'
+    - '''COULD NOT BE CHECKED'' AND THE GREY ''NO DATA'' (TR5, SETTLED by Keith 2026-11-14): leads on the banner, the row, the queue item and BLOCKER_LABEL, exactly as a failed load (REQ-DASH-148 criterion 2). SUPERSEDES F3''s ''Not checked - ...'' and ''No result''. REJECTED keeping F3''s words; REJECTED the label with ''No result''.'
+    - 'WHY NOT F3''S WORDS (dashboard finding 1, verified: STATUS_WORDS.notchecked at line 2256, defined by notCheckedNote as ''neither a Fail nor a result, and does not count toward this dataset''s status''; ''No result'' is only the cross-table grid''s word): the same label would have meant two things on one page, one of them ''does not count''.'
     - 'LIKE A FAILED LOAD (TA Q4) and CLEARED BY A RETRY OR A REJECTION (TA Q9): see REQ-PIPE-417.'
     - 'WHICH RUNS (TR1): arrival runs and decision-caused full re-checks; see REQ-PIPE-417.'
-    - 'THE ERROR TYPE A LEVEL DOWN (dashboard finding 9): a psycopg class name on the banner is the raw tool jargon the data team
-      leader finds noisiest; it is in the try list.'
+    - 'THE ERROR TYPE A LEVEL DOWN (dashboard finding 9): a psycopg class name on the banner is the raw tool jargon the data team leader finds noisiest; it is in the try list.'
     - 'THE SAME WORDS FOR RUNNING AND DEAD (delivery-scoper): the build may not read pg_locks.'
-    - 'THE EXISTING BLOCKER PATH DOES THE BLANKING: a could-not-check blocker is a blocker like a failed load, so the page''s
-      own rule (blockerWithoutARunOfItsOwn) makes the dataset red and every own check the grey No data whenever it opened after
-      the latest checked supply - which an arrival''s receipt and a re-check''s decision both are.'
-    - 'PROVISIONAL (2026-11-16): an arrival nobody could check has no run in the cycle table (it recorded no dataset_stats), so
-      its supply-history row is the ''Waiting for a person'' table''s, as a failed load''s is; a supply re-checked and not checked
-      keeps its cycle row, which reads the grey No data while its blocker is open.'
-    - 'PROVISIONAL (2026-11-16): the try count in ''could not be checked on <n> tries'' is the count recorded, not clipped to
-      the date on show.'
-    - 'JUDGED BY THE SUPPLY''S OWN RECEIPT (post-build-review #401): blockerWithoutARunOfItsOwn compares a could-not-check blocker''s
-      receivedAt, not when its red opened, so a crashed re-check of an older supply does not blank a newer one. Its banner has
-      its own words (blockedBannerLead): the pass retries it, a person can reject it.'
-    - 'PROVISIONAL (2026-11-16): the try count is as at the date on show (#405); before the newest try ended, the page says how
-      many earlier tries did not finish.'
-    - 'FOR KEITH (recorded, #401): should a crashed re-check of an old period turn a later period red? 417 c4 says ''red for the
-      period once''.'
+    - 'THE EXISTING BLOCKER PATH DOES THE BLANKING: a could-not-check blocker is a blocker like a failed load, so the page''s own rule (blockerWithoutARunOfItsOwn) makes the dataset red and every own check the grey No data whenever it opened after the latest checked supply - which an arrival''s receipt and a re-check''s decision both are.'
+    - 'PROVISIONAL (2026-11-16): an arrival nobody could check has no run in the cycle table (it recorded no dataset_stats), so its supply-history row is the ''Waiting for a person'' table''s, as a failed load''s is; a supply re-checked and not checked keeps its cycle row, which reads the grey No data while its blocker is open.'
+    - 'PROVISIONAL (2026-11-16): the try count in ''could not be checked on <n> tries'' is the count recorded, not clipped to the date on show.'
+    - 'JUDGED BY THE SUPPLY''S OWN RECEIPT (post-build-review #401): blockerWithoutARunOfItsOwn compares a could-not-check blocker''s receivedAt, not when its red opened, so a crashed re-check of an older supply does not blank a newer one. Its banner has its own words (blockedBannerLead): the pass retries it, a person can reject it.'
+    - 'PROVISIONAL (2026-11-16): the try count is as at the date on show (#405); before the newest try ended, the page says how many earlier tries did not finish.'
+    - 'FOR KEITH (recorded, #401): should a crashed re-check of an old period turn a later period red? 417 c4 says ''red for the period once''.'
+    - 'Keith 2026-11-21 (post-build-review #493 M2): the red Fail and its rollup stay (REQ-DASH-148''s model), and the banner''s first line says whose failure it is: ''Could not be checked — our pipeline could not check this supply; this is not a problem with the supplier''s data.'' The next step is said once, in the words beneath, which no longer repeat the label (M1); a try ended AT a time, never ''on 9:09am''. REJECTED a distinct not-checked state, outlined rather than red.'
     linked_tests:
     - tests/test_dashboard_e2e.py
     - tests-js/run-times.test.js
@@ -52239,21 +51997,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::supplyRowStatus
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     evidence:
-    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not
-      needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py
-      (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader
-      (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s
-      2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py
-      and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen
-      failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases
-      failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js
-      23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment
-      half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
-    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected
-      modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases,
-      test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line,
-      test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test
-      91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
+    - '2026-11-16, tree 5748a6ef plus the two test fixes in the commit that flips this to built: the fast half (pytest -m ''not needs_deployment'' -n 2) 6 failed, 7646 passed, 1 error in 39m32s on 5748a6ef. Of those, tests/test_door_flag_parity.py (a parity example the new could-not-be-checked state needed) and tests/test_attempts_in_the_build.py::TestPackageGatingReadsTheOneReader (asserted on the first reader call) were this batch''s and are fixed: both modules then 85 passed. tests/test_geocoding_faults.py''s 2 fail identically on the base 12f06b34 product code (not this batch); tests/test_period_opening.py, tests/test_refused_dataset_freezes.py and tests/test_distribution_groups.py passed when re-run alone (76 passed with geocoding''s 2 failing). New modules seen failing first against the code before them: test_attempt_run_time 22 failed of 64 with test_check_read_and_attempts; test_run_summary_line/test_duration_cases failed on import; test_attempts_in_the_build 14 of 19; test_could_not_check 15 of 17; test_slow_runs on import; tests-js/run-times.test.js 23 of 25. npm test 90 files, 1186 passed (before run-times'' last fix; run-times 25 passed after). The needs_deployment half and the e2e browser tests were NOT run: the deployment databases are at schema 50 and refused at 51 until rebuilt.'
+    - '2026-11-16, the post-build critic''s fixes (post-build-review #400-#408), on the tree committed with them: 15 affected modules (test_could_not_check, test_place_held_supply, test_attempts_in_the_build, test_tables_read, test_duration_cases, test_dataset_blockers, test_outstanding, test_filing_queue, test_package_gating, test_door_flag_parity, test_run_summary_line, test_attempt_run_time, test_build_dashboard_data, test_build_from_the_record, test_processing_pass) 425 passed; npm test 91 files, 1197 passed; ruff clean. Each defect''s test failed against 78edbad9 first.'
     - '2026-11-18: criterion 10''s browser half (TestRunTimesOnTheBuiltPage): the real build with one could-not-check blocker - a newer cp-clients supply whose only try crashed - reads ''Could not be checked'', ''Nothing is yet known about this supply''s data'' and ''The next processing pass retries it'' on the dataset page, with zero console errors.'
     open_questions: []
     signed_off:
