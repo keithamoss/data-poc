@@ -15,3 +15,26 @@ requirements.yaml until each requirement is presented and signed.
   (REQ-GHUB-433 as drafted).
 - **Q3.1, REQ-PIPE-352:** (a) retire c5 (to REQ-PIPE-250) and c6
   (`replaced_by: [REQ-PIPE-403]`).
+
+## Set B - project extractions (REQ-PIPE-379 c5)
+
+- **Q4.1, does an extraction's QA count?** (a) Yes - `never` verdicts are real
+  history and roll up within the extraction's own dashboard; REQ-PIPE-106's
+  not-counted rules apply to `not-yet-agreed` only (one small amending requirement).
+- **Q4.2, the outcome:** (b) a recorded release-or-withhold decision for the whole
+  extraction, with actor and reason.
+- **Q4.3, a second package in one extraction's database:** (a) refused; a re-send
+  is a new extraction (sprint 29 point 9).
+- **Q4.4, scope now:** (b) scope sprint 29's five alongside the lifecycle four -
+  recipe format, hierarchy from the recipe, the two check layers, the ephemeral
+  database and TUI path, publishing - so the end-to-end test runs a real recipe
+  package. (Not the recommendation, which was the lifecycle only.)
+
+## Set C - extractions, non-functional
+
+- **Q4.5, privacy:** (b) the same as recurring datasets - up to 5 failing-row
+  identifier keys per check. (Not the recommendation, counts only.)
+- **Q4.6, retention:** (a) a person drops the ephemeral database from the TUI,
+  typed confirmation; never automatic.
+- **Q4.7, mixing:** (a) a `never` dataset lives only on an extraction deployment
+  of its own; a recurring asset's configuration refuses one.
