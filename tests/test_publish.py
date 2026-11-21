@@ -150,6 +150,15 @@ class TestTheGateCannotBeSkipped:
                 return returns
             return _run
 
+        # NO WRANGLER HERE, as on CI's pytest runner, which never runs `npm ci`:
+        # found only through this checkout's node_modules, this test passed
+        # locally and failed on 724752c4's critical run.
+        monkeypatch.setattr(hosting, "ROOT", tmp_path)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        # ...so the transport is stubbed with the rest: this test is about the
+        # order and the gate (tests/test_cloudflare_publish.py drives wrangler).
+        monkeypatch.setattr(hosting, "find_wrangler", lambda: "stub-wrangler")
+        monkeypatch.setattr(hosting, "wrangler", lambda: "stub-wrangler")
         where = hosting.Hosting("p", "main", "https://p.pages.dev", "team.cloudflareaccess.com")
         monkeypatch.setattr(dashboard_cli, "publish_refusal", lambda **k: None)
         monkeypatch.setattr(hosting, "hosting", lambda: where)
