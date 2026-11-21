@@ -17257,3 +17257,12 @@ twice. It deliberately did not re-find the `TypeError`.
      Verified met by the functional critic: 355 c1-c8, c11; 356 c4-c8;
      367 c1-c7; REQ-DASH-209's amendments and 208 c2. Not verified: 355 c10
      and 356 c10 (one-off comparisons in evidence).
+
+491. **[done, 2026-11-21]** **[Docs & process]** **724752c4's commit message names the wrong chunks as having run before the snapshots_from quoting.**
+     It says "Chunks 00-05 ran before the snapshots_from quoting". The quoting
+     (data-asset.yaml's `snapshots_from: "2026-11-21"`) landed at about 04:25
+     UTC, so chunks 00-10 ran before it; 06 was re-run on the final tree, so
+     the chunks run at the earlier tree are 00-05 and 07-10. Every other
+     claim in the message stands. The commit is pushed and not rewritten; this
+     entry and the next pushed commit's message carry the correction, as #487
+     did for a6d20186.
