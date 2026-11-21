@@ -41,6 +41,15 @@ def conn(clean_qa_history):
         for table in ("hold", "load_outcome", "filing", "delivery_file", "delivery"):
             c.execute(f'TRUNCATE "{qa_store.SCHEMA}"."{table}" CASCADE')
     yield clean_qa_history
+    # NOTHING THIS MODULE RAISED MAY OUTLIVE IT (post-build-review #493): its
+    # runs end unfinished on purpose, and an unfinished run is an open 'could
+    # not be checked' blocker to every later module on the worker -
+    # test_dataset_blockers.py's TestOpenFromTheReceiptInstant found eight more
+    # blockers than it made whenever it ran after this one.
+    with supply_db.connect(label="test-could-not-check") as c:
+        c.execute(f'TRUNCATE "{qa_store.SCHEMA}".run, "{qa_store.SCHEMA}".run_attempt CASCADE')
+        for table in ("hold", "load_outcome", "filing", "delivery_file", "delivery"):
+            c.execute(f'TRUNCATE "{qa_store.SCHEMA}"."{table}" CASCADE')
 
 
 class Supply:

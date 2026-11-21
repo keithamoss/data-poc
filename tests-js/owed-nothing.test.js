@@ -147,7 +147,7 @@ describe("owed-nothing rows in the supply history (criteria 1, 2, 10, 12 and 13)
                                         off("2026-Q2", "2026-05-01")] });
     const runs = w.owedNothingRuns(raw, "2026-06-15");
     expect(runs).toHaveLength(1);
-    expect(runs[0].text).toBe("Turned off — paused, 2025-Q4 to 2026-Q2 (3 periods so far)".replace(
+    expect(runs[0].text).toBe("Turned off — paused: 2025-Q4 to 2026-Q2 (3 periods so far)".replace(
       "2025-Q4", w.fmtPeriodOrDay("2025-Q4")).replace("2026-Q2", w.fmtPeriodOrDay("2026-Q2")));
     const closed = w.owedNothingRuns(raw, "2026-09-15");
     expect(closed[0].text).toMatch(/\(3 periods\)$/);
@@ -315,6 +315,15 @@ describe("post-build-review #194", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].text).toMatch(/\(3 days\)$/);
     expect(w.owedNothingRuns(raw, "2026-03-03")[0].text).toMatch(/\(3 days so far\)$/);
+  });
+
+  it("keeps its reason apart from its dates, whose own commas read as a list otherwise (#493 nit)", () => {
+    // 'it supplies only on Mondays, Tuesday, 17 November ...' read as two weekdays.
+    const w = load();
+    const off = (d) => ({ period: d, date: d, kind: "turned_off", reason: "paused", months: null });
+    const raw = dataset({ id: "birth-registrations",
+                          owedNothing: [off("2026-03-01"), off("2026-03-02"), off("2026-03-03")] });
+    expect(w.owedNothingRuns(raw, "2026-03-10")[0].text).toMatch(/^Turned off — paused: Sunday, 1 March 2026 to /);
   });
 });
 

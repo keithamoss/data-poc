@@ -10431,7 +10431,10 @@ function owedNothingRuns(d, dateStr, supplied){
     r.current = current != null && r.periods[n-1] === current;
     const unit = /^\d{4}-\d{2}-\d{2}$/.test(r.periods[0]) ? "day" : "period";
     r.text = n === 1 ? r.label
-      : `${r.label}, ${fmtPeriodOrDay(r.periods[0])} to ${fmtPeriodOrDay(r.periods[n-1])} (${n} ${pluralize(n, unit)}${r.current ? " so far" : ""})`;
+      // A COLON, NOT A COMMA, before the dates (post-build-review #493 nit):
+      // a day's own commas made 'only on Mondays, Tuesday, 17 November' read
+      // as a list of weekdays.
+      : `${r.label}: ${fmtPeriodOrDay(r.periods[0])} to ${fmtPeriodOrDay(r.periods[n-1])} (${n} ${pluralize(n, unit)}${r.current ? " so far" : ""})`;
   });
   return runs;
 }
@@ -13914,6 +13917,10 @@ function changedSinceNote(onDateStr){
 function renderInPlaceOnPastNotice(){
   const notice = document.getElementById("in-place-on-past-notice");
   if(!notice) return;
+  // A MOVED PAGE SAYS NOTHING OF THIS ASSET'S PERIODS OR DATES (post-build-
+  // review #493 nit): it shows only where the thing went, and its link drops
+  // period= already.
+  if(movedEntryForRoute()){ notice.hidden = true; notice.innerHTML = ""; return; }
   // WHILE A PERIOD IS CHOSEN, ONE STATEMENT (REQ-DASH-355 criterion 6).
   if(typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD) return renderPeriodStatement(notice);
   const past = CURRENT_IN_PLACE_ON && DEFAULT_IN_PLACE_ON && CURRENT_IN_PLACE_ON !== DEFAULT_IN_PLACE_ON;

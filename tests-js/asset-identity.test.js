@@ -73,6 +73,17 @@ describe("a Feedback card's link to a route this asset does not hold (criterion 
   });
 });
 
+describe("a moved page carries none of this asset's period words (#493 nit)", () => {
+  it("shows no period statement over the moved notice", () => {
+    dashboard = built({ url: "https://data-poc-quarterly.pages.dev/?period=2026-Q3#/agency/registry-services" });
+    const w = dashboard.window;
+    w.eval("CURRENT_PERIOD = '2026-Q3'");
+    w.eval("STATE = {tier: 'dataset', agencyId: 'registry-services', collectionId: 'civil-registration', datasetId: 'birth-registrations'}");
+    w.renderInPlaceOnPastNotice();
+    expect(w.document.getElementById("in-place-on-past-notice").hidden).toBe(true);
+  });
+});
+
 describe("the Demo caption (criterion 10)", () => {
   it("is shown where the build captions it", () => {
     dashboard = built({ caption: "Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily" });
