@@ -45,3 +45,21 @@ requirements.yaml until each requirement is presented and signed.
   **no ephemeral database at all** as a real option beside sprint 29's
   ephemeral-database-plus-TUI requirement. Not decided; the scoper drafts both
   shapes and one settling question.
+
+## Round 2, on deferred-rescope-v2.yaml
+
+1. **Database:** (a) shape A, an ephemeral PostgreSQL database per extraction
+   (REQ-PIPE-442); REQ-PIPE-445 (no database) is rejected and comes out of the draft.
+2. **Where an extraction's configuration lives:** (b) a generated `assets/<extraction>/`
+   folder committed for each extraction. (Not the recommendation, a shared template;
+   the scoper flagged it as 30-40 a year and closer to state than configuration.)
+3. **Publishing and the decision:** (b) publish at any time as a QA report, showing
+   the decision once there is one. (Not the recommendation, decision first.)
+4. **What a release does:** (a) recorded only; the system never moves data.
+5. **Dropping an extraction never published:** (b) allowed with the typed
+   confirmation, which warns that no record will remain. (Not the recommendation.)
+6. **Recipe v1:** (b) the core fields plus optional expected row counts per table,
+   checked when present. (Not the recommendation.)
+7. **A declared table missing or an undeclared file present:** (a) failing
+   default-layer checks; QA carries on.
+8. **The root `file-checks.yaml`:** (a) applies to extractions.
