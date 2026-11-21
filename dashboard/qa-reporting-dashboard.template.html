@@ -1102,7 +1102,7 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
         </svg>
       </div>
       <div class="wordmark-text">
-        <div class="eyebrow">Multi-Agency Data Asset · Quality Assurance</div>
+        <div class="eyebrow" id="masthead-asset">Multi-Agency Data Asset · Quality Assurance</div>
         <h1>Data Asset QA Register</h1>
       </div>
     </button>
@@ -2867,6 +2867,15 @@ const SCENARIO_MAP = [];
 // with the build: a real asset's footer does not say its supplies are
 // generated. The raw template stands for a synthetic asset.
 const ASSET_SYNTHETIC = true;
+// THE ASSET'S NAME FOR A READER (REQ-PIPE-354 criterion 2, SETTLED by Keith
+// 2026-11-01: 'Quarterly data asset', 'Daily data asset'), from its
+// data-asset.yaml's display_name, in the masthead and every page title. Null in
+// the raw template.
+const ASSET_DISPLAY_NAME = null;
+// WHAT MOVED TO ANOTHER ASSET (REQ-PIPE-354 criterion 6): [{id, name,
+// asset_name, address}], from data-asset.yaml's moved_to - configuration, so
+// this page never reads the other asset's.
+const MOVED_TO = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -2943,6 +2952,11 @@ const SPRINT_DEPENDENCIES = null;
 // (AskUserQuestion): a real recording deserves its own tab, not a
 // cramped drawer.
 const DEMO_CAST = null;
+// THE DEMO'S CAPTION WHERE THE RECORDING IS OF ANOTHER ASSET (REQ-PIPE-354
+// criterion 10, wording SETTLED by Keith 2026-11-01) - from
+// dashboard/demos/qa_wizard.yaml at build time; null on the recording's own
+// asset and in the raw template.
+const DEMO_CAPTION = null;
 
 // Shared by every collection - each dataset is reshaped server-side into
 // this exact per-dataset JSON shape by pipeline/build_dashboard_data.py
@@ -7442,7 +7456,14 @@ window.addEventListener("popstate", (e)=>{
 // place to keep in step, and a tier added later gets this for free.
 // Pills are stripped - "Real pipeline data - 42 computed runs" is a
 // badge, not part of the view's name.
-const SITE_NAME = "Data Asset QA Register";
+// NAMING THE ASSET (REQ-PIPE-354 criterion 2): '<asset> · Data Asset QA
+// Register' wherever the build says which asset this is.
+const SITE_NAME = ASSET_DISPLAY_NAME ? `${ASSET_DISPLAY_NAME} \u00b7 Data Asset QA Register`
+  : "Data Asset QA Register";
+(function nameTheAssetInTheMasthead(){
+  const el = document.getElementById("masthead-asset");
+  if(el && ASSET_DISPLAY_NAME) el.textContent = `${ASSET_DISPLAY_NAME} \u00b7 Quality Assurance`;
+})();
 function currentViewName(){
   const h2 = document.querySelector("#view h2");
   if(!h2) return "";
@@ -9053,7 +9074,45 @@ function agencyCardHtml(ag){
 //
 // Found while removing fourteen datasets at once (REQ-DASH-055), which
 // is what made the case easy to hit, but it was always reachable.
+// THE ROUTE NAMES SOMETHING THAT MOVED TO ANOTHER ASSET (REQ-PIPE-354
+// criterion 6): the deepest of its dataset, collection and agency ids that a
+// MOVED_TO entry names, or null.
+function movedEntryForRoute(state){
+  const s = state || STATE || {};
+  for(const id of [s.datasetId, s.collectionId, s.agencyId]){
+    const hit = id && (MOVED_TO || []).find(m=> m.id === id);
+    if(hit) return hit;
+  }
+  return null;
+}
+// THE MOVED NOTICE'S LINK: the other asset's address, carrying the same hash
+// route and in-place-on, and dropping period=, cmp= and panel= - they name
+// this asset's periods, comparisons and panels.
+function movedHref(entry){
+  const target = new URL(entry.address);
+  const here = new URL(location.href);
+  for(const [k, v] of here.searchParams){
+    if(!["period", "cmp", "panel"].includes(k)) target.searchParams.set(k, v);
+  }
+  target.hash = location.hash;
+  return target.toString();
+}
+// SAID IN THE NOT-FOUND PAGE'S HEAD AND RAIL, never as a redirect (criterion
+// 6; wording SETTLED by Keith 2026-11-01): the name from the entry itself.
+function renderMovedNotice(view, entry){
+  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
+  view.innerHTML = `
+    <div class="view-head" data-moved-notice>
+      <div>
+        <h2>${escHtml(entry.name)} has moved to the ${escHtml(entry.asset_name)}'s dashboard</h2>
+        <div class="view-sub"><a href="${escAttr(movedHref(entry))}" data-moved-link>${escHtml(entry.address)}</a></div>
+        <div class="view-sub" data-moved-signin>That dashboard has its own sign-in.</div>
+      </div>
+    </div>`;
+}
 function renderNotFound(view, what, id){
+  const moved = movedEntryForRoute();
+  if(moved) return renderMovedNotice(view, moved);
   setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   view.innerHTML = `
     <div class="view-head">
@@ -13165,7 +13224,32 @@ function feedbackEvidence(item){
   if(item.kind === "sprint"){
     return `<span>Road-testing sprint ${item.n}${item.title ? ` — ${escHtml(item.title)}` : ""}</span>`;
   }
+  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): kept where
+  // moved_to covers it - following it shows the moved notice - and otherwise
+  // the label alone, never a link to the not-found page.
+  const state = feedbackRouteState(item.href);
+  if(state && !routeHeldHere(state) && !movedEntryForRoute(state))
+    return `<span data-fb-unlinked>${escHtml(item.label)}</span>`;
   return `<a href="${escAttr(item.href)}" data-fb-link="${escAttr(JSON.stringify({href:item.href, inPlaceOn:item.inPlaceOn || null}))}">${escHtml(item.label)}</a>`;
+}
+function feedbackRouteState(href){
+  const hash = String(href || "").split("#")[1];
+  if(hash == null) return null;
+  return pathToState(hash.split("?")[0].replace(/^\//, ""));
+}
+// WHETHER THIS DASHBOARD HOLDS A ROUTE'S AGENCY, COLLECTION AND DATASET -
+// read from the embedded hierarchy. With none embedded (the raw template)
+// every route counts as held.
+function routeHeldHere(state){
+  const agencies = HIERARCHY && HIERARCHY.agencies;
+  if(!agencies || !state.agencyId) return true;
+  const ag = agencies.find(a=> a.id === state.agencyId);
+  if(!ag) return false;
+  if(!state.collectionId) return true;
+  const col = (ag.collections || []).find(c=> c.id === state.collectionId);
+  if(!col) return false;
+  if(!state.datasetId) return true;
+  return (col.datasets || []).some(d=> d.id === state.datasetId);
 }
 function feedbackCard(card){
   const why = FEEDBACK_WHY_NOT.has(card.status);
@@ -13292,6 +13376,7 @@ function renderDemo(view){
         <div class="view-sub">A real recording of the actual <code>mothman</code> CLI/TUI - the Quality Assurance wizard, run for real against real synthetic Birth Registrations data. Not a mockup: every keystroke and every line of output below is what actually happened, captured with a real pseudo-terminal (see <code>scripts/dev/record_cast.py</code>).</div>
       </div>
     </div>
+    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${escHtml(DEMO_CAPTION)}</div>` : ""}
     <div id="demo-player-container" style="max-width:900px;"></div>
   `;
   const container = document.getElementById("demo-player-container");

@@ -770,6 +770,15 @@ def embed() -> None:
     # criterion 12), through the one reader of `synthetic: true`.
     html = _replace_const(html, "ASSET_SYNTHETIC",
                           json.dumps(asset_time.declared_synthetic()))
+    # THE ASSET'S NAME AND WHAT MOVED OUT OF IT (REQ-PIPE-354 criteria 2 and
+    # 6), from its own data-asset.yaml only.
+    from asset_model import assets as _assets
+    from asset_model import config_yaml as _config_yaml
+
+    _doc = _config_yaml.load(_assets.selected().data_asset_yaml) or {}
+    html = _replace_const(html, "ASSET_DISPLAY_NAME", json.dumps(_doc.get("display_name")))
+    html = _replace_const(html, "MOVED_TO", json.dumps(_doc.get("moved_to") or [],
+                                                        separators=(",", ":")))
     # THE SELECTED ASSET'S OWN SNAPSHOT ARCHIVE (REQ-DASH-373 criteria 3 and
     # 5): its folder, which the picker's links name, and the date it starts.
     from dashboard.snapshot_dashboard import archive_settings
@@ -873,6 +882,19 @@ def embed() -> None:
     else:
         html = _replace_const(html, "DEMO_CAST", "null")
         print("Re-embedded DEMO_CAST = null (no dashboard/demos/qa_wizard.cast - not recorded yet)")
+    # THE DEMO'S CAPTION ON ANOTHER ASSET'S DASHBOARD (REQ-PIPE-354 criterion
+    # 10): read from the recording's own facts, never an asset named in code.
+    demo_facts_path = os.path.join(os.path.dirname(DEMO_CAST_PATH), "qa_wizard.yaml")
+    caption = None
+    if os.path.exists(demo_facts_path):
+        from pathlib import Path as _P
+
+        from asset_model import config_yaml as _cy
+
+        facts = _cy.load(_P(demo_facts_path)) or {}
+        if facts.get("asset") and facts.get("asset") != assets.selected().name:
+            caption = facts.get("caption")
+    html = _replace_const(html, "DEMO_CAPTION", json.dumps(caption))
 
     # THE FILES, THEN THE PAGE, THEN THE TIDY (REQ-DASH-291 criterion 11): a
     # page is never on disk naming a file that is not, and a file the old

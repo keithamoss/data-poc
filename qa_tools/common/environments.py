@@ -203,5 +203,19 @@ def for_connection(path: Path | str | None = None) -> Environment:
             f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
             f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "
             f"ticketing off for {env.id!r} in assets/environments.yaml.")
+    # A TICKET LINKS TO THE DASHBOARD, so the address it links to must be
+    # configured too (REQ-GHUB-258 criterion 3), named by its key.
+    if env.ticketing and not _dashboard_address_configured():
+        raise EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
+            f"names no hosting.address for a ticket to link to. Name the dashboard's address "
+            f"under hosting: or turn ticketing off for {env.id!r} in assets/environments.yaml.")
     return env
+
+
+def _dashboard_address_configured() -> bool:
+    from asset_model.hierarchy import data_asset_yaml
+
+    doc = config_yaml.load(Path(data_asset_yaml())) or {}
+    return bool(str(((doc.get("hosting") or {}).get("address")) or "").strip())
 

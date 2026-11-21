@@ -13,7 +13,7 @@ import pytest
 
 
 from qa_tools.common.ticket_check_summary import (
-    DASHBOARD_BASE_URL, build_check_summary, check_url,
+    build_check_summary, check_url,
 )
 
 def _check(key, name, description, status, tool_ref=None, **over):
@@ -149,7 +149,7 @@ class TestCheckUrl:
     def test_it_matches_the_dashboards_own_path_shape(self):
         url = check_url("registry-services", "civil-registration",
                         "birth-registrations", "sex", "not_null_dbt")
-        assert url == (DASHBOARD_BASE_URL + "#/agency/registry-services/collection/"
+        assert url == ("https://data-poc-daily.pages.dev/#/agency/registry-services/collection/"
                        "civil-registration/dataset/birth-registrations/column/sex/"
                        "check/not_null_dbt")
 
@@ -223,6 +223,25 @@ class TestAgainstTheRealCommittedCheckDefinitions:
             tool, terse = ref.split(":", 1)
             assert key == f"{terse}_{tool}", check.check_id
             assert check_url("a", "b", "c", "col", key).endswith(f"/check/{key}")
+
+
+class TestTheLinkComesFromConfiguration:
+    """REQ-GHUB-258 criteria 1 to 3: the address is the asset's own
+    hosting.address, nothing hardcoded, and ticketing with none configured is
+    refused before connecting, naming the key."""
+
+    @pytest.mark.parametrize("asset", [pytest.param("quarterly", marks=pytest.mark.asset("quarterly")),
+                                       pytest.param("daily", marks=pytest.mark.asset("daily"))])
+    def test_each_asset_links_to_its_own_dashboard(self, asset):
+        assert check_url("a", "c", "d", "col", "k").startswith(f"https://data-poc-{asset}.pages.dev/#/")
+
+    def test_ticketing_with_no_address_is_refused_naming_the_key(self, monkeypatch):
+        from qa_tools.common import environments
+
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+        monkeypatch.setattr(environments, "_dashboard_address_configured", lambda: False)
+        with pytest.raises(environments.EnvironmentError_, match="names no hosting.address"):
+            environments.for_connection()
 
 
 #: The data asset this module's tests act for, unless a test says otherwise

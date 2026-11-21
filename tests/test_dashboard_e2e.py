@@ -10430,3 +10430,48 @@ class TestAnEmptyArchiveSaysWhenItStarts:
         text = " ".join(body.inner_text().split())
         assert text == ("Snapshots start from this asset's first publish after the split, "
                         "Saturday, 21 November 2026."), text
+
+
+@pytest.mark.shared_page
+class TestAMovedCollectionSaysWhereItWent:
+    """REQ-PIPE-354 criterion 7, on the real quarterly build: a pre-split
+    Birth Registrations dataset route shows the one-line notice, its link to
+    the daily dashboard carries the route and in-place-on and drops period=,
+    the title and the announcement name it, and the page does not navigate."""
+
+    ROUTE = {"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration",
+             "datasetId": "birth-registrations"}
+
+    @pytest.mark.fresh_load  # its own query string
+    def test_the_notice_on_a_pre_split_route(self, clean_page, built_dashboard_html):
+        url = (f"file://{built_dashboard_html.resolve()}?in-place-on=2026-09-01&period=2026-Q3"
+               f"#{_state_to_path(self.ROUTE)}")
+        clean_page.goto(url)
+        clean_page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        line = "Birth Registrations has moved to the Daily data asset's dashboard"
+        assert clean_page.locator("#view h2").inner_text().strip() == line
+        href = clean_page.locator("[data-moved-link]").get_attribute("href")
+        from urllib.parse import parse_qs, urlsplit
+
+        parts = urlsplit(href)
+        assert f"{parts.scheme}://{parts.netloc}" == "https://data-poc-daily.pages.dev"
+        assert parts.fragment == _state_to_path(self.ROUTE)
+        query = parse_qs(parts.query)
+        assert query.get("in-place-on") == ["2026-09-01"] and "period" not in query
+        assert clean_page.locator("[data-moved-signin]").is_visible()
+        assert line in clean_page.title()
+        assert clean_page.locator("#route-announcer").inner_text().strip() == line
+        assert clean_page.url.startswith(f"file://{built_dashboard_html.resolve()}"), "it did not navigate"
+
+
+@pytest.mark.shared_page
+class TestTheDemoSaysWhereItWasRecorded:
+    """REQ-PIPE-354 criterion 10 on the real quarterly build: the Demo tab is
+    there, captioned as a recording of the daily asset's commands, from
+    dashboard/demos/qa_wizard.yaml."""
+
+    def test_the_caption(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "demo"})
+        caption = clean_page.locator("[data-demo-caption]")
+        assert caption.inner_text().strip() == (
+            "Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily")

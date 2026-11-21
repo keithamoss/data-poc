@@ -41,9 +41,21 @@ from urllib.parse import quote
 
 from qa_tools.common.dataset_status import dashboard_status_of
 
-# The real published dashboard. A ticket is read on github.com, so a
-# relative link is no use and this has to be absolute.
-DASHBOARD_BASE_URL = "https://keithamoss.github.io/data-poc/"
+def dashboard_address() -> str:
+    """The published dashboard's address, from the selected asset's
+    data-asset.yaml `hosting.address` (REQ-GHUB-258 criterion 1) - never a
+    hardcoded one. A ticket is read on github.com, so a relative link is no
+    use and this has to be absolute. Refused where none is configured; an
+    environment that turns ticketing on is refused before it connects
+    (environments.for_connection, criterion 3)."""
+    from asset_model import assets, config_yaml
+
+    doc = config_yaml.load(assets.selected().data_asset_yaml) or {}
+    address = str(((doc.get("hosting") or {}).get("address")) or "").strip()
+    if not address:
+        raise ValueError(f"{assets.selected().data_asset_yaml.name} names no hosting.address, "
+                         f"the dashboard address a ticket links to")
+    return address.rstrip("/") + "/"
 
 # Ordered worst-first, which is also the order the sections print in.
 _NOT_GREEN = ("red", "amber")
@@ -80,7 +92,7 @@ def check_url(agency_id: str, collection_id: str, dataset_id: str,
         "agency", agency_id, "collection", collection_id,
         "dataset", dataset_id, "column", column_name, "check", check_key,
     ]
-    return DASHBOARD_BASE_URL + "#/" + "/".join(quote(s, safe="") for s in seg)
+    return dashboard_address() + "#/" + "/".join(quote(s, safe="") for s in seg)
 
 
 def _not_green_checks(dataset: dict) -> list[tuple[str, dict, str]]:
