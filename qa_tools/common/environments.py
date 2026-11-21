@@ -59,6 +59,11 @@ class Environment:
     label: str
     description: str = ""
     publishes: bool = False
+    #: The one environment that IS production (Keith, 2026-11-21, amending
+    #: REQ-TEST-114 criterion 5): every other environment says "not
+    #: production", whatever it publishes - the sandbox publishes today and is
+    #: still not production. Declared, never inferred from an id.
+    production: bool = False
     #: A person TYPES this environment's id before any change they make by
     #: hand from the terminal (REQ-PIPE-093 criteria 4-8).
     confirm_changes: bool = False
@@ -108,10 +113,16 @@ def _parse_environments(path: Path, text: str) -> list[Environment]:
             label=entry.get("label") or env_id,
             description=(entry.get("description") or "").strip(),
             publishes=bool(entry.get("publishes")),
+            production=bool(entry.get("production")),
             confirm_changes=bool(entry.get("confirm_changes")),
             ticketing=bool(entry.get("ticketing")),
         ))
 
+    productions = [e.id for e in out if e.production]
+    if len(productions) > 1:
+        raise EnvironmentError_(
+            f"{path}: {len(productions)} environments claim to be production "
+            f"({', '.join(productions)}) - at most one is")
     publishing = [e.id for e in out if e.publishes]
     if len(publishing) > 1:
         raise EnvironmentError_(
@@ -192,5 +203,19 @@ def for_connection(path: Path | str | None = None) -> Environment:
             f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
             f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "
             f"ticketing off for {env.id!r} in assets/environments.yaml.")
+    # A TICKET LINKS TO THE DASHBOARD, so the address it links to must be
+    # configured too (REQ-GHUB-258 criterion 3), named by its key.
+    if env.ticketing and not _dashboard_address_configured():
+        raise EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
+            f"names no hosting.address for a ticket to link to. Name the dashboard's address "
+            f"under hosting: or turn ticketing off for {env.id!r} in assets/environments.yaml.")
     return env
+
+
+def _dashboard_address_configured() -> bool:
+    from asset_model.hierarchy import data_asset_yaml
+
+    doc = config_yaml.load(Path(data_asset_yaml())) or {}
+    return bool(str(((doc.get("hosting") or {}).get("address")) or "").strip())
 

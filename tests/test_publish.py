@@ -61,6 +61,9 @@ class TestThereIsExactlyOnePublishPath:
         monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
         monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
         monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
+        # The suite's `test` environment publishes nothing; this is about the
+        # route, so the refusal it would meet first is set aside.
+        monkeypatch.setattr(dashboard_cli, "publish_refusal", lambda **k: None)
         result = CliRunner().invoke(pipeline.run_command, ["--publish"])
         assert result.exit_code == 0, result.output
 
@@ -106,8 +109,21 @@ class TestThereIsExactlyOnePublishPath:
         # #135). It never builds, uploads or deploys a site; that it pushes
         # ONLY to such refs is pinned in test_worktree_snapshot.py. Any other
         # pusher still fails here.
-        assert pushers == ["dashboard.py::_publish",
-                           "worktree_snapshot.py::snapshot_one"], pushers
+        # NO GIT PUSH PUBLISHES ANY MORE (REQ-PIPE-255 criterion 31): the
+        # upload to Cloudflare Pages replaced the push to the gh-pages branch.
+        assert pushers == ["worktree_snapshot.py::snapshot_one"], pushers
+
+    def test_only_publish_uploads(self):
+        """The same claim for the upload that replaced the push: one function
+        in the CLI calls hosting.upload()."""
+        callers = []
+        for path in sorted((ROOT / "cli").glob("*.py")):
+            source = path.read_text()
+            for node in ast.walk(ast.parse(source)):
+                if isinstance(node, ast.FunctionDef) and \
+                        "hosting.upload(" in (ast.get_source_segment(source, node) or ""):
+                    callers.append(f"{path.name}::{node.name}")
+        assert callers == ["dashboard.py::publish"], callers
 
 
 @pytest.mark.critical
@@ -117,47 +133,53 @@ class TestTheGateCannotBeSkipped:
 
     @staticmethod
     def _record_the_steps(monkeypatch, tmp_path, *, gate_fails=False):
+        """Every step of a publish recorded rather than run, the site behind
+        its sign-in and nothing archived yet - so what is asserted is the
+        order and the gate, not Cloudflare."""
+        from dashboard import access_check, hosting
         from dashboard import snapshot_dashboard
 
         monkeypatch.chdir(tmp_path)
         steps = []
 
-        def step(name, fail=False):
+        def step(name, fail=False, returns=None):
             def _run(*a, **k):
                 steps.append(name)
                 if fail:
                     raise RuntimeError("the render check failed")
+                return returns
             return _run
 
-        for name in ("_rebuild_results", "_build_data", "_embed", "_publish"):
+        where = hosting.Hosting("p", "main", "https://p.pages.dev", "team.cloudflareaccess.com")
+        monkeypatch.setattr(dashboard_cli, "publish_refusal", lambda **k: None)
+        monkeypatch.setattr(hosting, "hosting", lambda: where)
+        for name in ("_rebuild_results", "_build_data", "_embed"):
             monkeypatch.setattr(dashboard_cli, name, step(name))
         monkeypatch.setattr(dashboard_cli, "_check_renders", step("_check_renders", gate_fails))
+        monkeypatch.setattr(dashboard_cli, "_refuse_oversized_page", lambda page: None)
+        monkeypatch.setattr(snapshot_dashboard, "newest_snapshot", lambda: None)
+        monkeypatch.setattr(access_check, "check", lambda url, domain: access_check.Verdict(
+            url, access_check.SIGNIN, "HTTP 302 to team.cloudflareaccess.com"))
         monkeypatch.setattr(snapshot_dashboard, "take_snapshot", step("take_snapshot"))
         monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site", step("prepare_deploy_site"))
+        monkeypatch.setattr(hosting, "measure", lambda site: hosting.SiteSize(1, 1, ("index.html", 1), (), ()))
+        monkeypatch.setattr(hosting, "upload", step("upload", returns=hosting.Deployment(
+            "https://abc.p.pages.dev", "https://p.pages.dev")))
         return steps
 
     def test_it_runs_the_check_after_the_build_and_before_it_publishes(self, monkeypatch, tmp_path):
-        """Order, not presence. A gate after the push is not a gate."""
+        """Order, not presence. A gate after the upload is not a gate."""
         steps = self._record_the_steps(monkeypatch, tmp_path)
         dashboard_cli.publish()
         assert steps == ["_rebuild_results", "_build_data", "_embed", "_check_renders",
-                         "take_snapshot", "prepare_deploy_site", "_publish"]
+                         "take_snapshot", "prepare_deploy_site", "upload"]
 
     def test_a_failed_render_check_publishes_nothing(self, monkeypatch, tmp_path):
         steps = self._record_the_steps(monkeypatch, tmp_path, gate_fails=True)
         with pytest.raises(RuntimeError, match="render check"):
             dashboard_cli.publish()
         assert "_check_renders" in steps, "test precondition - the gate must have run"
-        assert "_publish" not in steps and "take_snapshot" not in steps
-
-    def test_a_publish_with_nothing_built_refuses(self, tmp_path):
-        """Criterion 5 from the other side. _publish() is reachable with a
-        site directory that was never built - by a caller getting the order
-        wrong - and it must not push an empty tree over a real site."""
-        import click
-
-        with pytest.raises(click.ClickException, match="missing"):
-            dashboard_cli._publish(tmp_path, branch="gh-pages", dry_run=True)
+        assert "upload" not in steps and "take_snapshot" not in steps
 
 
 class TestPublishingIsAlwaysAsked:
@@ -350,10 +372,11 @@ class TestTheArtifactSaysWhereItCameFrom:
         sha = "0123456789abcdef0123456789abcdef01234567"
         monkeypatch.setattr(edd, "current_commit_sha", lambda *a, **k: sha)
         monkeypatch.setattr(edd.environments, "current_or_none", lambda: SimpleNamespace(
-            id="sandbox", label="A sandbox", publishes=False))
+            id="sandbox", label="A sandbox", publishes=True, production=False))
 
         assert self._embedded_provenance(monkeypatch, tmp_path) == {
-            "environment": {"id": "sandbox", "label": "A sandbox", "publishes": False},
+            "environment": {"id": "sandbox", "label": "A sandbox", "publishes": True,
+                            "production": False},
             "commit": sha,
             # REQ-DASH-407 criterion 4: a synthetic asset's generated-up-to
             # date - none recorded in this worker's database.
@@ -387,58 +410,13 @@ class TestTheArtifactSaysWhereItCameFrom:
 
 
 @pytest.mark.critical
-class TestThePublishedContentCannotMixWithTheSource:
-    """Criterion 13."""
+class TestNothingPublishesToAGitBranch:
+    """REQ-PIPE-255 criterion 31: no code pushes the dashboard to a git branch,
+    and the publish command carries no option naming one."""
 
-    def test_it_publishes_to_a_branch_of_its_own(self):
-        assert dashboard_cli.PAGES_BRANCH == "gh-pages"
-
-    def test_it_publishes_from_a_worktree_the_source_never_shares(self, tmp_path, monkeypatch):
-        """A real publish, into a throwaway repository whose `origin` is a
-        local bare one. The source branch's HEAD, index and working tree
-        are untouched, and the published branch is an orphan holding the
-        built site alone.
-
-        The reason is not tidiness: every other arrangement puts a build
-        output somewhere `git add -A` on the source branch can reach, and
-        this project has already had a committed dashboard build for that
-        reason. And `.nojekyll` is there because Pages otherwise runs the
-        content through Jekyll, which silently drops anything beginning
-        with an underscore."""
-        import subprocess
-
-        def git(*args, cwd):
-            return subprocess.run(["git", *args], cwd=cwd, check=True,
-                                  capture_output=True, text=True).stdout.strip()
-
-        origin, source, site = tmp_path / "origin.git", tmp_path / "source", tmp_path / "site"
-        git("init", "--bare", "--quiet", str(origin), cwd=tmp_path)
-        source.mkdir()
-        git("init", "--quiet", "-b", "main", cwd=source)
-        git("config", "user.email", "tests@example.gov.au", cwd=source)
-        git("config", "user.name", "tests", cwd=source)
-        (source / "code.py").write_text("print('source')\n")
-        git("add", "-A", cwd=source)
-        git("commit", "--quiet", "-m", "source", cwd=source)
-        git("remote", "add", "origin", str(origin), cwd=source)
-        site.mkdir()
-        (site / "index.html").write_text("<p>built</p>")
-        head_before = git("rev-parse", "HEAD", cwd=source)
-
-        monkeypatch.chdir(source)
-        monkeypatch.setattr(dashboard_cli, "_short_sha", lambda: "abc1234")
-        dashboard_cli._publish(site, branch="gh-pages", dry_run=False)
-
-        assert git("rev-parse", "HEAD", cwd=source) == head_before
-        assert git("rev-parse", "--abbrev-ref", "HEAD", cwd=source) == "main"
-        assert git("status", "--porcelain", cwd=source) == "", \
-            "the publish left something in the source working tree or index"
-        published = git("ls-tree", "-r", "--name-only", "gh-pages", cwd=origin).splitlines()
-        assert sorted(published) == [".nojekyll", "index.html"]
-        assert git("rev-list", "--count", "gh-pages", cwd=origin) == "1", \
-            "the published branch shares history with the source"
-        assert len(git("worktree", "list", cwd=source).splitlines()) == 1, \
-            "the publish worktree was left registered"
+    def test_the_publish_command_names_no_branch(self):
+        names = {opt for p in dashboard_cli.publish_command.params for opt in p.opts}
+        assert names == {"--dry-run"}, names
 
 
 @pytest.mark.critical

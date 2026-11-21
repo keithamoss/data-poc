@@ -20,6 +20,11 @@ from pathlib import Path
 
 from dashboard import snapshot_dashboard
 
+#: WHERE THE SITE PLACES AN ARCHIVE (REQ-DASH-373 criterion 3): at
+#: snapshots/<the archive folder's name>/, the path the repository keeps it at
+#: (dashboard/snapshots/<asset>/). These tests' archive folder is `snapshots`.
+ARCHIVE = "snapshots"
+
 
 def _write_fake_dashboard(tmp_path, content: str = "<html>fake dashboard</html>\nconst SNAPSHOT_MANIFEST = [];\n"):
     html_path = tmp_path / "qa-reporting-dashboard.html"
@@ -247,9 +252,10 @@ def test_a_local_snapshot_gets_the_fonts_and_player_beside_it(tmp_path):
 def test_the_local_fonts_and_player_copies_are_never_committed():
     import subprocess
 
-    for path in ("dashboard/snapshots/fonts/a.woff2", "dashboard/snapshots/vendor/x.js"):
+    for path in ("dashboard/snapshots/quarterly/fonts/a.woff2",
+                 "dashboard/snapshots/quarterly/vendor/x.js"):
         assert subprocess.run(["git", "check-ignore", "-q", path],
-                              cwd=snapshot_dashboard.SNAPSHOTS_DIR.parent.parent).returncode == 0, path
+                              cwd=snapshot_dashboard.SNAPSHOTS_ROOT.parent.parent).returncode == 0, path
 
 
 def test_sync_local_snapshots_skips_gz_files_that_already_have_a_local_copy(tmp_path):
@@ -321,7 +327,7 @@ def test_prepare_deploy_site_decompresses_every_committed_snapshot(tmp_path):
 
     snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=snapshots_dir)
 
-    site_snapshots_dir = site_dir / "snapshots"
+    site_snapshots_dir = site_dir / "snapshots" / ARCHIVE
     assert (site_snapshots_dir / "20260916T000000Z_abc1234.html").read_bytes() == b"<html>archived snapshot one</html>"
     assert (site_snapshots_dir / "20260916T010000Z_def5678.html").read_bytes() == b"<html>archived snapshot two</html>"
     assert (site_snapshots_dir / "manifest.json").read_text() == '[{"file": "irrelevant"}]'
@@ -430,7 +436,7 @@ def test_prepare_deploy_site_and_sync_local_snapshots_use_the_same_decompression
     snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=snapshots_dir)
 
     local_html = (snapshots_dir / "20260916T000000Z_abc1234.html").read_bytes()
-    deployed_html = (site_dir / "snapshots" / "20260916T000000Z_abc1234.html").read_bytes()
+    deployed_html = (site_dir / "snapshots" / ARCHIVE / "20260916T000000Z_abc1234.html").read_bytes()
     assert local_html == deployed_html == b"<html>identical decompression check</html>"
 
 
@@ -548,13 +554,13 @@ def test_the_site_carries_each_snapshot_split_back_byte_for_byte(tmp_path):
 
     page, files, out, site = _site_with_a_snapshot(tmp_path)
     stem = out.name[: -len(".html.gz")]
-    placed = site / "snapshots" / f"{stem}.html"
+    placed = site / "snapshots" / ARCHIVE / f"{stem}.html"
     html = placed.read_text()
     assert "data-mothman-file" in html and "</script>" in html
     assert not re.search(r'data-mothman-file="[^"]+">\(window', html), "a block was left inline"
     listed = data_files.page_manifest(html)["files"]
     for e in listed:
-        content = (site / "snapshots" / f"{stem}.data" / e["name"]).read_bytes()
+        content = (site / "snapshots" / ARCHIVE / f"{stem}.data" / e["name"]).read_bytes()
         assert hashlib.sha256(content).hexdigest() == e["sha256"]
         assert len(content) <= data_files.BUDGET_BYTES
     assert data_files.read_page(html, placed.parent).problems == []
@@ -590,11 +596,11 @@ def test_a_block_over_the_budget_is_split_into_parts_within_it(tmp_path):
     budget = 3000
     page, files, out, site = _site_with_a_snapshot(tmp_path, budget=budget, size=9000)
     stem = out.name[: -len(".html.gz")]
-    placed = site / "snapshots" / f"{stem}.html"
+    placed = site / "snapshots" / ARCHIVE / f"{stem}.html"
     listed = data_files.page_manifest(placed.read_text())["files"]
     assert len(listed) > len(files)
     for e in listed:
-        assert (site / "snapshots" / f"{stem}.data" / e["name"]).stat().st_size <= budget
+        assert (site / "snapshots" / ARCHIVE / f"{stem}.data" / e["name"]).stat().st_size <= budget
     got = data_files.read_page(placed.read_text(), placed.parent)
     assert got.problems == []
     whole = data_files.read_page(_archived(out), tmp_path / "nowhere")
@@ -611,8 +617,8 @@ def test_a_snapshot_from_before_the_split_is_placed_as_it_is(tmp_path):
         f.write(old)
     site = tmp_path / "_site"
     snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=snapshots)
-    assert (site / "snapshots" / "20261022T000000Z_abc1234.html").read_bytes() == old
-    assert not (site / "snapshots" / "20261022T000000Z_abc1234.data").exists()
+    assert (site / "snapshots" / ARCHIVE / "20261022T000000Z_abc1234.html").read_bytes() == old
+    assert not (site / "snapshots" / ARCHIVE / "20261022T000000Z_abc1234.data").exists()
 
 
 def test_a_local_snapshot_copy_is_still_decompressed_whole(tmp_path):
@@ -632,15 +638,15 @@ def test_a_reused_site_directory_publishes_none_of_its_stale_files(tmp_path):
     publish after. Only what this build lists is on the site afterwards."""
     page, files, out, site = _site_with_a_snapshot(tmp_path)
     stale = [site / "data" / "collection-gone.0123456789ab.js",
-             site / "snapshots" / "20200101T000000Z_old.data" / "x.js",
-             site / "snapshots" / "20200101T000000Z_old.html"]
+             site / "snapshots" / ARCHIVE / "20200101T000000Z_old.data" / "x.js",
+             site / "snapshots" / ARCHIVE / "20200101T000000Z_old.html"]
     for path in stale:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("stale")
     snapshot_dashboard.prepare_deploy_site(site, html_path=page, snapshots_dir=tmp_path / "snapshots")
     assert [p for p in stale if p.exists()] == []
     assert sorted(p.name for p in (site / "data").iterdir()) == sorted(f.entry["name"] for f in files)
-    assert (site / "snapshots" / out.with_suffix("").name).is_file()
+    assert (site / "snapshots" / ARCHIVE / out.with_suffix("").name).is_file()
 
 
 def test_clearing_the_site_touches_nothing_it_does_not_write(tmp_path):
@@ -676,8 +682,8 @@ def test_a_snapshot_on_the_site_finds_its_fonts_and_player_beside_it(tmp_path):
     those sat only at the site root, so every published snapshot fell back to
     a system font and failed to load the player."""
     site = _site_with_fonts_vendor_and_a_snapshot(tmp_path)
-    assert (site / "snapshots" / "fonts" / "public-sans-regular.woff2").read_bytes() == b"fake-woff2-bytes"
-    assert (site / "snapshots" / "vendor" / "asciinema-player.min.js").read_text() == "/* fake player */"
+    assert (site / "snapshots" / ARCHIVE / "fonts" / "public-sans-regular.woff2").read_bytes() == b"fake-woff2-bytes"
+    assert (site / "snapshots" / ARCHIVE / "vendor" / "asciinema-player.min.js").read_text() == "/* fake player */"
     assert (site / "fonts" / "public-sans-regular.woff2").is_file(), "the live page's own copy stays"
 
 

@@ -79,8 +79,11 @@ def build_data_command() -> None:
 
 
 def _embed() -> None:
-    from dashboard.embed_dashboard_data import embed
+    from dashboard.embed_dashboard_data import embed, output_paths
     embed()
+    # EVERY BUILD SAYS HOW BIG IT IS (REQ-PIPE-255 criterion 26): embed,
+    # rebuild, pipeline run and the publish all end here.
+    report_built_sizes(output_paths()[0])
 
 
 @dashboard_group.command("embed")
@@ -288,44 +291,78 @@ def rebuild_command() -> None:
     console.print(f"Rebuilt -> {built_page()}", style="green")
 
 
-#: The branch GitHub Pages serves the published dashboard from
-#: (REQ-PIPE-092 criteria 12 and 13). A branch rather than a directory on
-#: the source branch, so a build output can never be staged or committed
-#: alongside the code that produced it - the two share no working tree at
-#: any point.
-PAGES_BRANCH = "gh-pages"
+def publish_refusal(*, dry_run: bool = False) -> str | None:
+    """Why this publish may not run, said before anything is built, written or
+    uploaded - or None where it may. Every route to a publish asks it: the
+    command, `mothman pipeline run --publish`, the post-QA prompt and any
+    automated job, which can only publish through publish() (REQ-PIPE-372
+    criterion 3).
+
+    IN THIS ORDER: the stated environment publishes (REQ-PIPE-255 criterion
+    20); the selected asset declares where it is hosted (criterion 8; it
+    replaced REQ-PIPE-372's publish_to_gh_pages, criterion 5); and, unless
+    this is a dry run, which uploads nothing, the credentials are set
+    (criterion 7) and the pinned wrangler is installed (criteria 4 and 5)."""
+    from asset_model import assets
+    from dashboard import hosting
+    from qa_tools.common import environments
+
+    env = environments.current()
+    if not env.publishes:
+        publishers = [e.id for e in environments.all_environments() if e.publishes]
+        return (f"The {env.id} environment does not publish - the dashboard is published only "
+                f"from {', '.join(publishers) or 'no environment'} (assets/environments.yaml). "
+                f"`mothman dashboard rebuild` builds it for viewing here.")
+    if hosting.hosting() is None:
+        return (f"The {assets.selected().name} asset declares no hosting: its data-asset.yaml has no "
+                f"`hosting:` block naming its Cloudflare Pages project, production branch, address "
+                f"and sign-in domain (docs/dashboard-hosting.md). `mothman dashboard rebuild` builds "
+                f"it for viewing here.")
+    if dry_run:
+        return None
+    missing = hosting.credentials_refusal()
+    if missing:
+        return missing
+    try:
+        hosting.find_wrangler()
+    except hosting.PublishRefused as refused:
+        return str(refused)
+    return None
 
 
-def publish(*, dry_run: bool = False, branch: str | None = None) -> None:
-    """Build the dashboard, gate it, and publish it. THE one publish path
-    (REQ-PIPE-092 criteria 10, 11 and 15).
+def publish(*, dry_run: bool = False) -> None:
+    """Build the dashboard, gate it, and upload it to the selected asset's
+    Cloudflare Pages project. THE one publish path (REQ-PIPE-092 criteria 10,
+    11 and 15; REQ-PIPE-255 criterion 2 - the upload replaced the push to the
+    gh-pages branch, criterion 31).
 
-    EVERY ROUTE TO A PUBLISHED SITE COMES THROUGH HERE - the command
-    below, `mothman pipeline run --publish`, and the prompt the QA wizard
-    offers. Criterion 10 is that there is exactly one way to get content
-    published, and criterion 15 that the prompt reaches the site by the
-    same path the command uses. Three entry points to one function is
-    that; three functions that each push would not be, however carefully
-    they matched today.
+    THE GATE IS NOT OPTIONAL AND CANNOT BE SKIPPED (REQ-PIPE-092 criteria 4
+    and 5; REQ-PIPE-255 criterion 3): a real browser runs against the built
+    page here, where it was built, and nothing is uploaded that did not pass.
 
-    THE GATE IS NOT OPTIONAL AND CANNOT BE SKIPPED (criteria 4 and 5).
-    It runs a real browser against the built artifact, here, where the
-    build happened - it used to run in the GitHub Actions job that built
-    it, and moved with the build rather than being dropped. Nothing is
-    pushed unless it passes, which is why the render check sits between
-    the build and the push rather than beside them.
+    NOTHING CHANGED, NOTHING PUBLISHED (criteria 22 to 25, 27): the build's
+    fingerprint is compared with the newest archived snapshot's BEFORE
+    anything is archived, so an unchanged build leaves no snapshot and makes
+    no deployment - and no flag overrides that.
 
-    WHAT HAPPENS IF THE DATABASE IS UNREACHABLE (criterion 8): the build
-    fails, this raises, and NOTHING is pushed - so the previously
-    published dashboard stays exactly as it is. That is the behaviour
-    worth having rather than a placeholder page: a stale dashboard whose
-    build stamp says when it was built is honest, and an empty one that
-    replaced it would not be.
+    WHAT HAPPENS IF THE DATABASE IS UNREACHABLE (REQ-PIPE-092 criterion 8):
+    the build fails, this raises, and nothing is uploaded - the previous
+    deployment keeps serving.
     """
-    branch = branch or PAGES_BRANCH
+    from datetime import datetime
     from pathlib import Path as _Path
 
-    from dashboard.snapshot_dashboard import prepare_deploy_site
+    from dashboard import access_check, hosting
+    from dashboard import snapshot_dashboard as snapshots
+    from dashboard.embed_dashboard_data import output_paths
+
+    # REFUSED BEFORE ANYTHING IS BUILT, WRITTEN OR UPLOADED, and non-zero
+    # (REQ-PIPE-372 criterion 2): a script or a loop over assets must not
+    # read a refusal as a publish.
+    refused = publish_refusal(dry_run=dry_run)
+    if refused:
+        raise click.ClickException(refused)
+    where = hosting.hosting()
 
     console.print("Rebuilding check results from the recorded QA history...", style="dim")
     _rebuild_results()
@@ -333,129 +370,182 @@ def publish(*, dry_run: bool = False, branch: str | None = None) -> None:
     _build_data()
     console.print("Embedding real data into the dashboard...", style="dim")
     _embed()
-
     console.print("Gate - dashboard structural + real-browser render check...", style="dim")
     _check_renders()
 
-    # ONE SNAPSHOT PER PUBLISH (criterion 6), and the "per publish" is the
-    # part worth stating. Snapshots used to be opt-in via
-    # SNAPSHOT_DASHBOARD=1, because CI published on every relevant push and
-    # archiving each one would have buried the archive. Publishing is a
-    # deliberate act now, so archiving what was published is exactly the
-    # criterion: a self-contained copy of what people were shown, openable
-    # years later with nothing but a browser. That is also why
-    # `dashboard/snapshots/*.html.gz` stays committed while everything else
-    # moved into the database - a row in a database it cannot reach is not
-    # openable with a browser.
-    #
-    # AFTER THE GATE, not before, so nothing is archived that was not good
-    # enough to publish. And never on a dry run: a committed artifact is
-    # not what "tell me what would happen" means.
-    if not dry_run:
-        from dashboard.snapshot_dashboard import take_snapshot
-        console.print(f"Snapshot archived -> {take_snapshot()}", style="dim")
+    # THE PAGE THIS BUILD WROTE, wherever it wrote it (`--out-dir`, a test's
+    # scratch directory), never a path bound when this module was imported.
+    page = _Path(output_paths()[0])
+    newest = snapshots.newest_snapshot()
+    unchanged = newest is not None and \
+        snapshots.snapshot_fingerprint(newest[0]) == snapshots.page_fingerprint(page)
+    if unchanged:
+        taken = datetime.fromisoformat(newest[1]["taken_at"])
+        console.print(f"The dashboard is unchanged since the snapshot published "
+                      f"{taken:%Y-%m-%d %H:%M} UTC ({newest[0].name}) - nothing archived or uploaded.",
+                      style="green")
+        return
 
-    site = _Path("_site")
-    prepare_deploy_site(site_dir=site)
-    _publish(site, branch=branch, dry_run=dry_run)
+    from qa_tools.common import build_output
+
+    site = _Path(build_output.out_dir() or ".") / "_site"
+    sha = _short_sha()
+    if dry_run:
+        snapshots.prepare_deploy_site(site_dir=site, html_path=page)
+        size = hosting.measure(site)
+        console.print(f"--dry-run: the content has changed since "
+                      f"{'the newest archived snapshot' if newest else 'nothing - no snapshot is archived yet'}. "
+                      f"Would upload {size.files} file(s), {hosting.mib(size.total_bytes)} in all; the "
+                      f"largest is {size.largest[0]} at {hosting.mib(size.largest[1])}.", style="yellow")
+        console.print("--dry-run: would run wrangler " + " ".join(hosting.deploy_args(site, where, sha))
+                      + f" with {hosting.TOKEN_ENV}=<elided> and {hosting.ACCOUNT_ENV}=<elided> in its "
+                        f"environment; nothing invoked, nothing archived.", style="yellow")
+        _size_warnings(size)
+        return
+
+    # BEHIND THE SIGN-IN BEFORE ANYTHING IS UPLOADED (REQ-PIPE-257 criteria 9
+    # and 10) - and before a snapshot is archived, so a refusal leaves none.
+    before = access_check.check(f"https://{where.production_host}/", where.access_domain)
+    if not before.protected:
+        raise click.ClickException(
+            f"Not uploaded: {before.words()} A publish uploads only to a site whose address "
+            f"redirects to the sign-in at {where.access_domain} (docs/dashboard-hosting.md).")
+    _refuse_oversized_page(page)
+    # THE PINNED WRANGLER, asked before anything is archived (criterion 4).
+    try:
+        hosting.wrangler()
+    except hosting.PublishRefused as refused:
+        raise click.ClickException(str(refused)) from None
+
+    console.print(f"Snapshot archived -> {snapshots.take_snapshot(html_path=page)}", style="dim")
+    snapshots.prepare_deploy_site(site_dir=site, html_path=page)
+    size = hosting.measure(site)
+    if size.over_limit:
+        raise click.ClickException(_too_big(size.over_limit))
+    _size_warnings(size)
+    try:
+        done = hosting.upload(site, where, sha)
+    except hosting.PublishRefused as refused:
+        raise click.ClickException(str(refused)) from None
+    except hosting.UploadFailed as failed:
+        raise click.ClickException(f"The upload failed, and was not retried:\n{failed}") from None
+    console.print(f"Published -> {done.url} (production: {done.production_url})", style="green")
+
+    after = access_check.check(done.url, where.access_domain)
+    if not after.protected:
+        raise click.ClickException(
+            f"{done.url} is reachable without sign-in: {after.words()} Fix its Access application "
+            f"before anyone shares the address (docs/dashboard-hosting.md).")
+
+
+def publish_after_a_run() -> None:
+    """publish(), reached after a QA run whose results are already recorded -
+    `mothman pipeline run --publish` and the post-QA prompt (REQ-PIPE-255
+    criterion 29): a failure keeps the results and the local dashboard, says
+    so, names the retry and exits non-zero."""
+    try:
+        publish()
+    except (click.ClickException, Exception) as failed:
+        why = failed.format_message() if isinstance(failed, click.ClickException) else \
+            f"{type(failed).__name__}: {failed}"
+        raise click.ClickException(
+            f"The run's results are recorded and the dashboard is built here, but the publish "
+            f"failed, so the published site is unchanged: {why} `mothman dashboard publish` "
+            f"retries the publish alone.") from None
+
+
+def _too_big(files) -> str:
+    from dashboard import hosting
+
+    return "Not uploaded - Cloudflare Pages serves no file over 25 MiB: " + "; ".join(
+        f"{name} is {hosting.mib(n)}" for name, n in files) + "."
+
+
+def _size_warnings(size) -> None:
+    from dashboard import hosting
+
+    for name, n in size.over_warning:
+        console.print(f"warning: {name} is {hosting.mib(n)}, near Cloudflare Pages' 25 MiB "
+                      f"limit per file.", style="yellow")
+
+
+def _refuse_oversized_page(page) -> None:
+    """Criterion 13 on the built page and its data files, before anything is
+    archived."""
+    from dashboard import hosting
+
+    over = [(name, n) for name, n in built_sizes(page) if n > hosting.LIMIT_BYTES]
+    if over:
+        raise click.ClickException(_too_big(over))
+
+
+def built_sizes(html_path) -> list[tuple[str, int]]:
+    """The built page and every data file and part it references, with their
+    sizes (REQ-PIPE-255 criterion 26)."""
+    from pathlib import Path as _Path
+
+    from dashboard import data_files
+
+    html_path = _Path(html_path)
+    page = html_path.read_bytes().decode("utf-8")
+    found = data_files.read_page(page, html_path.parent)
+    out = [(html_path.name, html_path.stat().st_size)]
+    out += [(f"{data_files.DATA_DIR}/{e['name']}", len(found.contents.get(e["name"], b"")))
+            for e in (found.manifest or {}).get("files", [])]
+    return out
+
+
+def report_built_sizes(html_path) -> None:
+    """Printed at the end of every build (REQ-PIPE-255 criterion 26), with a
+    warning for any file of 20 MiB or more, so the per-file ceiling is watched
+    while developing rather than first met at a publish."""
+    from dashboard import hosting
+
+    sizes = built_sizes(html_path)
+    console.print("Built sizes: " + ", ".join(f"{name} {hosting.mib(n)}" for name, n in sizes),
+                  style="dim")
+    for name, n in sizes:
+        if n >= hosting.WARN_BYTES:
+            console.print(f"warning: {name} is {hosting.mib(n)}, near Cloudflare Pages' 25 MiB "
+                          f"limit per file.", style="yellow")
 
 
 @dashboard_group.command("publish")
 @click.option("--dry-run", is_flag=True,
-              help="Build and gate, and say what would be pushed without pushing it.")
-@click.option("--branch", default=None,
-              help=f"The branch GitHub Pages serves. Default: {PAGES_BRANCH}.")
-def publish_command(dry_run: bool, branch: str | None) -> None:
-    """Build the dashboard from the recorded QA history, gate it, and publish it."""
-    publish(dry_run=dry_run, branch=branch)
+              help="Build, gate and prepare the site, and say what would be uploaded, without "
+                   "uploading it or archiving a snapshot.")
+def publish_command(dry_run: bool) -> None:
+    """Build the dashboard from the recorded QA history, gate it, and upload it to this
+    asset's Cloudflare Pages project - only when its content has changed."""
+    publish(dry_run=dry_run)
 
 
-def _publish(site_dir, branch: str, dry_run: bool) -> None:
-    """Push a built, gated site to the branch GitHub Pages serves.
+@dashboard_group.command("verify-access")
+def verify_access_command() -> None:
+    """Check that this asset's published dashboard - its production address and its
+    most recent deployment's own address - needs a sign-in, uploading nothing
+    (REQ-PIPE-257 criterion 12)."""
+    from dashboard import access_check, hosting
 
-    WHY A BRANCH AT ALL (REQ-PIPE-092 criterion 12). The dashboard used to
-    reach Pages through a GitHub Actions job that built it and called
-    actions/deploy-pages. That job cannot build it any more: the QA results
-    are in a PostgreSQL database and a runner has no route to it, and
-    giving one a database credential is exactly the wrong thing to build.
-    So the build happens where the data is and the ARTIFACT travels, by the
-    one mechanism GitHub Pages will serve without running anything: a
-    branch it reads directly.
-
-    WHY A WORKTREE rather than checking the branch out here (criterion 13).
-    The published content and the source must never share a working tree -
-    not for tidiness, but because every other arrangement puts a build
-    output somewhere `git add -A` on the source branch can reach it, and
-    this project has already had that exact problem with a committed
-    dashboard build. A detached worktree cannot: the source branch's index
-    is untouched throughout, so there is no moment when the two are
-    confusable.
-
-    ORPHAN HISTORY, deliberately. The published branch shares no ancestry
-    with the source branch and each publish is one commit replacing the
-    last, because its history answers a different question - "what was
-    published, and when" - and interleaving it with the code's history
-    would make both harder to read. GitHub Pages serves the tip and cares
-    about nothing else.
-    """
-    import shutil
-    import subprocess
-    import tempfile
-    from pathlib import Path
-
-    site_dir = Path(site_dir)
-    index = site_dir / "index.html"
-    if not index.is_file():
-        raise click.ClickException(
-            f"{index} is missing - a publish must follow a real build, and nothing was built here.")
-
-    sha = _short_sha()
-    message = f"Publish the dashboard{f' built from {sha}' if sha else ''}"
-
-    if dry_run:
-        files = sum(1 for p in site_dir.rglob("*") if p.is_file())
-        console.print(f"--dry-run: would push {files} file(s) from {site_dir} to "
-                       f"{branch!r} as {message!r}.", style="yellow")
-        return
-
-    worktree = Path(tempfile.mkdtemp(prefix="mothman-publish-"))
+    where = hosting.hosting()
+    if where is None:
+        raise click.ClickException(publish_refusal(dry_run=True) or "This asset declares no hosting.")
+    missing = hosting.credentials_refusal()
+    if missing:
+        raise click.ClickException(missing)
     try:
-        # A worktree with no branch and no history, populated from the
-        # built site alone - so nothing from the source tree can ride
-        # along even by accident.
-        _git("worktree", "add", "--detach", str(worktree))
-        _git("checkout", "--orphan", branch, cwd=worktree)
-        _git("rm", "-rf", "--quiet", ".", cwd=worktree, allow_failure=True)
-        for child in site_dir.iterdir():
-            dst = worktree / child.name
-            shutil.copytree(child, dst) if child.is_dir() else shutil.copy2(child, dst)
-        # .nojekyll, because Pages otherwise runs the content through
-        # Jekyll, which silently drops any file or directory beginning with
-        # an underscore. Nothing in the site starts with one today; a
-        # published page that vanished for that reason would be very hard
-        # to diagnose from the outside.
-        (worktree / ".nojekyll").write_text("")
-        _git("add", "-A", cwd=worktree)
-        if not subprocess.run(["git", "diff", "--cached", "--quiet"],
-                               cwd=worktree).returncode:
-            console.print("Nothing changed since the last publish - nothing pushed.", style="dim")
-            return
-        _git("commit", "--quiet", "-m", message, cwd=worktree)
-        _git("push", "--force", "origin", f"HEAD:refs/heads/{branch}", cwd=worktree)
-        console.print(f"Published -> {branch} ({message})", style="green")
-    finally:
-        shutil.rmtree(worktree, ignore_errors=True)
-        _git("worktree", "prune", allow_failure=True)
-
-
-def _git(*args: str, cwd=None, allow_failure: bool = False) -> str:
-    import subprocess
-
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
-    if result.returncode and not allow_failure:
-        raise click.ClickException(
-            f"git {' '.join(args)} failed: {(result.stderr or result.stdout).strip()}")
-    return result.stdout.strip()
+        latest = hosting.latest_deployment_url(where)
+    except (hosting.PublishRefused, hosting.UploadFailed) as failed:
+        raise click.ClickException(str(failed)) from None
+    verdicts = [access_check.check(f"https://{where.production_host}/", where.access_domain)]
+    if latest:
+        verdicts.append(access_check.check(latest, where.access_domain))
+    for v in verdicts:
+        console.print(v.words(), style="green" if v.protected else "red")
+    if not latest:
+        console.print("No deployment was listed to check beyond the production address.", style="yellow")
+    if not all(v.protected for v in verdicts):
+        raise click.ClickException("Reachable without sign-in, or not checkable - see above.")
 
 
 def _short_sha() -> str | None:

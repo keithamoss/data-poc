@@ -78,30 +78,17 @@ common/check_lifecycle.py`'s own `check_id` convention.
    committing to either.
 
 4. **[in-progress, 2026-10-18]** **[Dashboard UI]** **[Pipeline & publishing]**
-   Private hosting for the dashboard, then a private repository - SCOPED
-   2026-10-18 with Keith over five rounds of questions (his answers in
-   `plans/running-thoughts.md` #104), now five UNSIGNED requirements:
-   REQ-PIPE-255 (the one publish path uploads to Cloudflare Pages by
-   direct upload from the sandbox, replacing the gh-pages push; a build
-   fingerprint so an unchanged dashboard is neither uploaded nor
-   snapshotted), REQ-PIPE-257 (Cloudflare Access one-time code to named
-   work emails on every hostname, checked before and after each upload,
-   configured by hand from a committed runbook), REQ-GHUB-258 (ticket
-   links from configuration rather than github.io), REQ-TEST-260 (CI
-   minutes: push once per gate-green piece of work, `mothman github
-   ci-usage` measures it, the flip waits on a measured week fitting
-   2,000 minutes a month) and REQ-DOCS-259 (the flip, last, behind a
-   checklist Keith completes himself). Settled and recorded in their
-   decisions: no paid GitHub plan; Entra ID, GitHub identity and a
-   shared credential rejected for sign-in; automatic publishing at the
-   end of a run proposed and rejected the same day, REQ-PIPE-092's
-   opt-in rule stands; private only once the new site is live and a
-   teammate has signed in. Item 2's parked "don't pre-solve hosting"
-   note is answered by the same set; both items go when REQ-DOCS-259 is
-   built. REQ-PIPE-255 amends REQ-PIPE-092 criteria 12 and 13 (delivery
-   by git push becomes delivery by upload), which Keith must approve in
-   wording at sign-off. The built page outgrowing Cloudflare Pages'
-   25 MiB per-file limit is item 19 (REQ-DASH-291 to 293).
+   Private hosting for the dashboard, then a private repository - scoped
+   2026-10-18 (Keith's answers in `plans/running-thoughts.md` #104). BUILT
+   2026-11-21: REQ-PIPE-255 (the upload to Cloudflare Pages), REQ-PIPE-354
+   (one project per asset), REQ-GHUB-258 (ticket links from configuration)
+   and REQ-PIPE-257's code half (the access checks and the runbook,
+   `docs/dashboard-hosting.md`); REQ-TEST-260 earlier. What remains is
+   Keith's: REQ-PIPE-257 criteria 1-5 and 14 (the Cloudflare console steps
+   and the first live check) and REQ-DOCS-259 (the flip). The decisions
+   live on those requirements. Kept until REQ-DOCS-259 is built, when this
+   item and item 2 go together, because item 2's parked note is only
+   answered once the flip happens.
 5. **[done, 2026-09-16]** **[Dashboard UI]** "Time travel" - the ability
    to go back and see the entire reporting solution exactly as it was
    for any previous run, not just a single check's own history (which

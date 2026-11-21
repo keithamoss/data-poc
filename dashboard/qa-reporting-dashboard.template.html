@@ -1102,7 +1102,7 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
         </svg>
       </div>
       <div class="wordmark-text">
-        <div class="eyebrow">Multi-Agency Data Asset · Quality Assurance</div>
+        <div class="eyebrow" id="masthead-asset">Multi-Agency Data Asset · Quality Assurance</div>
         <h1>Data Asset QA Register</h1>
       </div>
     </button>
@@ -1216,8 +1216,9 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
       you pick - or the newest one still awaiting a decision - and its
       results. It uses <b>everything known today</b>: a decision written down
       after that date still counts if it took effect by then, and one that
-      took effect after it does not. To see what this page itself said on a past date, open the
-      <b>snapshot archive</b> (🕐 Past snapshots). A dataset with nothing
+      took effect after it does not. To see what this page itself said on a past date, open
+      <b>this asset's snapshot archive</b> (🕐 Past snapshots), kept from its first publish after
+      the asset split. A dataset with nothing
       supplied by that date shows as <b>No data</b>, never a misleading
       blank, Pass or Fail. Applies to the whole data asset at once.
     </div>
@@ -2785,6 +2786,11 @@ function assembleCollectionData(){
 }
 const COLLECTION_DATA = null;
 const SNAPSHOT_MANIFEST = [];
+// THE SELECTED ASSET'S ARCHIVE (REQ-DASH-373 criteria 3 and 5), embedded with
+// the build: {asset, from} - the folder the picker's links name,
+// snapshots/<asset>/<name>.html, and the date the archive starts from. Null in
+// the raw template, whose links then name snapshots/<name>.html.
+const SNAPSHOT_ARCHIVE = null;
 // SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/calendar.yaml
 // at build time. Every AUTHORED calendar, its warning threshold, its
 // last authored period, and the dates each dataset on it actually owes
@@ -2861,6 +2867,15 @@ const SCENARIO_MAP = [];
 // with the build: a real asset's footer does not say its supplies are
 // generated. The raw template stands for a synthetic asset.
 const ASSET_SYNTHETIC = true;
+// THE ASSET'S NAME FOR A READER (REQ-PIPE-354 criterion 2, SETTLED by Keith
+// 2026-11-01: 'Quarterly data asset', 'Daily data asset'), from its
+// data-asset.yaml's display_name, in the masthead and every page title. Null in
+// the raw template.
+const ASSET_DISPLAY_NAME = null;
+// WHAT MOVED TO ANOTHER ASSET (REQ-PIPE-354 criterion 6): [{id, name,
+// asset_name, address}], from data-asset.yaml's moved_to - configuration, so
+// this page never reads the other asset's.
+const MOVED_TO = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -2937,6 +2952,11 @@ const SPRINT_DEPENDENCIES = null;
 // (AskUserQuestion): a real recording deserves its own tab, not a
 // cramped drawer.
 const DEMO_CAST = null;
+// THE DEMO'S CAPTION WHERE THE RECORDING IS OF ANOTHER ASSET (REQ-PIPE-354
+// criterion 10, wording SETTLED by Keith 2026-11-01) - from
+// dashboard/demos/qa_wizard.yaml at build time; null on the recording's own
+// asset and in the raw template.
+const DEMO_CAPTION = null;
 
 // Shared by every collection - each dataset is reshaped server-side into
 // this exact per-dataset JSON shape by pipeline/build_dashboard_data.py
@@ -7436,7 +7456,14 @@ window.addEventListener("popstate", (e)=>{
 // place to keep in step, and a tier added later gets this for free.
 // Pills are stripped - "Real pipeline data - 42 computed runs" is a
 // badge, not part of the view's name.
-const SITE_NAME = "Data Asset QA Register";
+// NAMING THE ASSET (REQ-PIPE-354 criterion 2): '<asset> · Data Asset QA
+// Register' wherever the build says which asset this is.
+const SITE_NAME = ASSET_DISPLAY_NAME ? `${ASSET_DISPLAY_NAME} \u00b7 Data Asset QA Register`
+  : "Data Asset QA Register";
+(function nameTheAssetInTheMasthead(){
+  const el = document.getElementById("masthead-asset");
+  if(el && ASSET_DISPLAY_NAME) el.textContent = `${ASSET_DISPLAY_NAME} \u00b7 Quality Assurance`;
+})();
 function currentViewName(){
   const h2 = document.querySelector("#view h2");
   if(!h2) return "";
@@ -9047,7 +9074,45 @@ function agencyCardHtml(ag){
 //
 // Found while removing fourteen datasets at once (REQ-DASH-055), which
 // is what made the case easy to hit, but it was always reachable.
+// THE ROUTE NAMES SOMETHING THAT MOVED TO ANOTHER ASSET (REQ-PIPE-354
+// criterion 6): the deepest of its dataset, collection and agency ids that a
+// MOVED_TO entry names, or null.
+function movedEntryForRoute(state){
+  const s = state || STATE || {};
+  for(const id of [s.datasetId, s.collectionId, s.agencyId]){
+    const hit = id && (MOVED_TO || []).find(m=> m.id === id);
+    if(hit) return hit;
+  }
+  return null;
+}
+// THE MOVED NOTICE'S LINK: the other asset's address, carrying the same hash
+// route and in-place-on, and dropping period=, cmp= and panel= - they name
+// this asset's periods, comparisons and panels.
+function movedHref(entry){
+  const target = new URL(entry.address);
+  const here = new URL(location.href);
+  for(const [k, v] of here.searchParams){
+    if(!["period", "cmp", "panel"].includes(k)) target.searchParams.set(k, v);
+  }
+  target.hash = location.hash;
+  return target.toString();
+}
+// SAID IN THE NOT-FOUND PAGE'S HEAD AND RAIL, never as a redirect (criterion
+// 6; wording SETTLED by Keith 2026-11-01): the name from the entry itself.
+function renderMovedNotice(view, entry){
+  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
+  view.innerHTML = `
+    <div class="view-head" data-moved-notice>
+      <div>
+        <h2>${escHtml(entry.name)} has moved to the ${escHtml(entry.asset_name)}'s dashboard</h2>
+        <div class="view-sub"><a href="${escAttr(movedHref(entry))}" data-moved-link>${escHtml(entry.address)}</a></div>
+        <div class="view-sub" data-moved-signin>That dashboard has its own sign-in.</div>
+      </div>
+    </div>`;
+}
 function renderNotFound(view, what, id){
+  const moved = movedEntryForRoute();
+  if(moved) return renderMovedNotice(view, moved);
   setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   view.innerHTML = `
     <div class="view-head">
@@ -11829,22 +11894,27 @@ document.getElementById("check-panel-close").addEventListener("click", closeChec
 // tab, to a separate static file), not a state this app's own back
 // button would ever step through.
 //
-// Each link points at a plain, relative `snapshots/<name>.html` path -
-// resolves correctly on the published GitHub Pages site (.github/
-// workflows/deploy-pages.yml decompresses every .html.gz into
-// _site/snapshots/ at deploy time specifically for this), but will 404
-// if this dashboard is opened locally via file:// straight from a clone,
-// since dashboard/snapshots/ only ever holds the gzipped originals -
-// known, accepted: this picker's own scoping (plans/dashboard.md #5) was
-// explicitly "needs to work on the live public site now", not local
-// convenience: `gunzip dashboard/snapshots/<file>.html.gz` still works
-// for that, same as before this panel existed.
+// Each link points at a relative `snapshots/<asset>/<name>.html` path
+// (snapshotHref, REQ-DASH-373): the selected asset's archive is kept at
+// dashboard/snapshots/<asset>/, and prepare_deploy_site places it at the same
+// path on the site, so a link resolves on both once sync_local_snapshots()
+// has decompressed the local copies.
+// ONE ADDRESS FOR A SNAPSHOT, locally and on the site: snapshots/<asset>/
+// <name>.html (REQ-DASH-373 criterion 3) - prepare_deploy_site places each
+// asset's archive at the same relative path the repository keeps it at.
+function snapshotHref(name){
+  const asset = SNAPSHOT_ARCHIVE && SNAPSHOT_ARCHIVE.asset;
+  return asset ? `snapshots/${encodeURIComponent(asset)}/${name}` : `snapshots/${name}`;
+}
 function renderSnapshotsPanel(){
   const body = document.getElementById("snapshots-panel-body");
   if(!SNAPSHOT_MANIFEST.length){
-    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
-      No snapshots yet — run <code>mothman pipeline run --snapshot</code>
-      to archive one (see plans/dashboard.md #5).
+    // WHEN THE ARCHIVE STARTS, not a developer instruction (REQ-DASH-373
+    // criterion 5, wording SETTLED by Keith 2026-11-01).
+    const from = SNAPSHOT_ARCHIVE && SNAPSHOT_ARCHIVE.from;
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);" data-snapshots-empty>
+      ${from ? `Snapshots start from this asset's first publish after the split, ${escHtml(fmtDay(from))}.`
+        : "No snapshots yet."}
     </div>`;
     return;
   }
@@ -11863,7 +11933,7 @@ function renderSnapshotsPanel(){
           <div class="date">${fmtInstant(s.taken_at)}</div>
           <div class="sub">commit ${s.commit_sha} · ${sizeKb} KB compressed</div>
         </div>
-        <a href="snapshots/${name}" target="_blank" rel="noopener">Open ›</a>
+        <a href="${escAttr(snapshotHref(name))}" target="_blank" rel="noopener">Open ›</a>
       </div>`;
   }).join("");
   body.innerHTML = intro + rows;
@@ -13154,7 +13224,32 @@ function feedbackEvidence(item){
   if(item.kind === "sprint"){
     return `<span>Road-testing sprint ${item.n}${item.title ? ` — ${escHtml(item.title)}` : ""}</span>`;
   }
+  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): kept where
+  // moved_to covers it - following it shows the moved notice - and otherwise
+  // the label alone, never a link to the not-found page.
+  const state = feedbackRouteState(item.href);
+  if(state && !routeHeldHere(state) && !movedEntryForRoute(state))
+    return `<span data-fb-unlinked>${escHtml(item.label)}</span>`;
   return `<a href="${escAttr(item.href)}" data-fb-link="${escAttr(JSON.stringify({href:item.href, inPlaceOn:item.inPlaceOn || null}))}">${escHtml(item.label)}</a>`;
+}
+function feedbackRouteState(href){
+  const hash = String(href || "").split("#")[1];
+  if(hash == null) return null;
+  return pathToState(hash.split("?")[0].replace(/^\//, ""));
+}
+// WHETHER THIS DASHBOARD HOLDS A ROUTE'S AGENCY, COLLECTION AND DATASET -
+// read from the embedded hierarchy. With none embedded (the raw template)
+// every route counts as held.
+function routeHeldHere(state){
+  const agencies = HIERARCHY && HIERARCHY.agencies;
+  if(!agencies || !state.agencyId) return true;
+  const ag = agencies.find(a=> a.id === state.agencyId);
+  if(!ag) return false;
+  if(!state.collectionId) return true;
+  const col = (ag.collections || []).find(c=> c.id === state.collectionId);
+  if(!col) return false;
+  if(!state.datasetId) return true;
+  return (col.datasets || []).some(d=> d.id === state.datasetId);
 }
 function feedbackCard(card){
   const why = FEEDBACK_WHY_NOT.has(card.status);
@@ -13281,6 +13376,7 @@ function renderDemo(view){
         <div class="view-sub">A real recording of the actual <code>mothman</code> CLI/TUI - the Quality Assurance wizard, run for real against real synthetic Birth Registrations data. Not a mockup: every keystroke and every line of output below is what actually happened, captured with a real pseudo-terminal (see <code>scripts/dev/record_cast.py</code>).</div>
       </div>
     </div>
+    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${escHtml(DEMO_CAPTION)}</div>` : ""}
     <div id="demo-player-container" style="max-width:900px;"></div>
   `;
   const container = document.getElementById("demo-player-container");
@@ -13549,8 +13645,9 @@ function renderInPlaceOnPastNotice(){
   if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
   notice.innerHTML = `Showing what was <b>in place in the warehouse on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
-    everything known today - including decisions written down since, where they took effect by then. The
-    snapshot archive (🕐 Past snapshots) shows what this page itself said then.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
+    everything known today - including decisions written down since, where they took effect by then. This
+    asset's snapshot archive (🕐 Past snapshots) shows what this page itself said then, from its first
+    publish after the asset split.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
 }
 function renderInPlaceOnRangeNotice(){
   renderInPlaceOnPastNotice();
@@ -13887,14 +13984,18 @@ function renderBuildStamp(){
     // words are what actually carry it.
     if(env){
       bits.push(env.label || env.id);
-      if(!env.publishes) bits.push("not production");
+      // NOT PRODUCTION UNLESS IT IS (Keith, 2026-11-21, amending REQ-TEST-114
+      // criterion 5): the declared production flag, not publishing - the
+      // sandbox publishes and is still not production. A build recorded
+      // before the flag existed falls back to publishing, as it was read then.
+      if(!(env.production ?? env.publishes)) bits.push("not production");
     }else{
       // NO environment recorded. Saying nothing here is what the
       // criterion forbids: an unlabelled page reads as the real one,
       // which is the exact confusion this exists to prevent.
       bits.push("environment unknown");
     }
-    if(!env || !env.publishes) el.closest(".live")?.classList.add("non-production");
+    if(!env || !(env.production ?? env.publishes)) el.closest(".live")?.classList.add("non-production");
     // SHORT, because a reader recognises a seven-character sha and does
     // not read a forty-character one. The full value stays in the title.
     if(BUILD_PROVENANCE.commit) bits.push(BUILD_PROVENANCE.commit.slice(0, 7));

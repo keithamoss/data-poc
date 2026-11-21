@@ -118,6 +118,33 @@ postgres_major: 16
 # never sets it.
 synthetic: true
 
+# THIS ASSET'S SNAPSHOT ARCHIVE STARTS HERE (REQ-DASH-373 criterion 4, key
+# SETTLED by Keith 2026-11-01): dashboard/snapshots/daily/ holds every
+# publish from this date. The archive taken before the asset split showed
+# both assets' results on one page and was deleted that day, at Keith's call;
+# git history still holds it. The snapshots panel's empty state names it.
+snapshots_from: "2026-11-21"
+
+# THE ASSET'S NAME FOR A READER (REQ-PIPE-354 criterion 2, SETTLED by Keith
+# 2026-11-01), in the dashboard's masthead and title.
+display_name: Daily data asset
+
+# WHERE THIS ASSET'S DASHBOARD IS PUBLISHED (REQ-PIPE-255 criterion 8,
+# REQ-PIPE-257 criterion 8; one Cloudflare Pages project per asset,
+# REQ-PIPE-354 criterion 3; names chosen by Keith 2026-11-21). Configuration,
+# not secrets: the API token and the account id are environment variables
+# (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID) and never committed.
+# access_domain IS A PLACEHOLDER until Keith's Cloudflare Zero Trust team
+# exists (Keith, 2026-11-21): every publish checks that the site redirects to
+# it before uploading, so with the placeholder every publish is refused and
+# nothing can be made public by accident. docs/dashboard-hosting.md says how
+# to set it.
+hosting:
+  pages_project: data-poc-daily
+  production_branch: main
+  address: https://data-poc-daily.pages.dev
+  access_domain: CHANGE-ME.cloudflareaccess.com
+
 # WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
 # values, strictest first:
 #   hold                     - never promoted automatically; it waits,

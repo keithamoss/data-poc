@@ -57,6 +57,13 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
 
     from . import dashboard as dashboard_cli
 
+    # A PUBLISH THIS ASSET MAY NOT MAKE IS REFUSED BEFORE THE RUN, not after
+    # it (REQ-PIPE-372 criterion 2): nothing is processed only to be refused.
+    if do_publish:
+        refused = dashboard_cli.publish_refusal()
+        if refused:
+            raise click.ClickException(refused)
+
     # REFUSED OVER RECORDED HISTORY (REQ-PIPE-144 criterion 39), before
     # anything is run, for the reason bootstrap --force is: a re-run adds to
     # the history rather than replacing it. The refusal is the pipeline's own
@@ -129,7 +136,10 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
         # copy of its steps - criterion 10 is that there is exactly one way
         # to get content published. It rebuilds and re-embeds, which this
         # run has just done; paying that twice is worth one publish path.
-        dashboard_cli.publish()
+        # A FAILED PUBLISH KEEPS THE RUN (REQ-PIPE-255 criterion 29): the
+        # results are recorded and the local page built; only the upload is
+        # retried.
+        dashboard_cli.publish_after_a_run()
 
 
 @pipeline_group.command("process")

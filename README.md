@@ -132,12 +132,12 @@ rationale.
 
 The dashboard's own "🕐 Past snapshots" picker links to a decompressed
 copy of each snapshot alongside the `.gz` originals
-(`dashboard/snapshots/<name>.html`). Locally these are gitignored and
+(`dashboard/snapshots/<asset>/<name>.html`). Locally these are gitignored and
 regenerated automatically — every `mothman pipeline run` run backfills them
 regardless of the `--snapshot` flag above, so the picker works
-even when opening the dashboard straight off disk via `file://`. On the
-published GitHub Pages site the same decompression happens at deploy time
-instead, in whichever step publishes — either way, only the `.gz` files
+even when opening the dashboard straight off disk via `file://`. On each asset's
+published site the same decompression happens when `mothman dashboard publish`
+prepares it — either way, only the `.gz` files
 are ever actually committed to git.
 
 ## What's actually running
@@ -338,7 +338,16 @@ uv run pre-commit install  # one-time: wires ruff into `git commit` so lint issu
                             # get caught locally, not on the next person's pull
 uv run playwright install chromium  # one-time: for driving the dashboard in a
                             # real browser (UI verification) - see below
+npm ci                     # one-time: the JS tests, and the pinned wrangler that
+                            # `mothman dashboard publish` uploads with (REQ-PIPE-255)
 ```
+
+**Publishing** (`mothman dashboard publish`) uploads each asset's dashboard to
+its own Cloudflare Pages project behind Cloudflare Access sign-in, and only
+when its content has changed. It needs Node and `npm ci`, the
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` variables, and the publishing
+environment stated (`MOTHMAN_ENVIRONMENT=sandbox` today).
+`docs/dashboard-hosting.md` is the runbook.
 
 Ruff's rule set is deliberately narrow (`pyproject.toml`'s `[tool.ruff.lint]`)
 — this is still a fast-moving PoC with a narrative-comment-heavy style, not

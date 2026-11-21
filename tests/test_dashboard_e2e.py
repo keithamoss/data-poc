@@ -5866,7 +5866,11 @@ class TestTheQualifierAsAtTheDateOnShow:
         notice = clean_page.locator('[data-testid="arrival-notice"]')
         assert notice.is_visible()
         box = notice.bounding_box()
-        assert box and 0 <= box["y"] < clean_page.viewport_size["height"], \
+        # UNDER A PIXEL ABOVE THE TOP IS AT THE TOP: scrollIntoView aligns the
+        # banner's top to the viewport's, and the browser rounds a fractional
+        # scroll position - the asset's name in the masthead (REQ-PIPE-354)
+        # left the banner at a .5px offset, so it measured -0.5.
+        assert box and -1 < box["y"] < clean_page.viewport_size["height"], \
             "the banner is on screen after the drill"
         clean_page.go_back()
         clean_page.wait_for_function(
@@ -7379,7 +7383,9 @@ def a_snapshot_of_the_built_page(built_dashboard_html, tmp_path_factory):
 
     work = tmp_path_factory.mktemp("snapshot")
     copy = _copy_of_the_built_page(built_dashboard_html, work / "dashboard")
-    archived = snapshot_dashboard.take_snapshot(html_path=copy, snapshots_dir=work / "snapshots")
+    # AN ASSET'S OWN ARCHIVE FOLDER, as dashboard/snapshots/<asset>/ (REQ-DASH-373).
+    archive = work / "snapshots" / "quarterly"
+    archived = snapshot_dashboard.take_snapshot(html_path=copy, snapshots_dir=archive)
     alone = work / "alone"
     alone.mkdir()
     import gzip
@@ -7387,10 +7393,10 @@ def a_snapshot_of_the_built_page(built_dashboard_html, tmp_path_factory):
     with gzip.open(archived, "rb") as f:
         (alone / "snapshot.html").write_bytes(f.read())
     site = work / "_site"
-    snapshot_dashboard.prepare_deploy_site(site, html_path=copy, snapshots_dir=work / "snapshots",
+    snapshot_dashboard.prepare_deploy_site(site, html_path=copy, snapshots_dir=archive,
                                            fonts_dir=built_dashboard_html.parent / "fonts",
                                            vendor_dir=built_dashboard_html.parent / "vendor")
-    split = site / "snapshots" / archived.with_suffix("").name
+    split = site / "snapshots" / "quarterly" / archived.with_suffix("").name
     yield {"alone": alone / "snapshot.html", "split": split, "site": site}
     shutil.rmtree(work, ignore_errors=True)
 
@@ -7475,7 +7481,7 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         # 2026-10-25, #268 (c)), so nothing is filtered here: no console
         # error at all, and the fonts were actually asked for and found.
         assert served["errors"] == []
-        assert any("/snapshots/fonts/" in u for u in served["requests"]), served["requests"]
+        assert any("/snapshots/quarterly/fonts/" in u for u in served["requests"]), served["requests"]
 
 
 @pytest.mark.shared_page
@@ -10412,3 +10418,64 @@ class TestAPeriodLinkOpensWithItsStatement:
         text = " ".join(clean_page.locator("#in-place-on-past-notice").inner_text().split())
         assert text.startswith(f"Showing {self.PERIOD}"), text
         assert "in place in the warehouse on" not in text
+
+
+@pytest.mark.shared_page
+class TestAnEmptyArchiveSaysWhenItStarts:
+    """REQ-DASH-373 criterion 5, on the real build: with no snapshot in the
+    selected asset's archive, the Past snapshots panel names the date the
+    archive starts from, in the words Keith settled - asserted as text, not
+    only as an absence of console errors."""
+
+    def test_the_panel_names_the_date_from_snapshots_from(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        _open_a_drawer(clean_page)
+        body = clean_page.locator("#snapshots-panel-body")
+        text = " ".join(body.inner_text().split())
+        assert text == ("Snapshots start from this asset's first publish after the split, "
+                        "Saturday, 21 November 2026."), text
+
+
+@pytest.mark.shared_page
+class TestAMovedCollectionSaysWhereItWent:
+    """REQ-PIPE-354 criterion 7, on the real quarterly build: a pre-split
+    Birth Registrations dataset route shows the one-line notice, its link to
+    the daily dashboard carries the route and in-place-on and drops period=,
+    the title and the announcement name it, and the page does not navigate."""
+
+    ROUTE = {"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration",
+             "datasetId": "birth-registrations"}
+
+    @pytest.mark.fresh_load  # its own query string
+    def test_the_notice_on_a_pre_split_route(self, clean_page, built_dashboard_html):
+        url = (f"file://{built_dashboard_html.resolve()}?in-place-on=2026-09-01&period=2026-Q3"
+               f"#{_state_to_path(self.ROUTE)}")
+        clean_page.goto(url)
+        clean_page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        line = "Birth Registrations has moved to the Daily data asset's dashboard"
+        assert clean_page.locator("#view h2").inner_text().strip() == line
+        href = clean_page.locator("[data-moved-link]").get_attribute("href")
+        from urllib.parse import parse_qs, urlsplit
+
+        parts = urlsplit(href)
+        assert f"{parts.scheme}://{parts.netloc}" == "https://data-poc-daily.pages.dev"
+        assert parts.fragment == _state_to_path(self.ROUTE)
+        query = parse_qs(parts.query)
+        assert query.get("in-place-on") == ["2026-09-01"] and "period" not in query
+        assert clean_page.locator("[data-moved-signin]").is_visible()
+        assert line in clean_page.title()
+        assert clean_page.locator("#route-announcer").inner_text().strip() == line
+        assert clean_page.url.startswith(f"file://{built_dashboard_html.resolve()}"), "it did not navigate"
+
+
+@pytest.mark.shared_page
+class TestTheDemoSaysWhereItWasRecorded:
+    """REQ-PIPE-354 criterion 10 on the real quarterly build: the Demo tab is
+    there, captioned as a recording of the daily asset's commands, from
+    dashboard/demos/qa_wizard.yaml."""
+
+    def test_the_caption(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "demo"})
+        caption = clean_page.locator("[data-demo-caption]")
+        assert caption.inner_text().strip() == (
+            "Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily")

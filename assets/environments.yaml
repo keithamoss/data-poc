@@ -57,8 +57,10 @@ environments:
     description: >
       An agent session's container. Data is synthetic and the database
       does not survive the container, so a build here describes a
-      moment rather than a system of record.
-    publishes: false
+      moment rather than a system of record. The one environment that
+      publishes, to each asset's Cloudflare Pages project, until a
+      production deployment exists (REQ-PIPE-255 criterion 21).
+    publishes: true
     confirm_changes: false
     ticketing: false
 
@@ -80,8 +82,11 @@ environments:
       The deployment whose build is the published dashboard. One per
       data asset - the asset is a deployment's identity rather than a
       row in the data, so a second asset is a second deployment of this
-      same configuration, not another entry here.
-    publishes: true
+      same configuration, not another entry here. Publishes nothing until
+      a production deployment exists (REQ-PIPE-255 criterion 21) - the
+      sandbox publishes today, and at most one environment does.
+    publishes: false
+    production: true
     confirm_changes: true
     ticketing: true
 
