@@ -72,3 +72,14 @@ requirements.yaml until each requirement is presented and signed.
    `assets/`, holding the extraction template and one folder per extraction.
    Selected by MOTHMAN_ASSET and given its own database as any asset is, but never
    listed by the enduring-asset loops in CI or the session-start hook.
+
+## Round 4, Keith's own addition
+
+- "We should be able to support other types of one-off in future too." Asked how to
+  leave the door open, he chose **`one-offs/<kind>/<id>/`** - the kind is a folder
+  level (`one-offs/extraction/<id>/`), with each kind's template beside its folders.
+  Not the recommendation (one root with a declared `kind:`). Shared by every kind:
+  the listing, the database per one-off, the release decision and publishing; each
+  kind plugs in its own recipe reader and checks. Note for v5: ids still share one
+  namespace with each other and with assets (`MOTHMAN_ASSET`, `supply_<name>`,
+  `data/<name>`), so an id must be unique across every kind, not only within one.
