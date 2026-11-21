@@ -1,0 +1,79 @@
+# v4 (2026-11-21, round 3): Set A unchanged and final; adds the REQ-PIPE-342 and REQ-PIPE-363 amendments REQ-PIPE-446 criterion 13 names.
+# SET A, FINAL (Keith 2026-11-21: Q1.1 (a), Q1.2 (a), Q3.1 (a)). Ready to apply.
+REQ-PIPE-065:
+  acceptance_criteria_replace:
+    3: "WHEN a supply is recorded as a resupply of a slot already filled by a promoted supply, THE SYSTEM SHALL say, in the queue item that offers its decision, when the promoted supply was accepted. AMENDED 2026-11-21 (Keith): it asked for a separate report; the awaiting-decision queue item is that report (REQ-PIPE-131, REQ-DASH-070)."
+    4: "WHERE such a resupply was received within an hour before the next slot's claim window opened, THE SYSTEM SHALL say so in that queue item, naming the next slot. AMENDED 2026-11-21 (Keith)."
+  acceptance_criteria_append:
+    10: "WHERE a resupply replaces a promoted supply automatically under the replacement setting (REQ-PIPE-123), THE SYSTEM SHALL carry the same accepted-at and proximity wording in the supply-history entry recording the replacement, and SHALL NOT give that entry more prominence than REQ-PIPE-123 criterion 6 allows. ADDED 2026-11-21 (Keith)."
+  retired_criteria:
+    - criterion: 7
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-GHUB-082]
+      reason: "The queue item offers its operations itself - promote, which supersedes the holder, re-file and reject (filing_queue.operations_for, REQ-GHUB-082 criterion 16) - so naming them again in prose is a second list that can drift from the first."
+    - criterion: 8
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-131, REQ-DASH-070]
+      reason: "There is no separate warning to emit. Under REQ-PIPE-131 a supply received into a filled slot is recorded as a resupply and waits in the awaiting-decision queue, which never stops processing; a second, parallel warning for the same supply would say the same thing twice."
+  unmet_criteria: "REMOVE the criterion-8 entry (retired); add entries for criteria 3, 4 and 10 as not yet built, owned by this requirement's rework."
+  status_note: "Criteria 3, 4 and 10 become unbuilt by this amendment, so the status moves from built to in_progress until the rework lands."
+  implemented_by_replace:
+    remove:
+      - qa_tools/common/landed_on_accepted.py::report
+      - qa_tools/common/landed_on_accepted.py::may_auto_promote
+      - qa_tools/common/landed_on_accepted.py::LandedOnAccepted
+    add:
+      - qa_tools/common/promotion.py::should_promote
+      - "qa_tools/common/filing_queue.py::waiting_over_promoted   # the rework adds the wording here"
+  linked_tests_remove:
+    - tests/test_landed_on_accepted.py
+  code_to_delete:
+    - qa_tools/common/landed_on_accepted.py
+    - tests/test_landed_on_accepted.py
+    - "the 'qa_tools/common/landed_on_accepted' entry in tests/test_sample_data.py's module list (line 283)"
+  decisions_add:
+    - "THE FILLED-SLOT REPORT IS THE QUEUE ITEM, NOT A SECOND WARNING (SETTLED by Keith 2026-11-21, Q1.1 (a)): landed_on_accepted.report() was built in September, before REQ-PIPE-131 made every such arrival a resupply waiting in the queue, and nothing ever called it. Its wording moves into the queue item's reason; the module and its test go. REJECTED (c) wiring report() as a separate warning, which shows one supply twice, and (b) retiring criteria 3 to 8 outright, which loses the accepted-at instant and the near-the-next-window hint."
+    - "THE AUTOMATIC REPLACEMENT CARRIES THE SAME WORDS (SETTLED by Keith 2026-11-21, Q1.2 (a)): with replacement set to green, a green file sent early for the next period and received just before its window opens replaces accepted data with no queue item; criterion 10 gives that history entry the same diagnosis, wording only, no added prominence."
+    - "CRITERION 9 IS THE PROMOTION GATE'S (2026-11-21): promotion.should_promote's slot-filled refusal implements it and REQ-PIPE-075 criterion 4 restates it; landed_on_accepted.may_auto_promote was called only by tests and is deleted with the module."
+    - "CRITERIA 3 TO 7 HAD BEEN CLAIMED BY TESTS OF CODE NOTHING RAN (found 2026-11-21 by the delivery-architect triage); this amendment ends that over-claim rather than carrying it."
+REQ-PIPE-352:
+  retired_criteria:
+    - criterion: 5
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-250]
+      reason: "One requirement owns one claim (REQ-PIPE-403's decisions, Keith 2026-11-14): the per-asset 12-minute budget is REQ-PIPE-250 criterion 2, as amended by this requirement on 2026-11-15, and its measurements are REQ-PIPE-403's evidence."
+    - criterion: 6
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-403]
+      reason: "It asked whether splitting one bootstrap into two added cost, against the pre-split figures on REQ-PIPE-336's commit. That comparison can no longer be like for like - Cancer and Mental Health were added and the speed batch landed, and the last quiet measure (REQ-PIPE-403, 2026-11-18) includes both - and the question no longer matters: no supported path runs the two bootstraps side by side (CI's deployment half bootstraps each asset in turn; at the target scale each asset bootstraps in its own environment). Each asset's own figure is REQ-PIPE-403's evidence for REQ-PIPE-250."
+  unmet_criteria: "REMOVE both entries (criteria 5 and 6 are retired); the requirement is then built with nothing unmet."
+  decisions_add:
+    - "C5 AND C6 RETIRED (SETTLED by Keith 2026-11-21, Q3.1 (a)): c5 to REQ-PIPE-250, which owns the budget; c6 because nothing runs the bootstraps side by side. REJECTED (b) re-baselining c6 as one commit alone against side by side, which measures contention on the sandbox only, and (c) folding it into REQ-PIPE-250, a second claim on the budget's owner."
+REQ-GHUB-082:
+  unmet_criteria: "Criterion 1's entry: replace blocked_by {unowned: true} with blocked_by {requirements: [REQ-GHUB-433]}, owner REQ-GHUB-433 (Keith 2026-11-21, Q2.1 (a))."
+REQ-PIPE-379:
+  unmet_criteria: "Criterion 5's entry: replace blocked_by {unowned: true} with blocked_by {requirements: [REQ-TEST-437]}; retired_by REQ-TEST-437 criterion 6 when that is built."
+REQ-PIPE-342:
+  acceptance_criteria_replace:
+    5: "THE SYSTEM SHALL discover the asset folders from assets/ itself, and the extraction folders from extractions/ itself (REQ-PIPE-446), and SHALL NOT hold a list of assets or extractions, or name either, anywhere in code. AMENDED 2026-11-21 by REQ-PIPE-446."
+  note: "Criterion 1 is unchanged - it lays out an ENDURING asset's folder; an extraction's folder is REQ-PIPE-440's."
+REQ-PIPE-363:
+  acceptance_criteria_replace:
+    1: "THE SYSTEM SHALL take the asset a command acts for from MOTHMAN_ASSET, naming an asset folder under assets/ or an extraction folder under extractions/ by its bare name, beside MOTHMAN_ENVIRONMENT and MOTHMAN_SUPPLY_DSN (SETTLED by Keith 2026-11-01, on REQ-PIPE-091's precedent). AMENDED 2026-11-21 by REQ-PIPE-446."
+    4: "IF a command that is not one of the tool commands of criterion 5 is given WHILE MOTHMAN_ASSET is unset or names no asset or extraction folder, THEN THE SYSTEM SHALL answer not 'No such command' but that MOTHMAN_ASSET is not set, or names no folder, naming the variable, listing the folder names found under assets/, saying how many extractions there are and how to list them, and saying there is deliberately no default, in the form environments.current() uses for MOTHMAN_ENVIRONMENT - reading nothing but those folder names. AMENDED 2026-11-21 by REQ-PIPE-446."
+    6: "IF a command that reads asset configuration or opens a connection runs WHILE MOTHMAN_ASSET is unset or names no asset or extraction folder, THEN THE SYSTEM SHALL refuse before reading any asset configuration or opening any connection, naming the variable, every asset folder found and how many extractions there are, and SHALL NOT fall back to a default, a last-used value or the only asset present. AMENDED 2026-11-21 by REQ-PIPE-446."
+  wording_for_keith: "Criteria 4 and 6 list the enduring assets by name but extractions only as a count ('and 37 extractions - mothman extraction list'), so the refusal stays readable with 200 of them. REQ-PIPE-363's refusal wording was SETTLED by Keith on 2026-11-01, so the exact new words need his yes."
+  decisions_add:
+    - "EXTRACTIONS ARE SELECTED BY THEIR BARE ID (REQ-PIPE-446, 2026-11-21): MOTHMAN_ASSET=<id> for both roots, a name in both refused; the refusal lists assets by name and extractions by count. REJECTED a prefix, since data/, reports/ and supply_<name> are one namespace either way."
+REQ-PIPE-106:
+  note: "Amended by REQ-PIPE-438 criterion 1 when built (criteria 7, 9 and 10 to read 'not-yet-agreed' only); nothing applied now."
+plans_drafts:
+  "plans/supply-model.md sprint 12": "Owns line gains REQ-GHUB-433."
+  "plans/supply-model.md sprint 29": "Owns: REQ-PIPE-434, REQ-PIPE-435, REQ-DASH-436, REQ-TEST-437, REQ-PIPE-438, REQ-PIPE-439, REQ-PIPE-440, REQ-PIPE-446, REQ-QAC-441, REQ-PIPE-442, REQ-PIPE-443, REQ-DASH-444. Replace 'the five requirements below are not drafted' with 'drafted 2026-11-21, with the no-period lifecycle beneath them'. The sprint's prose stays until its last requirement is built (CLAUDE.md rule 4, delete a thread whole)."
+  "plans/running-thoughts.md #53": "Delete once REQ-GHUB-433 is signed (its accept-badge half went with #54 and REQ-PIPE-091; its polling half is 433)."
+  "plans/running-thoughts.md #141": "Delete once 434 to 446 are signed; carried in REQ-PIPE-434's decisions."
+  "plans/post-build-review.md #473": "Repoint at REQ-PIPE-434, REQ-PIPE-435 and REQ-DASH-436."

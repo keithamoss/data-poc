@@ -1,0 +1,393 @@
+- id: REQ-GHUB-433
+  title: "The processing pass reads new slot-ticket comments from GitHub and hands each to the GitHub filing route once, so a comment reaches the decision log without GitHub Actions reaching the database"
+  date_written: "2026-11-21"
+  story: "As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database."
+  moscow: should
+  status: not_started
+  source: "Keith, delivery-architect triage of REQ-GHUB-082 criterion 1 relayed by the main session, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H's drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21; v2 the same day after Keith chose polling (Q2.1 (a), 2026-11-21). PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL read every comment posted on the asset's ticket repository since the last comment it handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by GitHub's creation time."
+    - "THE SYSTEM SHALL read those comments by an outbound request from inside the environment that holds the asset's database, and SHALL NOT require any inbound connection to that environment."
+    - "THE SYSTEM SHALL read comments with one repository-level listing per pass, paged, and SHALL NOT make a request per ticket."
+    - "THE SYSTEM SHALL record which comments it has handled in the asset's own database, and SHALL NOT keep that record in the repository or on local disk."
+    - "THE SYSTEM SHALL hand any one comment to the handler at most once, so that a pass re-run after a failure does not raise the same decision twice."
+    - "IF reading or handling comments fails partway through a pass, THEN THE SYSTEM SHALL keep the record at the last comment handled, SHALL report the stage as failed in the pass's exit status, and SHALL read the rest on the next pass."
+    - "THE SYSTEM SHALL take each comment's author from GitHub's own record of who posted it, and SHALL NOT read an author from the comment's body (REQ-GHUB-082 criterion 4)."
+    - "WHERE a comment is on a ticket whose slot is not a dataset of the selected asset, THE SYSTEM SHALL neither handle it nor reply to it."
+    - "THE SYSTEM SHALL read comments before it reconciles tickets in the same pass, so that a decision raised on a ticket is reflected on that ticket by the same pass (REQ-GHUB-082 criterion 8)."
+    - "WHERE the environment's ticketing is off, THE SYSTEM SHALL read no comments and SHALL say so in one line of the pass's report."
+    - "THE SYSTEM SHALL act on a comment as it read when first handled, and SHALL NOT re-handle a comment edited afterwards."
+    - "THE SYSTEM SHALL delete the disabled .github/workflows/ticket-sync.yml in the same change, and SHALL close REQ-GHUB-082 criterion 1's unmet entry citing this requirement."
+  non_functional_requirements:
+    - "COMPATIBILITY: the environment already calls GitHub outbound for ticket reconciliation (ticket_reconciler.service_from_env), so this adds a read over the same route and the same credential; no new network path is opened."
+    - "SECURITY: the credential is read-and-write on issues of one repository only, never contents; what it lets a holder do is unchanged, because a comment's authority comes from its GitHub author being in people.yaml, never from the poller."
+    - "SECURITY: when the repository goes private (REQ-DOCS-259), commenting already needs repository access, which narrows who can raise a decision; the people.yaml allowlist stays the gate either way."
+    - "SCALABILITY: at about 30 collections per asset the cost is one paged listing per pass, independent of the number of tickets, well inside GitHub's per-token rate limit."
+    - "RELIABILITY: a GitHub outage delays decisions until the next pass and never loses one, because the record of handled comments only moves forward over comments actually handled."
+    - "OBSERVABILITY: every decision is still recorded with the person as actor and the reason they gave (REQ-GHUB-082 criteria 10 and 27); the pass report says how many comments were read and how many raised a decision."
+    - "LATENCY: a comment is acted on at the next processing pass, so the scheduler's interval is the response time; nothing here promises faster."
+    - "STATE: the record of handled comments is state, so it lives in the database (CLAUDE.md, the repository holds configuration, not state)."
+  dependencies:
+    - REQ-GHUB-082
+    - REQ-PIPE-151
+    - REQ-PIPE-083
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q2.1 (a)): POLLED BY THE PROCESSING PASS rather than a webhook or a separate Lambda. The environment already calls GitHub outbound to reconcile tickets, so polling adds no new path or credential, while a webhook needs an inbound endpoint into a strictly separated environment. A scheduled Lambda is the same thing as the scheduler that already calls `mothman pipeline process` (REQ-PIPE-151), so it is not a separate option."
+    - "REJECTED a webhook into the environment: it needs an inbound endpoint, a public address and secret verification for each of two separated environments, all to save at most one scheduler interval of latency on a decision that is not urgent."
+    - "REJECTED reviving ticket-sync.yml with database access: a runner with a route to the database breaks REQ-PIPE-089/092's line that a GitHub runner holds no route to the supply database."
+    - "DRAIN THE BACKLOG, carried from Thread H (2026-09-22): each pass reads everything since its record rather than reacting to one event, so a missed or failed pass costs nothing. Applied serially, oldest first, last wins, exactly as settled then."
+    - "ONE ASSET PER ENVIRONMENT READS ONLY ITS OWN SLOTS: both assets name the same ticket_repository today, so each pass must ignore the other asset's tickets in silence; a reply would put two environments answering one thread."
+  open_questions:
+    - "Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. Does not change what is built here, but it is a deployment decision for whoever stands up each environment."
+
+- id: REQ-PIPE-434
+  title: "A supply for a dataset with no calendar is filed to no period, never held for placing, and checked when it arrives"
+  date_written: "2026-11-21"
+  story: "As whoever runs QA on a project extraction, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately); plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27). Relayed by the main session 2026-11-21. Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing."
+    - "THE SYSTEM SHALL NOT hold such a supply for a person to place (REQ-PIPE-064), because no period exists to place it in."
+    - "WHEN such a supply is staged, THE SYSTEM SHALL run its dataset's active checks over it in the same pass as any other arrival, against a run view of the newest version of each no-calendar table (REQ-PIPE-106)."
+    - "THE SYSTEM SHALL NOT compute a claim window, lateness, runway, a missing slot or a schedule-ended hold for such a dataset, and SHALL NOT report any of them as failing for want of a calendar."
+  non_functional_requirements:
+    - "SCALABILITY: no work per period, so the cost is per arrival only; 30-40 extractions a year (sprint 29 point 8) adds nothing that grows with time."
+    - "RELIABILITY: a supply that cannot be loaded or checked reads could-not-load or could-not-check as for any arrival, and is never silently skipped."
+    - "MAINTAINABILITY: one rule at the filing boundary, asked of the declaration (sample_data.is_sample), not a branch per caller."
+  dependencies:
+    - REQ-PIPE-106
+  decisions:
+    - "BOTH no_calendar VALUES ARE FILED THE SAME WAY (delivery-scoper): neither has a period, so filing, holding and lateness cannot differ between them; what the record COUNTS for differs, and that is REQ-PIPE-438's."
+    - "THE DEFECT, from #141 (2026-11-18): NoCalendarAgreed is not a ValueError, so file_arrivals' handlers missed it; past that the supply was held as waiting for a person to place it, so no tool checked it. Criteria 1 to 3 close both."
+    - "REJECTED holding a no-period supply for a person: there is nothing a person could choose, so the hold would be a queue item with no answer."
+    - "REJECTED inventing a pseudo-period (the receipt date, or one period per extraction) so the ordinary filing path runs: it would put a period into slot, lateness and promotion arithmetic that REQ-PIPE-106 criterion 5 excludes by construction."
+
+- id: REQ-PIPE-435
+  title: "A person records one release-or-withhold decision for a whole extraction, with a reason, and nothing about it is ever promoted"
+  date_written: "2026-11-21"
+  story: "As the person accountable for handing an extract to a project, I want to record whether this extraction is released or withheld, and why, so that there is a named, dated account of who let the data go - or stopped it."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.2 (b): a recorded release-or-withhold decision for the whole extraction, with actor and reason, replacing v1's report-only provisional. plans/running-thoughts.md #141 (the promotion gate raises). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN every dataset of an extraction has a recorded outcome for its checks, THE SYSTEM SHALL offer, in the TUI, one decision for the whole extraction - release or withhold."
+    - "WHEN a person records that decision, THE SYSTEM SHALL append it to the extraction's decision record with the person as actor, the instant, the decision and their reason, and SHALL refuse it without a reason."
+    - "IF the person is not named in the extraction's people.yaml (copied from the template, REQ-PIPE-440), or is a placeholder, THEN THE SYSTEM SHALL refuse the decision and say why."
+    - "THE SYSTEM SHALL NOT accept a decision for a single dataset of an extraction, only for the whole extraction."
+    - "WHERE more than one decision has been recorded for an extraction, THE SYSTEM SHALL treat the latest as standing, and SHALL keep and show every earlier one."
+    - "THE SYSTEM SHALL NOT put a supply for a `no_calendar` dataset to the promotion gate; IF the gate is asked about one, THEN THE SYSTEM SHALL refuse it as having no period, and SHALL NOT raise NoCalendarAgreed."
+    - "THE SYSTEM SHALL NOT open a ticket for an extraction, nor accept its decision from GitHub."
+    - "THE SYSTEM SHALL record the decision only, and SHALL NOT itself move, copy or send extraction data to the project."
+  non_functional_requirements:
+    - "OBSERVABILITY / COMPLIANCE: the database is dropped once the work is done (REQ-PIPE-442) and the page may be published before any decision (REQ-PIPE-443), so the latest published page is the only lasting copy of every decision; REQ-DASH-444 carries them."
+    - "SECURITY: the same identity rules as a filing decision - a named, non-placeholder person, the actor taken from git identity on the terminal (REQ-GHUB-082 criterion 14's allowlist, applied to the extraction's folder)."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-440
+    - REQ-PIPE-074
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.2 (b)): one release-or-withhold decision for the WHOLE extraction, with actor and reason. REJECTED (a) report only, the v1 recommendation, and (c) a decision per dataset."
+    - "TERMINAL ONLY (delivery-scoper): GitHub tickets are per slot (REQ-PIPE-083) and an extraction has none; sprint 29 point 7 runs it from the TUI with no CI. This is not a breach of REQ-GHUB-082's two-route parity, which governs FILING decisions; a release is a different act."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q4 (a)): a release is RECORDED ONLY - the system never moves, copies or sends data to the project. REJECTED (b) withholding blocking a hand-over step this system would have to build."
+    - "LAST WINS, ALL KEPT, carried from Thread H's rule for filing decisions: a withheld extraction can be released after discussion, and both entries stay visible."
+
+- id: REQ-DASH-436
+  title: "The dashboard builds and reads correctly for an asset whose datasets have no calendar"
+  date_written: "2026-11-21"
+  story: "As a reader of an extraction's dashboard, I want each dataset's checks and supplies shown without any schedule language, so that I see what was checked rather than a page that failed to build or calls everything missing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 (2026-11-18: agreement.cadence() raises in the build); sprint 29 point 8. Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN the dashboard is built for an asset holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() or any other cadence read."
+    - "THE SYSTEM SHALL list such a dataset's supplies by receipt instant, and SHALL NOT show a period, a slot, a due date, lateness or anything marked missing for it."
+    - "THE SYSTEM SHALL show such a dataset's checks with their real verdicts, on a rendered page."
+    - "WHERE every dataset of an asset declares `no_calendar`, THE SYSTEM SHALL NOT show the as-of picker's period controls or any schedule summary."
+    - "THE SYSTEM SHALL roll such datasets up as REQ-PIPE-438 decides, and SHALL NOT decide it a second time here."
+  non_functional_requirements:
+    - "COMPATIBILITY: the built page stays one self-contained file that opens from file:// with no network, as every dashboard does."
+    - "PERFORMANCE: an extraction is tens of tables with one supply each; no budget beyond the existing build."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-438
+  decisions:
+    - "THE ROLLUP LIVES IN ONE PLACE (delivery-scoper): REQ-PIPE-438 amends REQ-PIPE-106, and this requirement follows it rather than carrying an exception of its own."
+
+- id: REQ-PIPE-438
+  title: "A `never` dataset's results are real quality history and roll up within its extraction; REQ-PIPE-106's not-counted rules apply to `not-yet-agreed` only; a recurring asset refuses a `never` dataset"
+  date_written: "2026-11-21"
+  story: "As a reader of an extraction's dashboard, I want its tables' verdicts to count and roll up, so that the page answers whether the extract is fit to release rather than reading 'Not counted' throughout."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-11-21, Q4.1 (a) and Q4.7 (a). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed. Amends REQ-PIPE-106 (built)."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only."
+    - "THE SYSTEM SHALL record the QA results of a dataset declaring `no_calendar: never` as agreed results, not in development, unless the recipe marks it a derived product (REQ-PIPE-440)."
+    - "THE SYSTEM SHALL roll a `never` dataset's verdicts up into its collection and its extraction, as for any dataset with a calendar."
+    - "THE SYSTEM SHALL label a `never` dataset in words as a one-off extraction, without the not-yet-agreed label."
+    - "IF an asset under assets/ declares a dataset `no_calendar: never`, THEN THE SYSTEM SHALL refuse the configuration in `mothman check`, naming the dataset."
+    - "IF an extraction under extractions/ declares a dataset `no_calendar: not-yet-agreed` or with a calendar, THEN THE SYSTEM SHALL refuse it, naming the dataset."
+  non_functional_requirements:
+    - "CORRECTNESS: every status implementation changes together - the template's rollup, dataset_status.py and status-cases.json - with one test driving the same inputs through both, as REQ-PIPE-106 did (the item-74 lesson)."
+    - "SCALABILITY: the gate is per asset and per dataset, so it costs nothing extra at 30 collections."
+  dependencies:
+    - REQ-PIPE-106
+    - REQ-PIPE-440
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.1 (a)): an extraction's QA IS the deliverable, so its verdicts count. REJECTED (b), REQ-PIPE-106 as built, under which an all-`never` asset reads 'Not counted' at every level."
+    - "WHY 106 GOT THIS WRONG, so it is not re-derived: 106's 'one mechanism, two exits' (2026-09-27) gave both exits the check-development semantics, and sprint 29 point 5 - only DERIVED products are excluded from an extraction's rollup - implied otherwise. Nobody reconciled the two until 2026-11-21."
+    - "SETTLED by Keith 2026-11-21 (Q4.7 (a)): a `never` dataset lives only on an extraction of its own; a recurring asset's configuration refuses one. Since round 3 an extraction is whatever lives under extractions/, so the gate keys on the folder's root, not on a declaration. REJECTED allowing both, which would put real verdicts with no schedule into a recurring asset's rollups."
+    - "WHAT STAYS FROM 106 for `never`: criteria 4 and 5 (data in the no-period schema, excluded from period arithmetic by construction) and the hierarchy criteria 11 to 15. Criterion 17's discard is superseded for an extraction by dropping its database (REQ-PIPE-442)."
+
+- id: REQ-PIPE-439
+  title: "An extraction arrives as a package - its files plus a recipe JSON whose format we define, with optional expected row counts - and a package with no valid recipe is refused"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want the extraction to declare itself in a recipe beside its files, so that what it claims to contain is stated before anything checks it."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 1-3 (Keith, 2026-09-27); Keith 2026-11-21 Q4.4 (b) and round 2 Q6 (b). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL read an extraction as a package - a directory on local disk or an S3 prefix - holding one recipe file and the data files it names."
+    - "THE SYSTEM SHALL read the recipe as JSON against a schema committed in this repository, carrying a recipe format version."
+    - "THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement."
+    - "THE SYSTEM SHALL accept, for each table, an optional expected row count."
+    - "IF the recipe is missing, does not parse, or fails the schema, THEN THE SYSTEM SHALL refuse the package before anything is generated or loaded, naming each problem."
+    - "IF the extraction id is not lowercase letters, digits and single hyphens (the asset folder naming rule), THEN THE SYSTEM SHALL refuse the package, naming the id."
+    - "THE SYSTEM SHALL read each data file through the existing arrival reader, and SHALL NOT assume CSV."
+    - "THE SYSTEM SHALL NOT write the recipe into any database."
+  non_functional_requirements:
+    - "MAINTAINABILITY: the recipe schema is versioned so a later format can be read alongside an older one without guessing."
+    - "PORTABILITY: S3 is read with the environment's own credentials; no new third-party domain beyond AWS's."
+    - "SECURITY: the recipe is untrusted input; it is parsed as data, its filter text is never executed, and a file name in it is refused if it escapes the package directory."
+  dependencies: []
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (sprint 29 point 1): a package of files, local or S3; format may change, so nothing assumes CSV."
+    - "SETTLED by Keith 2026-09-27 (point 2): the recipe is OURS to define - tables, columns, filter/cohort/date range, placement."
+    - "SETTLED by Keith 2026-09-27 (point 3): the recipe lives beside the package and never enters the database. REJECTED, deferred not refused, recording it in the database - natural only if extractions later load straight to a database. Since round 2 Q2 (b) what the recipe declares is ALSO carried into the committed asset folder REQ-PIPE-440 generates; that is configuration in the repository, not the database, so point 3 still holds."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q6 (b)): the core fields plus an optional expected row count per table, checked when present (REQ-QAC-441). REJECTED (a) the core fields only, the recommendation."
+    - "COHORT BOUNDS ARE STRUCTURED, THE FILTER IS PROSE (delivery-scoper; Keith accepted the field list in Q6): only a structured bound can become a check; filter text is shown on the page, never parsed."
+    - "THE v2 FLAG ABOUT THE BUILD READING THE RECIPE FROM DISK IS GONE: since Q2 (b) the build reads the committed asset folder, which carries everything the page shows, so it reads configuration and recorded results only, as the standing rule says."
+
+- id: REQ-PIPE-440
+  title: "Opening an extraction generates extractions/<id>/ from its recipe and the committed template - hierarchy, datasets, contracts, checks and defaults - which must be committed before the package loads"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want its configuration generated from its recipe into a committed folder of its own, apart from the enduring assets, so that each extraction's checks and declaration are reviewable configuration and nothing is typed by hand."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b) (a committed generated folder per extraction) and round 3 Q1 (a) with his addition (extractions/<id>/ at the repository root, beside assets/). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a person opens a package from the TUI, THE SYSTEM SHALL generate extractions/<extraction id>/ from its recipe and the extraction template (extractions/_template/), and SHALL NOT read any hierarchy or check authored by hand for that extraction."
+    - "THE SYSTEM SHALL generate in that folder a data-asset.yaml naming its project, recipe format version and recipe digest, its filter text, and the agency, collection and dataset hierarchy of the recipe's placements, every table a dataset declaring `no_calendar: never`."
+    - "THE SYSTEM SHALL generate in that folder each dataset's contract and recipe check layer (REQ-QAC-441), its dbt project, and copies of the template's people.yaml, presentation.yaml, default check layer and publishing destination, and SHALL generate no calendar.yaml, no synthetic/ folder and no QA adapter module of its own."
+    - "WHERE the recipe marks a table as a derived product, THE SYSTEM SHALL declare it in development in the generated configuration, so that its real verdicts are reported and excluded from the extraction's rollups."
+    - "IF extractions/<extraction id>/ or assets/<extraction id>/ already exists, THEN THE SYSTEM SHALL refuse the package, naming which, and say a re-send is a new extraction (REQ-PIPE-442 criterion 2)."
+    - "IF two tables of one recipe claim the same dataset placement, or an id does not meet the hierarchy's naming rules, THEN THE SYSTEM SHALL refuse the package before generating anything, naming them."
+    - "IF the recipe beside the package no longer matches the digest its generated folder records, THEN THE SYSTEM SHALL refuse to load or check the package, naming both digests."
+    - "IF the generated folder has uncommitted changes, or is not in the repository's history at all, THEN THE SYSTEM SHALL refuse to load the package, so that the published page names a commit holding the configuration it ran."
+    - "THE SYSTEM SHALL NOT add any level above agency, nor any hierarchy or naming scheme of an extraction's own."
+  non_functional_requirements:
+    - "STATE, THE COST FLAGGED AND ACCEPTED: 30-40 generated folders a year, about 200 after five, each with a dbt project. They are configuration in the CLAUDE.md sense - they declare how that extraction is checked, and two people with the same folder get the same behaviour - but they are generated from a supplier's input rather than authored. Keeping them under extractions/ rather than assets/ keeps that distinction visible in the tree."
+    - "PRIVACY: a committed folder carries the project name, the cohort and the filter text, readable by everyone with repository access - both assets' teams while one repository holds both (REQ-PIPE-342's future decision point: a repository per asset)."
+    - "MAINTAINABILITY: the template is the one place defaults are edited; a folder keeps the copy it was generated with, so changing a default never changes what an old extraction ran."
+    - "OBSERVABILITY: the commit of criterion 8 is git-identity-authored like any other, so who generated and committed an extraction's configuration, and when, is in git."
+  dependencies:
+    - REQ-PIPE-439
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (round 2 Q2 (b)): a generated folder committed per extraction. REJECTED (a) one committed template with each extraction's hierarchy built in memory from its recipe - the scoper's recommendation, flagged as keeping 30-40 a year of folders that are closer to state than configuration out of the repository - and (c) a generated folder beside the package, not committed."
+    - "SETTLED by Keith 2026-11-21 (round 3, his own addition): the one-offs live APART from the enduring assets, in extractions/<id>/ at the repository root beside assets/, which holds the template and one folder per extraction. v3's assets/<id>/ is replaced."
+    - "SETTLED by Keith 2026-11-21 (round 3 Q1 (a)): loading is refused until the generated folder is committed (criterion 8). REJECTED (b) loading at once and committing afterwards, which could leave a page naming a commit without its own configuration."
+    - "THE TEMPLATE KEEPS ITS UNDERSCORE, as extractions/_template/ (delivery-scoper, v4): the folder listing (asset_model/assets.py's _Assets.names) already skips '_' and '.' names, so reusing that rule for the second root needs no special case; a bare 'template' would have to be a reserved name that no extraction id may take."
+    - "THE FOLDER'S LOCATION IS ITS KIND (delivery-scoper, v4): an extraction is whatever lives under extractions/, so data-asset.yaml no longer declares a shape - v3's declaration would have been a second source that could disagree with the location."
+    - "DEFAULTS ARE COPIED, NOT READ AT RUN TIME (delivery-scoper, following Q2 (b)): the committed folder is then the whole account of what that extraction ran."
+    - "ONE SHARED EXTRACTION ADAPTER, NOT A GENERATED ONE (delivery-scoper): generating Python per extraction would commit 30-40 code files a year; REQ-PIPE-446 lets the collections gate accept it."
+    - "THE COMMITTED FOLDER IS THE LASTING DUPLICATE GUARD: a dropped database forgets an id and a page may never have been published, but the folder stays in git."
+    - "SETTLED by Keith 2026-09-27 (points 4 and 5): each table its own calendar-less dataset; derived products in development, real verdicts, out of the extraction's rollup."
+    - "REJECTED by Keith 2026-09-27: a new concept above agency ('there would be some convenience to have them all in one dashboard, but then we have to add a new concept above agency'); deriving the hierarchy by convention from the package or extraction name; and hand-authoring it per extraction as a contract is today."
+
+- id: REQ-PIPE-446
+  title: "extractions/ is a second root the resolver reads beside assets/ - an extraction selected by MOTHMAN_ASSET by its bare id, a name in both roots refused, and each per-asset gate run over extractions only where it applies"
+  date_written: "2026-11-21"
+  story: "As whoever maintains the pipeline, I want extractions found and selected like assets while staying out of everything that serves the enduring assets, so that 200 of them in five years cost the gates seconds and never touch CI."
+  moscow: must
+  status: not_started
+  source: "Delivery-scoper, 2026-11-21 v4, Keith's round 3 addition (extractions/ beside assets/, selected by MOTHMAN_ASSET, its own database, never listed by the enduring-asset loops) checked against asset_model/assets.py (_Assets.names, asset(), selected(), use_root, NAME_PATTERN, data_asset_yaml), cli/check.py (_asset_passes, _SYNTHETIC_GATES, NOT_APPLICABLE), REQ-PIPE-342 and REQ-PIPE-363. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL list extraction folders from extractions/ at the repository root by the same rule it lists assets/ - directories only, '_' and '.' names skipped, names held to NAME_PATTERN - and SHALL NOT hold a list of extractions anywhere in code."
+    - "WHEN MOTHMAN_ASSET names an extraction's bare id, THE SYSTEM SHALL select that extraction, its configuration in extractions/<id>/, its state paths data/<id>/ and reports/<id>/, and its database supply_<id>."
+    - "IF a name is a folder under both assets/ and extractions/, THEN THE SYSTEM SHALL refuse to select it, and `mothman check` SHALL fail, naming both folders - since the two would share data/, reports/, a database and a module tag."
+    - "THE SYSTEM SHALL keep assets.names(), and every reader that iterates the enduring assets through it, to assets/ alone, and SHALL list extractions only through a reader of their own."
+    - "THE SYSTEM SHALL let a deployment point the extractions root elsewhere as use_root does for assets/ (REQ-PIPE-342), and SHALL let a test point it at a temporary folder."
+    - "IF `mothman pipeline bootstrap`, `mothman env reset-synthetic`, a dashboard deployment or any other synthetic or deployment command runs WHILE MOTHMAN_ASSET names an extraction, THEN THE SYSTEM SHALL refuse it, naming the extraction."
+    - "THE SYSTEM SHALL have every per-asset gate in `mothman check` declare whether it applies to extractions, and SHALL refuse to run a gate that declares neither."
+    - "WHEN `mothman check` runs, THE SYSTEM SHALL run each gate that applies to extractions over every extraction folder, and SHALL show one row per gate for all extractions - how many passed and the name of each that failed - rather than one row per extraction."
+    - "THE SYSTEM SHALL show a gate that does not apply to extractions as 'not applicable (extraction)', as it shows a synthetic gate on an asset with no synthetic/ folder (REQ-PIPE-385), and SHALL NOT show it passed."
+    - "THE SYSTEM SHALL let the collections gate accept an extraction's collections served by the one shared extraction adapter, and SHALL go on failing any enduring asset's collection without an adapter of its own."
+    - "THE SYSTEM SHALL have a test that no CI workflow and no session-start hook lists or names extractions/."
+    - "THE SYSTEM SHALL record in evidence `mothman check --no-pytest`'s time with 0 and with 50 generated extraction folders present, and SHALL keep the cost per extraction under one second."
+    - "THE SYSTEM SHALL amend REQ-PIPE-342 criterion 5 and REQ-PIPE-363 criteria 1, 4 and 6 in the same change, as amendments-v4 states."
+  non_functional_requirements:
+    - "SCALABILITY: about 200 extractions after five years; criteria 8 and 12 keep the gate run readable and its cost measured before it becomes the slow part of every run."
+    - "COST: the shell loops in test.yml (about 15) and the session-start hook (3) list assets/ and so never see extractions, which is what keeps CI's 2,000-minute allowance safe; criterion 11 keeps it so."
+    - "SECURITY: an extraction's database holds real supply rows, so nothing CI runs may name one (CLAUDE.md, CI never touches live data)."
+  dependencies:
+    - REQ-PIPE-342
+    - REQ-PIPE-363
+    - REQ-PIPE-385
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (round 3): extractions live in extractions/ beside assets/, are selected by MOTHMAN_ASSET and get a database as any asset does, and are never listed by the enduring-asset loops. Most of v3's loop-skipping falls away: the shell loops list assets/ and the Python ones read assets.names(), so neither sees extractions without being changed. What is left is criteria 3 (collision), 6 (refusing synthetic and deployment commands), 7 to 9 (gate applicability), 10 (the shared adapter) and 11 (a test that nothing CI runs looks there)."
+    - "THE BARE ID, NOT A PREFIX (delivery-scoper, v4): MOTHMAN_ASSET=<id>. A prefix with a slash breaks NAME_PATTERN, the module tag and the data/<name> paths; a name prefix such as 'x-' would be cosmetic, since data/, reports/ and supply_<name> are one namespace whichever root a name came from. What a prefix would have prevented - a clash - criterion 3 refuses directly, and REQ-PIPE-440 criterion 5 refuses at generation."
+    - "EACH GATE DECLARES, NO DEFAULT (delivery-scoper, v4): a default of 'applies' would run calendar, scenario and publishing gates over extractions and fail on every one; a default of 'does not apply' would silently leave a new gate unrun over 200 folders. Refusing an undeclared gate is the only choice that fails loudly - this project's standing 'no permissive fallback' stance."
+    - "EXPECTED DECLARATIONS, for whoever builds this: apply - the collections, check-file, lifecycle, presentation, people, dbt layout and file-check gates, and the recipe digest; do not apply - the schedule, calendar, providers, scenarios, scenario map, bootstrap and Cloudflare publishing gates."
+    - "ONE ROW PER GATE FOR ALL EXTRACTIONS: 200 rows per gate would bury the enduring assets' results, which is the per-dataset-banner failure at 30 that CLAUDE.md's scale note warns about."
+    - "REJECTED putting extractions under assets/ (v3): Keith's round-3 addition, and the reason it is better - every enduring-asset loop would have needed teaching to skip them, about 18 shell loops and every Python reader."
+
+- id: REQ-QAC-441
+  title: "An extraction is checked in two layers - a default set every extraction gets and a set derived from its recipe - separate from the recurring datasets' checks, plus the shared file checks, and stated as assertions, not tools"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want a standard floor of checks on every extraction plus checks derived from what its recipe declares, so that every extract is held to the same baseline and to its own promises."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 point 6 and its tool-agnostic note (Keith, 2026-09-27); Keith 2026-11-21 Q4.5 (b), round 2 Q6 (b), Q7 (a), Q8 (a). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL apply a default check layer to every extraction, defined once in the extraction template and copied into each generated folder (REQ-PIPE-440)."
+    - "THE SYSTEM SHALL assert, in that default layer, at least that every table the recipe declares arrived, every declared column arrived in each, and no primary identifier the recipe declares is null."
+    - "WHERE a declared table did not arrive, or a file arrived that the recipe does not declare, THE SYSTEM SHALL record it as a failing default-layer result, and SHALL go on checking everything else."
+    - "THE SYSTEM SHALL derive a recipe layer from each recipe, asserting at least that each declared column has its declared type and each table's structured cohort bounds hold."
+    - "WHERE the recipe declares an expected row count for a table, THE SYSTEM SHALL assert that the table arrived with exactly that many rows."
+    - "WHERE the recipe declares a cross-table relationship, THE SYSTEM SHALL check it as a cross-table check (REQ-PIPE-106 criterion 13)."
+    - "THE SYSTEM SHALL keep both layers separate from the recurring datasets' check definitions, and SHALL NOT import or share them."
+    - "THE SYSTEM SHALL run the shared file checks (the root file-checks.yaml) over every extraction file, as for any delivery."
+    - "THE SYSTEM SHALL record every result with up to the same number of failing-row identifier keys per check as a recurring dataset's (FAILING_SAMPLE_LIMIT), and SHALL NOT record row content."
+  non_functional_requirements:
+    - "MAINTAINABILITY: each criterion names what is ASSERTED and no tool; which tool evaluates each is a build decision, revisitable once the PoC settles which tools stay."
+    - "PRIVACY: failing-row identifier keys are recorded exactly as for recurring datasets, and so reach a page that is never retired (Keith, Q4.5 (b))."
+  dependencies:
+    - REQ-PIPE-439
+    - REQ-PIPE-440
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 6): two layers, a default set (his example: primary identifiers must not be null) and a customised layer from the recipe. REJECTED reusing the recurring datasets' own checks - his word was SEPARATE, similar but not shared."
+    - "SETTLED by Keith 2026-09-27: write it tool-agnostically - 'it would depend on which tools we stabilise on after this POC'."
+    - "SETTLED by Keith 2026-11-21 (Q4.5 (b)): failing-row identifier keys exactly as recurring datasets carry them. REJECTED counts only, the recommendation."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q7 (a)): a missing declared table or an undeclared file is a failing default-layer check, and QA carries on. REJECTED (b) refusing the package before QA."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q8 (a)): the root file-checks.yaml applies, because it asks about the file rather than the dataset; 'separate' governs the dataset checks. REJECTED (b) not applying it."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q6 (b)): an expected row count is checked when the recipe gives one, as an exact count. Exact rather than a tolerance because the recipe describes this extract, not a feed that drifts."
+    - "NOT IN SCOPE, by Keith's call 2026-09-27: lineage, and plans/wider.md #9's reconciliation and aggregation checks, which stay parked there."
+
+- id: REQ-PIPE-442
+  title: "Each extraction is loaded into a database of its own on the local server, worked from the TUI, refused if its id has been seen, and dropped only by a person with a typed confirmation"
+  date_written: "2026-11-21"
+  story: "As whoever QAs a project extraction, I want it worked in a database of its own that I remove when I am done, so that one extract's rows never sit beside another's and never outlast the work."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 points 7 and 9 (Keith, 2026-09-27); Keith 2026-11-21 Q4.3 (a), Q4.6 (a), round 2 Q1 (a) and Q5 (b). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a person loads a committed extraction from the TUI, THE SYSTEM SHALL create supply_<extraction id> (REQ-PIPE-446 criterion 2) on the configured local server, and stage, check and record the package there through the same pipeline as any arrival."
+    - "IF extractions/<extraction id>/ already existed when the package was opened, a database for that id exists, or a page for it is already published (REQ-PIPE-443), THEN THE SYSTEM SHALL refuse the package and say a re-send is a new extraction."
+    - "THE SYSTEM SHALL offer every extraction step - open, load and check, decide, publish, drop - in the TUI, and each as a `mothman extraction` subcommand."
+    - "WHEN a person drops an extraction's database from the TUI, THE SYSTEM SHALL require them to type the extraction id to confirm, and SHALL NOT drop it otherwise."
+    - "WHERE the extraction's page has not been published, THE SYSTEM SHALL warn, in that confirmation, that no record of its QA results or decisions will remain once it is dropped - only its committed configuration - and SHALL drop it if the id is typed."
+    - "THE SYSTEM SHALL NOT drop an extraction's database automatically - not on publishing, not on a schedule, and not as a side effect of anything else."
+    - "THE SYSTEM SHALL list, in the TUI, every extraction database still on the server and how long since it was created."
+    - "THE SYSTEM SHALL NOT run any part of an extraction in CI."
+  non_functional_requirements:
+    - "SECURITY: creating a database needs CREATEDB on the local server; the role that holds it is the operator's, never a CI or service identity."
+    - "PRIVACY: an extract's rows sit on a shared local server between load and drop; anyone with access to that server can read them, the same exposure as the recurring assets' databases."
+    - "COMPLIANCE / RETENTION: a forgotten database is the retention risk, which is why criterion 7 lists them with their age; nothing drops one for the person."
+    - "RELIABILITY: a failed run leaves the database in place and resumable; nothing is half-dropped."
+  dependencies:
+    - REQ-PIPE-439
+    - REQ-PIPE-440
+    - REQ-PIPE-443
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 7) and confirmed 2026-11-21 (round 2 Q1 (a)): one ephemeral PostgreSQL database per extraction, on the local server, driven by a human through the TUI, with no CI anywhere near it."
+    - "REJECTED by Keith 2026-11-21 (round 2 Q1), after drafting it as a real alternative at his own ask ('maybe it doesn't have a database'): checking an extraction in process over its files with no database, its record a file beside the package. Its gain was real - rows never copied, no server or CREATEDB needed - but it reversed REQ-PIPE-087's 'one engine, and it is PostgreSQL' for dbt, Soda and datacontract-cli (a second DuckDB adapter each, and soda-core-duckdb's old duckdb pin back), gave every check a second SQL dialect, forked staging, run views, the results writer and the decision log into a second implementation beside the recurring assets' (the item-74 pattern), and kept the decision record append-only by convention only. The published page is the lasting record in both shapes, so the database being dropped did not separate them. Also REJECTED with it: a shape with no engine at all, which dropped three of the four tools."
+    - "SETTLED by Keith 2026-09-27 (point 9), A REVERSAL: a corrected re-send is a NEW extraction. He first chose resupply, then reversed because a package arriving months later finds the first database dropped and its dashboard a static file that cannot be merged into. REJECTED with it: re-running QA over both packages from disk, a non-ephemeral per-extraction database, and the new dashboard merely linking back."
+    - "SETTLED by Keith 2026-11-21 (Q4.3 (a)): a second package for one extraction is refused. The committed folder (REQ-PIPE-440) is the lasting guard; the server and the destination are checked too."
+    - "SETTLED by Keith 2026-11-21 (Q4.6 (a) and round 2 Q5 (b)): a person drops it from the TUI with a typed confirmation, never automatically; an unpublished one may be dropped, the confirmation warning that no record will remain. REJECTED (a) refusing the drop until published, the recommendation."
+
+- id: REQ-PIPE-443
+  title: "An extraction's dashboard can be published at any time to a configured shared folder or S3 location, showing its decision once there is one, never retired and never overwriting another extraction"
+  date_written: "2026-11-21"
+  story: "As a project team member or auditor, I want each extraction's QA page in one known place, permanently, so that what was checked and decided can be found years later."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29 point 8 and its durable-record paragraph (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q3 (b). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "WHEN a person publishes an extraction from the TUI, THE SYSTEM SHALL write its dashboard as one self-contained file named by the extraction id to the destination the extraction's configuration names - a filesystem path or an S3 prefix - whether or not a decision has been recorded."
+    - "WHEN a person publishes an extraction already published, THE SYSTEM SHALL replace its own page at the same address, the new page showing every decision recorded so far."
+    - "IF a page at that address was published for a different package, THEN THE SYSTEM SHALL refuse to write over it."
+    - "THE SYSTEM SHALL NOT delete or retire a published page, and SHALL NOT build an index of published pages."
+    - "THE SYSTEM SHALL NOT publish any extraction from CI or to the recurring assets' hosting."
+  non_functional_requirements:
+    - "SCALABILITY: 30-40 pages a year, about 200 after five years, in one place with no index; Keith accepted that cost out loud."
+    - "SECURITY: who can read the destination is the destination's access control, not this system's; the page carries failing-row identifier keys (Q4.5 (b)), so the destination must be restricted to people entitled to them."
+    - "COMPATIBILITY: the page opens from a shared folder or a downloaded copy with no network - fonts and vendor assets self-contained, as today."
+    - "COST: S3 storage for a few hundred small files is negligible."
+  dependencies:
+    - REQ-DASH-444
+  decisions:
+    - "SETTLED by Keith 2026-09-27 (point 8): one dashboard per extraction, to a shared filesystem or S3, never retired, with no index."
+    - "SETTLED by Keith 2026-11-21 (round 2 Q3 (b)): publish at any time as a QA report, showing the decision once there is one. REJECTED (a) refusing to publish until a decision exists, the recommendation, and (c) publishing once only."
+    - "REJECTED by Keith 2026-09-27: a generated index page, with the cost accepted out loud - after five years, 200 files and no way to answer 'which extractions did we QA for that project'."
+    - "A LATER PUBLISH REPLACES ONLY ITS OWN PAGE (delivery-scoper): replacing is how an undecided report becomes a decided one; refusing an overwrite from a different package is what keeps 'never retired' true for everyone else's."
+
+- id: REQ-DASH-444
+  title: "An extraction's page shows what its recipe declared and every release-or-withhold decision, because it is the only lasting record of either"
+  date_written: "2026-11-21"
+  story: "As someone reading an extraction's page long after its working data is gone, I want it to say what the extraction claimed to contain and who released or withheld it and why, so that the page answers those questions on its own."
+  moscow: must
+  status: not_started
+  source: "plans/supply-model.md sprint 29, 'the durable record is a static file' (2026-09-27); Keith 2026-11-21 Q4.2 (b). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL show on an extraction's page its id, project, recipe format version, each table with its columns, types and identifier marks, its placement, whether it is derived, its cohort bounds and its filter text."
+    - "THE SYSTEM SHALL show on that page every release-or-withhold decision, newest first, with actor, instant, decision and reason, and SHALL mark the standing one."
+    - "WHERE no decision has been recorded, THE SYSTEM SHALL say in words that the extraction is undecided."
+    - "THE SYSTEM SHALL show which checks are the default layer and which derive from the recipe."
+  non_functional_requirements:
+    - "OBSERVABILITY: the page records which commit of this repository built it, so a later reader can find the check definitions it ran."
+  dependencies:
+    - REQ-DASH-436
+    - REQ-PIPE-435
+    - REQ-PIPE-439
+  decisions:
+    - "LOAD-BEARING, NOT A NICETY (sprint 29, 2026-09-27): the recipe never enters a database and the working data is removed, so leave the declaration off the page and it is gone the moment the work ends."
+
+- id: REQ-TEST-437
+  title: "A real recipe package is run end to end through the extraction path to a published page, and a not-yet-agreed dataset is run beside a calendared one, replacing REQ-PIPE-379 criterion 5"
+  date_written: "2026-11-21"
+  story: "As whoever maintains the pipeline, I want one test that takes a real recipe package from opening to a published page, so that the extraction shape cannot quietly stop working again."
+  moscow: must
+  status: not_started
+  source: "REQ-PIPE-379 criterion 5 (signed 2026-11-14), deferred by Keith 2026-11-18 to #141; Keith 2026-11-21 Q4.4 (b). Drafted by delivery-scoper 2026-11-21, v4. PROPOSAL until signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL have a test that opens a committed fixture package - a recipe and at least three files, one a derived product, one table with an expected row count, with a cross-table relationship - through `mothman extraction` into a temporary extractions root, loads it into a test database, publishes it undecided, records a release decision and publishes it again, to a temporary destination."
+    - "THE SYSTEM SHALL have that test assert each table checked and recorded with no slot, no period and nothing marked missing, the derived table excluded from the rollup and the others counted, the row count checked, and the second page showing the recipe and the decision with no console error."
+    - "THE SYSTEM SHALL have that test assert that a second package with the same extraction id is refused, and that a drop without the typed id is refused."
+    - "THE SYSTEM SHALL have that test assert that the generated folder is refused for loading until committed, and that an id already under assets/ is refused."
+    - "THE SYSTEM SHALL have a second test that runs a `no_calendar: not-yet-agreed` dataset beside a calendared one on one recurring asset, and shows the calendared dataset's status and rollup unchanged in the rendered page."
+    - "THE SYSTEM SHALL assert, in each test, that the fixture holds at least one calendar-less dataset and at least one recorded result before asserting anything about them."
+    - "WHEN this requirement is built, THE SYSTEM SHALL retire REQ-PIPE-379 criterion 5, replaced_by this requirement."
+  non_functional_requirements:
+    - "COST: the test database and temporary folders, never a bootstrap and never the real assets/ tree; not marked critical."
+    - "PORTABILITY: no network and no gitignored artefact assumed present; the fixture package is small committed test data."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-435
+    - REQ-DASH-436
+    - REQ-PIPE-438
+    - REQ-PIPE-439
+    - REQ-PIPE-440
+    - REQ-QAC-441
+    - REQ-PIPE-442
+    - REQ-PIPE-443
+    - REQ-DASH-444
+    - REQ-PIPE-446
+  decisions:
+    - "SETTLED by Keith 2026-11-21 (Q4.4 (b)): the end-to-end test runs a real recipe package. REJECTED (a) the lifecycle only, the recommendation."
+    - "MOVED OUT OF REQ-PIPE-379 (delivery-scoper): 379 is about one calendar mechanism, which is built; the proof belongs with the requirements that make the shape run."
+    - "GENERATES INTO A TEMPORARY EXTRACTIONS ROOT, never the real extractions/, by the same rule tests/conftest.py's _no_test_files_a_real_delivery enforces for deliveries: a test that wrote a real extraction folder would commit one."
+    - "THE not-yet-agreed CASE IS ADDED because REQ-PIPE-106's decisions record that its criteria 8, 13 and 14 were never exercised on a rendered page."
