@@ -512,6 +512,23 @@ def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
     html_path.write_text(html)
 
 
+def newest_snapshot(snapshots_dir: Path | None = None) -> tuple[Path, dict] | None:
+    """The newest archived snapshot of the selected asset and its manifest
+    entry - what a publish compares its build against (REQ-PIPE-255 criterion
+    24) - or None while the archive is empty. The manifest's last entry, whose
+    file must exist: a manifest naming a missing file is not an archive."""
+    snapshots_dir = snapshots_dir or asset_snapshots_dir()
+    manifest = _read_manifest(snapshots_dir)
+    if not manifest:
+        return None
+    entry = manifest[-1]
+    path = snapshots_dir / entry["file"]
+    if not path.is_file():
+        raise FileNotFoundError(f"{snapshots_dir / 'manifest.json'} names {entry['file']}, "
+                                f"which is not in the archive.")
+    return path, entry
+
+
 def _read_manifest(snapshots_dir: Path) -> list:
     manifest_path = snapshots_dir / "manifest.json"
     return json.loads(manifest_path.read_text()) if manifest_path.exists() else []

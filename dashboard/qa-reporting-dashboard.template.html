@@ -13899,14 +13899,18 @@ function renderBuildStamp(){
     // words are what actually carry it.
     if(env){
       bits.push(env.label || env.id);
-      if(!env.publishes) bits.push("not production");
+      // NOT PRODUCTION UNLESS IT IS (Keith, 2026-11-21, amending REQ-TEST-114
+      // criterion 5): the declared production flag, not publishing - the
+      // sandbox publishes and is still not production. A build recorded
+      // before the flag existed falls back to publishing, as it was read then.
+      if(!(env.production ?? env.publishes)) bits.push("not production");
     }else{
       // NO environment recorded. Saying nothing here is what the
       // criterion forbids: an unlabelled page reads as the real one,
       // which is the exact confusion this exists to prevent.
       bits.push("environment unknown");
     }
-    if(!env || !env.publishes) el.closest(".live")?.classList.add("non-production");
+    if(!env || !(env.production ?? env.publishes)) el.closest(".live")?.classList.add("non-production");
     // SHORT, because a reader recognises a seven-character sha and does
     // not read a forty-character one. The full value stays in the title.
     if(BUILD_PROVENANCE.commit) bits.push(BUILD_PROVENANCE.commit.slice(0, 7));

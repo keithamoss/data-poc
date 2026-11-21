@@ -95,7 +95,10 @@ def environment_statement() -> str | None:
         return None
     if env is None:
         return None
-    statement = f"Environment: {env.label}" + ("" if env.publishes else " (not production)")
+    # "NOT PRODUCTION" UNLESS IT IS PRODUCTION (Keith, 2026-11-21, amending
+    # REQ-TEST-114 criterion 5): keyed on the declared production flag, not on
+    # publishing, since the sandbox publishes and is not production.
+    statement = f"Environment: {env.label}" + ("" if env.production else " (not production)")
     # AND THE ASSET, IN WORDS (REQ-PIPE-363 criterion 8), wherever the
     # environment is named - so a person switching assets can see which one
     # this terminal is acting for.
@@ -789,7 +792,7 @@ def offer_to_publish() -> None:
         return
     from cli import dashboard as dashboard_cli
 
-    dashboard_cli.publish()
+    dashboard_cli.publish_after_a_run()
 
 
 def decide_record(run_id: str, *, keep: bool | None) -> bool:

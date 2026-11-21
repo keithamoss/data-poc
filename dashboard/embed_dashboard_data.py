@@ -573,8 +573,12 @@ def embed() -> None:
         # which environment that is. The page must not have to know the
         # name of the published one - that is configuration, and it
         # changes per deployment.
+        # `production` too (Keith, 2026-11-21): "not production" is said of
+        # every environment but the declared production one, publishing or
+        # not - the sandbox publishes and is still not production.
         provenance["environment"] = {"id": env.id, "label": env.label,
-                                     "publishes": bool(env.publishes)}
+                                     "publishes": bool(env.publishes),
+                                     "production": bool(env.production)}
     provenance.update(generated_up_to_provenance())
     html = _replace_const(html, "BUILD_PROVENANCE",
                            json.dumps(provenance, separators=(",", ":")))

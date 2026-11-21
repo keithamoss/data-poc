@@ -136,7 +136,10 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
         # copy of its steps - criterion 10 is that there is exactly one way
         # to get content published. It rebuilds and re-embeds, which this
         # run has just done; paying that twice is worth one publish path.
-        dashboard_cli.publish()
+        # A FAILED PUBLISH KEEPS THE RUN (REQ-PIPE-255 criterion 29): the
+        # results are recorded and the local page built; only the upload is
+        # retried.
+        dashboard_cli.publish_after_a_run()
 
 
 @pipeline_group.command("process")

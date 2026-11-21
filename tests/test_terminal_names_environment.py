@@ -24,6 +24,18 @@ class TestTheStatement:
         assert common.environment_statement() == \
             "Environment: Claude Code sandbox (not production) · Asset: quarterly"
 
+    def test_the_publishing_sandbox_still_says_not_production(self, monkeypatch):
+        """Keith, 2026-11-21, amending REQ-TEST-114 criterion 5: keyed on the
+        declared production environment, not on publishing - the sandbox is
+        the one that publishes (REQ-PIPE-255 criterion 21) and is not
+        production."""
+        from qa_tools.common import environments
+
+        assert environments.get("sandbox").publishes, "test premise - the sandbox publishes"
+        assert not environments.get("production").publishes, "test premise - production does not yet"
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "sandbox")
+        assert common.environment_statement().startswith("Environment: Claude Code sandbox (not production)")
+
     def test_production_says_its_label_and_nothing_else(self, monkeypatch):
         from qa_tools.common import environments
 

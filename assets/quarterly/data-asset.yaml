@@ -125,12 +125,44 @@ synthetic: true
 # git history still holds it. The snapshots panel's empty state names it.
 snapshots_from: 2026-11-21
 
-# THIS ASSET PUBLISHES TO THE gh-pages BRANCH (REQ-PIPE-372 criterion 1, key
-# SETTLED by Keith 2026-11-01) - today's one publish path. Only this asset
-# holds it: both assets publishing to one branch would overwrite each other,
-# so the daily asset's publish is refused until REQ-PIPE-255 gives each asset
-# its own Cloudflare Pages project, when this key is replaced (criterion 5).
-publish_to_gh_pages: true
+# THE ASSET'S NAME FOR A READER (REQ-PIPE-354 criterion 2, SETTLED by Keith
+# 2026-11-01), in the dashboard's masthead and title.
+display_name: Quarterly data asset
+
+# WHERE THIS ASSET'S DASHBOARD IS PUBLISHED (REQ-PIPE-255 criterion 8,
+# REQ-PIPE-257 criterion 8; one Cloudflare Pages project per asset,
+# REQ-PIPE-354 criterion 3; names chosen by Keith 2026-11-21). Configuration,
+# not secrets: the API token and the account id are environment variables
+# (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID) and never committed.
+# access_domain IS A PLACEHOLDER until Keith's Cloudflare Zero Trust team
+# exists (Keith, 2026-11-21): every publish checks that the site redirects to
+# it before uploading, so with the placeholder every publish is refused and
+# nothing can be made public by accident. docs/dashboard-hosting.md says how
+# to set it.
+hosting:
+  pages_project: data-poc-quarterly
+  production_branch: main
+  address: https://data-poc-quarterly.pages.dev
+  access_domain: CHANGE-ME.cloudflareaccess.com
+
+# WHAT MOVED TO THE DAILY ASSET IN THE SPLIT (REQ-PIPE-354 criteria 6 and 7):
+# a pre-split link to Birth Registrations opens a one-line notice saying where
+# it went, rather than the not-found page. Names carried here - this asset
+# never reads the daily asset's configuration.
+moved_to:
+  - id: registry-services
+    name: Registry Services
+    asset_name: Daily data asset
+    address: https://data-poc-daily.pages.dev
+  - id: civil-registration
+    name: Civil Registration
+    asset_name: Daily data asset
+    address: https://data-poc-daily.pages.dev
+  - id: birth-registrations
+    name: Birth Registrations
+    asset_name: Daily data asset
+    address: https://data-poc-daily.pages.dev
+
 
 # WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
 # values, strictest first:

@@ -655,6 +655,29 @@ class HierarchyConfig(_Strict):
     agencies: list[AgencyConfig] = Field(min_length=1)
 
 
+class Hosting(_Strict):
+    """One asset's Cloudflare Pages site (REQ-PIPE-255 criterion 8)."""
+
+    pages_project: NonEmptyStr
+    production_branch: NonEmptyStr
+    #: The dashboard's address, https://<project>.pages.dev or a custom
+    #: domain - what a ticket links to (REQ-GHUB-258).
+    address: NonEmptyStr
+    #: The Access sign-in domain the site must redirect to,
+    #: <team>.cloudflareaccess.com (REQ-PIPE-257 criterion 8).
+    access_domain: NonEmptyStr
+
+
+class MovedTo(_Strict):
+    """A collection that moved to another asset (REQ-PIPE-354 criterion 6)."""
+
+    #: The agency, collection or dataset id a pre-split route names.
+    id: NonEmptyStr
+    name: NonEmptyStr
+    asset_name: NonEmptyStr
+    address: NonEmptyStr
+
+
 class DataAsset(_Strict):
     data_asset_id: NonEmptyStr
     timezone: TimezoneConfig
@@ -678,11 +701,17 @@ class DataAsset(_Strict):
     #: criterion 8). Defaults to False: an asset that never said it was
     #: synthetic is treated as real, which is the direction that refuses.
     synthetic: bool = False
-    #: Whether this asset publishes through today's one publish path, to
-    #: the gh-pages branch (REQ-PIPE-372 criterion 1, key SETTLED by Keith
-    #: 2026-11-01). Only the quarterly asset holds it until REQ-PIPE-255
-    #: gives each asset hosting of its own; absent, a publish is refused.
-    publish_to_gh_pages: bool = False
+    #: The asset's name for a reader, in the masthead and the title
+    #: (REQ-PIPE-354 criterion 2, SETTLED by Keith 2026-11-01).
+    display_name: NonEmptyStr | None = None
+    #: Where this asset's dashboard is published (REQ-PIPE-255 criterion 8,
+    #: REQ-PIPE-257 criterion 8, one Cloudflare Pages project per asset,
+    #: REQ-PIPE-354 criterion 3). Absent, a publish is refused. It replaced
+    #: REQ-PIPE-372's interim publish_to_gh_pages (criterion 5).
+    hosting: Hosting | None = None
+    #: Collections that moved to another asset (REQ-PIPE-354 criterion 6):
+    #: a deep link naming one shows where it went.
+    moved_to: list[MovedTo] | None = None
     #: The date this asset's snapshot archive starts from (REQ-DASH-373
     #: criterion 4, key SETTLED by Keith 2026-11-01): the day the pre-split
     #: archive was deleted. Read for the snapshots panel's empty state.
