@@ -206,6 +206,27 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path | None =
     return out_path
 
 
+def withdraw_snapshot(gz_path: Path, html_path: Path = DASHBOARD_HTML,
+                      snapshots_dir: Path | None = None) -> None:
+    """Take back a snapshot this publish archived, when the publish stops
+    before its upload succeeds (REQ-PIPE-255 criterion 25 as amended, Keith
+    2026-11-21; post-build-review #492): its file and its manifest entry go,
+    and the built page's SNAPSHOT_MANIFEST is re-embedded without it - so a
+    retry compares against the snapshot before it and publishes again."""
+    snapshots_dir = snapshots_dir or asset_snapshots_dir()
+    gz_path = Path(gz_path)
+    gz_path.unlink(missing_ok=True)
+    manifest_path = snapshots_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
+    manifest = [e for e in manifest if e.get("file") != gz_path.name]
+    if manifest:
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    else:
+        manifest_path.unlink(missing_ok=True)
+    if Path(html_path).exists():
+        _embed_snapshot_manifest(Path(html_path), manifest)
+
+
 def _decompress_snapshot(gz_path: Path, dest_path: Path) -> None:
     """The one place a snapshot `.gz` becomes a plain `.html` file - used
     identically by `sync_local_snapshots()` (local dev) and

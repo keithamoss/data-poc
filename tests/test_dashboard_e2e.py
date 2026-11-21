@@ -10603,6 +10603,24 @@ class TestAMovedCollectionSaysWhereItWent:
         assert clean_page.url.startswith(f"file://{built_dashboard_html.resolve()}"), "it did not navigate"
 
 
+    @pytest.mark.fresh_load  # its own route
+    def test_a_check_link_under_it_shows_only_the_notice(self, clean_page, built_dashboard_html):
+        """post-build-review #492 F2: a ticket's check link - column and check
+        segments under a moved dataset - showed a contradictory 'column no longer
+        exists' notice above the moved one, and rewrote the address."""
+        route = {**self.ROUTE, "columnName": "date_of_birth", "checkKey": "not_null"}
+        path = _state_to_path(route)
+        clean_page.goto(f"file://{built_dashboard_html.resolve()}#{path}")
+        clean_page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        assert clean_page.locator("#view h2").inner_text().strip() == (
+            "Birth Registrations has moved to the Daily data asset's dashboard")
+        assert clean_page.locator(".stale-link-notice").count() == 0
+        assert clean_page.evaluate("location.hash") == f"#{path}", "the address was rewritten"
+        from urllib.parse import urlsplit
+
+        assert urlsplit(clean_page.locator("[data-moved-link]").get_attribute("href")).fragment == path
+
+
 @pytest.mark.shared_page
 class TestTheDemoSaysWhereItWasRecorded:
     """REQ-PIPE-354 criterion 10 on the real quarterly build: the Demo tab is

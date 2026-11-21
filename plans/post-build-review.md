@@ -17266,3 +17266,90 @@ twice. It deliberately did not re-find the `TypeError`.
      claim in the message stands. The commit is pushed and not rewritten; this
      entry and the next pushed commit's message carry the correction, as #487
      did for a6d20186.
+492. **[done, 2026-11-21]** **[Pipeline & publishing]** **[Dashboard UI]** **Post-build functional critic on group E (724752c4) and group F (9fc54c56): a failed upload blocked every retry.**
+     Every finding checked against the code before being written up; each
+     defect's test seen failing first.
+     - **F1, DEFECT, FIXED (Keith's call on the wording)**: `publish()` archived the
+       snapshot before the upload, and a failed upload (or the site's size
+       refusal after archiving) left it behind - every retry then read the
+       build as unchanged and uploaded nothing, with no flag to override. Keith
+       chose to keep the order and take the snapshot back: REQ-PIPE-255 c25
+       amended ("...and SHALL remove that snapshot again if the publish stops
+       before the upload succeeds"), `snapshot_dashboard.withdraw_snapshot`.
+       tests/test_cloudflare_publish.py's TestAFailedPublishLeavesNoSnapshot.
+       My first site-over-the-limit test passed for the wrong reason - the
+       page's own size check refused before anything was archived - and was
+       made to step past it and to assert the withdrawal happened.
+     - **F2, DEFECT, FIXED**: a column or check deep link under a moved dataset
+       (every ticket check link, REQ-GHUB-258) showed a contradictory "this
+       column no longer exists" notice above the moved one and rewrote the
+       address; `forgetStaleSegment` now returns for a moved route (REQ-PIPE-354
+       c6). TestAMovedCollectionSaysWhereItWent's check-link test.
+     - **F3, register, Keith**: REQ-PIPE-354 c3/c4 (Access per project, the daily
+       project) were claimed met; they are his console steps. Recorded unmet.
+     - **F4, coverage**: c13/c14 through `publish()` - TestSizesThroughThePublish
+       (a page over the limit refused before archiving; a near-limit file
+       warned and still published).
+     - **F5, coverage**: `verify-access`'s failure paths - four tests.
+     - **F6, register, for Keith**: REQ-PIPE-372's evidence describes git-push
+       tests deleted with the move to Cloudflare, and c6 (a stub git remote) is
+       moot under c5. Not edited - a register claim - flagged to Keith.
+     - **F7, coverage**: "not production" keyed on `production` in the page -
+       tests-js/build-environment.test.js now has a publishing sandbox.
+     - **Nits fixed**: an incomplete `hosting:` block names what is missing
+       rather than raising KeyError; the deployment address must be this
+       project's (`<id>.<project>.pages.dev`). CLAUDE.md's snapshots row was
+       already fixed in Keith's approved wording (wip/groupCD). **Not changed**:
+       the placeholder access domain refused only after a full build (safe;
+       an earlier refusal would be a new behaviour); no `--commit-dirty`;
+       unknown query parameters kept by the moved link (as specified).
+     - **Found while fixing, a test-isolation defect in E's own tests**:
+       test_cloudflare_publish's `built` fixture set MOTHMAN_DASHBOARD_OUT
+       through build_output.use() and ended with monkeypatch.delenv, which
+       recorded the scratch path as the value to restore - every later test in
+       the process embedded into a dead folder. Seen as two
+       TestTheArtifactSaysWhereItCameFrom failures when the modules ran in that
+       order (they ran apart under xdist's loadgroup). Fixed by setting it
+       through monkeypatch first.
+     - Group F verified: 413 c11, 414 c8, 415 c10 met; #488's fix verified, and
+       its test fails against the reverted fix.
+
+493. **[in-progress, 2026-11-21]** **[Dashboard UI]** **[Pipeline & publishing]** **Catch-up UX critic on E, F and the timing batch, and two defects the C/D gate found.**
+     The critic's report (`docs/drafts/ux-critic-catchup-2026-11-21.md`) was a
+     claim to verify; H1 and M5 were verified against the built pages before
+     being written up here.
+     - **Runway, page against gate, DEFECT, FIXED**: the build embedded each
+       slot's PERIOD date, while `runway.calendar_runway` counts by the round
+       each slot is due on (REQ-PIPE-321 c8), so at files_go_to_period 1 the
+       page counted one slot more than the gate and stayed silent on a date the
+       gate warned on (2026-11-01: cp-carers, 3 left of its own 4). Older than
+       today's runway amendment, which only exposed it - TestTheLowRunwayWarning
+       relied on the page's default date, which now warns nowhere. Fixed in
+       `embed_dashboard_data.py` (round dates); the class now opens on a named
+       date, and a new parity test compares the page's count with the gate's per
+       dataset - seen failing first (page 4, gate 3).
+     - **A scenario subject lifted off its edge by a late font, DEFECT, FIXED**:
+       a web font arriving after the jump reflows the page above the subject;
+       the settle step only lifted a subject pushed past the fold, so one moved
+       up stayed ~2.2px short of the edge (13 subjects in the C/D gate's
+       TestEveryScenarioSubjectLandsCentred; deterministic per build, not a
+       flake). Fixed by placing the subject again once fonts finish loading
+       (`loadingdone`, armed even when nothing is loading yet), unless the
+       reader has moved. New test holds the font files until after the jump -
+       seen failing first on TS-38, TS-66, TS-87.
+     - **H1, DEFECT, to fix**: a supply-cycle row keyed on a full re-check
+       (`__r1`) shows the re-check's time as the arrival's ("Checked in 8s ·
+       slow" on ED Presentations' 10 Oct 2013 row; the arrival took 793ms).
+     - **M5, DEFECT, to fix**: the run-time axis labels a middle tick "under 1s".
+     - **M1, wording, to fix**: the could-not-be-checked banner says it twice;
+       "crashed on 9:09am" -> "at"; mixed dashes.
+     - **Keith's calls, 2026-11-21**: (H2) an off-scale marker for a run beyond
+       the trend's scale; (H3) a supply we could not check says "not checked"
+       and stays off the trend; (M2) keep the red Fail and its rollup, the
+       banner's first line saying our pipeline could not check the supply and
+       that this is not a problem with the supplier's data; (M3/M4) count what
+       the dataset owes in its own unit ("9 Mondays with no supply"); (M6) the
+       tries note's signed summary to name how the last try ended, one number
+       and one date per try inside - exact amended wording of REQ-DASH-414's
+       summary to go to Keith before building.
+     - Nits as listed in the report; built with the fixes above.

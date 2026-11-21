@@ -417,18 +417,28 @@ def publish(*, dry_run: bool = False) -> None:
     except hosting.PublishRefused as refused:
         raise click.ClickException(str(refused)) from None
 
-    console.print(f"Snapshot archived -> {snapshots.take_snapshot(html_path=page)}", style="dim")
-    snapshots.prepare_deploy_site(site_dir=site, html_path=page)
-    size = hosting.measure(site)
-    if size.over_limit:
-        raise click.ClickException(_too_big(size.over_limit))
-    _size_warnings(size)
+    archived = snapshots.take_snapshot(html_path=page)
+    console.print(f"Snapshot archived -> {archived}", style="dim")
+    # A PUBLISH THAT STOPS BEFORE ITS UPLOAD SUCCEEDS TAKES ITS SNAPSHOT BACK
+    # (criterion 25 as amended, Keith 2026-11-21; post-build-review #492):
+    # left behind, it made every retry read the build as unchanged and upload
+    # nothing.
     try:
-        done = hosting.upload(site, where, sha)
-    except hosting.PublishRefused as refused:
-        raise click.ClickException(str(refused)) from None
-    except hosting.UploadFailed as failed:
-        raise click.ClickException(f"The upload failed, and was not retried:\n{failed}") from None
+        snapshots.prepare_deploy_site(site_dir=site, html_path=page)
+        size = hosting.measure(site)
+        if size.over_limit:
+            raise click.ClickException(_too_big(size.over_limit))
+        _size_warnings(size)
+        try:
+            done = hosting.upload(site, where, sha)
+        except hosting.PublishRefused as refused:
+            raise click.ClickException(str(refused)) from None
+        except hosting.UploadFailed as failed:
+            raise click.ClickException(f"The upload failed, and was not retried:\n{failed}") from None
+    except BaseException:
+        snapshots.withdraw_snapshot(archived, html_path=page)
+        console.print(f"Snapshot withdrawn -> {archived}: nothing was published.", style="dim")
+        raise
     console.print(f"Published -> {done.url} (production: {done.production_url})", style="green")
 
     after = access_check.check(done.url, where.access_domain)

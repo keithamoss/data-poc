@@ -62,8 +62,13 @@ def hosting() -> Hosting | None:
     found = doc.get("hosting")
     if not found:
         return None
-    return Hosting(**{k: str(found[k]) for k in ("pages_project", "production_branch",
-                                                  "address", "access_domain")})
+    keys = ("pages_project", "production_branch", "address", "access_domain")
+    missing = [k for k in keys if not found.get(k)]
+    if missing:
+        # NAMED, never a bare KeyError (post-build-review #492).
+        raise PublishRefused(f"{assets.selected().data_asset_yaml}'s hosting: block is missing "
+                             f"{', '.join(missing)}. docs/dashboard-hosting.md says what each is.")
+    return Hosting(**{k: str(found[k]) for k in keys})
 
 
 def pinned_version() -> str:
@@ -190,7 +195,9 @@ def upload(site_dir: Path, where: Hosting, commit: str | None) -> Deployment:
     if run.returncode:
         raise UploadFailed(said.strip() or f"wrangler exited {run.returncode} and said nothing.")
     found = [u.rstrip(".,)") for u in _URL.findall(said)]
-    own = next((u for u in found if not u.startswith(f"https://{where.production_host}")), None)
+    # THIS PROJECT'S OWN DEPLOYMENT ADDRESS, <id>.<project>.pages.dev - never
+    # any other pages.dev address wrangler happens to print (#492).
+    own = next((u for u in found if u.split("/")[2].endswith(f".{where.production_host}")), None)
     if not own:
         raise UploadFailed(f"wrangler reported success but named no deployment URL:\n{said.strip()}")
     return Deployment(url=own, production_url=f"https://{where.production_host}")

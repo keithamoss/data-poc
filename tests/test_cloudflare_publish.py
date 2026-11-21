@@ -54,6 +54,12 @@ def built(tmp_path, monkeypatch):
     from qa_tools.common import build_output
 
     out = tmp_path / "out"
+    # SET THROUGH monkeypatch FIRST, so what it restores is the value from
+    # before the test (post-build-review #492): build_output.use() writes
+    # os.environ itself, and the delenv this fixture ended with recorded the
+    # scratch path as the value to put back - every later test in the process
+    # then embedded into this test's dead folder.
+    monkeypatch.setenv(build_output.OUT_DIR_ENV, str(out))
     build_output.use(out)
     monkeypatch.setattr(snapshots, "SNAPSHOTS_ROOT", tmp_path / "snapshots")
     monkeypatch.chdir(tmp_path)
@@ -67,7 +73,6 @@ def built(tmp_path, monkeypatch):
         monkeypatch.setattr(dashboard_cli, name, lambda _n=name: steps.append(_n))
     monkeypatch.setattr(dashboard_cli, "_embed", page)
     yield steps
-    monkeypatch.delenv(build_output.OUT_DIR_ENV, raising=False)
 
 
 def _publish(*args) -> object:
@@ -207,6 +212,98 @@ class TestTheUpload:
         assert len([c for c in cf.calls(log) if c["argv"][:2] == ["pages", "deploy"]]) == 1
 
 
+class TestAFailedPublishLeavesNoSnapshot:
+    """REQ-PIPE-255 criterion 25 as amended (Keith, 2026-11-21; post-build-review
+    #492): a publish that stops after archiving - a failed upload, a site over the
+    limit - removes the snapshot it archived, so a retry publishes again rather
+    than reading the build as unchanged and uploading nothing."""
+
+    def _snapshots(self, tmp_path):
+        return sorted(p.name for p in (tmp_path / "snapshots" / "quarterly").glob("*.html.gz"))
+
+    def test_a_retry_after_a_failed_upload_uploads(self, built, publishing, signed_in,
+                                                   monkeypatch, tmp_path):
+        log = cf.stub_wrangler(tmp_path, monkeypatch, fail=True)
+        with cf.access_stub() as (base, _):
+            cf.route(monkeypatch, base)
+            first = _publish()
+            assert first.exit_code != 0
+            assert self._snapshots(tmp_path) == [], "the failed publish left its snapshot"
+            log = cf.stub_wrangler(tmp_path, monkeypatch, fail=False)
+            second = _publish()
+        assert second.exit_code == 0, _say(second)
+        assert "unchanged" not in _say(second)
+        # One deploy that failed, then the retry's - the same call log for both.
+        assert len([c for c in cf.calls(log) if c["argv"][:2] == ["pages", "deploy"]]) == 2
+        assert len(self._snapshots(tmp_path)) == 1
+
+    def test_a_site_over_the_limit_leaves_no_snapshot(self, built, publishing, signed_in,
+                                                      monkeypatch, tmp_path):
+        log = cf.stub_wrangler(tmp_path, monkeypatch)
+        # Past the page's own check (criterion 13, before archiving), so it is
+        # the site's check after archiving that refuses - the case that left a
+        # snapshot behind.
+        monkeypatch.setattr(dashboard_cli, "_refuse_oversized_page", lambda page: None)
+        monkeypatch.setattr(hosting, "LIMIT_BYTES", 10)
+        with cf.access_stub() as (base, _):
+            cf.route(monkeypatch, base)
+            got = _publish()
+        assert got.exit_code != 0 and "Cloudflare Pages serves no file over 25 MiB" in _say(got)
+        assert "Snapshot withdrawn" in _say(got), "precondition: a snapshot was archived first"
+        assert self._snapshots(tmp_path) == []
+        assert not [c for c in cf.calls(log) if c["argv"][:2] == ["pages", "deploy"]]
+
+
+class TestHostingIsReadWholeOrRefused:
+    def test_an_incomplete_hosting_block_names_what_is_missing(self, monkeypatch):
+        """post-build-review #492: never a bare KeyError."""
+        from asset_model import config_yaml
+
+        monkeypatch.setattr(config_yaml, "load", lambda path: {"hosting": {"pages_project": "p"}})
+        with pytest.raises(hosting.PublishRefused, match="production_branch, address, access_domain"):
+            hosting.hosting()
+
+    def test_the_deployment_address_is_this_projects(self, monkeypatch, tmp_path):
+        """A pages.dev address of another project in wrangler's words is not
+        this upload's deployment."""
+        import subprocess
+
+        where = hosting.Hosting("p", "main", "https://p.pages.dev", "x")
+        said = ("See https://abc.other.pages.dev\nDeployment complete! https://def.p.pages.dev")
+        monkeypatch.setattr(hosting, "wrangler", lambda: "w")
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, said, ""))
+        assert hosting.upload(tmp_path, where, None).url == "https://def.p.pages.dev"
+
+
+class TestSizesThroughThePublish:
+    """REQ-PIPE-255 criteria 13 and 14 through publish() itself, not only
+    hosting.measure() (post-build-review #492 F4)."""
+
+    def test_a_page_over_the_limit_is_refused_before_anything_is_archived(
+            self, built, publishing, signed_in, monkeypatch, tmp_path):
+        log = cf.stub_wrangler(tmp_path, monkeypatch)
+        monkeypatch.setattr(hosting, "LIMIT_BYTES", 10)
+        with cf.access_stub() as (base, _):
+            cf.route(monkeypatch, base)
+            got = _publish()
+        said = _say(got)
+        assert got.exit_code != 0 and "Not uploaded - Cloudflare Pages serves no file over 25 MiB" in said
+        assert "Snapshot archived" not in said
+        assert not list((tmp_path / "snapshots").rglob("*.html.gz"))
+        assert not [c for c in cf.calls(log) if c["argv"][:2] == ["pages", "deploy"]]
+
+    def test_a_file_near_the_limit_is_warned_about_and_still_published(
+            self, built, publishing, signed_in, monkeypatch, tmp_path):
+        log = cf.stub_wrangler(tmp_path, monkeypatch)
+        monkeypatch.setattr(hosting, "WARN_BYTES", 10)
+        with cf.access_stub() as (base, _):
+            cf.route(monkeypatch, base)
+            got = _publish()
+        assert got.exit_code == 0, _say(got)
+        assert "near Cloudflare Pages' 25 MiB limit per file" in _say(got)
+        assert len([c for c in cf.calls(log) if c["argv"][:2] == ["pages", "deploy"]]) == 1
+
+
 class TestTheSignInIsCheckedBeforeAndAfter:
     """REQ-PIPE-257 criteria 9 to 11: nothing uploaded unless the production
     address redirects to the configured sign-in, and a deployment reachable
@@ -270,6 +367,38 @@ class TestTheAccessCheckAgainstAStub:
 class TestVerifyAccess:
     """REQ-PIPE-257 criterion 12: the production address and the newest
     deployment, uploading nothing."""
+
+    def test_an_asset_with_no_hosting_is_refused(self, publishing, monkeypatch):
+        """post-build-review #492 F5: each failure path, in its own words."""
+        monkeypatch.setattr(hosting, "hosting", lambda: None)
+        got = CliRunner().invoke(dashboard_cli.verify_access_command, [])
+        assert got.exit_code != 0 and "declares no hosting" in " ".join(got.output.split())
+
+    def test_missing_credentials_are_named(self, signed_in, monkeypatch):
+        monkeypatch.delenv(hosting.TOKEN_ENV, raising=False)
+        monkeypatch.delenv(hosting.ACCOUNT_ENV, raising=False)
+        got = CliRunner().invoke(dashboard_cli.verify_access_command, [])
+        assert got.exit_code != 0
+        assert hosting.TOKEN_ENV in got.output and hosting.ACCOUNT_ENV in got.output
+
+    def test_a_deployment_list_that_fails_is_said(self, signed_in, monkeypatch, tmp_path):
+        cf.stub_wrangler(tmp_path, monkeypatch)
+
+        def failing(where):
+            raise hosting.UploadFailed("wrangler could not list the deployments.")
+        monkeypatch.setattr(hosting, "latest_deployment_url", failing)
+        got = CliRunner().invoke(dashboard_cli.verify_access_command, [])
+        assert got.exit_code != 0 and "could not list the deployments" in got.output
+
+    def test_no_deployment_listed_checks_the_production_address_alone(
+            self, signed_in, monkeypatch, tmp_path):
+        cf.stub_wrangler(tmp_path, monkeypatch)
+        monkeypatch.setattr(hosting, "latest_deployment_url", lambda where: None)
+        with cf.access_stub() as (base, _):
+            cf.route(monkeypatch, base)
+            got = CliRunner().invoke(dashboard_cli.verify_access_command, [])
+        assert got.exit_code == 0, got.output
+        assert "No deployment was listed" in got.output
 
     def test_both_behind_the_sign_in_passes(self, signed_in, monkeypatch, tmp_path):
         log = cf.stub_wrangler(tmp_path, monkeypatch)
@@ -360,18 +489,19 @@ class TestEndToEnd:
 
         prints = []
         for n in (1, 2):
+            monkeypatch.setenv(build_output.OUT_DIR_ENV, str(tmp_path / f"build{n}"))
             build_output.use(tmp_path / f"build{n}")
             dashboard_cli._rebuild_results()
             dashboard_cli._build_data()
             dashboard_cli._embed()
             prints.append(snapshots.page_fingerprint(tmp_path / f"build{n}" / "qa-reporting-dashboard.html"))
-        monkeypatch.delenv(build_output.OUT_DIR_ENV, raising=False)
         assert prints[0] == prints[1]
 
     def test_an_unchanged_real_publish_uploads_nothing(self, deployment_history, publishing, signed_in,
                                                         monkeypatch, tmp_path):
         from qa_tools.common import build_output
 
+        monkeypatch.setenv(build_output.OUT_DIR_ENV, str(tmp_path / "out"))
         build_output.use(tmp_path / "out")
         monkeypatch.setattr(snapshots, "SNAPSHOTS_ROOT", tmp_path / "snapshots")
         monkeypatch.chdir(tmp_path)
@@ -385,7 +515,6 @@ class TestEndToEnd:
             assert first.exit_code == 0, first.output
             before = len(cf.calls(log))
             second = _publish()
-        monkeypatch.delenv(build_output.OUT_DIR_ENV, raising=False)
         assert second.exit_code == 0, second.output
         assert "unchanged since the snapshot published" in _say(second)
         assert len(cf.calls(log)) == before
