@@ -89,3 +89,20 @@ requirements.yaml until each requirement is presented and signed.
 - **UX Q1, header tools on a one-off page:** (a) removed - Plans, Requirements,
   Release notes, Demo, Feedback, Leaderboard, Scenarios, Past snapshots, Recent
   activity.
+- **Architect Q1, one-off folders while the repository is public:** (a) blocked on
+  going private - draft and sign everything now; building 440's committed folders
+  and running any real extraction wait for REQ-DOCS-259. 434, 438, 436 and 433 can
+  be built at once.
+- **UX Q2, where the decision sits:** (a) one line above the QA status on every view,
+  deep links included, in its own words - never a Pass/Warn/Fail pill or colour;
+  the QA status labelled as the QA result.
+- **UX Q3, the undecided words:** (a) "No release decision recorded. This page
+  reports QA results only; it does not release or withhold the data."
+- **Architect Q2, `mothman check` over one-off folders:** (b) full gates on folders
+  changed since the diff base, plus one cheap pass over the rest checking each
+  still matches its recorded digest.
+- **Architect Q4, drop:** (a) the drop also deletes `data/<id>/`, `reports/<id>/` and
+  the dbt scratch; the typed confirmation lists each.
+- **Architect Q3, a cross-table check over a derived and a counted table:** (a) it
+  counts on the counted table's side and is excluded only from the derived
+  product's - one new rule.
