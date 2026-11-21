@@ -5866,7 +5866,11 @@ class TestTheQualifierAsAtTheDateOnShow:
         notice = clean_page.locator('[data-testid="arrival-notice"]')
         assert notice.is_visible()
         box = notice.bounding_box()
-        assert box and 0 <= box["y"] < clean_page.viewport_size["height"], \
+        # UNDER A PIXEL ABOVE THE TOP IS AT THE TOP: scrollIntoView aligns the
+        # banner's top to the viewport's, and the browser rounds a fractional
+        # scroll position - the asset's name in the masthead (REQ-PIPE-354)
+        # left the banner at a .5px offset, so it measured -0.5.
+        assert box and -1 < box["y"] < clean_page.viewport_size["height"], \
             "the banner is on screen after the drill"
         clean_page.go_back()
         clean_page.wait_for_function(

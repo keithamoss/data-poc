@@ -52,6 +52,9 @@ def test_embed_calls_the_real_embed_function(monkeypatch):
 
     called = []
     monkeypatch.setattr(embed_dashboard_data, "embed", lambda: called.append(True))
+    # The stub writes no page, so there is nothing for the size report that
+    # follows every build (REQ-PIPE-255 criterion 26) to measure.
+    monkeypatch.setattr(dashboard_cli, "report_built_sizes", lambda path: None)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["embed"])
 
