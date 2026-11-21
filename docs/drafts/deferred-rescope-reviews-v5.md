@@ -171,3 +171,9 @@ is a PROPOSAL to re-sign. Nothing has been applied to requirements.yaml.
 - REQ-PIPE-363 edge cases: Keith - yes to both (omit a kind with no folders; --help's Collections panel matches c4/c6).
 
 All review questions answered 2026-11-21. Next: delivery-scoper folds every finding and answer into v6 for Keith to re-sign.
+- v6 Q1 (commits): Keith - both 'checked at' and 'built at'; load refuses an uncommitted or unpushed template (2026-11-21).
+- v6 Q2 (MOTHMAN_ASSET): Keith - enduring assets only; beside --id it is refused; 363's one-off half reads '... Set it to one of: daily, quarterly. For one of 37 extractions, use mothman one-off.'
+- v6 Q3 (re-load after unpublished drop): Keith - yes, it runs again; no drop record.
+- v6 Q4 (decide with could-not-load/check): Keith - yes, they count as outcomes; the confirmation names them.
+- v6 Q5 (list): Keith - cheap stages only (opened, committed, pushed, loaded, age, next step).
+- v6 Q6 (446 size): Keith - split the mothman check criteria (c10-c14, c20) into a requirement of their own BEFORE re-signing.
