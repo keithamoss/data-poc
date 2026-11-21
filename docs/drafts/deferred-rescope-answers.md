@@ -106,3 +106,13 @@ requirements.yaml until each requirement is presented and signed.
 - **Architect Q3, a cross-table check over a derived and a counted table:** (a) it
   counts on the counted table's side and is excluded only from the derived
   product's - one new rule.
+
+## Round 6
+
+- **REQ-GHUB-433 c12, what a ticket says:** (a) that commands are acted on at the
+  next processing pass and how often passes run; no last-pass time (it would
+  rewrite every open ticket every pass).
+- **REQ-PIPE-363 c4 and c6 wording:** APPROVED by Keith as drafted in
+  deferred-rescope-amendments-v5.yaml - enduring assets by name, one-offs as a
+  count per kind ("Set it to one of: daily, quarterly - or one of 37 extractions
+  (mothman one-off list)"); `mothman one-off open` and `list` exempt.
