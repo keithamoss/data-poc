@@ -369,6 +369,27 @@ def selected_asset(monkeypatch, request):
 
 
 @pytest.fixture(autouse=True)
+def _streams_run_in_the_tests_own_process(monkeypatch, request):
+    """The bootstrap's streams, one after another in this process (post-build-
+    review #485, Keith 2026-11-21): a spawned stream process has none of a
+    test's monkeypatches, so twice a "stubbed" bootstrap of a two-collection
+    asset really staged and checked the checkout's deliveries for hours. A test
+    that needs the real spawned pool marks itself `real_stream_pool`."""
+    if request.node.get_closest_marker("real_stream_pool"):
+        yield
+        return
+    from bootstrap import bootstrap as boot
+
+    def in_process(names, sequential):
+        # Looked up at call time, so a test's own stub of _run_stream applies.
+        ran = {n: (boot._run_stream(n, sequential), boot.pin_report()) for n in names}
+        return {n: r[0] for n, r in ran.items()}, {n: r[1] for n, r in ran.items()}
+
+    monkeypatch.setattr(boot, "_run_concurrently", in_process)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _no_pin_or_memo_carried_over():
     """Every test starts with nothing remembered from another (post-build-
     review #399): the derived schedule values cleared (REQ-PIPE-400), and no

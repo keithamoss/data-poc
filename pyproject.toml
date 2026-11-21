@@ -165,6 +165,7 @@ markers = [
     "shared_page: a browser-test class whose tests share one loaded dashboard page (REQ-TEST-282)",
     "fresh_load: a test in a shared_page class that needs a document load of its own (REQ-TEST-282)",
     "asset(name): the data asset a test acts for, where it is not the suite's default (tests/conftest.py, REQ-PIPE-363 criterion 9)",
+    "real_stream_pool: the bootstrap's streams run in its real spawned process pool, not in the test's own process (post-build-review #485)",
 ]
 
 [tool.coverage.run]

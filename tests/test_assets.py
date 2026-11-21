@@ -462,6 +462,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
     """REQ-PIPE-369 criterion 4: a stream's spawned process is handed the
     asset beside the collection, and selects it itself."""
 
+    @pytest.mark.real_stream_pool
     def test_each_stream_process_selects_the_asset_it_was_handed(self, monkeypatch):
         from bootstrap import bootstrap
 
@@ -476,6 +477,7 @@ class TestTheBootstrapHandsItsStreamsTheAsset:
             "quarterly", str(ROOT / "assets" / "quarterly" / "collections" / "child_protection.py"))}
 
 
+    @pytest.mark.real_stream_pool
     def test_a_stream_process_is_handed_the_layout_too(self, monkeypatch, tmp_path):
         """The groundwork critic: handed the name alone, a child of a
         use_root deployment (REQ-PIPE-342) looks for the asset in today's tree."""
