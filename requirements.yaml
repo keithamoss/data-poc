@@ -19648,7 +19648,7 @@ requirements:
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - yes, the load-time file checks reach the dashboard, as their own scope, never folded into the data checks'' status. REFRESHED by delivery-scoper 2026-10-04 to fit REQ-PIPE-115''s dataset-level red (signed that day) and REQ-DASH-070''s outstanding items, with the failed-load case moved out to REQ-DASH-148. Reshaped the same day when Keith chose that any failing file check refuses the whole file, so the red and the queue item became REQ-DASH-148''s.'
     acceptance_criteria:
     - THE SYSTEM SHALL show a dataset's file-check results, on its dataset page, in a section of their own labelled as being about the file as delivered, distinct from its data checks.
-    - THE SYSTEM SHALL NOT fold a file check's verdict into any data check's status, count or trend.
+    - 'THE SYSTEM SHALL NOT fold a file check''s verdict into any data check''s status, count or trend. (AMENDED 2026-11-22, Keith, via REQ-DASH-436: except a one-off''s two package checks, ''declared table arrived'' and ''undeclared file'', which count in its dataset''s status.)'
     - THE SYSTEM SHALL word a file-check failure as a statement about the file that arrived, naming the file, and SHALL NOT word it as a count of records violating a rule.
     - THE SYSTEM SHALL let a reader open each file check, with its authored prose and its history over time, on the same terms as any other check.
     - WHERE every file check passed for the supply on show, THE SYSTEM SHALL show that section as one line saying so, and SHALL NOT render each passing check by default.
@@ -19687,6 +19687,7 @@ requirements:
     - THE FILE ON SHOW IS THE NEWEST LOAD ATTEMPT OF A FILE RECEIVED ON OR BEFORE
       THE DATE ON SHOW, by the file's own receipt (qa.delivery_file), never by
       when a pass ran - the same rule every in-place-on judgement uses.
+    - 'AMENDED by Keith 2026-11-22, via REQ-DASH-436 criterion 2 (option (a)): criterion 2''s one exception is a one-off''s two package checks - facts about its package, not a file''s bytes - which count in its dataset''s status so that a declared table that never arrived reads Fail rather than No data. Every other file check, every enduring asset''s among them, still never folds into a status; the build marks the exception countsInStatus and both status implementations read only that mark.'
   - id: REQ-PIPE-098
     title: A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born
     date_written: '2026-09-26'
@@ -52355,11 +52356,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 2's second half - a one-off's declared table that did not arrive shows as Fail from its failing default-layer result, never No data.
-      why: REQ-QAC-441 criterion 3's failing result is built and recorded - the one-off's own `table_arrived` file check, failing, in a completed run of the missing table's own (tests/test_one_off_load.py). But a file check never rolls up into its dataset's status (REQ-DASH-097 criterion 2), so built from that history the dataset reads Inactive, not Fail - found 2026-11-22 by the dashboard builder's own dataset_status. Which way it reaches the status is a question for Keith (REQ-QAC-441's build report), not a build decision.
-      owner: Keith's answer on how a one-off's package checks reach a dataset's status (2026-11-22)
-      blocked_by:
-        unowned: true
     - criterion: Criterion 3 - such a dataset's checks with their real verdicts, on a rendered page.
       why: Needs a built page with real recorded results for a no-calendar dataset, which is REQ-TEST-437's fixture. Verdicts are not altered for such a dataset (counted_cases), but no page with one has been rendered.
       owner: REQ-TEST-437
@@ -52367,11 +52363,11 @@ requirements:
         requirements:
         - REQ-TEST-437
     - criterion: Criteria 5 and 6 - a one-off's page without the schedule controls, trends, run comparison and supply history, and removed tools' routes opening the nearest view with a notice.
-      why: 'The page must know it is a one-off, which needs the Asset''s kind (REQ-PIPE-446 criterion 12); Keith 2026-11-22: these wait for REQ-PIPE-446.'
-      owner: REQ-PIPE-446
+      why: 'RE-TESTED 2026-11-22: REQ-PIPE-446 has shipped - the Asset states its kind and the build already asks it (build_dashboard_data._one_off_page) - and nothing is built yet. What these wait on now is the one-off page itself: the page knowing it is a one-off and its kind, which REQ-DASH-444 criterion 1 embeds, and the controls REQ-DASH-444 criterion 9 removes beside them.'
+      owner: REQ-DASH-444
       blocked_by:
         requirements:
-        - REQ-PIPE-446
+        - REQ-DASH-444
     source: 'Keith, plans/running-thoughts.md #141 (2026-11-18); sprint 29 point 8; delivery-dashboard-ux''s v4 review findings 6 and 10. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off A, C and D. Buildable at once (Keith, round 5). Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN the dashboard is built for an asset or one-off holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() (build_dashboard_data.py) or any other cadence read.
@@ -52399,12 +52395,15 @@ requirements:
     - 'BUILT 2026-11-22: ''NOT YET CHECKED'' IS `notyetchecked`, a DATASET-level unordered status: in status-cases.json''s vocabulary (by_level.dataset, labels, unordered) and both STATUS_WORDS, after notchecked and before notcounted in the quiet order, drawn as .pill.notchecked is. The dataset carries notYetChecked; both rollups leave it out and the not-counted line gives the reason ''not yet checked''.'
     - 'BUILT 2026-11-22: notYetChecked IS SET ONLY ON A ONE-OFF''S PAGE (an Asset stating a kind, REQ-PIPE-446 criterion 12), so no enduring asset''s page changes; no page carries it until 446 lands.'
     - 'SETTLED by Keith 2026-11-22: criteria 5 and 6 wait for REQ-PIPE-446 rather than being built now against an embedded flag.'
+    - 'SETTLED by Keith 2026-11-22 (option (a)): CRITERION 2''S FAIL HALF - A ONE-OFF''S PACKAGE CHECKS COUNT. For a one-off only, its two package checks, ''declared table arrived'' and ''undeclared file'', count in its dataset''s status, so a declared table that never arrived reads Fail; REQ-DASH-097 criterion 2 is AMENDED to say so. REJECTED (b) recording every check of a missing table as could-not-run, and (c) treating it as a failed load under REQ-DASH-148.'
+    - 'BUILT 2026-11-22: ONE MARK, TWO READERS (the parity rule): pipeline/file_check_panel.for_dataset marks those two checks countsInStatus - only a one-off names them (asset_model/file_check_definitions.ONE_OFF_NAMES) - and qa_tools/common/dataset_status.package_statuses and the template''s ownVerdict() both add a marked check''s status to the dataset''s own verdict. status-cases.json counted_cases.package_checks holds both suites to the same rows, an unmarked failing file check among them. The page and the build read the package checks live from the kind''s template through file_check_definitions (Kind.file_checks), with no check workspace in use.'
     linked_tests:
     - tests/test_no_calendar_dashboard.py
     - tests/test_counted_parity.py
     - tests-js/counted-parity.test.js
     - tests/test_status_parity.py
     - tests-js/status-parity.test.js
+    - tests/test_one_off_load.py
     implemented_by:
     - pipeline/build_dashboard_data.py::build_one_table
     - pipeline/build_dashboard_data.py::_one_off_page
@@ -52416,8 +52415,12 @@ requirements:
     - asset_model/statuses.py::STATUS_WORDS
     - dashboard/qa-reporting-dashboard.template.html
     - status-cases.json
+    - qa_tools/common/dataset_status.py::package_statuses
+    - pipeline/file_check_panel.py::for_dataset
+    - asset_model/file_check_definitions.py::merged
     evidence:
     - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work). tests/test_no_calendar_dashboard.py was SEEN FAILING FIRST: all 4 build tests raised NoCalendarAgreed - from agreement.cadence, then owed_nothing.for_dataset, then closed_slots - and all 6 pass.'
+    - '2026-11-22, code tree e8820d4c: tests/test_counted_parity.py 36 passed and tests-js/counted-parity.test.js 23 passed, the four new package_checks rows in status-cases.json failing in both before dataset_status.package_statuses and the template''s ownVerdict existed; tests/test_one_off_load.py 41 passed, its TestADeclaredTableThatNeverArrivedReadsFail having read the missing table''s dataset Inactive before; tests/test_extraction_recipe.py 16 passed, its TestEveryTableNamesAnIdentifier seen failing first.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52429,11 +52432,11 @@ requirements:
     status: built
     unmet_criteria:
     - criterion: Criterion 5 - the label 'Derived product, not counted in the <kind>'s status' in the kind's display word.
-      why: 'The kind''s display words are REQ-PIPE-446 criterion 2''s plug-in, not built. Built now: the build marks a derived dataset `derived: true`, it is in no rollup, and the not-counted line names derived products (''derived product'').'
-      owner: REQ-PIPE-446
+      why: 'RE-TESTED 2026-11-22: REQ-PIPE-446 has shipped - its kind plug-in carries the display words - and the label is not built: the page does not yet know which kind of one-off it is, which REQ-DASH-444 criterion 1 embeds (the kind, in its display word, in the masthead). Built now: the build marks a derived dataset `derived: true`, it is in no rollup, and the not-counted line names derived products (''derived product'').'
+      owner: REQ-DASH-444
       blocked_by:
         requirements:
-        - REQ-PIPE-446
+        - REQ-DASH-444
     source: Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off B and G and delivery-dashboard-ux B, C and the display-words point. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - 'THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only.'
@@ -52752,6 +52755,7 @@ requirements:
     - 'BUILT 2026-11-22: LIST IS THE STAGE BOARD (qa_tools/common/one_off_lifecycle.rows): `loaded` where supply_<id> is on the server, else `pushed`, `committed` or `opened` from git; the age from the database''s own PG_VERSION file, as `mothman env tidy-test-databases` reads it; and every supply_<name> that is no enduring asset''s is listed as a one-off database, with or without its folder. Through one administrative connection, claiming no asset; where no server is configured or reachable, the stages git can see are still shown and it says so.'
     - 'BUILT 2026-11-22: THE DROP (cli/one_off.drop_command) lists only what is there - the database with its tables and rows, data/<id>/ (filed files, check workspace, dbt scratch), reports/<id>/ and any dbt artefact in the folder, each with its count - asks for the typed id through click''s prompt after common.require_tty, refuses with no terminal in NeedsATerminal, says ''Deleted <item>'' as each goes, and on a failure names what remains and the command that finishes it. one_off_lifecycle.remove is called by the drop command only (criterion 9, held by a source-reading test).'
     - 'BUILT 2026-11-22: THE ENVIRONMENT LINE names a selected one-off as ''One-off: <id> (<kind''s display word>)'' in cli/common.environment_statement, which the TUI''s toolbar and the line at the first connection both read (criterion 13). cli/app.py''s ''one-off command'' docstring now says a single command run outside the wizard (criterion 15).'
+    - 'SETTLED by Keith 2026-11-22: the load''s next step naming decide and publish, before either is built, is fine - they are built next (REQ-PIPE-435, REQ-PIPE-443).'
     open_questions: []
     linked_tests:
     - tests/test_one_off_load.py
@@ -52905,7 +52909,7 @@ requirements:
     acceptance_criteria:
     - THE SYSTEM SHALL read an extraction as a package - a directory on local disk or an S3 prefix - holding one recipe file and the data files it names.
     - THE SYSTEM SHALL read the recipe as JSON against a schema committed in this repository, carrying a recipe format version.
-    - THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file and that file's format, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement.
+    - THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file and that file's format, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement, and at least one primary identifier per table (AMENDED 2026-11-22, Keith).
     - THE SYSTEM SHALL accept, for each table, an optional expected row count.
     - THE SYSTEM SHALL accept CSV as the only file format in recipe format version 1, and IF a recipe names any other format, THEN THE SYSTEM SHALL refuse it, naming the table.
     - IF the recipe is missing, does not parse, or fails the schema, THEN THE SYSTEM SHALL refuse the package before anything is generated or loaded, naming each problem.
@@ -52930,6 +52934,7 @@ requirements:
     - 'BUILT 2026-11-22: A DECLARED FILE MISSING FROM THE PACKAGE IS NOT A REFUSAL: REQ-QAC-441 criterion 3 records it as a failing default-layer result, and REQ-TEST-437''s fixture has one.'
     - 'BUILT 2026-11-22: S3 THROUGH A CLIENT THE CALLER HANDS IN (the PORTABILITY NFR): `mothman one-off open` makes it with boto3 and the environment''s credentials; the reader creates none. A file name that is absolute, holds a backslash or any ''..'' part is refused (the SECURITY NFR).'
     - 'SETTLED by Keith 2026-11-22: THE RECIPE FORMAT IS SET DOWNSTREAM, NOT BY US (''The recipe format is fixed downstream, we''ll probably create some sort of translator to work out what checks to apply as a base.''). Format version 1 is a STAND-IN, kept so the one-off path can be built and tested end to end, and is NEVER EXTENDED; the real format will arrive from downstream and a translator - not yet scoped (plans/running-thoughts.md) - will map it to base checks. REJECTED adding a `relationships` field to version 1 for REQ-QAC-441 criterion 6.'
+    - 'AMENDED by Keith 2026-11-22: EVERY TABLE DECLARES A PRIMARY IDENTIFIER, or the recipe is refused naming the table (extraction_recipe.read). A failing row is only ever recorded by its identifiers (REQ-QAC-441 criterion 9), so a table with none could name no failing row and lost its Soda failed-rows checks.'
     linked_tests:
     - tests/test_extraction_recipe.py
     - tests/extraction_support.py
@@ -52941,6 +52946,7 @@ requirements:
     - asset_model/kinds/extraction.py::EXTRACTION
     evidence:
     - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_recipe.py is new behaviour (17 tests): a local and an S3 package, CSV only, every refusal, the id rules and no connection opened.'
+    - '2026-11-22, code tree e8820d4c: tests/test_counted_parity.py 36 passed and tests-js/counted-parity.test.js 23 passed, the four new package_checks rows in status-cases.json failing in both before dataset_status.package_statuses and the template''s ownVerdict existed; tests/test_one_off_load.py 41 passed, its TestADeclaredTableThatNeverArrivedReadsFail having read the missing table''s dataset Inactive before; tests/test_extraction_recipe.py 16 passed, its TestEveryTableNamesAnIdentifier seen failing first.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -53093,12 +53099,14 @@ requirements:
     - 'BUILT 2026-11-22: THE DEFAULT LAYER''S DEFINITION is one-offs/extraction/_template/default-checks.yaml - each assertion''s name, words, category, introduced date and, optionally, a narrower set of tools; how an assertion becomes each tool''s configuration is code (extraction_checks.default_layer). The kind''s template gate (REQ-PIPE-448 criterion 6) refuses an undefined assertion, missing words, or a tool the assertion cannot take.'
     - 'BUILT 2026-11-22: THE CHECK WORKSPACE. What the tools must read as files is materialised into data/<id>/qa/config/ - the committed folder''s files with the default layer merged into each collection''s contract, Soda, Evidently and dbt files - rebuilt at every load and removed by the drop (REQ-PIPE-442 criterion 6). assets.use_workspace points the selected one-off''s configuration folder and dbt project there for the load, and assets.handoff carries it to a tool''s worker process. dbt runs there, so the committed folder never gets a target/, logs/ or dbt_packages, and the workspace''s packages.yml names the deployment''s local dbt_utils by path. REJECTED each tool reading the two layers from two places: dbt refuses one model''s properties declared in two files, and datacontract-cli takes one contract per run.'
     - 'BUILT 2026-11-22: TABLE ARRIVED AND UNDECLARED FILE ARE THE ONE-OFF''S OWN FILE CHECKS (asset_model/file_check_definitions.py ONE_OFF_NAMES), written into the workspace''s file-checks.yaml from the template''s words, and refused in any enduring asset''s file. `table_arrived` passes as each declared file is screened, and the load records it failing, in a run of its own named as the table''s arrival would have been, for a declared table that never came. `undeclared` (format `package`, so no file''s screening asks it) is asked of the package once, by the load. Their words, check ids and definition fingerprints so come from where every file check''s do.'
-    - 'PROVISIONAL (2026-11-22): THE PACKAGE''S ONE UNDECLARED-FILE RESULT IS RECORDED AGAINST ITS FIRST COUNTED DATASET (qa_tools/common/one_off_package.home_of) - a file that belongs to no table has no dataset of its own, and the first counted one keeps the failure in the one-off''s own status rather than in a derived product''s, which no rollup counts. The alternatives were every dataset (one stray file would fail them all) or a one-off-level scope the page does not yet have (REQ-DASH-444).'
+    - 'answered by Keith 2026-11-22 - it stays until REQ-DASH-444 settles the one-off page: THE PACKAGE''S ONE UNDECLARED-FILE RESULT IS RECORDED AGAINST ITS FIRST COUNTED DATASET (qa_tools/common/one_off_package.home_of) - a file that belongs to no table has no dataset of its own, and the first counted one keeps the failure in the one-off''s own status rather than in a derived product''s, which no rollup counts. The alternatives were every dataset (one stray file would fail them all) or a one-off-level scope the page does not yet have (REQ-DASH-444).'
     - 'BUILT 2026-11-22: EVIDENTLY''S ASSERTION METHODS, `missing` and `row_count` (asset_model/drift.py ASSERTION_METHODS), run the real evidently Report over the run''s own view and need no reference supply, so they never read as having none. A file of only those is accepted; a file declaring checks with neither psi nor an assertion is still refused.'
     - 'BUILT 2026-11-22: FAILING-ROW KEYS ARE THE DECLARED PRIMARY IDENTIFIERS (criterion 9): the kind''s shared adapter (qa_tools/kind_adapters/extraction.py) gives each table''s identifiers as its sample key, and a generated failed-rows query selects those columns only. datacontract-cli''s SQL rules record no keys - the existing gap for custom SQL rules (qa_tools/tools/run_datacontract.py).'
-    - 'KNOWN LIMIT 2026-11-22: A TABLE DECLARING NO PRIMARY IDENTIFIER gets no Soda failed-rows check for its types or bounds, having no key to sample; its other tools'' checks stand.'
+    - 'SUPERSEDED 2026-11-22: the known limit of a table declaring no primary identifier is gone - Keith required one on every recipe table (REQ-PIPE-439 criterion 3, amended), so every table has a key to sample.'
     - 'THE WORDS (docs/check-authoring-rules.md): the recipe layer''s are extraction_checks.RECIPE_WORDS, the default layer''s the template''s. No figure, no tool, not the check''s own column, `supply` for a delivery - held by tests/test_one_off_load.py''s TestEveryGeneratedCheckCarriesItsWords over both layers as the lifecycle parser reads them. The standard itself was not changed.'
     - 'DEFECTS FOUND BUILDING IT, each fixed test-first: a one-table collection''s generated contract carried the collection''s id and name where REQ-QAC-039 wants its dataset''s, failing the hierarchy gate the load runs (tests/test_extraction_folder.py TestAOneTableCollectionsContract, seen failing); the collections gate failed a one-off''s collections for want of an adapter module and compared a dbt folder outside the repository by its spelling (tests/test_one_off_gates.py TestTheCollectionsGateAcceptsTheSharedAdapter, seen failing); and datacontract_common appended to a `servers` list a generated contract does not carry (found by the first real run, KeyError ''servers'').'
+    - 'REJECTED by Keith 2026-11-22: a dbt generic test for the exact row count - Soda, datacontract-cli and Evidently already check it.'
+    - 'SETTLED by Keith 2026-11-22 (REQ-DASH-436 criterion 2, option (a)): the two package checks count in their dataset''s status on a one-off''s page - REQ-DASH-097 criterion 2 amended for them alone.'
     linked_tests:
     - tests/test_one_off_load.py
     - tests/test_one_off_gates.py
