@@ -1,6 +1,6 @@
 """A one-off load that died INSIDE a run's checks is resumed by loading the same
 package again: the retry opens a fresh attempt at that run, as a recurring
-asset's re-check does (Keith 2026-11-22, plans/qa-pipeline.md #89, now
+asset's re-check does (Keith 2026-11-22, 'Retry opens a new try';
 REQ-PIPE-442 criterion 16).
 
 THE DEFECT: the first load raised in Evidently, part way through the people

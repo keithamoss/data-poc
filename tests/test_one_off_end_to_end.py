@@ -24,9 +24,8 @@ and every subprocess is watched throughout.
 
 NOT HERE: a cross-table relationship between the derived table and a counted
 one (criteria 1 and 2) - recipe format version 1 declares none (REQ-QAC-441
-criterion 6, unowned), so the fixture cannot carry one. And criterion 5's
-second test, a not-yet-agreed dataset beside a calendared one on a recurring
-asset, which this module does not build.
+criterion 6, unowned), so the fixture cannot carry one. Criterion 5's second
+test is tests/test_not_yet_agreed_beside_calendared.py.
 """
 from __future__ import annotations
 
