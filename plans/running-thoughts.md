@@ -6161,3 +6161,14 @@ could never have computed it), and it belongs with batch 5's check work.
      template, the database, data/<id>/, reports/<id>/), and the published
      page undecided and then decided. Probably an artifact. After the
      build, not before - the folder's shape is still moving in v6.
+
+145. **[todo, 2026-11-22]** **[Pipeline & publishing]** **[QA checks & contract]** **A translator from the downstream recipe format to an extraction's base checks.**
+     Keith, 2026-11-22: "The recipe format is fixed downstream, we'll probably
+     create some sort of translator to work out what checks to apply as a
+     base." So REQ-PIPE-439's recipe format version 1 is a stand-in, kept so
+     the one-off path can be built and tested end to end and never extended;
+     the real recipes come from downstream, and a translator maps them to the
+     checks an extraction gets. REQ-QAC-441 criterion 6 (a cross-table
+     relationship the recipe declares) waits on it. Not scoped: the downstream
+     format, where the translator runs, and whether it replaces version 1 or
+     sits in front of it.

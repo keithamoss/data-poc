@@ -317,6 +317,8 @@ def _schema_errors(raw: dict, src: Source, model=None, file_name: str | None = N
                     "nowhere here precisely because a dropped one is invisible.",
                     field=field, layer="schema"))
             elif err["type"] == "missing":
+                if loc in (["amber_setting"], ["replacement_setting"]) and not _enduring_asset():
+                    continue  # not asked of a one-off (Keith 2026-11-22)
                 out.append(ConfigError(
                     file_name, scope,
                     f"{where} is required and is not there.",
@@ -2479,8 +2481,11 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)
     errors += _eras_errors(raw, src)
-    errors += _amber_setting_errors(raw, src)
-    errors += _replacement_setting_errors(raw, src)
+    # NOT ASKED OF A ONE-OFF (Keith 2026-11-22): a no-period supply is never
+    # promoted (REQ-PIPE-435 criterion 7), so neither setting means anything.
+    if _enduring_asset():
+        errors += _amber_setting_errors(raw, src)
+        errors += _replacement_setting_errors(raw, src)
     errors += _list_setting_errors(raw, src)
     if src.is_the_selected_assets and not errors:
         errors += _overlap_errors(src)

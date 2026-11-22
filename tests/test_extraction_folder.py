@@ -136,6 +136,28 @@ class TestGeneratedFromTheRecipeAlone:
         found = validate_schedule.validate()
         assert [e for e in found if "never" in e.problem or "derived" in e.problem] == []
 
+    def test_the_whole_schedule_gate_passes_with_no_amber_or_replacement_setting(self, opened):
+        """Keith 2026-11-22: neither is asked of a one-off - a no-period supply is
+        never promoted - and none is generated into the folder."""
+        from qa_tools.common import validate_schedule
+
+        doc = yaml.safe_load((opened / "data-asset.yaml").read_text())
+        assert "amber_setting" not in doc and "replacement_setting" not in doc
+        assets.select_one_off("cohort-2026-a")
+        assert [str(e) for e in validate_schedule.validate()] == []
+
+    def test_an_enduring_asset_still_must_state_both(self, tmp_path, monkeypatch):
+        import agreement_split
+        from qa_tools.common import validate_schedule
+
+        monkeypatch.setenv(assets.ASSET_ENV, "daily")
+        doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
+        doc.pop("amber_setting")
+        path = agreement_split.repoint(monkeypatch, tmp_path / "asset", doc)
+        found = validate_schedule.validate(validate_schedule.Source(
+            path, validate_schedule.Source.default().contract_dir))
+        assert any("amber_setting is required" in str(e) for e in found)
+
     def test_no_level_above_agency(self, opened):
         doc = yaml.safe_load((opened / "data-asset.yaml").read_text())
         assert set(doc["hierarchy"]) == {"agencies"}
