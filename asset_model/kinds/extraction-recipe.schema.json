@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mothman/extraction-recipe/1",
+  "title": "An extraction's recipe, format version 1 (REQ-PIPE-439)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["recipe_format_version", "extraction_id", "project", "filter", "tables"],
+  "properties": {
+    "recipe_format_version": {"const": 1},
+    "extraction_id": {"type": "string", "minLength": 1},
+    "project": {"type": "string", "minLength": 1},
+    "filter": {"type": "string", "description": "Descriptive text only - shown, never parsed or executed."},
+    "tables": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "format", "agency", "collection", "dataset", "columns", "derived", "cohort"],
+        "properties": {
+          "file": {"type": "string", "minLength": 1},
+          "format": {"type": "string", "minLength": 1},
+          "agency": {"$ref": "#/$defs/placed"},
+          "collection": {"$ref": "#/$defs/placed"},
+          "dataset": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "name", "table"],
+            "properties": {"id": {"type": "string", "minLength": 1},
+                           "name": {"type": "string", "minLength": 1},
+                           "table": {"type": "string", "minLength": 1}}
+          },
+          "derived": {"type": "boolean"},
+          "columns": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["name", "type", "primary_identifier"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "type": {"enum": ["string", "integer", "number", "date", "timestamp", "boolean"]},
+                "primary_identifier": {"type": "boolean"}
+              }
+            }
+          },
+          "cohort": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["column", "lower", "upper"],
+              "properties": {
+                "column": {"type": "string", "minLength": 1},
+                "lower": {"type": ["string", "number", "null"]},
+                "upper": {"type": ["string", "number", "null"]}
+              }
+            }
+          },
+          "expected_rows": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "placed": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {"id": {"type": "string", "minLength": 1},
+                     "name": {"type": "string", "minLength": 1}}
+    }
+  }
+}
