@@ -52315,7 +52315,14 @@ requirements:
     date_written: '2026-11-21'
     story: As the person accountable for handing a one-off's data to a project, I want to record whether it is released or withheld, and why, so that there is a named, dated account of who let the data go - or stopped it.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 11 - saying, on a decision recorded after the one-off's page was published, that the page still shows the earlier state, naming the publish command.
+      why: 'Whether and where a page was published is REQ-PIPE-443''s record, not built. Built now: every decision ends with the publish command as its next step.'
+      owner: REQ-PIPE-443
+      blocked_by:
+        requirements:
+        - REQ-PIPE-443
     source: 'Keith, 2026-11-21, Q4.2 (b) and round 2 Q4 (a); plans/running-thoughts.md #141 (the promotion gate raises); the delivery-architect''s v4 review (a new qa table, not decision_log). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-cli-ux G1, G5 and C2 and Keith''s answers (copy nothing; never GitHub; --id). Shared by every one-off kind. v7 folds in Keith''s answer to v6 Q4 (as drafted; the PROVISIONAL mark cleared). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN every dataset of a one-off has a recorded outcome for its checks - a could-not-load or could-not-check result counting as one - THE SYSTEM SHALL offer, in the `mothman one-off` TUI and as `mothman one-off decide --id <id>`, one decision for the whole one-off - release or withhold.
@@ -52346,6 +52353,30 @@ requirements:
     - 'v6, CRITERION 10 IS apply_decision''s FLOW (delivery-cli-ux C2): one order for every recorded decision in mothman, so a person who has filed a supply already knows this one; the QA summary is shown because the decision is about it.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q4 (a)): a could-not-load or could-not-check result COUNTS AS AN OUTCOME, so such a one-off can be decided; the confirmation names those datasets (criterion 10), withholding is the expected answer, and releasing one is a person''s recorded call with a reason. REJECTED (b) offering no decision until every dataset has a real verdict, which leaves a one-off with one unloadable table undecidable. v7 clears v6''s PROVISIONAL mark.'
     - 'v6, CRITERION 11 (delivery-cli-ux G1): a decision recorded after the last publish is otherwise invisible on the page and lost at drop.'
+    - 'BUILT 2026-11-22: THE TABLE is qa.one_off_decision (qa_tools/common/one_off_decision.py) - one_off_id, decision, reason, actor email and name, decided_at - created with the one-off''s database by the load and on first use, append-only by a statement trigger refusing UPDATE, DELETE and TRUNCATE for every role, as qa.filing is. It carries no dataset column (criterion 5). The publisher reads it through qa_store.ensure_publisher_role''s SELECT on the qa schema, whose write revokes cover it (criterion 3). Outside qa_store''s own DDL deliberately, as qa.one_off_load is: no enduring asset''s database has it, so no schema version moves.'
+    - 'BUILT 2026-11-22: `mothman one-off decide --id <id> [--decision release|withhold] [--reason ...] [--yes]` in apply_decision''s order (criterion 10, delivery-cli-ux C2): the actor from git identity against the kind''s people.yaml read at that moment; the refusal where a dataset has no recorded outcome (criterion 1 - a completed run, whatever its result, so a could-not-load or could-not-check dataset counts, Keith v6 Q4 (a)); the decision and the reason, each asked where no flag gave it, a blank reason refused; then the QA summary dataset by dataset, the datasets that could not be checked named, and the decision in force; one confirmation, skipped by --yes and refused with no terminal. It ends with the publish command. The TUI offers it as ''Record its release decision''.'
+    - 'BUILT 2026-11-22: PEOPLE ARE THE KIND''S, LIVE (criterion 4): qa_tools/common/people.people_yaml() is the kind template''s people.yaml for a selected one-off, so a person added there may decide at once. The people gate asks a one-off''s people for no `github:` and no asset manager - a one-off never uses GitHub (REQ-PIPE-446 criterion 14) and files nothing a manager must confirm. one-offs/extraction/_template/people.yaml ships with Keith''s entry as assets/daily/people.yaml carries it, less its GitHub username, and one placeholder.'
+    - 'BUILT 2026-11-22: NO-PERIOD SUPPLIES ARE NEVER GATED (criterion 7): orchestrate.promote_after does not call the gate for an arrival whose every dataset has no calendar, and gate.after_arrival, asked about one, refuses it with promotion.NO_PERIOD - ''this dataset has no calendar, so its supply has no period and is never put to the promotion gate'' - where it used to give the rule''s ''no slot could be confidently claimed''. Seen failing first: the load said ''not promoted - ... no slot ...''.'
+    - 'BUILT 2026-11-22: NEVER GITHUB (criterion 8): the decision touches no ticket code; held by a test with the GitHub boundary (ticket_github._gh) set to fail.'
+    - 'SETTLED by Keith 2026-11-22: building it next, after REQ-PIPE-442, is why the load''s next step already names decide.'
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_off_gates.py
+    implemented_by:
+    - qa_tools/common/one_off_decision.py::record
+    - qa_tools/common/one_off_decision.py::ensure_table
+    - qa_tools/common/one_off_decision.py::history
+    - qa_tools/common/one_off_decision.py::standing
+    - qa_tools/common/one_off_decision.py::qa_summary
+    - qa_tools/common/one_off_decision.py::refusal
+    - cli/one_off.py::decide_command
+    - qa_tools/common/people.py::people_yaml
+    - qa_tools/common/validate_people.py::problems
+    - qa_tools/common/gate.py::after_arrival
+    - qa_tools/tools/orchestrate.py::promote_after
+    evidence:
+    - '2026-11-22, code tree 3d8528e0 (later commits touch requirements.yaml only): tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs and test_counted_parity, pytest -n 4, 193 passed in 43s; npx vitest run 1312 passed in 99 files; ruff clean. On the tree before its last fix (the package checks read with no template present), 36 modules - those six with test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, the run_* and datacontract modules, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_validate_soda, test_validate_imports, test_hand_filing, test_no_calendar_dashboard, test_two_asset_gates, test_cli_package_gate, test_package_gate, test_people, test_validate_people, test_promotion, test_promotion_gate, test_promotion_after_run, test_promotion_step, test_cli_filing_tui and test_status_parity - 1037 passed and 1 failed, the failure that fix answered (tests/test_one_off_gates.py''s collections gate over a root with no template). The full suite was not run.'
+    - 'tests/test_one_off_load.py TestTheReleaseDecision (8 tests) over the module''s real load: a withhold then a release appended with actor, instant and reason, the latest standing and both kept, the summary and the decision in force shown before ''Recorded'', nothing of the data moved; a blank reason, no terminal without --yes, an unknown person and a placeholder refused with nothing recorded; a person added to the template deciding at once; --dataset no such option and no dataset column; UPDATE and DELETE refused by the trigger, and a publisher role granted SELECT and neither UPDATE nor DELETE; and the outcome refusal. TestNoPeriodIsNeverGated (2, the first seen failing). tests/test_one_off_gates.py TestAOneOffsPeopleNeedNoGitHub (written with its fix, the failure first seen in a scratch run of the people gate over a generated folder: ''has no github:'' and ''no real person holds the manager role'').'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52513,12 +52544,11 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 8's decide and publish steps in `mothman one-off`.
-      why: 'Decide is REQ-PIPE-435''s and publish REQ-PIPE-443''s. Built: the group, its TUI, list (as REQ-PIPE-442''s stage board), open (REQ-PIPE-440), load and drop (REQ-PIPE-442), each taking --id.'
-      owner: REQ-PIPE-435
+    - criterion: Criterion 8's publish step in `mothman one-off`.
+      why: 'Publish is REQ-PIPE-443''s. Built: the group, its TUI, list, open, load, decide (REQ-PIPE-435) and drop, each taking --id.'
+      owner: REQ-PIPE-443
       blocked_by:
         requirements:
-        - REQ-PIPE-435
         - REQ-PIPE-443
     source: Keith 2026-11-21, round 3 (one-offs apart from the enduring assets), round 4 (one-offs/<kind>/<id>/, the extraction the first kind) and round 5 (architect Q2 (b)); delivery-architect v4 findings 6, 7 and 9 and its reuse list. Checked against asset_model/assets.py, cli/check.py's _GATES and _asset_passes, qa_tools/common/diff_base.py and REQ-PIPE-342/363. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A, H, J, K, L and M, delivery-cli-ux G4, G7 and C5, and Keith's answers (--id; never GitHub; every kind declares a project; copy nothing). Shared by every kind. v7 folds in Keith's answers to the v6 questions (Q2, MOTHMAN_ASSET for enduring assets only; Q6, the `mothman check` criteria split out as REQ-PIPE-448). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
@@ -52684,12 +52714,11 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 2's and criterion 12's later steps - decide and publish in the TUI's menu, and the next step said after publish.
-      why: 'Decide is REQ-PIPE-435''s and publish REQ-PIPE-443''s, neither built. Built now: the TUI lists the one-offs, opens a new package, and once one is chosen offers load, drop and list for it for the rest of the session; open, load, list and drop each end with the next step. The load''s names decide and publish, as criterion 12 says, though neither command exists yet.'
-      owner: REQ-PIPE-435
+    - criterion: Criterion 2's and criterion 12's publish step - publish in the TUI's menu, and the next step said after publish.
+      why: 'Publish is REQ-PIPE-443''s, not built. Built now: the TUI offers load, the release decision (REQ-PIPE-435), drop and list for a chosen one-off; open, load, decide, list and drop each end with the next step.'
+      owner: REQ-PIPE-443
       blocked_by:
         requirements:
-        - REQ-PIPE-435
         - REQ-PIPE-443
     - criterion: Criterion 6's warnings - any warning REQ-PIPE-443 adds to the drop's confirmation (an unpublished page, a stale published one).
       why: They need the publishing destination, which is REQ-PIPE-443's. The confirmation lists each item and what it holds, and has a place for them.
@@ -52957,12 +52986,11 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 13's other live readers - people.yaml and the publishing destination read from the kind's template at each step.
-      why: 'people.yaml is REQ-PIPE-435''s and the destination REQ-PIPE-443''s, neither built. Built now: the default check layer is read from one-offs/extraction/_template/default-checks.yaml at every load and never copied into the folder (REQ-QAC-441 criterion 1).'
-      owner: REQ-PIPE-435
+    - criterion: Criterion 13's last live reader - the publishing destination read from the kind's template at each step.
+      why: 'The destination is REQ-PIPE-443''s, not built. Built now: the default check layer (REQ-QAC-441) and people.yaml (REQ-PIPE-435) are read from one-offs/extraction/_template/ at each step and never copied into the folder.'
+      owner: REQ-PIPE-443
       blocked_by:
         requirements:
-        - REQ-PIPE-435
         - REQ-PIPE-443
     source: plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b), round 3 Q1 (a) and addition, round 4 (one-offs/<kind>/<id>/); delivery-architect v4 findings 1, 3 and 5. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A2, B, F, H, I and M, delivery-cli-ux C4, and Keith's answers (copy nothing; pushed before load; dbt_utils a local copy; no 259 hold). The extraction kind's own. v7 folds in Keith's answer to v6 Q1 (the template half of criterion 9 settled) and the REQ-PIPE-448 split (criterion 5's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:

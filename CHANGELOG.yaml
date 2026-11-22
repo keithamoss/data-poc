@@ -162,6 +162,21 @@ releases:
               shows each one-off's stage and next step, and `mothman one-off
               drop --id <id>` removes its database and files once you type its
               id. Bare `mothman one-off` offers the same steps as a menu.
+          - headline: Record whether an extraction is released or withheld
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off decide --id <id>` records one release or
+              withhold decision for the whole one-off, with your reason, after
+              showing you each dataset's QA result and the decision in force.
+              Every decision is kept and the latest stands. Who may decide is
+              read from the kind's template. Nothing about the data is moved.
+          - headline: A table that never arrived reads Fail
+            components: ["Dashboard UI"]
+            description: >
+              On a one-off's page, a declared table that never arrived, or a
+              file nobody declared, now counts in the dataset's status, so the
+              dataset reads Fail rather than No data. A recipe whose table
+              names no primary identifier is now refused.
       - category: Fixed
         items:
           - headline: A supply with no schedule is checked when it arrives
