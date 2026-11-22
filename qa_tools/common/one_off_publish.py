@@ -111,7 +111,7 @@ def read_page(dest, one_off_id: str, *, s3_client=None) -> str | None:
     return got["Body"].read().decode("utf-8")
 
 
-def _write(dest, page: Path, one_off_id: str, *, s3_client=None) -> str:
+def write_page(dest, page: Path, one_off_id: str, *, s3_client=None) -> str:
     """Write the page and the fonts beside it; return the page's address."""
     name = page_name(one_off_id)
     if not dest.is_s3:
@@ -312,4 +312,4 @@ def publish(planned: Plan, steps, *, s3_client=None, say=print) -> str:
             raise PublishRefused(f"a page for another package was published at "
                                  f"{planned.address} while this one was building, so nothing "
                                  f"was written over it.")
-        return _write(dest, page, planned.one_off_id, s3_client=s3_client)
+        return write_page(dest, page, planned.one_off_id, s3_client=s3_client)

@@ -751,3 +751,45 @@ class TestAnUnknownDeciderIsToldWhichFile:
         said = _said(got).replace(" ", "")
         template = str(journey.root / "extraction" / "_template" / "people.yaml").replace(" ", "")
         assert got.exit_code != 0 and template in said, said
+
+
+class TestAnS3Destination:
+    """REQ-PIPE-443 criterion 1's other destination: an S3 prefix, through the
+    boto3 client's own calls - the page and its fonts/ under the prefix, read
+    back as the record of what was published. No S3 is reachable here, so the
+    client is a stand-in holding objects in memory; the calls are boto3's."""
+
+    class Bucket:
+        def __init__(self):
+            self.objects = {}
+
+        def put_object(self, Bucket, Key, Body, **kw):
+            self.objects[(Bucket, Key)] = Body
+
+        def get_object(self, Bucket, Key):
+            import io
+
+            if (Bucket, Key) not in self.objects:
+                error = Exception("NoSuchKey")
+                error.response = {"Error": {"Code": "NoSuchKey"}}
+                raise error
+            return {"Body": io.BytesIO(self.objects[(Bucket, Key)])}
+
+    def test_written_and_read_back(self, tmp_path):
+        from asset_model import one_off_publishing
+        from qa_tools.common import one_off_publish
+
+        (tmp_path / "publishing.yaml").write_text("destination: s3://qa-pages/extractions/\n")
+        dest = one_off_publishing.read(tmp_path)
+        assert (dest.bucket, dest.prefix) == ("qa-pages", "extractions")
+        bucket = self.Bucket()
+        assert one_off_publish.read_page(dest, "x-1", s3_client=bucket) is None
+        page = tmp_path / "x-1.html"
+        page.write_text("<html>" + one_off_publish.meta_tag({"one_off_id": "x-1"}) + "</html>")
+        address = one_off_publish.write_page(dest, page, "x-1", s3_client=bucket)
+        assert address == "s3://qa-pages/extractions/x-1.html"
+        keys = {k for _b, k in bucket.objects}
+        assert "extractions/x-1.html" in keys
+        assert any(k.startswith("extractions/fonts/") and k.endswith(".woff2") for k in keys)
+        back = one_off_publish.read_page(dest, "x-1", s3_client=bucket)
+        assert one_off_publish.identity_of(back) == {"one_off_id": "x-1"}
