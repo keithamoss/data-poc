@@ -125,6 +125,16 @@ releases:
               and choose one with `mothman one-off`, with MOTHMAN_ASSET unset,
               and `mothman check` refuses a badly named or clashing folder. A
               one-off never touches GitHub.
+          - headline: An extraction's folder is generated from its recipe
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off open --kind extraction <package>` reads an
+              extraction's recipe, from a local folder or S3, refuses it with
+              every problem named if it is not valid, and generates the
+              extraction's own folder from it - its datasets, contracts and dbt
+              project - with a digest of every file. `mothman check` now gates
+              a changed one-off folder in full and checks the rest against
+              their digests.
           - headline: Commands on a slot's ticket are acted on at the next pass
             components: ["GitHub workflow & people"]
             description: >

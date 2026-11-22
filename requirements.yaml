@@ -52609,30 +52609,19 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: 'Criterion 2 - each applicable gate run in full over every one-off folder changed since the diff base, and every other folder checked against its recorded digest.'
-      why: 'The recorded digest is REQ-PIPE-440''s. Running a per-asset gate over a one-off folder goes through `mothman one-off gate --id` (SETTLED by Keith 2026-11-22).'
-      owner: REQ-PIPE-440
-      blocked_by:
-        requirements:
-        - REQ-PIPE-440
-    - criterion: 'Criterion 3''s rows - one per applicable gate per kind, folders gated in full and by digest counted, a digest failure naming its first differing file, and the counts in the run''s one-line result.'
-      why: 'Nothing gates a one-off folder until criterion 2. Built now: the not-applicable line per kind, and silence where there are no one-offs.'
-      owner: REQ-PIPE-440
-      blocked_by:
-        requirements:
-        - REQ-PIPE-440
     - criterion: 'Criterion 4 - the collections gate accepting a one-off''s collections served by its kind''s shared adapter.'
-      why: 'A kind''s shared adapter is the extraction''s (REQ-PIPE-440); no kind provides one yet.'
-      owner: REQ-PIPE-440
+      why: 'A kind''s shared adapter says how its collections are checked, which is REQ-QAC-441''s check layers; no kind provides one yet, so a generated extraction folder still fails the collections gate for want of an adapter and its check files.'
+      owner: REQ-QAC-441
       blocked_by:
         requirements:
-        - REQ-PIPE-440
+        - REQ-QAC-441
     - criterion: 'Criterion 6 - a kind''s changed _template/ gated with every gate its kind declares for the template.'
-      why: 'What a template holds and is read for live is REQ-PIPE-440 criterion 13''s, and gating it needs criterion 2''s way of running a gate over a folder that is not an asset.'
-      owner: REQ-PIPE-440
+      why: 'The template holds the default check layer (REQ-QAC-441) and people.yaml (REQ-PIPE-435); neither is built, so there is nothing in it yet for a gate to read live.'
+      owner: REQ-QAC-441
       blocked_by:
         requirements:
-        - REQ-PIPE-440
+        - REQ-QAC-441
+        - REQ-PIPE-435
     source: 'Split out of REQ-PIPE-446 by Keith 2026-11-21 (v6 Q6 (b)), carrying v6''s criteria 10-14 and 20 unchanged in substance: Keith round 5 (architect Q2 (b)); delivery-architect v4 findings 6 and 7 and post-sign-off H and K; delivery-cli-ux C5. Drafted by delivery-scoper 2026-11-21, v7. Shared by every kind. v7, PROPOSAL until signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - THE SYSTEM SHALL have every per-asset gate in `mothman check` declare, for each one-off kind, whether it applies, SHALL refuse to run a gate with any (gate, kind) pair undeclared, SHALL decide a one-off's synthetic gates from that declaration and never from _has_synthetic's default for a name it does not find, and SHALL word a gate that does not apply to a kind 'not applicable (<kind>)' with the kind's display word, keeping 'not applicable (no synthetic/ folder)' for an enduring asset.
@@ -52665,9 +52654,19 @@ requirements:
     - 'BUILT 2026-11-22: ''not applicable (<kind>)'' uses the kind''s SINGULAR display word; the enduring assets keep ''not applicable (no synthetic/ folder)'' unchanged. The one line per kind prints under the summary table, only where that kind has folders.'
     - 'CRITERION 5''S TEST READS SOURCE ON PURPOSE (CLAUDE.md''s test rule 1): every workflow `run:` step and the session-start hook''s script, refused any mention of one-offs/, `mothman one-off`, one_off or --id - an architecture rule with no behaviour to observe from a test.'
     - 'SETTLED by Keith 2026-11-22: A PER-ASSET GATE ACTS FOR A ONE-OFF THROUGH A HIDDEN `mothman one-off gate --id <id> <gate>`, which selects the one-off and runs that gate in process. REJECTED a second environment variable naming the one-off for the gate''s subprocess: it would be a second way of naming a one-off beside --id, the thing REQ-PIPE-446 criterion 9 and Keith''s v6 Q2 (b) rule out.'
+    - 'BUILT 2026-11-22 (criteria 2 and 3): qa_tools/common/one_off_gating.py. A folder changed since the diff base, committed or not, untracked files included, is gated in full through `mothman one-off gate --id <id> <gate>` - a subprocess per (folder, gate), carrying a one-offs root pointed elsewhere by a hidden --root, never MOTHMAN_ASSET - and digest-checked too; every other folder is digest-checked in process. The gitignored dbt artefacts (target/, logs/, dbt_packages, package-lock.yml) are left out of the digest. One row per (gate, kind) follows the gate''s own row - ''<gate> (<kinds>: <n> in full, <m> by digest; failed: <ids>)'' - each failure printed with its folder and first differing file, and the one-line result counts folder-gates in full and by digest.'
+    - 'BUILT 2026-11-22: `mothman one-off gate` runs the gate''s own argv in process - a module run as __main__, or a mothman command invoked - with the one-off selected; it lives in cli/, since qa_tools may not import cli (the import gate).'
     linked_tests:
     - tests/test_one_off_gates.py
     implemented_by:
+    - qa_tools/common/one_off_gating.py::kind_pass
+    - qa_tools/common/one_off_gating.py::digest_problem
+    - qa_tools/common/one_off_gating.py::changed
+    - qa_tools/common/one_off_gating.py::gate_folder
+    - cli/one_off.py::gate_command
+    - cli/one_off.py::run_in_process
+    - cli/check.py::one_off_rows
+    - cli/check.py::result_line
     - cli/check.py::undeclared
     - cli/check.py::not_applicable_text
     - cli/check.py::not_applicable_lines
@@ -52676,6 +52675,7 @@ requirements:
     - cli/check.py::check_command
     - asset_model/one_off_kinds.py::Kind
     evidence:
+    - '2026-11-22, tree e76f814f: criteria 2 and 3 built; tests/test_one_off_gates.py 17 tests (7 new: a changed folder gated in full through the hidden command, the row''s counts in full and by digest, an unchanged folder by digest alone, a digest failure naming the folder and file, an untracked file counted and dbt artefacts not, no row for a gate that does not apply, the result line''s counts) in the 50-module run, 1451 passed in 2m03s.'
     - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_one_off_gates.py is new behaviour (10 tests); its criterion 1 tests cannot pass on the code before it, which has no undeclared().'
     signed_off:
       by: Keith
@@ -52861,7 +52861,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want the extraction to declare itself in a recipe beside its files, so that what it claims to contain is stated before anything checks it.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29 points 1-3 (Keith, 2026-09-27); Keith 2026-11-21 Q4.4 (b) and round 2 Q6 (b); delivery-architect v4 finding 4. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; unchanged in v6. The extraction kind's own. v7 folds in REQ-PIPE-446's renumbering (one decision's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL read an extraction as a package - a directory on local disk or an S3 prefix - holding one recipe file and the data files it names.
@@ -52887,6 +52887,21 @@ requirements:
     - 'COHORT BOUNDS ARE STRUCTURED, THE FILTER IS PROSE: only a structured bound can become a check; filter text is shown, never parsed.'
     - 'v6: no change. The project the recipe already requires is what REQ-PIPE-446 criterion 13 (every kind declares a project) is met from for the extraction kind.'
     - 'v7: no change but that reference, which follows REQ-PIPE-446''s renumbering (v6''s criterion 18 is now 13).'
+    - 'BUILT 2026-11-22: THE RECIPE SCHEMA is asset_model/kinds/extraction-recipe.schema.json (JSON Schema 2020-12, read with jsonschema), recipe_format_version 1 a const; the reader is asset_model/kinds/extraction_recipe.py, the extraction kind plug-in''s `reader`. Placement is {id, name} for the agency and the collection and {id, name, table} for the dataset; column types are the ODCS logical types (string, integer, number, date, timestamp, boolean); cohort bounds are {column, lower, upper}.'
+    - 'BUILT 2026-11-22: A DECLARED FILE MISSING FROM THE PACKAGE IS NOT A REFUSAL: REQ-QAC-441 criterion 3 records it as a failing default-layer result, and REQ-TEST-437''s fixture has one.'
+    - 'BUILT 2026-11-22: S3 THROUGH A CLIENT THE CALLER HANDS IN (the PORTABILITY NFR): `mothman one-off open` makes it with boto3 and the environment''s credentials; the reader creates none. A file name that is absolute, holds a backslash or any ''..'' part is refused (the SECURITY NFR).'
+    - 'OPEN, put to Keith 2026-11-22: version 1 has no field for a cross-table relationship, which REQ-QAC-441 criterion 6 checks ''WHERE the recipe declares'' one, and the schema refuses unknown keys. Recommended: an optional `relationships` list in version 1 ({table, column, references_table, references_column}), added with REQ-QAC-441.'
+    linked_tests:
+    - tests/test_extraction_recipe.py
+    - tests/extraction_support.py
+    implemented_by:
+    - asset_model/kinds/extraction_recipe.py::read
+    - asset_model/kinds/extraction_recipe.py::Recipe
+    - asset_model/kinds/extraction_recipe.py::RecipeRefused
+    - asset_model/kinds/extraction_recipe.py::recipe_digest
+    - asset_model/kinds/extraction.py::EXTRACTION
+    evidence:
+    - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_recipe.py is new behaviour (17 tests): a local and an S3 package, CSV only, every refusal, the id rules and no connection opened.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52895,7 +52910,28 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want its configuration generated from its recipe into a committed folder of its own, apart from the enduring assets, so that each extraction's checks and declaration are reviewable configuration and nothing is typed by hand.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: 'Criterion 1''s TUI route - opening a package from the `mothman one-off` TUI.'
+      why: '`mothman one-off open --kind extraction <package>` is built; the TUI''s ''open a new package'' choice is REQ-PIPE-442 criterion 2''s menu.'
+      owner: REQ-PIPE-442
+      blocked_by:
+        requirements:
+        - REQ-PIPE-442
+    - criterion: 'Criterion 4''s recipe check layer - each dataset''s recipe checks generated into the folder.'
+      why: 'The recipe layer''s checks are REQ-QAC-441''s (criteria 4 to 6). Built now: the contract per collection with its schema from the recipe''s columns, presentation.yaml from the recipe''s names, and the dbt project.'
+      owner: REQ-QAC-441
+      blocked_by:
+        requirements:
+        - REQ-QAC-441
+    - criterion: 'Criterion 13''s live readers - the default check layer, people.yaml and the destination read from the kind''s template at each step.'
+      why: 'assets.kind_template() names the template and nothing is copied from it; reading each part at its step is REQ-QAC-441 (the default layer), REQ-PIPE-435 (people.yaml) and REQ-PIPE-443 (the destination).'
+      owner: REQ-QAC-441
+      blocked_by:
+        requirements:
+        - REQ-QAC-441
+        - REQ-PIPE-435
+        - REQ-PIPE-443
     source: plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b), round 3 Q1 (a) and addition, round 4 (one-offs/<kind>/<id>/); delivery-architect v4 findings 1, 3 and 5. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A2, B, F, H, I and M, delivery-cli-ux C4, and Keith's answers (copy nothing; pushed before load; dbt_utils a local copy; no 259 hold). The extraction kind's own. v7 folds in Keith's answer to v6 Q1 (the template half of criterion 9 settled) and the REQ-PIPE-448 split (criterion 5's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - WHEN a person runs `mothman one-off open --kind extraction` on a package, or opens one from the `mothman one-off` TUI, THE SYSTEM SHALL generate one-offs/extraction/<id>/ from its recipe alone, SHALL NOT read any hierarchy or check authored by hand for that extraction, and SHALL NOT copy any file from the kind's template (one-offs/extraction/_template/) into it.
@@ -52946,6 +52982,34 @@ requirements:
     - 'v6, UNTRACKED FILES COUNT (delivery-architect H): a file added by hand to a generated folder and never committed is refused at load, as an edited one is.'
     - 'v6, NO 259 HOLD (Keith 2026-11-21, architect Q-A2: ''Happy for it to go while the repo is public, this is a poc with fake data.''): REVERSES round 5''s ''blocked on going private''. REQ-DOCS-259 leaves the dependencies; the PRIVACY NFR says a real deployment''s folders would need a private repository. REJECTED the architect''s (a) a guard criterion on `one-off open` into the repository''s own root.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q1 (a)): LOAD REFUSES AN UNCOMMITTED OR UNPUSHED TEMPLATE as it refuses such a folder (criterion 9), because the default checks, people.yaml and the destination are read live from it and the page''s ''checked at'' commit must hold the version that ran. v7 clears v6''s PROVISIONAL mark.'
+    - 'BUILT 2026-11-22: THE GENERATOR is asset_model/kinds/extraction_folder.py (configuration only, so asset_model''s side of the import gate), the extraction plug-in''s `generator`; `mothman one-off open` reads the package with the plug-in''s reader and generates into the one-offs root. Tests always generate into a root pointed elsewhere; no real one-offs/extraction/<id>/ folder is committed (Keith 2026-11-22).'
+    - 'BUILT 2026-11-22: GENERATED SHORTS - each agency `a<n>`, each collection `c<n>` with run prefix `c<n>_run_`, in recipe order: a one-off builds no command group (REQ-PIPE-446 criterion 8), so a short only has to be unique and the right shape. A contract per collection at <agency>/<collection>-contract.yaml, its schema from the recipe''s columns with no quality rules (those are REQ-QAC-441''s layers).'
+    - 'BUILT 2026-11-22: THE DIGEST is generated.sha256.json at the folder''s top - the recipe''s digest and every generated file''s sha256 - which the collections gate accepts beside the asset-wide files for a one-off; REQ-PIPE-448''s digest pass reads it.'
+    - 'BUILT 2026-11-22: THE LOCAL dbt_utils IS NAMED BY AN ENVIRONMENT VARIABLE in the generated packages.yml (`local: {{ env_var(''MOTHMAN_ONE_OFF_DBT_UTILS'') }}`), so the committed, digested folder names no machine''s path; the load sets it from the environment''s `one_off_dbt_utils` (assets/environments.yaml). `mothman one-off setup-dbt-utils` copies an enduring asset''s installed dbt_utils where `mothman env dbt-deps` has put it - no fetch - else runs one dbt deps over the assets'' own packages.yml and lock; it records the revision installed, and the load refuses another revision than the assets lock. A one-off''s dbt/package-lock.yml is gitignored with target/, logs/ and dbt_packages, since dbt deps writes one naming the local path.'
+    - 'BUILT 2026-11-22: THE LOAD''S REFUSALS ARE qa_tools/common/one_off_load.refusals() - the recipe digest (criterion 8), the folder and the template committed and on the tracked remote branch, with `git add`, `git commit` and `git push <remote> <branch>` filled in and the reason (criterion 9), and the dbt_utils copy (criterion 12) - for REQ-PIPE-442''s load to ask first.'
+    - 'PROVISIONAL (2026-11-22): what the generated data-asset.yaml must state that a recipe does not - the zone its instants are read in and the PostgreSQL major - is the one the enduring assets agree on, refused where they disagree.'
+    - 'OPEN, put to Keith 2026-11-22: the asset schema REQUIRES amber_setting and replacement_setting (REQ-PIPE-122 criterion 9, REQ-PIPE-123 criterion 1), so a generated folder fails the schedule gate, and a recipe says nothing about either. A no-period supply is never promoted (REQ-PIPE-435 criterion 7). Recommended: the schedule gate does not require either of a one-off; the alternative is generating fixed values into every folder.'
+    linked_tests:
+    - tests/test_extraction_folder.py
+    - tests/extraction_support.py
+    implemented_by:
+    - asset_model/kinds/extraction_folder.py::generate
+    - asset_model/kinds/extraction_folder.py::files_for
+    - asset_model/kinds/extraction_folder.py::recorded
+    - asset_model/assets.py::kind_template
+    - qa_tools/common/one_off_load.py::refusals
+    - qa_tools/common/one_off_load.py::git_refusal
+    - qa_tools/common/one_off_load.py::digest_refusal
+    - qa_tools/common/one_off_load.py::dbt_utils_refusal
+    - qa_tools/common/one_off_load.py::setup_dbt_utils
+    - qa_tools/common/environments.py::Environment
+    - qa_tools/common/schemas.py::DatasetConfig
+    - qa_tools/common/schemas.py::RecipeRecord
+    - qa_tools/common/validate_collections.py::check_file_problems
+    - cli/one_off.py::open_command
+    - cli/one_off.py::setup_dbt_utils_command
+    evidence:
+    - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_folder.py is new behaviour (24 tests): the generated files and nothing else, read back by the real hierarchy, calendar loader, schedule gate and folders gate with the one-off selected; the digest; each refusal; and the load''s refusals against a temporary repository and bare remote.'
     signed_off:
       by: Keith
       date: '2026-11-21'
