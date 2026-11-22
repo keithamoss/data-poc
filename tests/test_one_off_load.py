@@ -106,6 +106,13 @@ class World:
         # repository because the load reads it from the one-offs root.
         shutil.copytree(ROOT / "one-offs" / "extraction" / "_template",
                         self.root / "extraction" / "_template")
+        # THE TEST'S PEOPLE, in its copy of the template: one who may decide,
+        # one placeholder (REQ-PIPE-435 criterion 4).
+        (self.root / "extraction" / "_template" / "people.yaml").write_text(yaml.safe_dump({
+            "roles": ["qa"], "people": [
+                {"email": "tester@example.org", "name": "Tess Ter", "roles": ["qa"]},
+                {"email": "stand-in@example.org", "name": "Stand In", "roles": ["qa"],
+                 "placeholder": True}]}))
         self.commit("start", push="-u")
         admin = os.environ["MOTHMAN_TEST_DSN"]
         info = psycopg.conninfo.conninfo_to_dict(admin)
@@ -667,6 +674,142 @@ class TestTheTui:
             assets.use_one_offs_root(None)
 
 
+class TestTheReleaseDecision:
+    """REQ-PIPE-435: one release-or-withhold decision for the whole one-off,
+    appended with its actor, instant and reason, in apply_decision's order;
+    people read live from the kind's template; never GitHub."""
+
+    def _as(self, monkeypatch, email):
+        from qa_tools.common import git_identity
+
+        monkeypatch.setattr(git_identity, "get_run_by", lambda: email)
+
+    def _decide(self, world, *args):
+        return _invoke(["decide", "--id", world.id, *args])
+
+    def test_a_decision_is_appended_and_the_latest_stands(self, world, monkeypatch):
+        from qa_tools.common import one_off_decision, ticket_github
+
+        self._as(monkeypatch, "tester@example.org")
+        monkeypatch.setattr(ticket_github, "_gh", lambda *a, **k: pytest.fail("GitHub"))
+        files = sorted(p.name for p in (world.state / "data" / world.id).rglob("*.csv"))
+        first = self._decide(world, "--decision", "withhold", "--reason", "visits missing",
+                             "--yes")
+        assert first.exit_code == 0, first.output
+        said = _said(first)
+        assert said.index("QA result of") < said.index("Decision in force: none recorded") \
+            < said.index("Recorded: Withheld by Tess Ter")
+        assert "Visits (cohort-visits): Fail" in said
+        assert f"mothman one-off publish --id {world.id}" in first.output
+        second = self._decide(world, "--decision", "release", "--reason", "agreed on review",
+                              "--yes")
+        assert "Decision in force: Withheld by Tess Ter" in _said(second)
+        rows = world.query("SELECT decision, reason, actor_email, decided_at IS NOT NULL "
+                           "FROM qa.one_off_decision ORDER BY id")
+        assert rows == [("withhold", "visits missing", "tester@example.org", True),
+                        ("release", "agreed on review", "tester@example.org", True)]
+        assets.select_one_off(world.id)
+        with psycopg.connect(world.dsn()) as conn:
+            assert one_off_decision.standing(conn).decision == "release"
+            assert len(one_off_decision.history(conn)) == 2
+        # Recorded only: nothing of its data moved (criterion 9).
+        assert sorted(p.name for p in (world.state / "data" / world.id).rglob("*.csv")) == files
+
+    def test_no_reason_is_refused(self, world, monkeypatch):
+        self._as(monkeypatch, "tester@example.org")
+        got = self._decide(world, "--decision", "release", "--reason", " ", "--yes")
+        assert got.exit_code != 0 and "needs a reason" in _said(got)
+
+    def test_no_terminal_and_no_yes_is_refused(self, world, monkeypatch):
+        self._as(monkeypatch, "tester@example.org")
+        got = self._decide(world, "--decision", "release", "--reason", "ok")
+        assert got.exit_code != 0 and "pass --yes" in _said(got)
+
+    @pytest.mark.parametrize("email,why", [("nobody@example.org", "is not in"),
+                                           ("stand-in@example.org", "placeholder")])
+    def test_who_may_decide_is_read_live_from_the_template(self, world, monkeypatch,
+                                                           email, why):
+        self._as(monkeypatch, email)
+        before = world.query("SELECT count(*) FROM qa.one_off_decision")[0][0]
+        got = self._decide(world, "--decision", "release", "--reason", "ok", "--yes")
+        assert got.exit_code != 0 and why in _said(got)
+        assert world.query("SELECT count(*) FROM qa.one_off_decision")[0][0] == before
+
+    def test_a_person_added_to_the_template_may_decide_at_once(self, world, monkeypatch):
+        people = world.root / "extraction" / "_template" / "people.yaml"
+        before = people.read_text()
+        doc = yaml.safe_load(before)
+        doc["people"].append({"email": "newcomer@example.org", "name": "New Comer",
+                              "roles": ["qa"]})
+        people.write_text(yaml.safe_dump(doc))
+        try:
+            self._as(monkeypatch, "newcomer@example.org")
+            got = self._decide(world, "--decision", "withhold", "--reason", "hold", "--yes")
+            assert got.exit_code == 0, got.output
+        finally:
+            people.write_text(before)
+
+    def test_only_for_the_whole_one_off(self, world):
+        got = self._decide(world, "--dataset", "cohort-people", "--decision", "release")
+        assert got.exit_code != 0 and "No such option" in got.output
+        columns = {c for (c,) in world.query(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'qa' AND table_name = 'one_off_decision'")}
+        assert "dataset_id" not in columns and "one_off_id" in columns
+
+    def test_append_only_and_the_publisher_only_reads_it(self, world):
+        from qa_tools.common import qa_store, supply_db
+
+        with psycopg.connect(world.dsn(), autocommit=True) as conn:
+            with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
+                conn.execute("UPDATE qa.one_off_decision SET reason = 'x'")
+            with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
+                conn.execute("DELETE FROM qa.one_off_decision")
+        assets.select_one_off(world.id)
+        role = f"oneoff2_pub_{world.id[-6:]}"
+        try:
+            with supply_db.connect(label="test-publisher") as conn:
+                qa_store.ensure_publisher_role(conn, role)
+            ((sel, upd, dele),) = world.query(
+                "SELECT has_table_privilege(%s, 'qa.one_off_decision', 'SELECT'), "
+                "has_table_privilege(%s, 'qa.one_off_decision', 'UPDATE'), "
+                "has_table_privilege(%s, 'qa.one_off_decision', 'DELETE')", [role] * 3)
+            assert (sel, upd, dele) == (True, False, False)
+        finally:
+            with psycopg.connect(world.dsn(), autocommit=True) as conn:
+                conn.execute(f'DROP OWNED BY "{role}"')
+                conn.execute(f'DROP ROLE IF EXISTS "{role}"')
+
+    def test_offered_only_once_every_dataset_has_an_outcome(self):
+        from qa_tools.common import one_off_decision as od
+
+        some = [od.DatasetResult("a", "A", "Pass", True),
+                od.DatasetResult("b", "B", "Could not be checked", False)]
+        assert "b" in od.refusal(some)
+        assert od.refusal([some[0], od.DatasetResult("b", "B", "Could not be checked",
+                                                     True)]) is None
+
+
+class TestNoPeriodIsNeverGated:
+    """REQ-PIPE-435 criterion 7: a no_calendar supply is never put to the
+    promotion gate, and the gate asked about one refuses it as having no
+    period, raising nothing."""
+
+    def test_the_load_never_asks_the_gate(self, world):
+        assert "no slot could be confidently claimed" not in world.loaded.output
+        assert "not promoted" not in world.loaded.output
+
+    def test_the_gate_asked_refuses_it_as_having_no_period(self, world, monkeypatch):
+        from qa_tools.common import filing, gate, promotion
+
+        assets.select_one_off(world.id)
+        monkeypatch.setattr(filing, "supplies_of", lambda conn, arrival: [
+            {"dataset_id": "cohort-people", "period": None, "supply": "s1"}])
+        got = gate.after_arrival("cohort-study", object(), effective_at="2026-11-22T00:00:00+08:00")
+        assert got.refused["cohort-people"].startswith("this dataset has no calendar")
+        assert getattr(got.refused["cohort-people"], "kind", None) == promotion.NO_PERIOD
+
+
 class TestTheDropIsOnlyEverAsked:
     """Criterion 9. READS SOURCE ON PURPOSE: 'nothing drops a one-off
     automatically' is an architecture rule with no behaviour to observe - the
@@ -744,3 +887,4 @@ class TestTheDrop:
         assert (_folder(world) / "data-asset.yaml").is_file()
         assert not (_folder(world) / "dbt" / "target").exists() and not reports.exists()
         assert second.output.rstrip().endswith("Next: mothman one-off list")
+

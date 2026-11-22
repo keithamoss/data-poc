@@ -1540,9 +1540,19 @@ def after_arrival(collection_id: str, arrival, *, effective_at: str, run_by: str
 
     with supply_db.connect(label="mothman:gate") as conn:
         items = filing.supplies_of(conn, arrival)
+    from qa_tools.common import sample_data
+
     filed = [i for i in items if i.get("period")]
-    unfiled = [i for i in items if not i.get("period")]
+    # A NO-CALENDAR SUPPLY HAS NO PERIOD AND IS NEVER GATED (REQ-PIPE-435
+    # criterion 7): asked about one, the gate refuses it as such - never the
+    # rule's 'no slot' refusal, and never NoCalendarAgreed.
+    no_period = [i for i in items if not i.get("period") and sample_data.is_sample(i["dataset_id"])]
+    unfiled = [i for i in items if not i.get("period") and i not in no_period]
     out = Applied()
+    for item in no_period:
+        out.refused[item["dataset_id"]] = promotion.Refusal(
+            "this dataset has no calendar, so its supply has no period and is never put to "
+            "the promotion gate", promotion.NO_PERIOD)
     if unfiled:
         got = promotion.after_runs(
             _only(arrival, unfiled), [], agency_id=_agency_of(collection_id),

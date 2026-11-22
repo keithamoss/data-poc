@@ -58,6 +58,15 @@ def problems(path: Path | str | None = None) -> list[str]:
         return [f"{path} does not parse as YAML: {exc}"]
 
     found: list[str] = []
+    # A ONE-OFF'S PEOPLE (its kind's template, REQ-PIPE-435 criterion 4) never
+    # use GitHub (REQ-PIPE-446 criterion 14) and file nothing, so neither the
+    # `github:` rule nor the asset-manager rule is theirs.
+    from asset_model import assets as _a
+
+    try:
+        one_off = _a.selected().is_one_off
+    except _a.AssetError:
+        one_off = False
     out = found
     seen: set[str] = set()
     usernames: dict[str, str] = {}
@@ -97,7 +106,7 @@ def problems(path: Path | str | None = None) -> list[str]:
                 f"username ({github!r}). A placeholder stands in for somebody "
                 f"not yet named; a username makes it assignable to a real "
                 f"ticket and able to raise a real filing decision.")
-        if not placeholder and not github:
+        if not placeholder and not github and not one_off:
             found.append(
                 f"{email} has no `github:`. Without one they cannot be "
                 f"assigned a ticket and cannot raise a filing decision from "
@@ -158,7 +167,7 @@ def problems(path: Path | str | None = None) -> list[str]:
             if not (p or {}).get("placeholder") and not (p or {}).get("synthetic")}
     # An empty people list fails too (delivery-critic on 171, #5) - only a
     # MISSING file passes, as on a fresh clone.
-    if not [p for p in asset_managers if p in real]:
+    if not one_off and not [p for p in asset_managers if p in real]:
         found.append("no real person holds the manager role at data-asset level - add an "
                      "assignment `data_asset: <the data_asset_id>`, `role: manager` for the "
                      "person accountable for the whole asset. Without one no correction's "

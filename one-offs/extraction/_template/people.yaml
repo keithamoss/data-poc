@@ -1,0 +1,20 @@
+# Who may record an extraction's release decision (REQ-PIPE-435 criterion 4):
+# every extraction's people, read live from here at the moment of deciding and
+# never copied into an extraction's folder (REQ-PIPE-440 criterion 13). The
+# schema is assets/<asset>/people.yaml's. A one-off never uses GitHub
+# (REQ-PIPE-446 criterion 14), so nobody here needs a `github:`, and nothing
+# here is ever assigned a ticket. A placeholder is shown and can decide nothing.
+roles:
+  - qa
+  - manager
+
+people:
+  - email: fpycnkgvmt@privaterelay.appleid.com
+    name: Keith Moss
+    nickname: K$
+    roles: [qa, manager]
+  - email: brian.cohen@example.com
+    name: Brian Cohen
+    nickname: Brian
+    roles: [qa]
+    placeholder: true

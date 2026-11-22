@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 
 import rich_click as click
 from rich.console import Console
@@ -57,7 +58,8 @@ def choose(one_off_id: str):
 #: The TUI's choice for a package not yet opened (REQ-PIPE-442 criterion 2).
 OPEN_NEW = "Open a new package"
 #: The TUI's steps once a one-off is chosen, each the command of that name.
-STEPS = {"Load its package": "load", "Drop it": "drop", "List every one-off": "list"}
+STEPS = {"Load its package": "load", "Record its release decision": "decide",
+         "Drop it": "drop", "List every one-off": "list"}
 
 
 @click.group("one-off", invoke_without_command=True)
@@ -110,6 +112,9 @@ def _tui(ctx: click.Context) -> None:
             if STEPS[step] == "load":
                 package = click.prompt(common._named("Where is its package?"))
                 ctx.invoke(load_command, one_off_id=one_off_id, package=package)
+            elif STEPS[step] == "decide":
+                ctx.invoke(decide_command, one_off_id=one_off_id, decision=None, reason=None,
+                           yes=False)
             elif STEPS[step] == "drop":
                 ctx.invoke(drop_command, one_off_id=one_off_id)
             else:
@@ -275,6 +280,79 @@ def load_command(one_off_id: str, package: str) -> None:
     click.echo("\n".join(["Next: decide what to release, or publish it:",
                           f"  mothman one-off decide --id {one_off_id}",
                           f"  mothman one-off publish --id {one_off_id}"]))
+
+
+@one_off_group.command("decide")
+@id_option
+@click.option("--decision", type=click.Choice(["release", "withhold"]), default=None,
+              help="Release or withhold the whole one-off. Asked for where not given.")
+@click.option("--reason", default=None, help="Why. Asked for where not given; required.")
+@click.option("--yes", is_flag=True, help="Skip the one confirmation (the scripted form).")
+def decide_command(one_off_id: str, decision: str | None, reason: str | None,
+                   yes: bool) -> None:
+    """Record one release-or-withhold decision for the WHOLE one-off, with a
+    reason, once every dataset has a recorded outcome (REQ-PIPE-435). Recorded
+    only - nothing is moved or sent. In filing_tui.apply_decision's order: who
+    you are, any refusal, the reason, then one confirmation after the QA
+    summary and the decision in force. The latest decision stands; every one is
+    kept. Terminal only, never GitHub."""
+    from qa_tools.common import git_identity, one_off_decision, people, supply_db
+
+    choose(one_off_id)
+    # 1. THE ACTOR, from git identity, against the kind's people.yaml read now.
+    try:
+        actor = people.person_by_email(git_identity.get_run_by())
+    except (people.UnknownActor, git_identity.MissingGitIdentityError) as exc:
+        raise click.ClickException(f"the decision was refused: {exc}") from None
+    # 2. ANY REFUSAL, before a reason is asked for.
+    with supply_db.connect(read_only=True, label="mothman:one-off-decide") as conn:
+        summary = one_off_decision.qa_summary(conn)
+        in_force = one_off_decision.standing(conn)
+    refused = one_off_decision.refusal(summary)
+    if refused:
+        raise click.ClickException(f"the decision was refused: {refused}")
+    if decision is None:
+        decision = common.select("Release or withhold the whole one-off?",
+                                 ["release", "withhold"],
+                                 f"mothman one-off decide --id {one_off_id} --decision "
+                                 f"release|withhold --reason <why> --yes")
+        if decision is None:
+            return
+    # 3. THE REASON.
+    if not (reason or "").strip():
+        if not (sys.stdin.isatty() and sys.stdout.isatty()) and not yes:
+            raise click.ClickException("a decision needs a reason - pass --reason. Nothing "
+                                       "was recorded.")
+        reason = "" if yes else click.prompt(common._named("Why?"), default="",
+                                             show_default=False)
+    if not (reason or "").strip():
+        raise click.ClickException("a decision needs a reason, and none was given. Nothing "
+                                   "was recorded.")
+    # 4. THE QA SUMMARY AND THE DECISION IN FORCE, then one confirmation.
+    click.echo(f"QA result of {one_off_id}, dataset by dataset:")
+    for d in summary:
+        click.echo(f"  {d.name} ({d.dataset_id}): {d.result}")
+    unchecked = [d.dataset_id for d in summary if d.result == "Could not be checked"]
+    if unchecked:
+        click.echo(f"Could not be loaded or checked: {', '.join(unchecked)}.")
+    click.echo("Decision in force: " + (one_off_decision.words(in_force) if in_force
+                                         else "none recorded."))
+    if not yes:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            raise click.ClickException("no terminal to confirm at - pass --yes to record it "
+                                       "without asking. Nothing was recorded.")
+        if not common.confirm(f"Record '{decision}' for the whole of {one_off_id}?",
+                              yes=False, default=False):
+            click.echo("Not recorded.")
+            return
+    try:
+        with supply_db.connect(label="mothman:one-off-decide") as conn:
+            got = one_off_decision.record(conn, one_off_id, decision, reason, actor)
+    except one_off_decision.DecisionRefused as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(f"Recorded: {one_off_decision.words(got)}.")
+    click.echo("Next: publish it, so its page carries the decision:\n"
+               f"  mothman one-off publish --id {one_off_id}")
 
 
 @one_off_group.command("drop")

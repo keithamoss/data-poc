@@ -44,8 +44,14 @@ def _default_layer_problems(template) -> list[str]:
 def _package_checks(template) -> dict:
     """The one-off's package checks, read live from its kind's template
     (REQ-QAC-441 criteria 1 to 3) - file_check_definitions reads them."""
+    from pathlib import Path
+
     from asset_model.kinds import extraction_checks
 
+    # NO TEMPLATE, NO PACKAGE CHECKS TO READ - said by the template's own gate
+    # (REQ-PIPE-448 criterion 6) and refused by the load, never a crash here.
+    if not (Path(template) / extraction_checks.DEFAULT_LAYER_FILE).is_file():
+        return None
     return extraction_checks.package_checks(extraction_checks.read_template(template))
 
 

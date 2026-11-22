@@ -268,6 +268,11 @@ def ensure_database(one_off_id: str, digest: str, recipe_digest: str, commit: st
         db_identity.mark(conn, db_identity.Identity(one_off_id, environments.current().id))
         conn.execute("CREATE SCHEMA IF NOT EXISTS qa")
         conn.execute(_LOAD_DDL)
+        # ITS RELEASE DECISIONS' TABLE, from the start (REQ-PIPE-435), so the
+        # publisher reads an empty one rather than none.
+        from qa_tools.common import one_off_decision
+
+        one_off_decision.ensure_table(conn)
         conn.execute(f"INSERT INTO {LOAD_TABLE} (one_off_id, package_digest, recipe_digest, "
                      "loaded_commit) VALUES (%s, %s, %s, %s)",
                      [one_off_id, digest, recipe_digest, commit])

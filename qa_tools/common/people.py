@@ -37,7 +37,13 @@ def people_yaml() -> Path:
     6; it was the import-time constant PEOPLE_YAML)."""
     from asset_model import assets
 
-    return assets.selected().file("people.yaml")
+    chosen = assets.selected()
+    # A ONE-OFF'S PEOPLE ARE ITS KIND'S, read live from the template at the
+    # moment they are asked (REQ-PIPE-435 criterion 4, REQ-PIPE-440 criterion
+    # 13): never copied into its folder.
+    if chosen.is_one_off:
+        return assets.kind_template(chosen.kind) / "people.yaml"
+    return chosen.file("people.yaml")
 
 
 #: The three levels an assignment may name, exactly one each (REQ-GHUB-171

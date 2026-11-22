@@ -331,3 +331,20 @@ class TestAChangedTemplateIsGated:
 
         monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: False)
         assert check.template_rows() == []
+
+
+class TestAOneOffsPeopleNeedNoGitHub:
+    """REQ-PIPE-435 criterion 4 and REQ-PIPE-446 criterion 14: a one-off's
+    people are its kind template's, read live, and the people gate asks them
+    neither for a GitHub username nor for an asset manager."""
+
+    def test_the_template_people_pass(self, extraction):
+        from qa_tools.common import one_off_gating
+
+        template = extraction.parent / "_template"
+        template.mkdir(exist_ok=True)
+        (template / "people.yaml").write_text(yaml.safe_dump({"roles": ["qa"], "people": [
+            {"email": "tester@example.org", "name": "Tess Ter", "roles": ["qa"]}]}))
+        code, said = one_off_gating.gate_folder("people", "cohort-2026-a")
+        assert code == 0, said
+        assert "1 person" in said or "1 person/people" in said, said
