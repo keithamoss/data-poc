@@ -23,6 +23,8 @@ import one_off_support
 from asset_model import assets
 from qa_tools.common import validate_folders
 
+#: READS ONLY ITS OWN REPORTS - none at all: reports/<id> is named only as the
+#: path a selected one-off resolves to (tests/test_publish.py's marker).
 ROOT = Path(__file__).resolve().parent.parent
 
 
