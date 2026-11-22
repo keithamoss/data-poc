@@ -378,6 +378,12 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     return schedule.no_calendar(dataset_id)
 
 
+def _one_off_page() -> bool:
+    """Whether this page is built for a folder under one-offs/ - which states
+    its kind (REQ-PIPE-446 criterion 12); no enduring asset does."""
+    return getattr(assets.selected(), "kind", None) is not None
+
+
 def _derived(dataset_id: str) -> bool:
     """Whether calendar.yaml declares this dataset a derived product
     (REQ-PIPE-438 criterion 2) - configuration, so safe here."""
@@ -1059,6 +1065,12 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # A DERIVED PRODUCT (REQ-PIPE-438 criteria 3 and 5): in no rollup,
         # and said so in words. Absent in the ordinary case.
         **({"derived": True} if derived_here else {}),
+        # ARRIVED, NO CHECK OUTCOME YET, ON A ONE-OFF'S PAGE (REQ-DASH-436
+        # criterion 4): its own status, 'Not yet checked', out of the rollup.
+        # A one-off's Asset states its kind (REQ-PIPE-446 criterion 12); an
+        # enduring asset's page is unchanged.
+        **({"notYetChecked": True}
+           if _one_off_page() and last_arrival and not results else {}),
         "lastArrival": last_arrival,
         # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081 criteria
         # 1, 2, 3 and 6): the ANSWERS, from the decision log, never the rule.

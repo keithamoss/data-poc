@@ -23,7 +23,7 @@ const FOUR = [
   { id: "a", status: "red" },
   { id: "b", status: "amber" },
   { id: "c", status: "green" },
-  { id: "d", status: "green", scheduleNotAgreed: true },
+  { id: "d", status: "green", scheduleNotAgreed: "not-yet-agreed" },
 ];
 
 describe("the datasets-not-green line", () => {

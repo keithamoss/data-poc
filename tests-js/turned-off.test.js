@@ -96,7 +96,7 @@ describe("the marker, as at the date on show (criteria 1, 4, 25, 27 and 28)", ()
 describe("the rollup (criteria 6 to 11)", () => {
   const green = { id: "g", status: "green", columns: [{ status: "green" }] };
   const off = { id: "o", status: "red", columns: [{ status: "red" }], turnedOffOutOfRollup: true };
-  const unagreed = { id: "u", status: "green", columns: [{ status: "green" }], scheduleNotAgreed: true };
+  const unagreed = { id: "u", status: "green", columns: [{ status: "green" }], scheduleNotAgreed: "not-yet-agreed" };
 
   it("leaves a turned-off dataset out, red verdict and all", () => {
     expect(load().rollup([green, off])).toBe("green");

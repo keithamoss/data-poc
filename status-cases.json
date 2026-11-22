@@ -60,7 +60,11 @@
     "the level of a row the dashboard build makes from a run's left_out entry.",
     "No tool records it - a check that ran and errored stays Fail - so a check",
     "result or a dataset tile carrying it is refused, naming it, and left-out",
-    "rows never reach a dataset's rollup."
+    "rows never reach a dataset's rollup.",
+    "",
+    "`notyetchecked` is a DATASET's alone (REQ-DASH-436 criterion 4): a one-off's",
+    "dataset that has arrived with no recorded check outcome yet. Distinct from the",
+    "check-level `notchecked` ('Not checked'), so two different facts never read alike."
    ],
    "check": [
     "nodata",
@@ -77,7 +81,8 @@
     "exhausted",
     "inactive",
     "notcounted",
-    "turnedoff"
+    "turnedoff",
+    "notyetchecked"
    ],
    "left_out": [
     "notchecked"
@@ -139,6 +144,11 @@
     "label": "Turned off",
     "verb": "turned off",
     "count": "turned off"
+   },
+   "notyetchecked": {
+    "label": "Not yet checked",
+    "verb": "not yet checked",
+    "count": "not yet checked"
    }
   },
   "unordered": {
@@ -155,7 +165,8 @@
    "inactive": "No automated quality rule is defined for this column at all - neither the ODCS contract nor the Soda/dbt check files name one (post-build-review #4). Not green: green is a verdict, and a column nobody checks has not passed anything - it was the honest label being four clicks deep that made an unchecked column read as a healthy one everywhere above the check panel. Not amber or red either: nothing is failing and nobody is being asked to act on the DATA. It is INACTIVE, which is a state a reader already has a vocabulary for, and which cannot be mistaken for a verdict.",
    "notchecked": "A CHECK's status when its run left it out of scope for the period - not part of the agreement or not supplied by decision - shown only on a left-out row and on a cross-collection group heading whose every row is left out (REQ-DASH-299 criteria 17 and 18). DISPLAY ONLY: no tool records it, and a check that ran and errored stays Fail. Not a verdict, so it never competes with one; quiet, after nodata - 'no result yet' may resolve itself, a check left out for the period will not for that supply - and before notcounted, which is a GROUP's word for datasets kept out of a rollup.",
    "notcounted": "A GROUP's status when every dataset in it is left out of its rollup (post-build-review #135, Keith 2026-10-10). Before it existed such a group rolled up GREEN - 'nothing here counts' read as 'everything here is fine'. Quiet and last in precedence: exhausted, inactive, nodata, then notcounted.",
-   "turnedoff": "A GROUP's status when every dataset in it is out of its rollup because it is turned off and owes nothing more (REQ-DASH-180 criteria 7, 8 and 11). Never green. Last in precedence: exhausted, inactive, nodata, notcounted, turnedoff - a group out for mixed reasons reads notcounted."
+   "turnedoff": "A GROUP's status when every dataset in it is out of its rollup because it is turned off and owes nothing more (REQ-DASH-180 criteria 7, 8 and 11). Never green. Last in precedence: exhausted, inactive, nodata, notcounted, turnedoff - a group out for mixed reasons reads notcounted.",
+   "notyetchecked": "A DATASET's status on a one-off's page when its supply has arrived and no check outcome is recorded for it yet (REQ-DASH-436 criterion 4) - a page can be published before QA finishes (REQ-PIPE-443). Not No data: something did arrive. Not 'Not checked', which is a check left out of its run's scope (REQ-DASH-299). Drawn in the same dashed, muted style, left out of every rollup with that reason, and quiet: after notchecked, before notcounted."
   }
  },
  "check_cases": [
@@ -597,6 +608,41 @@
      "notchecked"
     ],
     "expect": "notchecked"
+   },
+   {
+    "id": "not-yet-checked-loses-to-a-real-verdict",
+    "why": "REQ-DASH-436 criterion 4: a dataset not yet checked says nothing about the data, so a real verdict beside it wins.",
+    "statuses": [
+     "notyetchecked",
+     "red"
+    ],
+    "expect": "red"
+   },
+   {
+    "id": "not-yet-checked-alone-reads-not-yet-checked",
+    "why": "REQ-DASH-436 criterion 4: never Pass, never No data.",
+    "statuses": [
+     "notyetchecked"
+    ],
+    "expect": "notyetchecked"
+   },
+   {
+    "id": "not-checked-outranks-not-yet-checked",
+    "why": "Quiet order: exhausted, inactive, nodata, notchecked, notyetchecked, notcounted, turnedoff.",
+    "statuses": [
+     "notyetchecked",
+     "notchecked"
+    ],
+    "expect": "notchecked"
+   },
+   {
+    "id": "not-yet-checked-outranks-not-counted",
+    "why": "Quiet order, as above.",
+    "statuses": [
+     "notcounted",
+     "notyetchecked"
+    ],
+    "expect": "notyetchecked"
    }
   ]
  },
@@ -631,6 +677,202 @@
     "status": "green",
     "level": "left_out",
     "expect_error": true
+   }
+  ]
+ },
+ "counted_cases": {
+  "_why": [
+   "REQ-PIPE-438's CORRECTNESS NFR (the item-74 lesson): which datasets COUNT, held",
+   "to one table by every status implementation - sample_data.supply_state and",
+   "state_for_participants (what a result is recorded as), share_cross_table_results",
+   "(where a cross-table result is shown), dataset_status.py's in_no_rollup and",
+   "rollup_datasets, and the page's inNoRollup, rollup and unagreedMarker - with",
+   "REQ-DASH-436's 'Not yet checked'. Read by tests/test_counted_parity.py and",
+   "tests-js/counted-parity.test.js, neither of which owns it.",
+   "",
+   "`declares` is calendar.yaml's declaration; `page` is the dataset as the build",
+   "hands it to the page (scheduleNotAgreed, derived). `never` counts; `not-yet-agreed`",
+   "and `derived` do not; only `not-yet-agreed` carries the no-schedule marker."
+  ],
+  "datasets": [
+   {
+    "id": "agreed",
+    "declares": {},
+    "page": {},
+    "counted": true,
+    "marker": false
+   },
+   {
+    "id": "not-yet-agreed",
+    "declares": {
+     "no_calendar": "not-yet-agreed"
+    },
+    "page": {
+     "scheduleNotAgreed": "not-yet-agreed"
+    },
+    "counted": false,
+    "marker": true
+   },
+   {
+    "id": "never",
+    "declares": {
+     "no_calendar": "never"
+    },
+    "page": {
+     "scheduleNotAgreed": "never"
+    },
+    "counted": true,
+    "marker": false
+   },
+   {
+    "id": "derived",
+    "declares": {
+     "no_calendar": "never",
+     "derived": true
+    },
+    "page": {
+     "scheduleNotAgreed": "never",
+     "derived": true
+    },
+    "counted": false,
+    "marker": false
+   }
+  ],
+  "cross_table": [
+   {
+    "id": "never-and-derived",
+    "why": "REQ-PIPE-438 criterion 4 (Keith, round 5 Q3 (a)): recorded agreed, shown on both, counted on the never side only.",
+    "participants": [
+     "never",
+     "derived"
+    ],
+    "state": "agreed",
+    "shown_on": [
+     "never",
+     "derived"
+    ],
+    "not_counted_on": [
+     "derived"
+    ]
+   },
+   {
+    "id": "all-derived",
+    "why": "Criterion 4: nothing counted it, so in development.",
+    "participants": [
+     "derived",
+     "derived"
+    ],
+    "state": "in-development",
+    "shown_on": [
+     "derived"
+    ],
+    "not_counted_on": []
+   },
+   {
+    "id": "not-yet-agreed-and-agreed",
+    "why": "REQ-PIPE-106 criterion 15, kept for not-yet-agreed: in development, never shown on the agreed side.",
+    "participants": [
+     "agreed",
+     "not-yet-agreed"
+    ],
+    "state": "in-development",
+    "shown_on": [
+     "not-yet-agreed"
+    ],
+    "not_counted_on": []
+   },
+   {
+    "id": "never-and-never",
+    "why": "An ordinary agreed check among counted datasets.",
+    "participants": [
+     "never",
+     "never"
+    ],
+    "state": "agreed",
+    "shown_on": [
+     "never"
+    ],
+    "not_counted_on": []
+   }
+  ],
+  "rollups": [
+   {
+    "id": "a-red-never-turns-its-group",
+    "datasets": [
+     [
+      "agreed",
+      "green"
+     ],
+     [
+      "never",
+      "red"
+     ]
+    ],
+    "expect": "red"
+   },
+   {
+    "id": "a-red-derived-does-not",
+    "datasets": [
+     [
+      "never",
+      "green"
+     ],
+     [
+      "derived",
+      "red"
+     ]
+    ],
+    "expect": "green"
+   },
+   {
+    "id": "a-red-not-yet-agreed-does-not",
+    "datasets": [
+     [
+      "agreed",
+      "green"
+     ],
+     [
+      "not-yet-agreed",
+      "red"
+     ]
+    ],
+    "expect": "green"
+   },
+   {
+    "id": "only-derived-is-not-counted",
+    "datasets": [
+     [
+      "derived",
+      "red"
+     ]
+    ],
+    "expect": "notcounted"
+   },
+   {
+    "id": "not-yet-checked-is-left-out",
+    "why": "REQ-DASH-436 criterion 4.",
+    "datasets": [
+     [
+      "never",
+      "green"
+     ],
+     [
+      "never",
+      "notyetchecked"
+     ]
+    ],
+    "expect": "green"
+   },
+   {
+    "id": "only-not-yet-checked-is-not-counted",
+    "why": "REQ-DASH-436 criterion 4: never Pass, never No data.",
+    "datasets": [
+     [
+      "never",
+      "notyetchecked"
+     ]
+    ],
+    "expect": "notcounted"
    }
   ]
  }

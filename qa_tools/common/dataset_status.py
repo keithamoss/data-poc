@@ -59,7 +59,10 @@ from asset_model.statuses import ORDERED_STATUSES, UnknownStatusError
 # period (REQ-DASH-299 criterion 17) - DISPLAY ONLY: no tool records it, the
 # build makes the row from a left_out entry, and a check that ran and errored
 # stays red. Unordered, and at a level of its own (LEFT_OUT_STATUSES below).
-UNORDERED_STATUSES = {"exhausted", "inactive", "notchecked", "notcounted", "turnedoff"}
+# `notyetchecked` is a DATASET's status on a one-off's page: arrived, with no
+# recorded check outcome yet (REQ-DASH-436 criterion 4). Never a check's.
+UNORDERED_STATUSES = {"exhausted", "inactive", "notchecked", "notyetchecked", "notcounted",
+                      "turnedoff"}
 
 RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 
@@ -172,7 +175,8 @@ _DASHBOARD_STATUS_BY_TOOL_STATUS = {
 #: headline; "nobody defined a rule" is a standing fact somebody can act
 #: on; "no run within tolerance as of this date" is temporal and may
 #: resolve itself tomorrow.
-_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notchecked", "notcounted", "turnedoff")
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notchecked", "notyetchecked",
+                     "notcounted", "turnedoff")
 
 
 def rollup_statuses(statuses) -> str:
@@ -223,7 +227,9 @@ def in_no_rollup(dataset: dict) -> bool:
     same committed table as everything else here, for the reason this
     module exists at all.
     """
-    return bool(dataset.get("scheduleNotAgreed"))
+    # NOT-YET-AGREED AND DERIVED ONLY (REQ-PIPE-438 criteria 1 and 3): a
+    # `never` dataset's verdicts are real quality history and roll up.
+    return dataset.get("scheduleNotAgreed") == "not-yet-agreed" or bool(dataset.get("derived"))
 
 
 def rollup_datasets(datasets) -> str:
@@ -239,7 +245,9 @@ def rollup_datasets(datasets) -> str:
     datasets = list(datasets)
     # A TURNED-OFF DATASET OWING NOTHING is out like an unagreed one
     # (REQ-DASH-180 criterion 7); the page sets the flag as at its date.
-    counted = [d for d in datasets if not in_no_rollup(d) and not d.get("turnedOffOutOfRollup")]
+    # NOT YET CHECKED is out too, with that reason (REQ-DASH-436 criterion 4).
+    counted = [d for d in datasets if not in_no_rollup(d) and not d.get("turnedOffOutOfRollup")
+               and not d.get("notYetChecked")]
     live = [d for d in counted
             if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
     if not live:
@@ -333,6 +341,9 @@ def dataset_status(dataset: dict) -> str:
     "retired" the same way the dashboard treats it: `retired_as_of` is
     set (a real, hand-authored declaration, never inferred from
     absence)."""
+    # ARRIVED, NO CHECK OUTCOME YET (REQ-DASH-436 criterion 4): its own status.
+    if dataset.get("notYetChecked"):
+        return "notyetchecked"
     # rollup_statuses rather than worst_of: a check may now carry a
     # status with no verdict (`inactive`), which worst_of refuses to
     # rank - correctly. See that function's own docstring.
@@ -340,5 +351,7 @@ def dataset_status(dataset: dict) -> str:
         dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
         for col in dataset.get("columns", [])
         for ck in col.get("checks", [])
-        if not is_retired(ck)
+        # COUNTED ON ITS COUNTED PARTICIPANTS' SIDE, NOT HERE (REQ-PIPE-438
+        # criterion 4): the build marks it on a derived product's page.
+        if not is_retired(ck) and not ck.get("notCountedHere")
     )

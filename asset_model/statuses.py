@@ -83,6 +83,8 @@ STATUS_WORDS = {
     "inactive": {"label": "No rule defined", "verb": "no rule defined",
                  "count": "no rule defined"},
     "notchecked": {"label": "Not checked", "verb": "not checked", "count": "not checked"},
+    "notyetchecked": {"label": "Not yet checked", "verb": "not yet checked",
+                      "count": "not yet checked"},
     "notcounted": {"label": "Not counted", "verb": "not counted", "count": "not counted"},
     "turnedoff": {"label": "Turned off", "verb": "turned off", "count": "turned off"},
 }

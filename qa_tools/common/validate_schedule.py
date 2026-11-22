@@ -603,6 +603,13 @@ def _version_date_errors(scope: str, index: int, version: dict, src: Source) -> 
 
 # ---- datasets -------------------------------------------------------
 
+def _enduring_asset() -> bool:
+    """Whether the folder being gated is an enduring asset under assets/ -
+    every selectable folder today. A one-off's Asset will state its kind
+    (REQ-PIPE-446 criterion 12), and one stating a kind is not enduring."""
+    return getattr(assets.selected(), "kind", None) is None
+
+
 def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
     out: list[ConfigError] = []
 
@@ -612,6 +619,35 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         scope = f"dataset {dataset_id!r}"
         named = dataset.get("calendar")
         declared_none = dataset.get(schedule.NO_CALENDAR_KEY)
+        derived = dataset.get(schedule.DERIVED_KEY)
+
+        # `never` AND `derived` LIVE ONLY UNDER one-offs/ (REQ-PIPE-438
+        # criterion 8, Keith 2026-11-21 Q4.7 (a)): this gate refuses them on an
+        # enduring asset, naming the dataset; the calendar loader reads what it
+        # is given, so every other reader of a bad folder still works.
+        if _enduring_asset():
+            if declared_none == schedule.NEVER:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {schedule.NEVER}` on "
+                    f"{src.asset_label}, an enduring asset.",
+                    f"`{schedule.NEVER}` is for a one-off, which lives under one-offs/, never "
+                    f"under assets/. Give this dataset the asset's baseline, or declare "
+                    f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` while its schedule "
+                    f"is still being agreed."))
+            if derived is not None:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.DERIVED_KEY}:` on {src.asset_label}, an enduring asset.",
+                    f"`{schedule.DERIVED_KEY}: true` marks a one-off's derived product, which "
+                    f"lives under one-offs/, never under assets/. Remove it."))
+        if derived is not None and declared_none is None:
+            out.append(ConfigError(
+                src.name, scope,
+                f"declares `{schedule.DERIVED_KEY}:` with no `{schedule.NO_CALENDAR_KEY}:` beside it.",
+                f"`{schedule.DERIVED_KEY}: true` sits beside a dataset's `{schedule.NO_CALENDAR_KEY}:` "
+                f"declaration (REQ-PIPE-438); a dataset with a calendar is never a derived "
+                f"product."))
 
         # A DATASET MAY SAY IT HAS NO CALENDAR, DELIBERATELY (REQ-PIPE-106
         # criterion 2) - and only deliberately. This branch is what lets
@@ -647,9 +683,8 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                 f"no-calendar declaration for it ({src.asset_label}).",
                 f"In {src.calendar_name}, declare the asset's baseline under `calendars:`, or "
                 f"declare `{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` for this "
-                f"dataset if no schedule has been agreed for it yet (or `{schedule.NEVER}` "
-                f"for a one-off extraction). Without either there is nothing to judge this "
-                f"dataset's supplies against."))
+                f"dataset if no schedule has been agreed for it yet. Without either there is "
+                f"nothing to judge this dataset's supplies against."))
             continue
 
         months = dataset.get("delivery_months")
@@ -1243,6 +1278,8 @@ def _merged_view(raw: dict, cal_raw: dict) -> dict:
         # (REQ-PIPE-345): _baseline_errors refuses both by name.
         dataset.pop("calendar", None)
         dataset.pop("dates", None)
+        if entry.get(schedule.DERIVED_KEY) is not None:
+            dataset[schedule.DERIVED_KEY] = entry[schedule.DERIVED_KEY]
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             dataset[schedule.NO_CALENDAR_KEY] = entry[schedule.NO_CALENDAR_KEY]
         elif base:

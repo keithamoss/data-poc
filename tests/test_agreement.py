@@ -337,14 +337,15 @@ class TestTheContractsDetection:
 
 class TestAnAssetWithNoCalendarsAtAll:
     def test_an_empty_list_of_calendars_is_accepted(self, broken):
-        """Criterion 36 - the project-extraction shape: every dataset has
-        supplies and no cadence, so the asset has no calendar to name."""
+        """Criterion 36: every dataset declares no calendar, so the asset has
+        none to name. `not-yet-agreed`, since an enduring asset refuses `never`
+        (REQ-PIPE-438 criterion 8)."""
         from asset_model import hierarchy
 
         def mutate(doc):
             doc["calendars"] = []
             doc["collections"] = []
-            doc["datasets"] = [{"id": d.dataset_id, "no_calendar": "never"}
+            doc["datasets"] = [{"id": d.dataset_id, "no_calendar": "not-yet-agreed"}
                                for d in hierarchy.all_datasets()]
         errors = broken(mutate)
         assert errors == [], _text(errors)

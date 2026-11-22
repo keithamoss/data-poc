@@ -250,8 +250,8 @@ button{font:inherit; color:inherit;}
 /* NOT CHECKED (REQ-DASH-299 criterion 17): a check its run left out for the
    period. Quiet like the two above, with a DASHED border so it cannot be
    read as a group's 'Not counted'; the words tell them apart. */
-.pill.notchecked{background:transparent; color:var(--ink-muted); border:1px dashed var(--ink-muted);}
-.pill.notchecked .ico{display:none;}
+.pill.notchecked, .pill.notyetchecked{background:transparent; color:var(--ink-muted); border:1px dashed var(--ink-muted);}
+.pill.notchecked .ico, .pill.notyetchecked .ico{display:none;}
 .pill.turnedoff .ico, .pill.notcounted .ico, .pill.sm.turnoff-marker .ico,
 .turnoff-marker .ico{background:var(--ink-muted); width:8px; height:2px; border-radius:1px;}
 
@@ -2354,6 +2354,7 @@ const STATUS_WORDS = {
   exhausted: {label:"Schedule ended", verb:"schedule ended", count:"schedule ended"},
   inactive: {label:"No rule defined", verb:"no rule defined", count:"no rule defined"},
   notchecked: {label:"Not checked", verb:"not checked", count:"not checked"},
+  notyetchecked: {label:"Not yet checked", verb:"not yet checked", count:"not yet checked"},
   notcounted: {label:"Not counted", verb:"not counted", count:"not counted"},
   turnedoff: {label:"Turned off", verb:"turned off", count:"turned off"},
 };
@@ -2408,7 +2409,9 @@ function statusWords(value, form){
 // `notchecked` (REQ-DASH-299 criterion 17): a CHECK left out of its run's
 // scope for the period - DISPLAY ONLY, made by the build from a left_out entry
 // and recorded by no tool - at a level of its own, LEFT_OUT_STATUSES.
-const UNORDERED_STATUSES = ["exhausted", "inactive", "notchecked", "notcounted", "turnedoff"];
+// `notyetchecked` (REQ-DASH-436 criterion 4): a one-off's DATASET that has
+// arrived with no recorded check outcome yet - a dataset's status, never a check's.
+const UNORDERED_STATUSES = ["exhausted", "inactive", "notchecked", "notyetchecked", "notcounted", "turnedoff"];
 const LEFT_OUT_STATUSES = ["notchecked"];
 // Recognition is scoped to WHERE a status was read from. `exhausted` is
 // a property of a dataset's SCHEDULE - a check result carrying one means
@@ -2983,6 +2986,15 @@ const DEMO_CAPTION = null;
 // every build of every date the agency trend asks for (REQ-DASH-226 NFR 6),
 // so the parse is cached; each caller still gets its own Date.
 const _PARSED_DATE = new Map();
+// A COLUMN'S ROLLED-UP STATUS from its checks, as buildRealDataset's comment
+// below explains: retired checks never count, a stale dataset reads nodata,
+// and a CROSS-TABLE RESULT COUNTED ON ITS COUNTED PARTICIPANTS' SIDE is left
+// out of a derived product's own status (REQ-PIPE-438 criterion 4) - the
+// build marks it notCountedHere, as dataset_status.py's dataset_status reads.
+function columnStatus(c, d){
+  return d.staleInPlaceOn ? "nodata"
+    : rollupStatuses(c.checks.filter(ck=>!ck.retired && !ck.notCountedHere).map(checkStatus));
+}
 function buildRealDataset(d){
   const toDate = s => {
     let ms = _PARSED_DATE.get(s);
@@ -3052,7 +3064,9 @@ function buildRealDataset(d){
   // rollupStatuses, not worstOf: a check may carry `inactive`, which
   // worstOf refuses to rank - correctly - and which this has to turn
   // into a column status rather than throw on (post-build-review #4).
-  columns.forEach(c=> c.status = d.staleInPlaceOn ? "nodata" : rollupStatuses(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
+  // A CROSS-TABLE RESULT COUNTED ON ITS COUNTED PARTICIPANTS' SIDE is left out
+  // of a derived product's own status (REQ-PIPE-438 criterion 4).
+  columns.forEach(c=> c.status = columnStatus(c, d));
 
   const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), arrivalStatus: a.arrivalStatus }));
 
@@ -4008,8 +4022,10 @@ function rawRealDatasetById(datasetId){
 // verdict its checks found: developing a check means seeing whether it
 // passes. So the tile stays red or amber or green and says in words that
 // no schedule is agreed (criterion 8); only the rollup above it skips it.
+// NOT-YET-AGREED AND DERIVED ONLY (REQ-PIPE-438 criteria 1 and 3): a `never`
+// dataset's verdicts are real quality history, rolled up like any other.
 function inNoRollup(d){
-  return Boolean(d && d.scheduleNotAgreed);
+  return Boolean(d && (d.scheduleNotAgreed === "not-yet-agreed" || d.derived));
 }
 // WHETHER THE ROLLUP COUNTS A DATASET'S STATUS (REQ-DASH-226 criterion 3),
 // lifted out of rollup() so the agency cards' and collection headings'
@@ -4018,7 +4034,7 @@ function inNoRollup(d){
 // (REQ-PIPE-115 criterion 10), whatever quiet state its runs alone would
 // have put it in.
 function inRollup(d){
-  return !inNoRollup(d) && !d.turnedOffOutOfRollup && Boolean(d.blocked || d.waitingBlocker || d.noSupply
+  return !inNoRollup(d) && !d.turnedOffOutOfRollup && !d.notYetChecked && Boolean(d.blocked || d.waitingBlocker || d.noSupply
     || (!d.noDataInPlaceOn && !d.scheduleExhausted));
 }
 function rollup(datasets){
@@ -4030,7 +4046,8 @@ function rollup(datasets){
   // (REQ-PIPE-053).
   // A TURNED-OFF DATASET OWING NOTHING is left out like an unagreed one
   // (REQ-DASH-180 criterion 7), its own red verdict and all.
-  const counted = datasets.filter(d=>!inNoRollup(d) && !d.turnedOffOutOfRollup);
+  // NOT YET CHECKED is out too, with that reason (REQ-DASH-436 criterion 4).
+  const counted = datasets.filter(d=>!inNoRollup(d) && !d.turnedOffOutOfRollup && !d.notYetChecked);
   const live = counted.filter(inRollup);
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
@@ -4058,7 +4075,7 @@ function rollup(datasets){
 // lose a reduce that starts from "green").
 function rollupStatuses(statuses){
   const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted" && s!=="inactive"
-    && s!=="notchecked" && s!=="notcounted" && s!=="turnedoff");
+    && s!=="notchecked" && s!=="notyetchecked" && s!=="notcounted" && s!=="turnedoff");
   if(!live.length){
     // THE QUIET STATES, IN ORDER OF WHAT A READER CAN DO ABOUT THEM.
     // An ended schedule is why nothing is happening at all, so it stays
@@ -4076,6 +4093,8 @@ function rollupStatuses(statuses){
     // A CHECK LEFT OUT FOR THE PERIOD (REQ-DASH-299 criterion 17): after
     // nodata, which may resolve itself, and before a group's notcounted.
     if(statuses.includes("notchecked")) return "notchecked";
+    // ARRIVED, NOT YET CHECKED (REQ-DASH-436 criterion 4): a dataset's.
+    if(statuses.includes("notyetchecked")) return "notyetchecked";
     // Last of the quiet states: a group with nothing counted is not a
     // verdict and not "nothing yet" either - and never green (#135).
     if(statuses.includes("notcounted")) return "notcounted";
@@ -4459,6 +4478,10 @@ function buildDatasetsOn(inPlaceOnDateStr, period = null){
           ds.crossTableShownWhileHeld = blockChecksWhileHeld(ds, blanking);
         } else if(ds.noSupply){
           ds.status = "red";
+        } else if(ds.notYetChecked){
+          // ARRIVED, NO CHECK OUTCOME YET (REQ-DASH-436 criterion 4): a status
+          // of its own, never No data (something arrived) nor Pass.
+          ds.status = "notyetchecked";
         } else if(ended){
           // An exhausted schedule OUTRANKS "no data as of" on the same
           // dataset, and that is the whole point: both render as a
@@ -5405,7 +5428,10 @@ function notCountedReasons(datasets){
   const by = {};
   (datasets||[]).forEach(d=>{
     let why = null;
-    if(inNoRollup(d)) why = d.scheduleNotAgreed === "never" ? "one-off extraction" : "no schedule agreed yet";
+    // DERIVED PRODUCTS ARE NAMED in the line saying what was not counted
+    // (REQ-PIPE-438 criterion 5); a `never` dataset is counted, so never here.
+    if(inNoRollup(d)) why = d.derived ? "derived product" : "no schedule agreed yet";
+    else if(d.notYetChecked) why = "not yet checked";
     else if(d.turnedOffOutOfRollup) why = "turned off";
     if(why) by[why] = (by[why]||0) + 1;
   });
@@ -5590,13 +5616,12 @@ function turnOffMarker(d, dateStr){
   const title = t.level === "collection" ? `Set for the whole collection: ${t.reason}` : t.reason;
   return `<span class="pill sm turnoff-marker" data-turn-off="${escAttr(t.phase)}" title="${escAttr(title)}"><span class="ico"></span>${escHtml(t.text)}</span>`;
 }
+// FOR A NOT-YET-AGREED DATASET ONLY (REQ-PIPE-438 criterion 7): a `never`
+// dataset carries no marker - the one-off page says that once (REQ-DASH-444).
 function unagreedMarker(d){
-  if(!d || !d.scheduleNotAgreed) return "";
-  const words = d.scheduleNotAgreed === "never"
-    ? "One-off extraction — no delivery schedule"
-    : "No delivery schedule agreed yet";
+  if(!d || d.scheduleNotAgreed !== "not-yet-agreed") return "";
   return `<span class="pill unagreed sm" title="This dataset is not counted in any \
-collection or asset rollup."><span class="ico"></span>${words}</span>`;
+collection or asset rollup."><span class="ico"></span>No delivery schedule agreed yet</span>`;
 }
 // ESCAPED, unlike most of this page. The page's long-standing posture
 // is that committed repo content renders into innerHTML unescaped, and
