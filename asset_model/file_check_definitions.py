@@ -111,7 +111,28 @@ def merged(own_path: Path | str | None = None, *, shared_text: str | None = None
     own_path = Path(own_path) if own_path is not None else definitions_path()
     shared = (config_yaml.parse(shared_text, name=FILE) if shared_text else None) if from_text \
         else _load_if_present(shared_path())
-    return merged_entries(shared=shared, own=_load_if_present(own_path), own_source=str(own_path))
+    own = _load_if_present(own_path)
+    if own is None:
+        own = _one_offs_own()
+    return merged_entries(shared=shared, own=own, own_source=str(own_path))
+
+
+def _one_offs_own():
+    """A selected one-off's own additions - its package checks - read live from
+    its kind's template where its folder has no file-checks.yaml of its own
+    (REQ-QAC-441 criterion 1): never copied into the folder."""
+    try:
+        asset = assets.selected()
+    except assets.AssetError:
+        return None
+    if not asset.is_one_off:
+        return None
+    from asset_model import one_off_kinds
+
+    kind = one_off_kinds.get(asset.kind)
+    if kind is None or kind.file_checks is None:
+        return None
+    return kind.file_checks(assets.kind_template(asset.kind))
 
 
 def problems() -> list[str]:

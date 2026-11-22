@@ -85,26 +85,12 @@ def materialise(dbt_utils: Path | None = None) -> Path:
 
 
 def package_checks(defaults: dict) -> dict:
-    """The default layer's two facts about the package, as the one-off's own
-    file-check additions (asset_model/file_check_definitions.ONE_OFF_NAMES):
-    a FAILURE severity, since each failing result is a Fail; `table_arrived`
-    asked of each declared CSV file as it is screened, `undeclared_file` of
-    the package by the load."""
-    from asset_model import file_check_definitions as defs
+    """asset_model/kinds/extraction_checks.package_checks - kept here for the
+    workspace's file-checks.yaml, which the load's own writes are stamped
+    from."""
+    from asset_model.kinds import extraction_checks
 
-    out = []
-    for name, assertion, fmt in ((defs.TABLE_ARRIVED, "table_arrived", "csv"),
-                                 (defs.UNDECLARED_FILE, "undeclared_file", defs.PACKAGE)):
-        entry = defaults[assertion]
-        out.append({"check": name, "name": entry["name"], "severity": defs.FAILURE,
-                    "formats": [fmt], "category": entry["category"],
-                    "introduced_date": str(entry["introduced_date"]),
-                    "description": str(entry["description"]).strip(),
-                    "failure_indicates": str(entry["failure_indicates"]).strip(),
-                    **({"technical_note": str(entry["technical_note"]).strip()}
-                       if entry.get("technical_note") else {}),
-                    "changelog": list(entry.get("changelog") or [])})
-    return {"checks": out}
+    return extraction_checks.package_checks(defaults)
 
 
 def _rel(on_disk: str) -> str:

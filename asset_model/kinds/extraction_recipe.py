@@ -220,6 +220,13 @@ def read(location: str, *, s3_client=None, opening: bool = True) -> Package:
         if t["format"] not in FORMATS_V1:
             problems.append(f"{where}: format {t['format']!r} - recipe format version 1 "
                             f"reads {', '.join(FORMATS_V1)} only.")
+        # EVERY TABLE NAMES A PRIMARY IDENTIFIER (criterion 3 AMENDED
+        # 2026-11-22, Keith): a failing row is only ever recorded by its
+        # identifiers (REQ-QAC-441 criterion 9), so a table with none could
+        # name no failing row.
+        if not any(c["primary_identifier"] for c in t["columns"]):
+            problems.append(f"{where}: declares no primary identifier - mark at least one "
+                            f"column `primary_identifier: true`.")
         if _escapes(t["file"]):
             problems.append(f"{where}: file {t['file']!r} would leave the package directory.")
         tables.append(Table(

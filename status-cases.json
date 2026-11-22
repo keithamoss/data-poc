@@ -874,6 +874,53 @@
     ],
     "expect": "notcounted"
    }
+  ],
+  "package_checks": [
+   {
+    "id": "missing-table",
+    "why": "REQ-DASH-436 criterion 2 (Keith 2026-11-22, option (a)): a one-off's declared table that never arrived is Fail from its failing `table_arrived` - its only result - never No data.",
+    "columns": [],
+    "package": [
+     "red"
+    ],
+    "expect": "red"
+   },
+   {
+    "id": "undeclared-file",
+    "why": "The package's failing undeclared-file result counts on its home dataset, beside its green data checks.",
+    "columns": [
+     "green"
+    ],
+    "package": [
+     "green",
+     "red"
+    ],
+    "expect": "red"
+   },
+   {
+    "id": "all-arrived",
+    "why": "Passing package checks change nothing.",
+    "columns": [
+     "amber"
+    ],
+    "package": [
+     "green",
+     "green"
+    ],
+    "expect": "amber"
+   },
+   {
+    "id": "not-marked",
+    "why": "A file check without countsInStatus - every file check of an enduring asset (REQ-DASH-097 criterion 2) - never counts.",
+    "columns": [
+     "green"
+    ],
+    "package": [],
+    "unmarked": [
+     "red"
+    ],
+    "expect": "green"
+   }
   ]
  }
 }

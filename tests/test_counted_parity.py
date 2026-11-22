@@ -124,3 +124,18 @@ def test_not_yet_checked_is_a_dataset_s_own_status():
 
 #: The daily asset's configuration is the fixture's base.
 pytestmark = pytest.mark.asset("daily")
+
+
+@pytest.mark.parametrize("case", COUNTED["package_checks"], ids=lambda c: c["id"])
+def test_a_one_offs_package_checks_count(case):
+    """REQ-DASH-436 criterion 2 (REQ-DASH-097 criterion 2 AMENDED 2026-11-22,
+    Keith): a one-off's two package checks, marked countsInStatus by the
+    build, count in its dataset's status; no other file check does."""
+    def file_check(status, counts):
+        return {"current_status": status, **({"countsInStatus": True} if counts else {})}
+    page = {"columns": [{"name": "a", "checks": [
+                {"current": 9 if s == "red" else 0, "warn": 0, "fail": 0, "current_status": s}]}
+                        for s in case["columns"]],
+            "fileChecks": {"checks": [file_check(s, True) for s in case["package"]]
+                           + [file_check(s, False) for s in case.get("unmarked", [])]}}
+    assert dataset_status.dataset_status(page) == case["expect"]

@@ -47,6 +47,10 @@ class Kind:
     #: since the diff base (REQ-PIPE-448 criterion 6): every one-off of the
     #: kind reads it live.
     template_gates: Mapping[str, Callable] = field(default_factory=dict)
+    #: template folder -> the one-off's own file-check additions, as a
+    #: file-checks.yaml document - its package checks, read live from the
+    #: template (REQ-QAC-441 criterion 1), or None for a kind with none.
+    file_checks: Callable | None = None
 
 
 _REGISTRY: dict[str, Kind] = {}

@@ -41,6 +41,14 @@ def _default_layer_problems(template) -> list[str]:
     return []
 
 
+def _package_checks(template) -> dict:
+    """The one-off's package checks, read live from its kind's template
+    (REQ-QAC-441 criteria 1 to 3) - file_check_definitions reads them."""
+    from asset_model.kinds import extraction_checks
+
+    return extraction_checks.package_checks(extraction_checks.read_template(template))
+
+
 #: WHAT GATES THE TEMPLATE (REQ-PIPE-448 criterion 6): its default check layer.
 #: people.yaml (REQ-PIPE-435) and the destination (REQ-PIPE-443) add theirs.
 TEMPLATE_GATES = {"default check layer": _default_layer_problems}
@@ -49,4 +57,4 @@ TEMPLATE_GATES = {"default check layer": _default_layer_problems}
 EXTRACTION = one_off_kinds.register(one_off_kinds.Kind(
     name="extraction", singular="extraction", plural="extractions", layer="Recipe check",
     reader=extraction_recipe.read, generator=_generate, gates=GATES,
-    template_gates=TEMPLATE_GATES))
+    template_gates=TEMPLATE_GATES, file_checks=_package_checks))

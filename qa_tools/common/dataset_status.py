@@ -347,11 +347,22 @@ def dataset_status(dataset: dict) -> str:
     # rollup_statuses rather than worst_of: a check may now carry a
     # status with no verdict (`inactive`), which worst_of refuses to
     # rank - correctly. See that function's own docstring.
-    return rollup_statuses(
+    return rollup_statuses([*(
         dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
         for col in dataset.get("columns", [])
         for ck in col.get("checks", [])
         # COUNTED ON ITS COUNTED PARTICIPANTS' SIDE, NOT HERE (REQ-PIPE-438
         # criterion 4): the build marks it on a derived product's page.
         if not is_retired(ck) and not ck.get("notCountedHere")
-    )
+    ), *package_statuses(dataset)])
+
+
+def package_statuses(dataset: dict) -> list[str]:
+    """A ONE-OFF'S PACKAGE CHECKS COUNT (REQ-DASH-436 criterion 2; REQ-DASH-097
+    criterion 2 AMENDED 2026-11-22, Keith): the file checks the build marks
+    countsInStatus - only a one-off's 'declared table arrived' and 'undeclared
+    file' - count in its dataset's status; no other file check ever does. The
+    page's ownVerdict() reads the same mark."""
+    return [ck.get("current_status") or "nodata"
+            for ck in ((dataset.get("fileChecks") or {}).get("checks") or [])
+            if ck.get("countsInStatus") and not is_retired(ck)]

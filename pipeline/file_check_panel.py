@@ -7,7 +7,8 @@ REQ-QAC-037 added rely on exactly that), and criterion 2 forbids it for a
 file check. So this is `fileChecks` on the dataset: the page renders it in
 a section of its own and opens each check in the same check panel, by the
 same route, as any other - but nothing that rolls a dataset up ever walks
-it.
+it, but for a one-off's two package checks, marked countsInStatus
+(REQ-DASH-097 criterion 2 AMENDED 2026-11-22, Keith, via REQ-DASH-436).
 
 RECORDED QA RESULTS ONLY (criterion 11): the file scope and the committed
 check definitions, never a supply row.
@@ -75,5 +76,11 @@ def for_dataset(dataset_id: str, conn=None) -> dict:
             # the threshold arithmetic data checks use.
             "current_status": history[-1]["status"] if history else "nodata",
             "history": history,
+            # A ONE-OFF'S PACKAGE CHECKS COUNT IN ITS DATASET'S STATUS
+            # (REQ-DASH-436 criterion 2; REQ-DASH-097 criterion 2 AMENDED
+            # 2026-11-22, Keith) - the one exception, marked so both status
+            # implementations read one fact. Only a one-off names them.
+            **({"countsInStatus": True}
+               if definition.check in file_check_definitions.ONE_OFF_NAMES else {}),
         })
     return {"key": KEY, "name": NAME, "scope": "file", "checks": checks}

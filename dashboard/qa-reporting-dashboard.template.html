@@ -2991,6 +2991,17 @@ const _PARSED_DATE = new Map();
 // and a CROSS-TABLE RESULT COUNTED ON ITS COUNTED PARTICIPANTS' SIDE is left
 // out of a derived product's own status (REQ-PIPE-438 criterion 4) - the
 // build marks it notCountedHere, as dataset_status.py's dataset_status reads.
+// A DATASET'S OWN VERDICT: its columns' statuses and, for a one-off only, its
+// package checks - the file checks the build marks countsInStatus ('declared
+// table arrived', 'undeclared file'), so a table that never arrived reads Fail
+// rather than No data (REQ-DASH-436 criterion 2; REQ-DASH-097 criterion 2
+// AMENDED 2026-11-22, Keith). No other file check ever counts. As
+// dataset_status.py's dataset_status and package_statuses read.
+function ownVerdict(ds, raw){
+  const pkg = ((raw && raw.fileChecks && raw.fileChecks.checks) || [])
+    .filter(ck=> ck.countsInStatus && !ck.retired_as_of).map(ck=> ck.current_status || "nodata");
+  return rollupStatuses([...ds.columns.map(c=>c.status), ...pkg]);
+}
 function columnStatus(c, d){
   return d.staleInPlaceOn ? "nodata"
     : rollupStatuses(c.checks.filter(ck=>!ck.retired && !ck.notCountedHere).map(checkStatus));
@@ -4496,7 +4507,7 @@ function buildDatasetsOn(inPlaceOnDateStr, period = null){
           // STILL BEING CHECKED OR GATED (REQ-DASH-272 criterion 21, Keith
           // 2026-10-29): AMBER, never green, until its gate is applied.
           ds.status = ds.packageGatingOn && ds.packageGatingOn.form ? "amber"
-            : rollupStatuses(ds.columns.map(c=>c.status));
+            : ownVerdict(ds, rawRealDatasetById(ds.id));
         }
       });
     });

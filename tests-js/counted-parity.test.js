@@ -37,7 +37,8 @@ function check(status, extra) {
 }
 
 it("the table is not empty", () => {
-  expect(COUNTED.datasets.length && COUNTED.cross_table.length && COUNTED.rollups.length)
+  expect(COUNTED.datasets.length && COUNTED.cross_table.length && COUNTED.rollups.length
+    && COUNTED.package_checks.length)
     .toBeTruthy();
 });
 
@@ -65,5 +66,19 @@ describe.each(COUNTED.cross_table)("cross-table $id", (row) => {
         check("red", marked ? { notCountedHere: true } : {})] };
       expect(w.columnStatus(column, page(id, "green"))).toBe(marked ? "green" : "red");
     }
+  });
+});
+
+describe.each(COUNTED.package_checks)("package checks $id", (row) => {
+  // REQ-DASH-436 criterion 2: a one-off's package checks count in its
+  // dataset's own verdict, as dataset_status.py's dataset_status reads.
+  it("count in the dataset's own verdict as the table says", () => {
+    const w = load();
+    const ds = { id: "x", columns: row.columns.map((s) => ({ name: s, status: s })) };
+    const raw = { fileChecks: { checks: [
+      ...row.package.map((s) => ({ current_status: s, countsInStatus: true })),
+      ...(row.unmarked || []).map((s) => ({ current_status: s })),
+    ] } };
+    expect(w.ownVerdict(ds, raw)).toBe(row.expect);
   });
 });

@@ -423,6 +423,31 @@ def dbt_schema_doc(layer: Layer, tables: list[str]) -> dict:
     return {"version": 2, "models": models}
 
 
+def package_checks(defaults: dict) -> dict:
+    """THE DEFAULT LAYER'S TWO FACTS ABOUT THE PACKAGE (moved here from
+    qa_tools/common/one_off_checks.py so the shared reading code can read them
+    live): the default layer's two facts about the package, as the one-off's own
+    file-check additions (asset_model/file_check_definitions.ONE_OFF_NAMES):
+    a FAILURE severity, since each failing result is a Fail; `table_arrived`
+    asked of each declared CSV file as it is screened, `undeclared_file` of
+    the package by the load."""
+    from asset_model import file_check_definitions as defs
+
+    out = []
+    for name, assertion, fmt in ((defs.TABLE_ARRIVED, "table_arrived", "csv"),
+                                 (defs.UNDECLARED_FILE, "undeclared_file", defs.PACKAGE)):
+        entry = defaults[assertion]
+        out.append({"check": name, "name": entry["name"], "severity": defs.FAILURE,
+                    "formats": [fmt], "category": entry["category"],
+                    "introduced_date": str(entry["introduced_date"]),
+                    "description": str(entry["description"]).strip(),
+                    "failure_indicates": str(entry["failure_indicates"]).strip(),
+                    **({"technical_note": str(entry["technical_note"]).strip()}
+                       if entry.get("technical_note") else {}),
+                    "changelog": list(entry.get("changelog") or [])})
+    return {"checks": out}
+
+
 #: The retired siblings every collection's checks carry (REQ-QAC-241): empty,
 #: since nothing in a one-off is ever retired.
 RETIRED = {"contract": {"schema": []}, "soda": {}, "evidently": {"checks": []},

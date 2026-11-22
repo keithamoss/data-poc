@@ -82,6 +82,20 @@ class TestCSVOnly:
         assert any("'cohort_visits'" in p and "parquet" in p for p in problems), problems
 
 
+class TestEveryTableNamesAnIdentifier:
+    """Criterion 3 AMENDED 2026-11-22 (Keith): every table declares at least
+    one primary identifier - a failing row is only ever named by one
+    (REQ-QAC-441 criterion 9) - or the recipe is refused, naming the table."""
+
+    def test_a_table_with_none_is_refused_naming_it(self, tmp_path, one_offs):
+        doc = ex.recipe()
+        for c in doc["tables"][1]["columns"]:
+            c["primary_identifier"] = False
+        problems = _refused(ex.package(tmp_path / "pkg", doc))
+        assert any("cohort_visits" in p and "primary identifier" in p for p in problems), problems
+        assert not any("cohort_people" in p for p in problems)
+
+
 class TestRefusedBeforeAnything:
     """Criterion 6: missing, unparseable or off-schema - every problem named."""
 

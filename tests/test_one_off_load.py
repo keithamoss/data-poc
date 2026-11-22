@@ -336,6 +336,29 @@ class TestWhatThePackageLacksOrAdds:
         assert _results(world, "%lab-results.reading.declared_type_%")
 
 
+class TestADeclaredTableThatNeverArrivedReadsFail:
+    """REQ-DASH-436 criterion 2's second half (Keith 2026-11-22, option (a)):
+    built from the recorded history by the dashboard's own builder - with no
+    check workspace in use, so the package checks are read live from the
+    kind's template - a declared table that never arrived is Fail from its
+    failing `table_arrived`, never No data. Read Inactive before."""
+
+    def test_its_built_dataset(self, world):
+        from pipeline import build_dashboard_data
+        from qa_tools.common import dataset_status
+        from qa_tools.tools import results_history
+
+        assets.select_one_off(world.id)
+        results_history.build_results_from_history("cohort-study")
+        built = {d["id"]: d for d in build_dashboard_data.build_datasets("cohort-study")}
+        visits = built["cohort-visits"]
+        marked = [c["key"] for c in visits["fileChecks"]["checks"] if c.get("countsInStatus")]
+        assert sorted(marked) == ["table_arrived_file", "undeclared_file"]
+        assert dataset_status.dataset_status(visits) == "red"
+        # The undeclared file's failure counts on its home dataset too.
+        assert dataset_status.dataset_status(built["cohort-people"]) == "red"
+
+
 class TestTheRecipeLayer:
     """Criteria 4 and 5: each declared type, each cohort bound and an expected
     row count, generated into the folder and evaluated."""
