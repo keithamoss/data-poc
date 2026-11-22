@@ -482,6 +482,13 @@ def one_offs_root() -> Path:
     return _layout.one_offs.root
 
 
+def kind_template(kind: str) -> Path:
+    """one-offs/<kind>/_template/ - what every one-off of the kind reads live
+    (REQ-PIPE-440 criterion 13): its default check layer, people.yaml and
+    publishing destination. Never copied into a one-off's folder."""
+    return _layout.one_offs.root / kind / "_template"
+
+
 def bad_one_off_names() -> list[Path]:
     """One-off folders whose names do not meet NAME_PATTERN - never selectable;
     `mothman check` names each (criterion 1)."""

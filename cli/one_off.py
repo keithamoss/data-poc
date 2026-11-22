@@ -14,6 +14,7 @@ added to this group, taking `--id` through `id_option`, when it is built.
 from __future__ import annotations
 
 import os
+import subprocess
 
 import rich_click as click
 from rich.console import Console
@@ -112,3 +113,60 @@ def list_command() -> None:
     widths = [max(len(r[i]) for r in rows) for i in range(2)]
     for name, word, project in rows:
         click.echo(f"{name.ljust(widths[0])}  {word.ljust(widths[1])}  {project}")
+
+
+@one_off_group.command("open")
+@click.option("--kind", "kind_name", required=True, metavar="KIND",
+              help="The kind of one-off, by its folder under one-offs/ (e.g. extraction).")
+@click.argument("package")
+def open_command(kind_name: str, package: str) -> None:
+    """Generate one-offs/<kind>/<id>/ from a package - a local directory or an
+    s3:// prefix - and its recipe alone (REQ-PIPE-440 criterion 1). Reads the
+    package, the kind's template and the folder names; connects to nothing."""
+    from asset_model import one_off_kinds
+
+    kind = one_off_kinds.get(kind_name)
+    if kind is None or kind.reader is None or kind.generator is None:
+        known = ", ".join(k.name for k in one_off_kinds.registered()
+                          if k.reader and k.generator) or "(none)"
+        raise click.ClickException(f"no one-off kind {kind_name!r} can open a package - "
+                                   f"kinds that can: {known}.")
+    client = None
+    if package.startswith("s3://"):
+        import boto3
+
+        client = boto3.client("s3")
+    try:
+        read = kind.reader(package, s3_client=client)
+        folder = kind.generator(read, assets.one_offs_root())
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from None
+    rel = folder
+    try:
+        rel = folder.relative_to(assets.ROOT)
+    except ValueError:
+        pass
+    click.echo(f"Generated {rel} from {package} ({kind.singular} "
+               f"{read.recipe.extraction_id}, {read.recipe.project}).")
+    # THE NEXT STEP (REQ-PIPE-442 criterion 12): commit and push, then load.
+    click.echo("\n".join([
+        "Next: commit and push it, then load it:",
+        f"  git add {rel}",
+        f'  git commit -m "Open {kind.singular} {read.recipe.extraction_id}"',
+        "  git push",
+        f"  mothman one-off load --id {read.recipe.extraction_id}"]))
+
+
+@one_off_group.command("setup-dbt-utils")
+def setup_dbt_utils_command() -> None:
+    """Install this deployment's one local dbt_utils copy for one-offs, at the
+    revision the enduring assets lock (REQ-PIPE-440 criterion 12). Run once per
+    deployment; a load then makes no network fetch."""
+    from qa_tools.common import one_off_load
+
+    try:
+        path = one_off_load.setup_dbt_utils()
+    except (RuntimeError, OSError, subprocess.CalledProcessError) as exc:
+        raise click.ClickException(str(exc)) from None
+    click.echo(f"dbt_utils {one_off_load.locked_revision()} installed at {path}.")
+

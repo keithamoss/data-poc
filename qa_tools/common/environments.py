@@ -74,6 +74,11 @@ class Environment:
     #: slot ticket says so, so nobody re-posts a command not yet read. None
     #: where undeclared, and then the ticket says nothing about how often.
     processing_interval_minutes: int | None = None
+    #: WHERE THIS DEPLOYMENT KEEPS ITS LOCAL dbt_utils COPY FOR ONE-OFFS
+    #: (REQ-PIPE-440 criterion 12), relative to the repository root unless
+    #: absolute - installed once by `mothman one-off setup-dbt-utils`, so a
+    #: load makes no network fetch. None where the environment works no one-offs.
+    one_off_dbt_utils: str | None = None
 
 
 #: The declared environments, keyed on the file's content (REQ-PIPE-192):
@@ -122,6 +127,8 @@ def _parse_environments(path: Path, text: str) -> list[Environment]:
             confirm_changes=bool(entry.get("confirm_changes")),
             ticketing=bool(entry.get("ticketing")),
             processing_interval_minutes=_interval(path, env_id, entry),
+            one_off_dbt_utils=(str(entry["one_off_dbt_utils"])
+                               if entry.get("one_off_dbt_utils") else None),
         ))
 
     productions = [e.id for e in out if e.production]

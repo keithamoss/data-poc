@@ -41,6 +41,13 @@
 # about how often (REQ-GHUB-433 criterion 12). No environment declares one
 # until a scheduler exists to declare it for.
 #
+# `one_off_dbt_utils:` (optional) is where this deployment keeps the one
+# local dbt_utils copy every one-off's dbt project reads (REQ-PIPE-440
+# criterion 12), relative to the repository root unless absolute. `mothman
+# one-off setup-dbt-utils` installs it once, at the revision the enduring
+# assets lock; a load makes no network fetch, and refuses without it. CI
+# works no one-offs, so it names none.
+#
 # `ci` WAS ADDED 2026-09-28, and the alternative is worth recording
 # because it looked cheaper: labelling a GitHub Actions runner `sandbox`.
 # That is a lie of exactly the kind this list exists to prevent - the
@@ -58,6 +65,7 @@ environments:
     publishes: false
     confirm_changes: false
     ticketing: false
+    one_off_dbt_utils: data/one-off-packages/dbt_utils
 
   - id: sandbox
     label: Claude Code sandbox
@@ -70,6 +78,7 @@ environments:
     publishes: true
     confirm_changes: false
     ticketing: false
+    one_off_dbt_utils: data/one-off-packages/dbt_utils
 
   - id: ci
     label: Continuous integration
@@ -96,6 +105,7 @@ environments:
     production: true
     confirm_changes: true
     ticketing: true
+    one_off_dbt_utils: data/one-off-packages/dbt_utils
 
   # REQ-PIPE-093 criterion 16: a test worker's own scratch database. Set
   # ONLY by the test suite's fixtures, so a worker is never labelled as
@@ -108,3 +118,4 @@ environments:
     publishes: false
     confirm_changes: false
     ticketing: false
+    one_off_dbt_utils: data/one-off-packages/dbt_utils
