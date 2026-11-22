@@ -361,11 +361,14 @@ def selected_asset(monkeypatch, request):
     monkeypatch.setenv(_assets.ASSET_ENV, asset)
     _assets.use_root(None)
     _assets.release_claim()
+    # NO ONE-OFF CARRIED OVER FROM ANOTHER TEST (REQ-PIPE-446).
+    _assets.deselect_one_off()
     asset_cli.rebuild_for_selected()
     _mark_worker_db_for(asset)
     yield asset
     _assets.use_root(None)
     _assets.release_claim()
+    _assets.deselect_one_off()
 
 
 @pytest.fixture(autouse=True)
