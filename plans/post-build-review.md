@@ -17385,3 +17385,66 @@ twice. It deliberately did not re-find the `TypeError`.
        older: the supply-cycle table scrolls sideways at 390px; a supply row
        is not keyboard-reachable; an empty current cycle hides the newest
        tries note behind 'Show all history'.
+
+494. **[in-progress, 2026-11-22]** **[Dashboard UI]** **[Pipeline & publishing]** **The worked mock run of a one-off (the ED readmissions extraction) - what it found and what was done.**
+     A real `mothman one-off` run end to end in a scratch clone at db7d7aa1
+     (open, load, list, decide, publish, drop), its findings verified against
+     the code before being written up here. Each defect fixed against
+     tests/test_one_off_page_agrees.py, seen failing first: a package whose
+     ONLY problems are package facts (an undeclared file on a clean home
+     dataset, a declared table absent, a failing derived product), which the
+     end-to-end fixture could not show because its home dataset also fails on
+     its data.
+     - **D1, FALSE GREEN, DEFECT, FIXED**: with an undeclared file the only
+       problem, the home dataset read Fail and its collection and agency Pass;
+       the load said "0 failing"; the dataset page named no failing check.
+       The page's `rollup()` and `dataset_status.rollup_datasets` read each
+       dataset's columns only, never its package checks, and
+       `fileAttemptInPlaceOn()` dropped the package check's point (no load
+       attempt). Both rollups now read the dataset's own verdict; a declared
+       table that never arrived now counts in its collection (it was left
+       out too); the package checks head the dataset's file section. The
+       load counts from the database. REQ-QAC-441, REQ-PIPE-442 decisions.
+     - **D2, DEFECT, FIXED**: default-layer checks showed raw tool names and
+       no prose: the publish built from the committed folder, which never
+       holds the default layer. It now builds from the materialised check
+       workspace, as the load does. REQ-QAC-441.
+     - **D3, NOT BUILT - needs a criterion change, for Keith**: `list` has no
+       decided or published stage, and after a published one-off is dropped it
+       recommends a load that is refused. REQ-PIPE-442 c1 limits list to the
+       one-offs root, git and one administrative connection, and c10 lists the
+       four stages, so either fix changes signed wording. Proposed: c10 "...
+       its stage - opened, committed, pushed, loaded, decided or published -
+       ... and the command for its next step, never a step that would be
+       refused ..."; c1 "... list reads the one-offs root, git and its kind's
+       publishing destination, and connects to the configured local server
+       only through an administrative connection that lists its databases and
+       reads the mark each one-off's database carries ...". With that, the
+       decide step would re-mark the database's comment ('decided') so list
+       still opens no one-off's database.
+     - **D4, DEFECT, FIXED**: `list` showed enduring-asset databases on a
+       suffixed DSN (supply_daily_c) as one-offs'. A one-off load now marks
+       its database's comment on the server; list reads it through its one
+       administrative connection. Its age read now tolerates a database
+       dropped mid-read (found running the suite in parallel). REQ-PIPE-442.
+     - **D5, DEFECTS, FIXED**: the three totals count different things
+       legitimately (the tools' results, 81; the database's, 110 with 29 file
+       and package checks) - the load now says what its total holds and counts
+       failures from the database, and the publish's line says it is the
+       tools' only; the repeated "nothing is currently owed" and the four
+       NoCalendarAgreed notes are gone for `never` datasets; a one-off's page
+       has no GitHub links (REQ-PIPE-446 c14). Names shown twice: not a
+       duplication bug - the agency blurb is the agency's name because the
+       recipe gives no blurb, and the dataset's provider is its agency, left
+       for Keith.
+     - **Keith's asks on the run, BUILT WITH DRAFT WORDING, awaiting his
+       approval before push**: a one-off's page hides the time travel,
+       cadence-aware viewing and leaderboard drawers and the feedback link,
+       shows no cross-table section, and words its footer, home and agency
+       lines, verdict line and receipt for one supply; a failing derived
+       product gets one line on the home view. REQ-DASH-444's decisions.
+     - **Left for Keith**: the "(no value)" example key of a null sole
+       identifier; Evidently's checks named by method ('Row count' beside
+       'Expected row count'); the agency card's blurb repeating its name; the
+       published line printing the full local path; the gate line's capitals
+       and "0 calendar(s)" on a one-off's load.

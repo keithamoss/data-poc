@@ -196,6 +196,15 @@ releases:
               commits it was built and checked. Each table's view shows what
               the recipe declared beside the checks made from it, and the
               development tools, dates and trends are gone from it.
+          - headline: A one-off's page speaks for one supply
+            components: ["Dashboard UI"]
+            description: >
+              A one-off's page no longer carries the data assets' time travel,
+              cadence-aware viewing, leaderboard or feedback, nor a cross-table
+              section its recipe cannot fill, and says when each table was
+              received rather than what is in place in a warehouse. A derived
+              product that fails is named on the home view, with a note that it
+              does not count in the status.
       - category: Fixed
         items:
           - headline: A one-off load that stopped mid-check finishes when run again
@@ -231,6 +240,42 @@ releases:
               The dashboard build stopped on a dataset with no delivery
               schedule. It now builds, and shows no due date, period or
               lateness for that dataset.
+          - headline: A file nobody declared fails the collection and agency too
+            components: ["Dashboard UI"]
+            description: >
+              When the only problem in an extraction was a file its recipe does
+              not declare, the dataset carrying that failure read Fail while
+              its collection and agency read Pass, and its own page named no
+              failing check. Every level now reads Fail, and the dataset's
+              page shows the failing check at the top of its file section.
+          - headline: The load's count of failures includes the package's own
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off load` counted only the four tools' results, so
+              it said "0 failing" when an undeclared file had failed. It now
+              counts every result it recorded, says how many are file and
+              package checks, and gives the same number of failures as the
+              page.
+          - headline: An extraction's own checks keep their names on its page
+            components: ["Dashboard UI"]
+            description: >
+              The checks every extraction gets showed on its page under the
+              tool's own name, such as dbt:not_null, with nothing about what
+              they check. They now carry their names and descriptions, as the
+              recipe's own checks already did.
+          - headline: The one-off list shows only one-offs' databases
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off list` listed any database whose name started
+              supply_ as a one-off's, including a data asset's own. It now lists
+              only the databases a one-off load created.
+          - headline: Quieter one-off loads and publishes, and no GitHub links
+            components: ["Pipeline & publishing"]
+            description: >
+              A one-off's load no longer repeats a note that nothing is owed
+              for each delivery, its publish no longer notes that it could not
+              read periods a one-off never has, and its page no longer links to
+              GitHub.
   - date: "2026-11-21"
     summary: >
       Each data asset now publishes to its own private site, keeps its own
