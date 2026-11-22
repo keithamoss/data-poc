@@ -27,6 +27,8 @@ one (criteria 1 and 2) - recipe format version 1 declares none (REQ-QAC-441
 criterion 6, unowned), so the fixture cannot carry one. Criterion 5's second
 test is tests/test_not_yet_agreed_beside_calendared.py.
 """
+# READS ONLY ITS OWN REPORTS: every reports/ path here is under this module's
+# own temporary state root, never the real tree.
 from __future__ import annotations
 
 import json

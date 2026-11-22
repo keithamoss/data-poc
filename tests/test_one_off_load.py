@@ -15,6 +15,8 @@ date) and visits.csv, which NEVER ARRIVES; `lab-study`
 declares labs.csv, expecting ten rows and holding eight, seven of them with
 a value that is no number. extra.csv is declared by nobody.
 """
+# READS ONLY ITS OWN REPORTS: every reports/ path here is under this module's
+# own temporary state root, never the real tree.
 from __future__ import annotations
 
 import json

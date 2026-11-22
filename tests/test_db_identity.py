@@ -304,7 +304,10 @@ class TestMarking:
         # The reset used to drop the qa schema and put the identity back; it
         # now never touches the identity table at all (post-build-review #122
         # D1/D2), so marking is the only writer.
-        assert writers == {"cli/env.py"}
+        # A ONE-OFF'S LOAD CREATES ITS OWN DATABASE and stamps it with the
+        # one-off's identity at birth (REQ-PIPE-442): it marks only a
+        # database it has just created, never an existing one.
+        assert writers == {"cli/env.py", "qa_tools/common/one_off_load.py"}
 
 
 class TestItLivesInATable:

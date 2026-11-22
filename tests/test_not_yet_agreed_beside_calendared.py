@@ -18,6 +18,8 @@ type. Counted, `notes` would turn the collection and the agency Fail; left
 out, both read `people`'s own status. The page is asked, and each dataset's
 status there must be the one dataset_status.py gives it.
 """
+# READS ONLY ITS OWN REPORTS: every reports/ path here is under this module's
+# own temporary state root, never the real tree.
 from __future__ import annotations
 
 import json
