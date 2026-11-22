@@ -145,25 +145,6 @@ hosting:
   address: https://data-poc-quarterly.pages.dev
   access_domain: CHANGE-ME.cloudflareaccess.com
 
-# WHAT MOVED TO THE DAILY ASSET IN THE SPLIT (REQ-PIPE-354 criteria 6 and 7):
-# a pre-split link to Birth Registrations opens a one-line notice saying where
-# it went, rather than the not-found page. Names carried here - this asset
-# never reads the daily asset's configuration.
-moved_to:
-  - id: registry-services
-    name: Registry Services
-    asset_name: Daily data asset
-    address: https://data-poc-daily.pages.dev
-  - id: civil-registration
-    name: Civil Registration
-    asset_name: Daily data asset
-    address: https://data-poc-daily.pages.dev
-  - id: birth-registrations
-    name: Birth Registrations
-    asset_name: Daily data asset
-    address: https://data-poc-daily.pages.dev
-
-
 # WHAT HAPPENS TO AN AMBER SUPPLY (REQ-PIPE-122). One setting, three
 # values, strictest first:
 #   hold                     - never promoted automatically; it waits,

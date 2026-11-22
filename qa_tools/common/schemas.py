@@ -669,16 +669,6 @@ class Hosting(_Strict):
     access_domain: NonEmptyStr
 
 
-class MovedTo(_Strict):
-    """A collection that moved to another asset (REQ-PIPE-354 criterion 6)."""
-
-    #: The agency, collection or dataset id a pre-split route names.
-    id: NonEmptyStr
-    name: NonEmptyStr
-    asset_name: NonEmptyStr
-    address: NonEmptyStr
-
-
 class DataAsset(_Strict):
     data_asset_id: NonEmptyStr
     timezone: TimezoneConfig
@@ -710,9 +700,6 @@ class DataAsset(_Strict):
     #: REQ-PIPE-354 criterion 3). Absent, a publish is refused. It replaced
     #: REQ-PIPE-372's interim publish_to_gh_pages (criterion 5).
     hosting: Hosting | None = None
-    #: Collections that moved to another asset (REQ-PIPE-354 criterion 6):
-    #: a deep link naming one shows where it went.
-    moved_to: list[MovedTo] | None = None
     #: The date this asset's snapshot archive starts from (REQ-DASH-373
     #: criterion 4, key SETTLED by Keith 2026-11-01): the day the pre-split
     #: archive was deleted. Read for the snapshots panel's empty state.

@@ -777,15 +777,13 @@ def embed() -> None:
     # criterion 12), through the one reader of `synthetic: true`.
     html = _replace_const(html, "ASSET_SYNTHETIC",
                           json.dumps(asset_time.declared_synthetic()))
-    # THE ASSET'S NAME AND WHAT MOVED OUT OF IT (REQ-PIPE-354 criteria 2 and
-    # 6), from its own data-asset.yaml only.
+    # THE ASSET'S NAME (REQ-PIPE-354 criterion 2), from its own
+    # data-asset.yaml only.
     from asset_model import assets as _assets
     from asset_model import config_yaml as _config_yaml
 
     _doc = _config_yaml.load(_assets.selected().data_asset_yaml) or {}
     html = _replace_const(html, "ASSET_DISPLAY_NAME", json.dumps(_doc.get("display_name")))
-    html = _replace_const(html, "MOVED_TO", json.dumps(_doc.get("moved_to") or [],
-                                                        separators=(",", ":")))
     # THE SELECTED ASSET'S OWN SNAPSHOT ARCHIVE (REQ-DASH-373 criteria 3 and
     # 5): its folder, which the picker's links name, and the date it starts.
     from dashboard.snapshot_dashboard import archive_settings
