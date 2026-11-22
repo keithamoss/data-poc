@@ -22177,14 +22177,17 @@ requirements:
         THE SYSTEM SHALL report such a dataset's own checks with their
         REAL verdicts - red, amber or green as the checks actually
         found - because developing a check means seeing whether it
-        passes. AMENDED 2026-11-22 by REQ-PIPE-438 criterion 1: "such a
+        passes. AMENDED 2026-11-22 (Keith, via REQ-PIPE-438 criterion 1): "such a
         dataset" is one declaring `no_calendar: not-yet-agreed`; a `never`
         dataset's verdicts are real quality history (REQ-PIPE-438).
       - >
         THE SYSTEM SHALL label such a dataset as one whose schedule is
         not agreed, alongside those verdicts and IN WORDS rather than
         by colour alone, following the pattern the `nodata` and
-        `inactive` pills already set.
+        `inactive` pills already set. AMENDED 2026-11-22 (Keith, via
+        REQ-PIPE-438): for a dataset declaring `no_calendar:
+        not-yet-agreed` only; a `never` or derived dataset follows
+        REQ-PIPE-438 criteria 5 to 7.
       - >
         THE SYSTEM SHALL exclude such a dataset's verdicts from every
         collection-level and asset-level rollup, so that a dataset
@@ -22196,7 +22199,7 @@ requirements:
         THE SYSTEM SHALL keep the record of that QA distinguishable
         from the QA history of agreed supplies, so that check
         development never counts toward a dataset's real quality
-        history. AMENDED 2026-11-22 by REQ-PIPE-438 criterion 1: for a
+        history. AMENDED 2026-11-22 (Keith, via REQ-PIPE-438 criterion 1): for a
         dataset declaring `no_calendar: not-yet-agreed` only; a `never`
         dataset's results are recorded agreed unless it is declared
         `derived` (REQ-PIPE-438 criterion 2).
@@ -22224,6 +22227,9 @@ requirements:
         and report it against the dataset without a calendar, and SHALL
         NOT let it contribute to the status of any dataset that has a
         calendar, nor to any collection-level or asset-level rollup.
+        AMENDED 2026-11-22 (Keith, via REQ-PIPE-438): where a participant
+        declares `no_calendar: not-yet-agreed`; a check spanning `never` or
+        derived datasets follows REQ-PIPE-438 criterion 4.
       - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
@@ -22311,6 +22317,17 @@ requirements:
         behaviour - verified by sample_dataset_ids() returning an empty set
         against the real asset.
     decisions:
+      - >
+        AMENDED 2026-11-22 (Keith, via REQ-PIPE-438): criteria 7, 8, 9, 10
+        and 15 apply to a dataset declaring `no_calendar: not-yet-agreed`
+        only. A one-off's QA is the deliverable (Keith 2026-11-21, Q4.1
+        (a)), so a `never` dataset's results are agreed quality history and
+        roll up; a dataset declared `derived` is recorded in development
+        and left out, and a cross-table check over a derived and a counted
+        dataset is agreed and counts on the counted side. What stays for
+        `never`: criteria 4 and 5 (the no-period schema) and the hierarchy
+        criteria 11 to 15 as amended. The mechanism is sample_data's split
+        of routing (is_sample) from counted state (supply_state).
       - >
         BUILT IN TWO HALVES ON 2026-09-28, and this records which half is
         which because the code alone does not say. The CONFIGURATION AND
@@ -52325,7 +52342,26 @@ requirements:
     date_written: '2026-11-21'
     story: As a reader of a one-off's dashboard, I want each dataset's checks and supplies shown without any schedule language or controls, so that I see what was checked rather than a page that failed to build, calls everything missing or offers buttons that do nothing.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: 'Criterion 2''s second half - a one-off''s declared table that did not arrive shows as Fail from its failing default-layer result, never No data.'
+      why: 'That failing result is REQ-QAC-441 criterion 3''s, not built. Built now: such a dataset''s page carries no period, slot, due date or lateness (periodSlots None, no cadence, nothing owed, no slot timeline).'
+      owner: REQ-QAC-441
+      blocked_by:
+        requirements:
+        - REQ-QAC-441
+    - criterion: 'Criterion 3 - such a dataset''s checks with their real verdicts, on a rendered page.'
+      why: 'Needs a built page with real recorded results for a no-calendar dataset, which is REQ-TEST-437''s fixture. Verdicts are not altered for such a dataset (counted_cases), but no page with one has been rendered.'
+      owner: REQ-TEST-437
+      blocked_by:
+        requirements:
+        - REQ-TEST-437
+    - criterion: 'Criteria 5 and 6 - a one-off''s page without the schedule controls, trends, run comparison and supply history, and removed tools'' routes opening the nearest view with a notice.'
+      why: 'The page must know it is a one-off, which needs the Asset''s kind (REQ-PIPE-446 criterion 12); Keith 2026-11-22: these wait for REQ-PIPE-446.'
+      owner: REQ-PIPE-446
+      blocked_by:
+        requirements:
+        - REQ-PIPE-446
     source: 'Keith, plans/running-thoughts.md #141 (2026-11-18); sprint 29 point 8; delivery-dashboard-ux''s v4 review findings 6 and 10. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off A, C and D. Buildable at once (Keith, round 5). Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN the dashboard is built for an asset or one-off holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() (build_dashboard_data.py) or any other cadence read.
@@ -52349,6 +52385,29 @@ requirements:
     - 'v6, A DECLARED TABLE THAT NEVER ARRIVED IS FAIL (delivery-dashboard-ux post-sign-off A): v5''s criterion 2 forbade ''anything marked missing'', while REQ-QAC-441 criterion 3 makes that table a failing result; read literally the page would have shown grey No data for the one failure that matters most. REJECTED showing it as No data, which reads as nothing owed.'
     - 'v6, ''NOT YET CHECKED'' IS A DATASET STATUS OF ITS OWN (delivery-dashboard-ux C): v5 borrowed the `.pill.notchecked` style, whose words are the check-level ''Not checked'' (REQ-DASH-299 criterion 17). REJECTED reusing `notchecked`, which would make two different facts read alike.'
     - 'v6, REMOVED TOOLS'' ROUTES (delivery-dashboard-ux D): REQ-DASH-444 removes the tools from the header, but #/plans, #/demo, #/scenarios, #/feedback, ?panel= and cmp= still resolve from a pasted link; criterion 6 now covers them with the same notice as a stray date.'
+    - 'BUILT 2026-11-22: THE BUILD''S CADENCE READS SKIP A NO-CALENDAR DATASET at each reader - build_one_table''s cadence (None), owed_nothing.sla_timeline and for_dataset (empty), closed_slots.for_dataset and late_slots (no slots) - asking the declaration, rather than catching NoCalendarAgreed further up, which would drop the whole page. Found one reader at a time by the test, each seen raising first.'
+    - 'BUILT 2026-11-22: ''NOT YET CHECKED'' IS `notyetchecked`, a DATASET-level unordered status: in status-cases.json''s vocabulary (by_level.dataset, labels, unordered) and both STATUS_WORDS, after notchecked and before notcounted in the quiet order, drawn as .pill.notchecked is. The dataset carries notYetChecked; both rollups leave it out and the not-counted line gives the reason ''not yet checked''.'
+    - 'BUILT 2026-11-22: notYetChecked IS SET ONLY ON A ONE-OFF''S PAGE (an Asset stating a kind, REQ-PIPE-446 criterion 12), so no enduring asset''s page changes; no page carries it until 446 lands.'
+    - 'SETTLED by Keith 2026-11-22: criteria 5 and 6 wait for REQ-PIPE-446 rather than being built now against an embedded flag.'
+    linked_tests:
+    - tests/test_no_calendar_dashboard.py
+    - tests/test_counted_parity.py
+    - tests-js/counted-parity.test.js
+    - tests/test_status_parity.py
+    - tests-js/status-parity.test.js
+    implemented_by:
+    - pipeline/build_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::_one_off_page
+    - pipeline/owed_nothing.py::sla_timeline
+    - pipeline/owed_nothing.py::for_dataset
+    - pipeline/closed_slots.py::for_dataset
+    - pipeline/closed_slots.py::late_slots
+    - qa_tools/common/dataset_status.py::rollup_datasets
+    - asset_model/statuses.py::STATUS_WORDS
+    - dashboard/qa-reporting-dashboard.template.html
+    - status-cases.json
+    evidence:
+    - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work). tests/test_no_calendar_dashboard.py was SEEN FAILING FIRST: all 4 build tests raised NoCalendarAgreed - from agreement.cadence, then owed_nothing.for_dataset, then closed_slots - and all 6 pass.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52357,7 +52416,21 @@ requirements:
     date_written: '2026-11-21'
     story: As a reader of a one-off's dashboard, I want its tables' verdicts to count and roll up, so that the page answers whether the data is fit to release rather than reading 'Not counted' throughout.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: 'Criterion 5 - the label ''Derived product, not counted in the <kind>''s status'' in the kind''s display word.'
+      why: 'The kind''s display words are REQ-PIPE-446 criterion 2''s plug-in, not built. Built now: the build marks a derived dataset `derived: true`, it is in no rollup, and the not-counted line names derived products (''derived product'').'
+      owner: REQ-PIPE-446
+      blocked_by:
+        requirements:
+        - REQ-PIPE-446
+    - criterion: 'Criterion 9 - a one-off declaring a dataset `not-yet-agreed` or with a calendar fails the schedule gate, and fails its load.'
+      why: 'No folder under one-offs/ can be selected or gated until REQ-PIPE-446 (its Asset states its kind, criterion 12), and a one-off''s load is REQ-PIPE-442 criterion 3''s. The gate already tells an enduring asset from a one-off by the Asset''s kind (validate_schedule._enduring_asset).'
+      owner: REQ-PIPE-446
+      blocked_by:
+        requirements:
+        - REQ-PIPE-446
+        - REQ-PIPE-442
     source: Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off B and G and delivery-dashboard-ux B, C and the display-words point. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - 'THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only.'
@@ -52388,6 +52461,37 @@ requirements:
     - 'v6, HOW CRITERION 4 WORKS (delivery-architect G): record the result agreed, share it with every participant as share_cross_table_results already does, and count it only where the participant is counted. All participants derived means nothing counted it, so in development. This is the mechanism under Keith''s round 5 answer, not a new rule.'
     - 'v6, THE MARKER IS FOR NOT-YET-AGREED ONLY (delivery-dashboard-ux B): v5''s criterion 6 removed the marker from `never` rows while criterion 7 rewrote its tooltip for them, leaving a tooltip with nothing to hang on. REJECTED keeping a `never` sentence in the tooltip.'
     - 'v6, THE KIND''S DISPLAY WORD (delivery-dashboard-ux smaller points): ''<kind>'' in criterion 5 is the plug-in''s display word (''extraction''), never the folder name.'
+    - 'BUILT 2026-11-22: THE COUNTED SET IS ONE VALUE, sample_data.Uncounted (not-yet-agreed ids, derived ids), built by uncounted() and passed by the writer as a hoist, as sample_ids was - so supply_state and state_for_participants read one definition. is_sample stays the routing question and is unchanged; qa_results_writer''s NO-SUPPLY read still asks the routing set.'
+    - 'BUILT 2026-11-22: THE DERIVED-SIDE EXCLUSION IS A CARD FLAG, notCountedHere. A shared result is one object on every participant''s page (REQ-QAC-037 forbids a copy), so it cannot carry a per-page state; build_one_table marks the derived page''s cross-table card when any of its results is agreed, and both status implementations (dataset_status.dataset_status and the template''s new columnStatus()) skip it. On a derived page an agreed result can only be a shared counted one, since the derived product''s own results are in development.'
+    - 'BUILT 2026-11-22: ROUTING AN IN-DEVELOPMENT RESULT generalises 106''s rule: it is never shared to a participant whose own results are agreed (sample_data.supply_state), replacing ''a participant with a calendar''.'
+    - 'BUILT 2026-11-22: `derived` WITHOUT `no_calendar` FAILS THE GATE too, wherever it is declared: criterion 2 puts it beside no_calendar, and a dataset with a calendar is never a derived product. The asset-level omission message no longer suggests `never` (Keith 2026-11-22: ''your reworded gate advice stands'').'
+    - 'PARITY (the CORRECTNESS NFR): status-cases.json counted_cases is read by tests/test_counted_parity.py and tests-js/counted-parity.test.js - recorded state, cross-table recording and sharing, the derived-side exclusion, both rollups, the marker and ''Not yet checked'' - neither suite owning it. tests/test_no_calendar.py''s existing node comparison of the two rollup implementations stays.'
+    - 'SETTLED by Keith 2026-11-22: REQ-PIPE-106 criteria 8 and 15 are amended as 7, 9 and 10 are - they apply to `not-yet-agreed` only, and `never` and derived datasets follow this requirement.'
+    linked_tests:
+    - tests/test_counted_parity.py
+    - tests-js/counted-parity.test.js
+    - tests/test_no_calendar.py
+    - tests/test_agreement.py
+    - tests-js/status-rollups.test.js
+    implemented_by:
+    - asset_model/schedule.py::is_derived
+    - asset_model/agreement.py::DatasetAgreement
+    - qa_tools/common/schemas.py::DatasetAgreementConfig
+    - qa_tools/common/sample_data.py::Uncounted
+    - qa_tools/common/sample_data.py::uncounted
+    - qa_tools/common/sample_data.py::supply_state
+    - qa_tools/common/sample_data.py::state_for_participants
+    - qa_tools/common/qa_results_writer.py::write_qa_result
+    - pipeline/build_dashboard_data.py::share_cross_table_results
+    - pipeline/build_dashboard_data.py::build_one_table
+    - qa_tools/common/dataset_status.py::in_no_rollup
+    - qa_tools/common/dataset_status.py::dataset_status
+    - qa_tools/common/validate_schedule.py::_dataset_errors
+    - qa_tools/common/validate_schedule.py::_enduring_asset
+    - dashboard/qa-reporting-dashboard.template.html
+    - status-cases.json
+    evidence:
+    - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work).'
     signed_off:
       by: Keith
       date: '2026-11-21'
