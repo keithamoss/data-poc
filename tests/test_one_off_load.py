@@ -154,6 +154,16 @@ def _point(world: World, mp) -> None:
     mp.delenv(supply_db.SUPPLY_DSN_ENV, raising=False)
     mp.setenv(supply_db.SERVER_ENV, world.server)
     mp.setenv("GIT_AUTHOR_EMAIL", "tester@example.org")
+    # THE DEPLOYMENT'S LOCAL dbt_utils COPY, in the test's own folder: set up
+    # once per world by the real setup step (REQ-PIPE-440 criterion 12), which
+    # copies an enduring asset's installed dbt_utils - never this checkout's
+    # data/one-off-packages/.
+    from qa_tools.common import one_off_load
+
+    copy = world.state / "one-off-packages" / "dbt_utils"
+    mp.setattr(one_off_load, "dbt_utils_path", lambda: copy)
+    if one_off_load.dbt_utils_refusal() is not None:
+        one_off_load.setup_dbt_utils()
 
 
 def _said(result) -> str:
