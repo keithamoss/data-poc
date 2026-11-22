@@ -596,6 +596,17 @@ class TestTheHomeView:
         summary = page.locator("[data-recipe-summary]").inner_text()
         assert journey.id not in summary and "The fixture study" not in summary
 
+    def test_the_undeclared_file_is_named_once(self, page, journey):
+        """Keith 2026-11-22 ('first dataset + home'): counted on the first
+        counted dataset, and named once on the home view."""
+        _open(page, journey, "released")
+        found = page.locator("[data-undeclared-files]")
+        assert found.count() == 1
+        assert found.locator("[data-undeclared-names]").inner_text() == "extra.csv"
+        assert "People" in found.inner_text()
+        _open(page, journey, "released", VIEWS["people"])
+        assert page.locator("[data-undeclared-files]").count() == 0
+
     def test_the_qa_result_label(self, page, journey):
         _open(page, journey, "released")
         assert page.locator(".card .qa-result-label").first.inner_text() == "QA result"

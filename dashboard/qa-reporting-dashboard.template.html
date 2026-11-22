@@ -5808,6 +5808,25 @@ function oneOffRecipeSummaryHtml(){
     <div class="view-sub" style="margin-top:6px;">Each table's declared columns, cohort and expected rows are on its own page.</div>
   </section>`;
 }
+// A FILE NOBODY DECLARED, NAMED ONCE ON THE HOME VIEW (Keith 2026-11-22,
+// 'first dataset + home'): its failing result stays on, and counts in, the
+// first counted dataset, as REQ-QAC-441 records it; the home view names the
+// file and that dataset, so a reader of the whole one-off meets it.
+function oneOffUndeclaredHtml(){
+  const key = ONE_OFF.declaration && ONE_OFF.declaration.undeclaredCheck;
+  if(!key) return "";
+  for(const [, entry] of Object.entries(COLLECTION_DATA || {})){
+    for(const d of (entry && entry.datasets) || []){
+      const ck = ((d.fileChecks && d.fileChecks.checks) || []).find(c=> c.key === key);
+      const last = ck && (ck.history || [])[ck.history.length - 1];
+      if(!ck || ck.current_status !== "red" || !last) continue;
+      return `<div class="one-off-section" data-undeclared-files>${pill("red", "sm")} <b>A file the recipe does not declare arrived:</b>
+        <span class="mono" data-undeclared-names>${escHtml(last.filename || "")}</span>. It was not filed or checked, and it fails the
+        ${escHtml(d.name)} dataset's '${escHtml(ck.name)}' check, which counts in that dataset's QA result.</div>`;
+    }
+  }
+  return "";
+}
 // THE TWO LAYER NAMES (REQ-DASH-444 criterion 10): 'Default check' for the
 // layer every one-off of the kind gets, the kind's own name for its own.
 function layerName(layer){
@@ -9305,7 +9324,7 @@ function renderExec(view){
         <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A Fail anywhere below makes the parent Fail; a Warn with no Fail makes it Warn — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, whose schedule has ended, that is turned off and owes nothing, or that has no schedule agreed sits outside that comparison rather than losing to it, and is counted separately below.</div>
       </div>
     </div>
-    ${ONE_OFF ? oneOffDecisionsHtml() + oneOffRecipeSummaryHtml() : ""}
+    ${ONE_OFF ? oneOffDecisionsHtml() + oneOffUndeclaredHtml() + oneOffRecipeSummaryHtml() : ""}
     ${assetNotCountedLine()}
     <div class="legend-key">
       <span><i class="green"></i>Pass — within threshold (${agencyCount("green")})</span>

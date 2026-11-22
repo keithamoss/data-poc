@@ -76,7 +76,11 @@ def _round_date(dataset_id: str, period: str) -> date | None:
     try:
         found = next((p for p in schedule.periods_for_dataset(dataset_id) if p.name == period),
                      None)
-    except (schedule.ScheduleConfigError, LookupError, ValueError):
+    except (schedule.ScheduleConfigError, LookupError, ValueError,
+            # NO CALENDAR, NO ROUND (REQ-PIPE-434): a not-yet-agreed dataset
+            # beside a calendared one is in no period's overlay (REQ-TEST-437
+            # criterion 5's test).
+            schedule.NoCalendarAgreed):
         return None
     return found.round_date if found is not None else None
 

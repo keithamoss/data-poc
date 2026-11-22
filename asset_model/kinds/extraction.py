@@ -105,7 +105,8 @@ def _declaration(folder) -> dict:
             "cohort": [{**dict(b), "checks": keys("cohort_bounds")} for b in t.cohort],
             "expectedRows": t.expected_rows,
             "expectedRowsChecks": keys("expected_rows") if t.expected_rows is not None else []}
-    return {"recipe": {"formatVersion": recipe.get("format_version"),
+    return {"undeclaredCheck": f"{extraction_checks.CHECK_NAME['undeclared_file']}_file",
+            "recipe": {"formatVersion": recipe.get("format_version"),
                        "digest": recipe.get("digest"), "filter": recipe.get("filter")},
             "tables": tables}
 
