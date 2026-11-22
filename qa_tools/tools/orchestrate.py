@@ -577,6 +577,10 @@ def _claim_window(collection_id: str, arrival):
             # 6, 378 Q2 (a), SETTLED by Keith): this dataset is left out of the
             # minimum - never a borrowed window.
             continue
+        except schedule.NoCalendarAgreed:
+            # NO CALENDAR, SO NO CLAIM WINDOW (REQ-PIPE-434 criterion 4): left
+            # out of the minimum the same way, rather than escaping the gate.
+            continue
     return min(windows, default=None)
 
 

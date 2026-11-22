@@ -526,6 +526,7 @@ def filings_command(dataset_id: str, limit: int) -> None:
         assignment.OPEN_UNFILLED: "the slot open when it arrived",
         assignment.RESUPPLY: "resupply - the open period was already filled",
         assignment.HELD: "[yellow]no period was open for it - held for a person[/yellow]",
+        assignment.NO_PERIOD: "no period - the dataset has no delivery calendar",
     }
     placed = _placements(dataset_id)
     console.print(f"[bold]{dataset_id}[/bold] - {len(found)} supply/supplies filed\n")
