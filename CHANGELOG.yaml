@@ -112,8 +112,19 @@ releases:
   - date: "2026-11-22"
     summary: >
       A dataset with no delivery schedule is now checked when its supply
-      arrives, and a dashboard holding one builds.
+      arrives, and a dashboard holding one builds. Filing commands posted on
+      a slot's ticket are acted on again.
     changes:
+      - category: New
+        items:
+          - headline: Commands on a slot's ticket are acted on at the next pass
+            components: ["GitHub workflow & people"]
+            description: >
+              A filing command you post on a slot's GitHub ticket is now read
+              by the next `mothman pipeline process` and acted on once, as if
+              you had made it in the terminal. The ticket says so, and the
+              pass reports how many comments it read, how many decisions they
+              raised and how many it refused.
       - category: Fixed
         items:
           - headline: A supply with no schedule is checked when it arrives

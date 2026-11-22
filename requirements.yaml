@@ -15388,6 +15388,7 @@ requirements:
     - tests/test_validate_people.py
     - tests/test_offer_after_hand_filed_run.py
     evidence:
+    - '2026-11-22: criterion 1''s entry point exists - REQ-GHUB-433''s stage of `mothman pipeline process` reads new slot-ticket comments and hands each to filing_from_github.handle_counted; its unmet entry (owner REQ-GHUB-433) is closed citing that requirement.'
     - '2026-09-29. The TUI adapter, 32 tests. The ones that matter are the three properties only this surface can break: it confirms before it writes (declining appends nothing, and it asks even for a promote), it never shows a cached answer (an unreachable log raises rather than falling back, the standing view prints no periods, the queue offers nothing and the command exits 1), and it calls no GitHub - asserted by parsing this module''s own imports rather than grepping its source, which its prose about GitHub would otherwise fail.
 
       '
@@ -15403,17 +15404,6 @@ requirements:
     - '2026-09-29. dashboard/demos/qa_wizard.cast re-recorded against the real TUI in a real pty - 217 events, 58.1s, and zero occurrences of "Promote" where there were three.
 
       '
-    unmet_criteria:
-    - criterion: 'Criterion 1, in the part of it that is an ENTRY POINT rather than a capability - a GitHub comment actually reaching filing_from_github.handle().
-
-        '
-      why: 'The adapter is built and tested; nothing in production calls it. ticket-sync.yml is disabled (REQ-PIPE-089) because a workflow cannot reach the database, and its replacement inverts the integration''s direction.
-
-        '
-      owner: REQ-GHUB-433
-      blocked_by:
-        requirements:
-        - REQ-GHUB-433
   - id: REQ-PIPE-083
     title: >
       Every slot has a ticket that is reconciled to its current state,
@@ -52201,7 +52191,7 @@ requirements:
     date_written: '2026-11-21'
     story: As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, delivery-architect triage of REQ-GHUB-082 criterion 1, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H''s drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21; SETTLED as polling by Keith the same day (Q2.1 (a)); v5 signed by Keith 2026-11-21; v6 folds in the post-sign-off reviews (architect C, dashboard UX 433 c12, CLI UX C6) and Keith''s answers. v7 folds in the REQ-PIPE-446 renumbering and v6 Q2 (one decision''s references only). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL, as a stage before ticket reconciliation, read the comments on the asset's ticket repository that it has not yet handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by its creation time.
@@ -52248,9 +52238,33 @@ requirements:
     - 'v6, HOW OFTEN COMES FROM CONFIGURATION (delivery-dashboard-ux post-sign-off, 433 c12): an interval written into the ticket code would go false the day a deployment''s scheduler changes.'
     - 'v6, CRITERION 14 AND THE NAMED CAUSE IN CRITERION 8 (delivery-cli-ux C6): a pass that read three comments and raised nothing must not read as idle, and a failed stage must say what failed.'
     - 'v6, ONE-OFFS NEVER USE GITHUB (Keith 2026-11-21): that rule is REQ-PIPE-446''s (criterion 14); this stage cannot reach a one-off, because no command outside `mothman one-off` can select one (REQ-PIPE-446 criteria 3 and 9, v7).'
+    - 'BUILT 2026-11-22, THE INTERVAL''S HOME (the second open question, a build decision): `processing_interval_minutes:` on an environment in assets/environments.yaml, whole minutes, refused if not a positive whole number; worded ''every 15 minutes'' / ''every hour'' / ''every 2 hours''. Minutes because the authored duration form (`14d`, `4h`) has no unit for a scheduler''s interval. No environment declares one yet, so every ticket says only ''acted on at the next processing pass'' (Keith 2026-11-22: nothing about frequency where none is declared).'
+    - 'BUILT 2026-11-22: qa.ticket_comment_handled (schema v53, additive) holds each handled comment''s GitHub id and creation instant; the newest creation instant is the listing''s `since` anchor. A comment is recorded once its handling returns - raised, refused or ignored alike - so a refusal is never posted twice.'
+    - 'BUILT 2026-11-22: the two listings are `gh api --paginate` over repos/<repo>/issues/comments?since= and repos/<repo>/issues?labels=slot-ticket&state=all, read as a stream of page arrays; the service''s own login is one `gh api user`. Same `gh` boundary and credential as reconciliation (ticket_github), so no new network path.'
+    - 'BUILT 2026-11-22: COUNTING NEEDED THE ROUTE TO SAY WHAT HAPPENED. filing_from_github.handle_counted returns raised / refused / ignored beside the outcome; handle() keeps its signature and returns the outcome alone. A comment with no command is read and counted, never refused.'
+    - 'BUILT 2026-11-22: A COMMENT ON ANOTHER ASSET''S SLOT, OR ON A TICKET OF NO SLOT, IS NOT RECORDED AS HANDLED in this asset''s database - the asset owning it handles it in its own - and is not counted as read.'
+    - 'BUILT 2026-11-22: THE STAGE STOPS AT THE FIRST COMMENT WHOSE HANDLING FAILS, naming it, rather than skipping past it: oldest first, last wins (Thread H) means a later comment must not be applied before an earlier one on the same slot.'
+    - 'TESTED WITH GITHUB STOOD IN FOR (Keith 2026-11-22): the real API is never called from a test and no real GitHub write happens - a stand-in service for the stage, and ticket_github._gh replaced by a recorder for the listings. filing_decisions.apply is recorded rather than run where a decision is raised; refusals and ignored comments go through the real route.'
+    - 'DELETED .github/workflows/ticket-sync.yml (criterion 13). CLAUDE.md still describes it as disabled; CLAUDE.md is Keith''s to edit.'
     open_questions:
     - Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. A deployment decision; it does not change what is built.
-    - Where the environment declares its processing interval for criterion 12 (assets/environments.yaml is the likely home), and what the ticket says where an environment declares none. A build decision; it does not change the settled wording.
+    linked_tests:
+    - tests/test_ticket_comments.py
+    - tests/test_processing_pass.py::TestKeithsAnswersToTheSprint14Critic
+    implemented_by:
+    - qa_tools/common/ticket_comments.py::read_and_handle
+    - qa_tools/common/ticket_comments.py::anchor
+    - qa_tools/common/ticket_comments.py::handled_ids
+    - qa_tools/common/ticket_github.py::GitHubTickets
+    - qa_tools/common/filing_from_github.py::handle_counted
+    - qa_tools/common/processing_pass.py::run_pass
+    - qa_tools/common/processing_pass.py::PassReport
+    - cli/pipeline.py::_say_pass
+    - qa_tools/common/ticket_reconciler.py::commands_line
+    - qa_tools/common/environments.py::interval_words
+    - qa_tools/common/qa_store.py::DDL
+    evidence:
+    - '2026-11-22, tree 452d3590: 23 named test modules (pytest -n 2: tests/test_ticket_comments.py, test_processing_pass, test_ticket_reconciler, test_ticket_github, test_filing_from_github, test_environments, test_stated_environment, test_schema_version_refusal, test_qa_store, test_publish, test_lambda_handlers, test_run_summary_line, test_ticket_sync, test_filing_decisions, test_cli_check and 8 more) 678 passed in 3m21s. tests/test_ticket_comments.py is new behaviour rather than a defect fix, so not seen failing first; it was checked to be able to fail by disabling the handled-id record and the own-author filter, which turned 5 of its 18 tests red. npm test was not run (no page change). The full suite, the needs_deployment half and the browser tests were NOT run. No test calls the real GitHub API.'
     signed_off:
       by: Keith
       date: '2026-11-21'

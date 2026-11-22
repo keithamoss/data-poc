@@ -175,7 +175,8 @@ of who's actually involved.
 
 **Owns:** `qa_tools/common/ticket_sync.py`/`ticket_status.py`/
 `github_links.py`/`people.py`/`leaderboard.py`,
-`contract/people.yaml`, `.github/workflows/ticket-sync.yml`.
+`contract/people.yaml`, `qa_tools/common/ticket_comments.py` (the
+processing pass's read of slot-ticket comments, REQ-GHUB-433).
 
 **In scope:** opening/updating/commenting on real GitHub Issues for QA
 events; routing a ticket to the right person; filing decisions raised

@@ -794,55 +794,6 @@ e2e.py`/`test_check_dashboard_renders.py` (22 passed), ruff clean, plus
 a manual real-browser walkthrough confirming all 3 link types resolve
 to the exact right file/line/folder with zero console errors.
 
-53. **[todo, 2026-09-27]** **[Pipeline & publishing]** Something in the AWS build has to poll GitHub for QA-ticket comments, because GitHub Actions no longer builds the dashboard.
-
-    Keith's own observation, 2026-09-27, while REQ-PIPE-092 was being
-    drafted: "now that GitHub Pages isn't doing any building of the
-    dashboard, we'll need a lambda in the AWS infra to poll GitHub
-    looking for comments - flag that as part of running thoughts for
-    the AWS build."
-
-    **The dependency being broken, stated plainly.** An accept/reject
-    decision is a real `/accept` or `/reject` comment on a dataset's own
-    QA ticket (REQ-QAC-017, built). `acceptance_sync.py` splits into a
-    real `gh` boundary - `fetch_all_ticket_comments()` - and pure
-    matching functions over already-fetched data. The `gh` call is made
-    by `deploy-pages.yml`, because that workflow already had a GitHub
-    token and was already building the dashboard, so fetching comments
-    there cost nothing extra.
-
-    REQ-PIPE-092 moves the build inside the environment and stops
-    GitHub Actions building anything. The environment has a database and
-    no GitHub token; the workflow has a token and no database. So the
-    one place that used to have both has stopped existing, and nothing
-    currently fetches those comments at all.
-
-    **Not urgent for the PoC, and worth saying why so it does not get
-    scoped as a crisis.** `embed_dashboard_data.py` already degrades:
-    with no `reports/qa_comments.json` it embeds an empty
-    `AMBER_DECISIONS` and the badges simply do not render. A local
-    build has always behaved that way. What breaks is the PUBLISHED
-    dashboard losing its decision badges, which matters as soon as
-    anybody relies on them.
-
-    **Three shapes, none of them decided here.** A Lambda on a schedule
-    that polls and writes into the metadata schema, which is Keith's own
-    suggestion and the one that fits the AWS MVP. A GitHub webhook
-    into something in the environment, which needs an inbound endpoint
-    the environment may not want. Or the environment polls GitHub
-    itself during a publish, which needs a token where we have just
-    finished removing credentials from one side and would be adding one
-    to the other.
-
-    **It bears on the unification question below** (see the decision-log
-    entry filed alongside this one): if an accept/reject is an entry in
-    the one decision log, then whatever polls GitHub is a WRITER to that
-    log rather than a producer of a side file the dashboard build reads.
-    That changes which of the three shapes is natural - a Lambda writing
-    to the database is very different from a Lambda writing a JSON file
-    into a build.
-
-
 54. **[done, 2026-09-27]** **[Pipeline & publishing]** An amber accept/reject and a filing decision are both decisions, and there are two logs.
 
     **OUTCOME, so nobody reads the analysis below as live: an amber
@@ -5609,7 +5560,7 @@ could never have computed it), and it belongs with batch 5's check work.
      or would it have cleared by itself minutes later? The early-arrival red
      in #95 (a table held until its partner's file arrives) is the case that
      prompted it. Automated notification on red is not scoped. It relates to
-     the ticketing work (#53) and to REQ-GHUB tickets.
+     the ticketing work (REQ-GHUB-433) and to REQ-GHUB tickets.
 
 114. **[todo, 2026-10-20]** **[Pipeline & publishing]** **"Zip" is a
      stand-in for "a package of files".** Keith, 2026-10-20: "zip is just a

@@ -4001,8 +4001,8 @@ twice. It deliberately did not re-find the `TypeError`.
     disabled and cannot run at all: it needs the recorded QA results,
     those are rows in a PostgreSQL database since REQ-PIPE-089, and a
     GitHub runner has no route to one. Its replacement inverts the
-    integration's direction, which is `plans/running-thoughts.md` #53
-    and is not scoped.
+    integration's direction, which was `plans/running-thoughts.md` #53 and
+    is REQ-GHUB-433 (built 2026-11-22: the processing pass polls).
 
     So REQ-GHUB-082's criterion 1 - "accept ... filing decisions raised
     on the GitHub ticket" - is met as far as an entry point allows, and
@@ -4027,8 +4027,8 @@ twice. It deliberately did not re-find the `TypeError`.
 
     Nothing was changed in the code. What changed is that the
     requirement and this file now say where the gap is, so whoever
-    scopes #53 knows the adapter is already there and needs only a
-    caller.
+    scopes it (REQ-GHUB-433, since) knows the adapter is already there and
+    needs only a caller.
 
 68. **[done, 2026-09-29]** **[GitHub workflow & people]**
     **The commoner way the ticket service is absent got the thinner
