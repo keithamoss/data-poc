@@ -15,7 +15,7 @@ COPY NOTHING FROM THE KIND'S TEMPLATE (Keith 2026-11-21, criterion 13): no
 people.yaml, no default check layer, no publishing destination - each is read
 live from one-offs/extraction/_template/ at the step that needs it - and no
 synthetic/ folder and no QA adapter module of its own (one shared adapter per
-kind, qa_tools/collections/kinds/extraction.py). THE RECIPE CHECK LAYER IS
+kind, qa_tools/kind_adapters/extraction.py). THE RECIPE CHECK LAYER IS
 generated here (REQ-QAC-441 criteria 4 and 5), from
 asset_model/kinds/extraction_checks.py, into each tool's own file.
 

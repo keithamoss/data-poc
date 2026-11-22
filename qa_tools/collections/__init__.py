@@ -37,7 +37,7 @@ def adapter_module(collection: Collection | str):
     # (REQ-PIPE-448 criterion 4): a one-off folder holds no adapter module.
     kind = assets.selected().kind
     if kind is not None:
-        from qa_tools.collections import kinds
+        from qa_tools import kind_adapters as kinds
 
         try:
             return kinds.adapter_module(kind, c)

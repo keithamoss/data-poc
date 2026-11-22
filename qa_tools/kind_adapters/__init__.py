@@ -1,7 +1,10 @@
 """Each one-off kind's ONE SHARED ADAPTER (REQ-PIPE-440 criterion 4,
 REQ-PIPE-448 criterion 4): a one-off carries no adapter module of its own, so
 every collection of a one-off of kind <kind> is served by
-qa_tools/collections/kinds/<kind>.py's `adapter_for(collection)`.
+qa_tools/kind_adapters/<kind>.py's `adapter_for(collection)` - beside
+qa_tools/collections/, which holds only the shared registry and base
+(REQ-PIPE-342 criterion 10), since a kind's adapter is shared code, never a
+collection's.
 
 Found by the kind's folder name, which assets.Asset.kind reads from where the
 folder is - never named in code, as the enduring assets' adapters are never
@@ -22,11 +25,11 @@ def module_for(kind: str):
     if not ID_PATTERN.fullmatch(kind):
         raise NoSharedAdapter(f"one-off kind {kind!r} is not a hierarchy id")
     try:
-        return importlib.import_module(f"qa_tools.collections.kinds.{kind.replace('-', '_')}")
+        return importlib.import_module(f"qa_tools.kind_adapters.{kind.replace('-', '_')}")
     except ModuleNotFoundError as exc:
-        if exc.name and exc.name.startswith("qa_tools.collections.kinds."):
+        if exc.name and exc.name.startswith("qa_tools.kind_adapters."):
             raise NoSharedAdapter(f"one-off kind {kind!r} has no shared adapter - "
-                                  f"qa_tools/collections/kinds/{kind.replace('-', '_')}.py "
+                                  f"qa_tools/kind_adapters/{kind.replace('-', '_')}.py "
                                   f"does not exist") from None
         raise
 

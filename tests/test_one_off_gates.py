@@ -248,7 +248,7 @@ class TestTheCollectionsGateAcceptsTheSharedAdapter:
         assert got.sample_key == {"cohort_people": ["person_id"],
                                   "cohort_visits": ["visit_id"]}
         assert collections.adapter_file("cohort-study").endswith(
-            "qa_tools/collections/kinds/extraction.py")
+            "qa_tools/kind_adapters/extraction.py")
 
     def test_an_enduring_assets_collection_without_one_still_fails(self, tmp_path):
         from qa_tools.common import validate_collections
