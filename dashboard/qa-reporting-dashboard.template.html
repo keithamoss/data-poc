@@ -1084,6 +1084,24 @@ footer{color:var(--ink-muted); font-size:12px; padding-block:30px 40px; border-t
   /* The same, for the one other thing a thumb has to hit. */
   .crumb{min-height:44px;}
 }
+/* A ONE-OFF'S PAGE (REQ-DASH-444 criterion 9, REQ-DASH-436 criterion 5): no
+   PoC development tools, no in-the-warehouse date and no period control. */
+.one-off-page #in-place-on-btn, .one-off-page #period-btn, .one-off-page #activity-btn,
+.one-off-page #changelog-btn, .one-off-page #requirements-btn, .one-off-page #scenarios-btn,
+.one-off-page #feedback-btn, .one-off-page #leaderboard-btn, .one-off-page #plans-btn,
+.one-off-page #demo-btn, .one-off-page #snapshots-btn{display:none !important;}
+/* THE DECISION LINE (criteria 2 and 3): words of its own, never a pill or a
+   colour - the ink the page's prose is in. */
+.one-off-decision{border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin:0 0 16px;
+  font-size:14px; color:var(--ink); background:transparent;}
+.one-off-decision .one-off-decision-line{font-weight:600;}
+.one-off-decision .one-off-provenance{margin-top:6px; font-size:12.5px; color:var(--ink-muted);}
+.qa-result-label{font-size:11.5px; color:var(--ink-muted); margin-right:4px; white-space:nowrap;}
+.layer-chip{display:inline-block; font-size:11px; color:var(--ink-muted); border:1px solid var(--line);
+  border-radius:4px; padding:0 5px; margin-left:6px; white-space:nowrap;}
+.one-off-section{margin:18px 0;}
+.one-off-section table{border-collapse:collapse; font-size:13px;}
+.one-off-section th, .one-off-section td{text-align:left; padding:4px 10px 4px 0; vertical-align:top;}
 </style>
 
 <!-- Vendored, not CDN-loaded - same self-hosting rationale as the
@@ -2004,6 +2022,7 @@ function notOwedYetText(owesFrom, d){
   return `Not owed yet — owes supplies from ${fmtDay(owesFrom)}`;
 }
 function slaTileHtml(d, dateStr){
+  if(ONE_OFF) return "";
   const s = slaInPlaceOn(d, dateStr);
   // TURNED OFF (REQ-DASH-180 criterion 16): nothing due once no owed slot is
   // open - never the last version's due time as though it applied - and
@@ -2892,6 +2911,54 @@ const ASSET_SYNTHETIC = true;
 // data-asset.yaml's display_name, in the masthead and every page title. Null in
 // the raw template.
 const ASSET_DISPLAY_NAME = null;
+// A ONE-OFF'S PAGE (REQ-DASH-444): what it knows about itself, embedded by
+// dashboard/one_off_page.py - its id and project, its kind's display words,
+// every release decision newest first, where and when it was published, the
+// commit that built it ('built at') and the commit its checks ran at
+// ('checked at'), and what its kind declared (an extraction's recipe,
+// REQ-DASH-447). Null on every enduring asset's page and in the raw template.
+const ONE_OFF = null;
+// THE ADDRESS A ONE-OFF'S PAGE CANNOT ANSWER (REQ-DASH-436 criterion 6): a
+// removed tool's route (#/plans, #/demo, #/scenarios, #/feedback), a period, a
+// `?panel=` naming a removed tool, a `cmp=` comparison or an in-the-warehouse
+// date. Repaired HERE, before anything reads the address, to the nearest view
+// that exists without it, and said in a notice above the page - never a blank
+// page. Literal parameter names: their constants are declared further down.
+const ONE_OFF_NOTICES = [];
+(function repairAOneOffsAddress(){
+  if(!ONE_OFF) return;
+  const url = new URL(location.href);
+  const said = [];
+  const parts = url.hash.slice(1).split("/").filter(Boolean);
+  const TOOLS = {plans:"Plans", demo:"Demo", scenarios:"Scenarios", feedback:"Feedback"};
+  if(parts.length && TOOLS[parts[0]]){ said.push(`${TOOLS[parts[0]]} page`); url.hash = "#/"; }
+  else if(parts[0] === "agency" && parts[2] === "collection" && parts[4] === "period"){
+    said.push("period view"); url.hash = `#/agency/${parts[1]}`;
+  }
+  const PANELS = {activity:"Recent activity", changelog:"Release notes", requirements:"Requirements",
+    snapshots:"Past snapshots", leaderboard:"Leaderboard", scenarios:"Scenarios", feedback:"Feedback",
+    plans:"Plans", demo:"Demo"};
+  if(url.searchParams.has("panel")){
+    const v = url.searchParams.get("panel");
+    said.push(PANELS[v] ? `${PANELS[v]} panel` : "such panel");
+    url.searchParams.delete("panel"); url.searchParams.delete("req");
+  }
+  if(url.searchParams.has("cmp")){ said.push("run comparison"); url.searchParams.delete("cmp"); }
+  if(url.searchParams.has("in-place-on") || url.searchParams.has("as" + "of")){
+    said.push("in-the-warehouse date");
+    url.searchParams.delete("in-place-on"); url.searchParams.delete("as" + "of");
+  }
+  if(url.searchParams.has("period")){ said.push("period control"); url.searchParams.delete("period"); }
+  if(!said.length) return;
+  const list = said.length > 1 ? `${said.slice(0, -1).join(", ")} or ${said[said.length - 1]}` : said[0];
+  ONE_OFF_NOTICES.push(`This page has no ${list} - it is a one-off's QA report - so it opened the nearest view that does exist.`);
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+})();
+// THE PAGE'S OWN WORDS FOR A DECISION (REQ-DASH-444 criterion 7): never
+// decisionWords() or causeNoun(), whose filing vocabulary ('held back')
+// would clash.
+const ONE_OFF_DECISION_WORDS = {release: "Released", withhold: "Withheld"};
+const ONE_OFF_UNDECIDED = "No release decision recorded. This page reports QA results only; it does not release or withhold the data.";
 // WHAT MOVED TO ANOTHER ASSET (REQ-PIPE-354 criterion 6): [{id, name,
 // asset_name, address}], from data-asset.yaml's moved_to - configuration, so
 // this page never reads the other asset's.
@@ -3957,15 +4024,55 @@ function buildCollectionDatasets(collectionId, inPlaceOnDateStr, period = null){
       const built = clipped ? buildRealDataset(clipped)
         : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
            closedSlots: d.closedSlots || []};
-      return {...built, periodHeld: row};
+      return {...built, ...rollupFacts(d), periodHeld: row};
     });
   }
   return (entry.datasets || []).map(d => {
     const clipped = clipDatasetToInPlaceOn(d, inPlaceOnDateStr);
-    return clipped ? buildRealDataset(clipped)
-      : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
-         closedSlots: d.closedSlots || []};
+    if(clipped) return {...buildRealDataset(clipped), ...rollupFacts(d)};
+    const empty = {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
+                   closedSlots: d.closedSlots || []};
+    // NOTHING ARRIVED AND A PACKAGE CHECK SAYS SO (REQ-DASH-436 criterion 2):
+    // a one-off's declared table that never arrived has no run, and its
+    // failing 'declared table arrived' is its verdict - Fail, never No data,
+    // as dataset_status.py's dataset_status reads it.
+    const pkg = packageStatuses(d);
+    return {...empty, ...rollupFacts(d),
+            ...(pkg.length ? {status: rollupStatuses(pkg), packageOnly: true} : {})};
   });
+}
+// WHAT THE ROLLUP ASKS OF A DATASET THAT buildRealDataset()'s OWN SHAPE DOES
+// NOT CARRY (REQ-TEST-437; REQ-PIPE-106 criterion 8, REQ-PIPE-438 criteria 3
+// and 5, REQ-DASH-436 criterion 4): no schedule agreed yet, a derived product,
+// arrived and not yet checked. Each is the build's, carried onto the page's
+// dataset so inNoRollup() and the not-counted line read them - they were
+// dropped here, and on a rendered page the rollup counted all three.
+const ROLLUP_FACTS = ["scheduleNotAgreed", "derived", "notYetChecked"];
+function rollupFacts(raw){
+  const out = {};
+  for(const k of ROLLUP_FACTS) if(raw && raw[k] != null) out[k] = raw[k];
+  return out;
+}
+// WHAT A DATASET WITH NO RUN WAS JUDGED ON (REQ-DASH-436 criterion 2): its
+// package checks, each with its verdict and finding.
+function packageChecksHtml(raw){
+  const counted = ((raw && raw.fileChecks && raw.fileChecks.checks) || [])
+    .filter(ck=> ck.countsInStatus && !ck.retired_as_of && ck.current_status);
+  if(!counted.length) return "";
+  return `<div class="scope-section" data-package-checks><div class="head"><h3>About the supply as a whole</h3>${pill(rollupStatuses(counted.map(ck=> ck.current_status)), "sm")}</div>
+    ${counted.map(ck=>{
+      const last = (ck.history || [])[ck.history.length - 1] || {};
+      return `<div class="scope-check" data-package-check="${escAttr(ck.key)}"><span class="label"><span class="nm">${escHtml(ck.name)}</span>
+        <span class="ds">${escHtml(sentenceCase(last.finding || ""))}</span></span>${layerChip(ck)}${pill(ck.current_status, "sm")}</div>`;
+    }).join("")}</div>`;
+}
+// THE PACKAGE CHECKS THAT COUNT IN A DATASET'S STATUS, with a verdict - the
+// file checks the build marks countsInStatus on a one-off's page, and none on
+// any other page.
+function packageStatuses(raw){
+  return ((raw && raw.fileChecks && raw.fileChecks.checks) || [])
+    .filter(ck=> ck.countsInStatus && !ck.retired_as_of && ck.current_status)
+    .map(ck=> ck.current_status);
 }
 // ONE DATASET-ID INDEX over every collection (criterion 5): dataset ids are
 // unique across collections, so an id alone finds its raw data and the
@@ -4890,6 +4997,7 @@ function xAxisTicks(n, xOf, labelOf, y){
   return kept.sort((a, b)=> a - b).map(i=> `<text x="${xOf(i).toFixed(1)}" y="${y}" font-size="${AXIS_FONT}" text-anchor="${anchor(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace" data-x-label>${escHtml(labelOf(i))}</text>`).join("");
 }
 function unitTrendBlock(series, o){
+  if(ONE_OFF) return "";
   const id = "utrend"+(chartSeq++);
   const n = series.length;
   const head = `<div class="unit-trend-title">${o.title}</div>${o.key || ""}`;
@@ -5018,6 +5126,7 @@ function firstRunDateOf(datasetIds){
 // slot itself, so a fill that lands after the reader has moved on draws the
 // date it was asked for, or nothing if its slot is gone.
 function datasetsTrendSlot(datasetIds, quiet){
+  if(ONE_OFF) return "";
   return `<div class="datasets-trend-slot" data-on="${CURRENT_IN_PLACE_ON}" data-ids="${escAttr(datasetIds.join(" "))}"${quiet ? " data-quiet" : ""}></div>`;
 }
 function fillDatasetsTrends(root){
@@ -5041,6 +5150,7 @@ function fillDatasetsTrends(root){
 }
 // The row and tile entry point: the units' series, drawn.
 function aggregateSparkline(units, quietStatus, opts){
+  if(ONE_OFF) return "";
   return twoLineSparkline(unitCounts(units), {...(opts||{}), quiet: !!quietStatus});
 }
 
@@ -5475,12 +5585,22 @@ function notCountedMarker(status, datasets){
 // sitting beside the 'Not owed yet' pill as though a run were missing
 // (post-build-review #199 F10).
 function noRunWords(ds, dateStr){
+  if(ds && ds.packageOnly) return "Nothing arrived for it, and a package check failed - open the dataset for why";
   const on = dateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const raw = ds && (rawRealDatasetById(ds.id) || ds);
   const owesFrom = raw && slaInPlaceOn(raw, on).notOwedYet;
   return owesFrom ? notOwedYetText(owesFrom, raw) : "No QA run within tolerance on the selected date";
 }
+// 'QA result' BESIDE EVERY ROLLUP STATUS ON A ONE-OFF'S PAGE (REQ-DASH-444
+// criterion 4), so it cannot be read as the release decision. Nothing on any
+// other page.
+function qaResultLabel(){ return ONE_OFF ? `<span class="qa-result-label">QA result</span>` : ""; }
+function rollupPill(status, size){ return qaResultLabel() + pill(status, size); }
 function statusPill(ds, size, dateStr){
+  if(ONE_OFF) return qaResultLabel() + statusPillOnly(ds, size, dateStr);
+  return statusPillOnly(ds, size, dateStr);
+}
+function statusPillOnly(ds, size, dateStr){
   const on = dateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   if(ds && ds.status === "nodata"
      && slaInPlaceOn(rawRealDatasetById(ds.id) || ds, on).notOwedYet){
@@ -5630,9 +5750,116 @@ function turnOffMarker(d, dateStr){
 // FOR A NOT-YET-AGREED DATASET ONLY (REQ-PIPE-438 criterion 7): a `never`
 // dataset carries no marker - the one-off page says that once (REQ-DASH-444).
 function unagreedMarker(d){
+  // THE RAW DATASET CARRIES `derived` (the build's), the clipped one need not.
+  const raw = d && d.id ? rawRealDatasetById(d.id) : null;
+  if(d && (d.derived || (raw && raw.derived))) return derivedMarker(d);
   if(!d || d.scheduleNotAgreed !== "not-yet-agreed") return "";
   return `<span class="pill unagreed sm" title="This dataset is not counted in any \
 collection or asset rollup."><span class="ico"></span>No delivery schedule agreed yet</span>`;
+}
+// ---- A ONE-OFF'S PAGE (REQ-DASH-444, REQ-DASH-447) ----------------------
+// THE STANDING DECISION, IN WORDS OF ITS OWN (criteria 2, 3 and 5): 'Released
+// by <actor>, <instant>: <reason>' or 'Withheld by ...', its reason in full -
+// or, with none recorded, the undecided line exactly as criterion 3 has it.
+function oneOffDecisionWords(d){
+  return `${ONE_OFF_DECISION_WORDS[d.decision] || d.decision} by ${d.actor}, ${d.atWords || fmtInstant(d.at)}: ${d.reason}`;
+}
+function oneOffDecisionLine(){
+  const d = (ONE_OFF.decisions || [])[0];
+  return d ? oneOffDecisionWords(d) : ONE_OFF_UNDECIDED;
+}
+// WHEN, WHERE AND FROM WHAT (criterion 8): the instant it was published, the
+// address, the commit that built it ('built at') and the commit its checks ran
+// at ('checked at') - and that a later decision appears only on a later
+// publish.
+function oneOffProvenanceHtml(){
+  const when = ONE_OFF.publishedAt
+    ? `Published ${escHtml(fmtInstant(ONE_OFF.publishedAt))} to <span class="mono" data-one-off-address>${escHtml(ONE_OFF.address || "")}</span>`
+    : `Not published - built ${escHtml(BUILT_AT ? fmtInstant(BUILT_AT) : "")} for viewing here`;
+  const commit = (label, sha, what)=> `${label} <code data-one-off-${what}>${escHtml(sha || "unknown")}</code>`;
+  return `<div class="one-off-provenance" data-one-off-provenance>${when} · ${commit("built at", ONE_OFF.builtAt, "built-at")} · ${commit("checked at", ONE_OFF.checkedAt, "checked-at")}.
+    A decision recorded after it was published appears only on a later publish.</div>`;
+}
+function oneOffDecisionHtml(){
+  return `<div class="one-off-decision" data-one-off-decision role="note">
+    <div class="one-off-decision-line" data-one-off-decision-line>${escHtml(oneOffDecisionLine())}</div>
+    ${oneOffProvenanceHtml()}</div>`;
+}
+// EVERY DECISION ON THE HOME VIEW, NEWEST FIRST (criterion 6).
+function oneOffDecisionsHtml(){
+  const all = ONE_OFF.decisions || [];
+  if(!all.length) return "";
+  return `<section class="one-off-section" data-one-off-decisions>
+    <h3 class="section-heading">Release decisions</h3>
+    <ol style="margin:6px 0 0 18px; padding:0;">${all.map(d=> `<li data-one-off-decision-entry style="margin:0 0 6px;">${escHtml(oneOffDecisionWords(d))}
+      <span style="color:var(--ink-muted); font-size:12.5px;"> - ${d.current ? "Current" : `Replaced by the decision of ${escHtml(d.replacedByWords || fmtInstant(d.replacedBy))}`}</span></li>`).join("")}</ol>
+  </section>`;
+}
+// WHAT THE RECIPE DECLARED, IN SUMMARY, ON THE HOME VIEW (REQ-DASH-447
+// criterion 1): its format version, digest and filter - never the id and
+// project the masthead already carries.
+function oneOffRecipeSummaryHtml(){
+  const r = ONE_OFF.declaration && ONE_OFF.declaration.recipe;
+  if(!r) return "";
+  return `<section class="one-off-section" data-recipe-summary>
+    <h3 class="section-heading">What the recipe declared</h3>
+    <table><tbody>
+      <tr><th>Recipe format version</th><td data-recipe-version>${escHtml(String(r.formatVersion))}</td></tr>
+      <tr><th>Recipe digest</th><td class="mono" data-recipe-digest>${escHtml(r.digest || "")}</td></tr>
+      <tr><th>Filter</th><td data-recipe-filter>${escHtml(r.filter || "")}</td></tr>
+    </tbody></table>
+    <div class="view-sub" style="margin-top:6px;">Each table's declared columns, cohort and expected rows are on its own page.</div>
+  </section>`;
+}
+// THE TWO LAYER NAMES (REQ-DASH-444 criterion 10): 'Default check' for the
+// layer every one-off of the kind gets, the kind's own name for its own.
+function layerName(layer){
+  if(!ONE_OFF || !layer) return "";
+  return layer === "kind" ? ONE_OFF.kind.layer : "Default check";
+}
+function layerChip(ck){
+  const name = layerName(ck && ck.layer);
+  return name ? `<span class="layer-chip" data-layer="${escAttr(ck.layer)}">${escHtml(name)}</span>` : "";
+}
+// A TABLE'S DECLARATION ON ITS OWN VIEW (REQ-DASH-447 criteria 2 and 3): its
+// columns with their types and identifier marks, its placement, whether it is
+// a derived product, its cohort bounds and its expected row count - each
+// recipe check beside the declaration it came from.
+function oneOffDeclarationHtml(ds){
+  const t = ONE_OFF && ONE_OFF.declaration && (ONE_OFF.declaration.tables || {})[ds.id];
+  if(!t) return "";
+  // A COLUMN'S CHECKS FROM THAT COLUMN, a table's from any of its columns.
+  const found = (keys, column)=> (ds.columns || []).filter(c=> column == null || c.name === column)
+    .flatMap(c=> (c.checks || []).filter(ck=> (keys || []).includes(ck.key)).map(ck=> ({c, ck})));
+  const checks = (keys, column)=> found(keys, column).map(({c, ck})=>
+    `<button class="scope-check declared-check" data-col="${escAttr(columnKey(c))}" data-check="${escAttr(ck.key)}" style="display:inline-flex; width:auto; margin:0 6px 4px 0;">
+      <span class="label"><span class="nm">${escHtml(ck.name)}</span> <span style="color:var(--ink-muted);">(${escHtml(String(ck.key).split("_").pop())})</span></span>${layerChip(ck)} ${pill(checkStatus(ck), "sm")}</button>`).join("");
+  const bound = b=> `${escHtml(b.column)}: ${b.lower != null ? `from ${escHtml(String(b.lower))}` : ""}${b.lower != null && b.upper != null ? " " : ""}${b.upper != null ? `to ${escHtml(String(b.upper))}` : ""}`;
+  return `<section class="one-off-section" data-declaration="${escAttr(ds.id)}">
+    <h3 class="section-heading">What the recipe declared</h3>
+    <table><tbody>
+      <tr><th>Placement</th><td data-declared-placement>${escHtml(t.placement.agency)} › ${escHtml(t.placement.collection)} › ${escHtml(t.placement.dataset)} (file <span class="mono">${escHtml(t.file)}</span>, table <span class="mono">${escHtml(t.table)}</span>)</td></tr>
+      <tr><th>Derived product</th><td data-declared-derived>${t.derived ? `Yes - ${derivedMarker({derived: true})}` : "No"}</td></tr>
+      <tr><th>Cohort</th><td data-declared-cohort>${(t.cohort || []).length ? t.cohort.map(b=> `<div>${bound(b)} ${checks(b.checks, b.column)}</div>`).join("") : "No cohort bounds declared"}</td></tr>
+      <tr><th>Expected rows</th><td data-declared-expected-rows>${t.expectedRows != null ? `${fmtInt(t.expectedRows)} ${checks(t.expectedRowsChecks)}` : "The recipe gave no expected row count"}</td></tr>
+    </tbody></table>
+    <table style="margin-top:10px;" data-declared-columns><thead><tr><th>Column</th><th>Type</th><th>Identifier</th><th>Recipe checks</th></tr></thead><tbody>
+      ${(t.columns || []).map(c=> `<tr data-declared-column="${escAttr(c.name)}"><td class="mono">${escHtml(c.name)}</td><td>${escHtml(c.type)}</td><td>${c.identifier ? "Primary identifier" : ""}</td><td>${checks(c.checks, c.name)}</td></tr>`).join("")}
+    </tbody></table>
+  </section>`;
+}
+function wireDeclaredChecks(root, ag, col, ds){
+  root.querySelectorAll(".declared-check").forEach(btn=> btn.addEventListener("click", ()=>{
+    const column = ds.columns.find(c=> columnKey(c) === btn.dataset.col);
+    const check = column && column.checks.find(ck=> ck.key === btn.dataset.check);
+    if(column && check) openCheckPanel(ag, col, ds, column, check);
+  }));
+}
+// A DERIVED PRODUCT SAYS SO IN WORDS (REQ-PIPE-438 criterion 5), in the
+// kind's display word - never its folder name.
+function derivedMarker(d){
+  const kind = ONE_OFF ? ONE_OFF.kind.singular : "asset";
+  return `<span class="derived-marker" data-derived-product style="font-size:12px; color:var(--ink-muted);">Derived product, not counted in the ${escHtml(kind)}'s status</span>`;
 }
 // ESCAPED, unlike most of this page. The page's long-standing posture
 // is that committed repo content renders into innerHTML unescaped, and
@@ -5841,6 +6068,9 @@ function wireArrivalContext(view){
 }
 
 function arrivalBanner(ds){
+  // NOTHING IS PROMOTED FROM A ONE-OFF (REQ-DASH-436 criterion 5): its
+  // 'awaiting a decision' would read as the release decision.
+  if(ONE_OFF) return "";
   if(!ARRIVAL_FROM) return "";
   const left = fmtPeriodName(ARRIVAL_FROM) || ARRIVAL_FROM;
   // FROM THE ARRIVAL CONTEXT ALONE (REQ-DASH-198 criterion 10): the period
@@ -5901,6 +6131,7 @@ function arrivalBanner(ds){
 // so "Promoted" and "Latest arrival" are on the row rather than implied
 // by order.
 function promotionSplit(ds){
+  if(ONE_OFF) return "";
   const st = ds && ds.promotionState;
   if(!st || !st.differs) return "";
   const arrived = st.arrived ? st.arrived.supply : null;
@@ -7223,7 +7454,7 @@ function fileSectionHtml(ds, inPlaceOnDateStr){
             data-file-status="${escAttr(r.point.status)}">
       <span class="label"><span class="kind-tag">File check</span><span class="nm">${escHtml(r.check.name)}</span>
         <span class="ds">${r.point.status === "green" ? "" : escHtml(sentenceCase(r.point.finding || ""))}</span></span>
-      ${pill(r.point.status,"sm")}
+      ${layerChip(r.check)}${pill(r.point.status,"sm")}
       <span class="sr-only"> — view its result for each file received</span>
     </button>`;
   const passed = shown.results.filter(r=> r.point.status === "green");
@@ -7540,10 +7771,21 @@ window.addEventListener("popstate", (e)=>{
 // badge, not part of the view's name.
 // NAMING THE ASSET (REQ-PIPE-354 criterion 2): '<asset> · Data Asset QA
 // Register' wherever the build says which asset this is.
-const SITE_NAME = ASSET_DISPLAY_NAME ? `${ASSET_DISPLAY_NAME} \u00b7 Data Asset QA Register`
+// A ONE-OFF'S PAGE IS '<id> · <project> · QA report' (REQ-DASH-444 criterion
+// 1): its masthead's heading and the suffix of every view's title, with its
+// kind said once, in the masthead, in the kind's display word.
+const SITE_NAME = ONE_OFF ? ONE_OFF.siteName
+  : ASSET_DISPLAY_NAME ? `${ASSET_DISPLAY_NAME} \u00b7 Data Asset QA Register`
   : "Data Asset QA Register";
 (function nameTheAssetInTheMasthead(){
   const el = document.getElementById("masthead-asset");
+  if(ONE_OFF){
+    if(el) el.textContent = `One-off ${ONE_OFF.kind.singular}`;
+    const h1 = document.querySelector(".masthead h1");
+    if(h1) h1.textContent = ONE_OFF.siteName;
+    document.documentElement.classList.add("one-off-page");
+    return;
+  }
   if(el && ASSET_DISPLAY_NAME) el.textContent = `${ASSET_DISPLAY_NAME} \u00b7 Quality Assurance`;
 })();
 function currentViewName(){
@@ -7719,6 +7961,9 @@ function render(){
   // one signal that says a render actually finished; nothing in the
   // page reads it.
   const done = r => {
+    if(ONE_OFF) view.insertAdjacentHTML("afterbegin", oneOffDecisionHtml());
+    if(ONE_OFF_NOTICES.length) view.insertAdjacentHTML("afterbegin",
+      `<div class="in-place-on-range-notice" role="status" data-one-off-notice>${escHtml(ONE_OFF_NOTICES.join(" "))}</div>`);
     const bar = scenarioJumpBar();
     if(bar){ view.insertAdjacentHTML("afterbegin", bar); wireScenarioJumpBar(view); }
     markScenarioSubject();
@@ -7748,6 +7993,12 @@ function render(){
   return renderTier(view, done);
 }
 function renderTier(view, done){
+  if(ONE_OFF && ["plans", "demo", "scenarios", "feedback", "period"].includes(STATE.tier)){
+    ONE_OFF_NOTICES.splice(0, ONE_OFF_NOTICES.length,
+      "This page has no such view - it is a one-off's QA report - so it opened the nearest view that does exist.");
+    STATE = STATE.tier === "period" ? {tier:"agency", agencyId:STATE.agencyId} : {tier:"exec"};
+    history.replaceState(STATE, "", navUrl());
+  }
   if(STATE.tier==="exec") return done(renderExec(view));
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   // NO DEMO IN A REAL DEPLOYMENT (Keith, 2026-11-18): its recording is of a
@@ -9052,6 +9303,7 @@ function renderExec(view){
         <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A Fail anywhere below makes the parent Fail; a Warn with no Fail makes it Warn — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, whose schedule has ended, that is turned off and owes nothing, or that has no schedule agreed sits outside that comparison rather than losing to it, and is counted separately below.</div>
       </div>
     </div>
+    ${ONE_OFF ? oneOffDecisionsHtml() + oneOffRecipeSummaryHtml() : ""}
     ${assetNotCountedLine()}
     <div class="legend-key">
       <span><i class="green"></i>Pass — within threshold (${agencyCount("green")})</span>
@@ -9187,7 +9439,7 @@ function agencyCardHtml(ag){
     const notGreen = datasetsNotGreenLine(agDatasets, ag.status);
     const trend = datasetsTrendSlot(agDatasets.map(d=>d.id), !notGreen);
     return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}' data-agency="${ag.id}">
-      <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
+      <div class="card-top"><h3>${ag.name}</h3>${rollupPill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${ag.sectionOf ? notOpenedLines(ag) : ""}
       ${trend}
@@ -9299,7 +9551,7 @@ function renderAgency(view, agencyId){
         <h2>${ag.name}</h2>
         <div class="view-sub">Real-time QA state across ${ag.name}'s data collections — for internal data teams and this agency's own data providers.</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${rollupPill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
     ${CURRENT_PERIOD ? `${periodStepsHtml(ag)}<div id="collections"></div>${outstandingQueue("agency", ag.id)}`
       : `${outstandingQueue("agency", ag.id)}<div id="collections"></div>`}
@@ -9335,7 +9587,7 @@ function renderAgency(view, agencyId){
       <p class="view-sub" data-testid="collection-not-loaded">Its data did not load, so its datasets are not shown here and no status counts them. The notice above names the file.</p>
     </div>` : `
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
+      <div class="collection-title"><h3>${col.name}</h3>${rollupPill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}${collectionTurnOffLine(col)}${collectionCarryForwardLines(col, CURRENT_IN_PLACE_ON)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
       ${heldBackMarker(col)}
@@ -9345,7 +9597,7 @@ function renderAgency(view, agencyId){
       ${columnsNotGreenKey()}
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Columns not passing</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>${ONE_OFF ? "QA result" : "Status"}</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Columns not passing</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
           // REQ-PIPE-053, checked BEFORE the no-data row. Both render
@@ -11146,8 +11398,10 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill({...ds, status:"nodata"})} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds.packageOnly ? ds : {...ds, status:"nodata"})} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
+      ${ds.packageOnly ? packageChecksHtml(rawRealDatasetById(ds.id)) : ""}
+      ${ONE_OFF ? oneOffDeclarationHtml(ds) : ""}
       ${arrivalBanner(ds)}
       ${notDueYetLine(ds)}
       ${causeNote(ds)}
@@ -11216,6 +11470,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>`}
     </div>
+    ${ONE_OFF ? oneOffDeclarationHtml(ds) : ""}
     <div class="legend-key">
       <span><i class="green"></i>Pass</span><span><i class="amber"></i>Warn</span><span><i class="red"></i>Fail</span>
       <span style="color:var(--ink-faint);">— click a column for the full check-by-check breakdown, run-over-run comparison, and history</span>
@@ -11224,11 +11479,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         key: columnsNotGreenKey(), yTitle:"% of columns", unitWord:"Columns", noun:"column", quiet: !!ds.noDataInPlaceOn})}
     <div id="file-section-wrap"></div>
     <div id="scope-sections"></div>
-    ${ds.blocked || ds.noDataInPlaceOn ? "" : `<div class="tile-lines-key">Each column's lines: share of its checks failing (solid) and warning (dotted), each QA run</div>`}
+    ${ds.blocked || ds.noDataInPlaceOn || ONE_OFF ? "" : `<div class="tile-lines-key">Each column's lines: share of its checks failing (solid) and warning (dotted), each QA run</div>`}
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
   `;
   wireArrivalContext(view);
+  if(ONE_OFF) wireDeclaredChecks(view, ag, col, ds);
 
   const grid = document.getElementById("col-grid");
   // Item 57 brought Tier 2's sparkline down to Tier 3, narrower still -
@@ -11321,7 +11577,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     const rows = ordered.map(({c, ck})=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
         <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="rc"></span><span class="ds"></span></span>
-        ${pill(checkStatus(ck),"sm")}
+        ${layerChip(ck)}${pill(checkStatus(ck),"sm")}
       </button>`).join("");
     return `<div class="scope-section" data-scope="${sc.scope}">
       <div class="head"><h3>${sc.title}</h3>${checks.length ? pill(worst,"sm") : ""}</div>
@@ -11391,7 +11647,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // (already as-of-clipped) - see rawRealDatasetById()'s own comment.
   const rawDs = rawRealDatasetById(datasetId);
   const historyWrap = document.getElementById("supply-history-wrap");
-  if(rawDs){
+  if(rawDs && !ONE_OFF){
     const cycles = buildSupplyHistory(rawDs);
     const currentCycleStart = currentPeriodOn(ds.id, CURRENT_IN_PLACE_ON).date;
     historyWrap.innerHTML = renderSupplyHistorySection(ds, cycles, currentCycleStart);
@@ -11511,7 +11767,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
   const renderCheckCard = ck => {
     const st = checkStatus(ck);
     return `<a class="check-card ${ck.retired?'is-retired':''}" href="${checkHref(ck)}" data-idx="${ck.__idx}" data-check="${escAttr(ck.key)}">
-      <div class="row1"><span class="name"></span>
+      <div class="row1"><span class="name"></span>${layerChip(ck)}
         ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredOn)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
       </div>
       ${ck.description? `<div class="check-desc"></div>`:""}
@@ -11768,6 +12024,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   }
   document.getElementById("check-panel-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name} / ${column.name}</span>`;
   document.getElementById("check-panel-title").textContent = check.name;
+  document.getElementById("check-panel-title").insertAdjacentHTML("beforeend", layerChip(check));
   // #42: the check-card this panel was opened from already shows a
   // status pill (pill(st,"sm") in the checksBlock template below) - the
   // panel itself used to drop that entirely, leaving a viewer to
@@ -11826,7 +12083,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // has 10+ history points), but a brand new onboarded dataset would
   // hit it on day one.
   const defaultCompareIdx = defaultCompareIndex(check.history);
-  const hasCompareRun = defaultCompareIdx >= 0;
+  const hasCompareRun = !ONE_OFF && defaultCompareIdx >= 0;
   const compareIdx = (STATE.compareIdx!=null && STATE.compareIdx>=0 && STATE.compareIdx<n-1) ? STATE.compareIdx : defaultCompareIdx;
   const comparePoint = hasCompareRun ? check.history[compareIdx] : null;
   const isDefaultCompare = compareIdx === defaultCompareIdx;
@@ -11962,7 +12219,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       ${aggregateValuesBlock(currentPoint)}
     </div>` : "";
 
-  const trendBlock = `
+  const trendBlock = ONE_OFF ? "" : `
     <div class="drawer-section">
       <h4>Over time — every QA run (${deliveryCount(check.history)} ${pluralize(deliveryCount(check.history),"run")})</h4>
       ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs, (r)=> historySource(col, r, ds))}

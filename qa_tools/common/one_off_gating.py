@@ -120,7 +120,12 @@ def template_pass(kind, *, base: str | None = None) -> dict | None:
     """{gate: [problem]} for every gate the kind declares for its template
     (REQ-PIPE-448 criterion 6) - or None where the template has not changed
     since the diff base, or the kind has none."""
+    from asset_model import one_off_publishing
+
     template = assets.kind_template(kind.name)
-    if not kind.template_gates or not template.is_dir() or not changed(template, base):
+    if not template.is_dir() or not changed(template, base):
         return None
-    return {name: list(check(template)) for name, check in sorted(kind.template_gates.items())}
+    # THE PUBLISHING DESTINATION IS EVERY KIND'S (REQ-PIPE-443 criterion 1),
+    # so it gates every kind's template beside the kind's own gates.
+    gates = {**kind.template_gates, "publishing destination": one_off_publishing.problems}
+    return {name: list(check(template)) for name, check in sorted(gates.items())}

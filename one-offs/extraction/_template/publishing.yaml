@@ -1,0 +1,15 @@
+# Where every extraction's QA page is published (REQ-PIPE-443): one page per
+# extraction, named by its id, with the page's fonts/ beside it. Read live from
+# here at the moment of publishing and never copied into an extraction's folder
+# (REQ-PIPE-440 criterion 13), so changing where extractions are published is
+# this one edit - and a page already published stays where it was written.
+#
+# A folder (a relative one is read from the repository root) or an S3 prefix,
+# s3://<bucket>/<prefix>. Who can read it is the destination's own access
+# control, not this system's: the pages carry failing-row identifier keys, so
+# it must be restricted to the people entitled to them.
+#
+# PROVISIONAL (2026-11-22): this sandbox's gitignored data/ folder, so a page
+# published here is never committed. A real deployment names its shared folder
+# or bucket.
+destination: data/one-off-pages

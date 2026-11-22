@@ -59,7 +59,7 @@ def choose(one_off_id: str):
 OPEN_NEW = "Open a new package"
 #: The TUI's steps once a one-off is chosen, each the command of that name.
 STEPS = {"Load its package": "load", "Record its release decision": "decide",
-         "Drop it": "drop", "List every one-off": "list"}
+         "Publish its page": "publish", "Drop it": "drop", "List every one-off": "list"}
 
 
 @click.group("one-off", invoke_without_command=True)
@@ -115,6 +115,8 @@ def _tui(ctx: click.Context) -> None:
             elif STEPS[step] == "decide":
                 ctx.invoke(decide_command, one_off_id=one_off_id, decision=None, reason=None,
                            yes=False)
+            elif STEPS[step] == "publish":
+                ctx.invoke(publish_command, one_off_id=one_off_id, yes=False)
             elif STEPS[step] == "drop":
                 ctx.invoke(drop_command, one_off_id=one_off_id)
             else:
@@ -245,6 +247,13 @@ def load_command(one_off_id: str, package: str) -> None:
     # criteria 8, 9 and 12).
     refused = one_off_load.refusals(chosen.folder, package, assets.kind_template(chosen.kind),
                                     s3_client=client)
+    # ALREADY PUBLISHED (REQ-PIPE-443 criterion 7): read from the destination,
+    # since by then the one-off's database may be gone.
+    from qa_tools.common import one_off_publish
+
+    published = one_off_publish.load_refusal(chosen.kind, one_off_id)
+    if published:
+        refused = [*refused, published]
     if refused:
         raise click.ClickException("the load was refused, and nothing was loaded:\n"
                                    + "\n\n".join(refused))
@@ -298,7 +307,7 @@ def decide_command(one_off_id: str, decision: str | None, reason: str | None,
     kept. Terminal only, never GitHub."""
     from qa_tools.common import git_identity, one_off_decision, people, supply_db
 
-    choose(one_off_id)
+    chosen = choose(one_off_id)
     # 1. THE ACTOR, from git identity, against the kind's people.yaml read now.
     try:
         actor = people.person_by_email(git_identity.get_run_by())
@@ -350,7 +359,18 @@ def decide_command(one_off_id: str, decision: str | None, reason: str | None,
             got = one_off_decision.record(conn, one_off_id, decision, reason, actor)
     except one_off_decision.DecisionRefused as exc:
         raise click.ClickException(str(exc)) from None
-    click.echo(f"Recorded: {one_off_decision.words(got)}.")
+    click.echo(f"Recorded: {one_off_decision.words(got).rstrip('.')}.")
+    # THE PUBLISHED PAGE IS NOW BEHIND (REQ-PIPE-435 criterion 11), read from
+    # the destination itself.
+    from qa_tools.common import one_off_publish
+
+    try:
+        found = one_off_publish.published(chosen.kind, one_off_id)
+    except one_off_publish.PublishRefused:
+        found = None
+    if found is not None:
+        click.echo(f"The page published at {found.address} still shows the earlier state until "
+                   f"{one_off_id} is published again: mothman one-off publish --id {one_off_id}")
     click.echo("Next: publish it, so its page carries the decision:\n"
                f"  mothman one-off publish --id {one_off_id}")
 
@@ -386,6 +406,16 @@ def drop_command(one_off_id: str) -> None:
     for item in items:
         click.echo(f"  {item.what}: {item.holds}")
     click.echo(f"Its committed configuration, {chosen.folder}, stays.")
+    # THE PUBLISHING WARNINGS (REQ-PIPE-443 criteria 8 and 9): no page means no
+    # record will remain; a page older than the latest decision does not show
+    # it, and publishing first is offered before the id is typed.
+    warnings, offer = _drop_warnings(chosen)
+    for line in warnings:
+        click.echo(line)
+    if offer and common.confirm(f"Publish {one_off_id} first, so its page shows every decision?",
+                                yes=False, default=True):
+        ctx = click.get_current_context()
+        ctx.invoke(publish_command, one_off_id=one_off_id, yes=True)
     typed = click.prompt(common._named(f"Type {one_off_id} to remove them"), default="",
                          show_default=False)
     if typed.strip() != one_off_id:
@@ -404,6 +434,69 @@ def drop_command(one_off_id: str) -> None:
             "these could not be removed and remain: " + "; ".join(left)
             + f". Run `mothman one-off drop --id {one_off_id}` again to finish.")
     click.echo("Next: mothman one-off list")
+
+
+def _drop_warnings(chosen) -> tuple[list[str], bool]:
+    """The drop's publishing warnings, from the destination and the recorded
+    decisions - or one saying they could not be read."""
+    from qa_tools.common import one_off_decision, one_off_load, one_off_publish, supply_db
+
+    decisions = []
+    try:
+        if one_off_load.database_name(chosen.name) in (_ages_or_none() or {}):
+            with supply_db.connect(read_only=True, label="mothman:one-off-drop") as conn:
+                decisions = one_off_decision.history(conn)
+        return one_off_publish.drop_warnings(chosen.kind, chosen.name, decisions)
+    except one_off_publish.PublishRefused as exc:
+        return [f"Warning: whether {chosen.name} has a published page could not be read: {exc}"], \
+            False
+
+
+@one_off_group.command("publish")
+@id_option
+@click.option("--yes", is_flag=True, help="Skip the one confirmation (the scripted form).")
+def publish_command(one_off_id: str, yes: bool) -> None:
+    """Publish a one-off's QA page - one page named by its id, with its fonts/
+    beside it - to the folder or S3 prefix its kind's template names, read now
+    (REQ-PIPE-443). Shows the address, the decision in force and how many
+    datasets are not yet checked, then asks (--yes confirms). Publishing again
+    replaces its own page; another package's is never written over. Never from
+    CI, and never to the recurring assets' hosting."""
+    from qa_tools.common import one_off_decision, one_off_publish
+
+    chosen = choose(one_off_id)
+    try:
+        planned = one_off_publish.plan(one_off_id)
+    except one_off_publish.PublishRefused as exc:
+        raise click.ClickException(f"nothing was published: {exc}") from None
+    # WHAT IT WILL DO, BEFORE IT DOES IT (criterion 3; delivery-cli-ux C3): it
+    # writes outside the repository to a place other people read.
+    click.echo(f"Publishing {chosen.name} ({_word(chosen.kind)}) to: {planned.address}"
+               + (" - replacing its own page there." if planned.replaces else ""))
+    click.echo("Decision in force: " + (one_off_decision.words(planned.in_force)
+                                         if planned.in_force else "none recorded - the page "
+                                         "will say no release decision is recorded."))
+    n = len(planned.not_yet_checked)
+    click.echo(f"Datasets not yet checked: {n}"
+               + (f" ({', '.join(planned.not_yet_checked)})" if n else "") + ".")
+    if not yes:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            raise click.ClickException("no terminal to confirm at - pass --yes to publish "
+                                       "without asking. Nothing was published.")
+        if not common.confirm(f"Publish {one_off_id}'s page to {planned.address}?", yes=False,
+                              default=False):
+            click.echo("Not published.")
+            return
+    try:
+        address = one_off_publish.publish(planned, say=lambda line: click.echo(line))
+    except (one_off_publish.PublishRefused, click.ClickException) as exc:
+        message = exc.format_message() if isinstance(exc, click.ClickException) else str(exc)
+        raise click.ClickException(f"nothing was published: {message}") from None
+    click.echo(f"Published -> {address}")
+    # THE NEXT STEP (REQ-PIPE-442 criterion 12).
+    click.echo("\n".join(["Next: record a decision, or drop it:",
+                          f"  mothman one-off decide --id {one_off_id}",
+                          f"  mothman one-off drop --id {one_off_id}"]))
 
 
 @one_off_group.command("setup-dbt-utils")

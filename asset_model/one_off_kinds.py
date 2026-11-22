@@ -51,6 +51,14 @@ class Kind:
     #: file-checks.yaml document - its package checks, read live from the
     #: template (REQ-QAC-441 criterion 1), or None for a kind with none.
     file_checks: Callable | None = None
+    #: check key -> 'default' (the layer every one-off of the kind gets) or
+    #: 'kind' (its own, named `layer`) - how its page labels each check
+    #: (REQ-DASH-444 criterion 10).
+    layer_of: Callable | None = None
+    #: one-off folder -> what the one-off declared, for its page, read from its
+    #: committed folder (REQ-DASH-447 criterion 4) - or None for a kind with
+    #: nothing to show.
+    declaration: Callable | None = None
 
 
 _REGISTRY: dict[str, Kind] = {}

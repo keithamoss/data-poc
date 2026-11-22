@@ -1267,11 +1267,32 @@ def build_datasets(collection_id: str) -> list[dict]:
     all_runs = sorted([*manifest, *readers_runs.values()],
                       key=lambda m: facts[m["run_id"]]["rank"])
     superseded = superseded_runs(facts, manifest)
-    return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
-                            dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
-                            warehouse_cache=cache, superseded=superseded,
-                            not_in_agreement=payload.get("not_in_agreement") or {})
-            for d in coll.datasets]
+    built = [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
+                             dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
+                             warehouse_cache=cache, superseded=superseded,
+                             not_in_agreement=payload.get("not_in_agreement") or {})
+             for d in coll.datasets]
+    if _one_off_page():
+        _label_layers(built)
+    return built
+
+
+def _label_layers(datasets: list[dict]) -> None:
+    """Each check of a one-off's page, marked with its layer - 'default' or
+    'kind' - through its kind's plug-in (REQ-DASH-444 criterion 10). The page
+    words them; nothing here names a kind."""
+    from asset_model import one_off_kinds
+
+    kind = one_off_kinds.get(assets.selected().kind)
+    if kind is None or kind.layer_of is None:
+        return
+    for ds in datasets:
+        checks = [ck for col in ds.get("columns") or [] for ck in col.get("checks") or []]
+        checks += list((ds.get("fileChecks") or {}).get("checks") or [])
+        for ck in checks:
+            layer = kind.layer_of(ck.get("key") or "")
+            if layer:
+                ck["layer"] = layer
 
 
 def build(collection_id: str) -> dict:
