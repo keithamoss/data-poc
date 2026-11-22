@@ -198,6 +198,19 @@ releases:
               development tools, dates and trends are gone from it.
       - category: Fixed
         items:
+          - headline: A one-off load that stopped mid-check finishes when run again
+            components: ["Pipeline & publishing"]
+            description: >
+              If a one-off's load stopped part way through a table's checks,
+              loading it again used to fail every time. It now checks that
+              table again on a fresh try and finishes the load.
+          - headline: An unscheduled dataset beside a scheduled one no longer stops filing
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection holding a dataset with no schedule agreed yet beside
+              a scheduled one stopped the scheduled supply's filing. Both are
+              now filed and checked, and the page leaves the unscheduled one
+              out of the collection's status.
           - headline: Datasets left out of a status are left out on the page too
             components: ["Dashboard UI"]
             description: >
