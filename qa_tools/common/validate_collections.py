@@ -307,6 +307,8 @@ def config_problems(package: Path | None = None) -> list[str]:
 #: collection's (REQ-QAC-241 criterion 2 as amended by A21).
 ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "file-checks.yaml",
               "presentation.yaml")
+#: A one-off's record of its generated files' digests (REQ-PIPE-440).
+ONE_OFF_DIGEST = "generated.sha256.json"
 #: The asset folder's own parts, each with a gate of its own - its dbt project
 #: (the dbt-folder gate), its QA adapters (the adapters gate) and its
 #: synthetic-only configuration (below) - so never an agency's folder.
@@ -366,6 +368,10 @@ def check_file_problems(root: Path | None = None) -> list[str]:
             continue
         rel = path.relative_to(root).as_posix()
         if path.parent == contract:
+            # A ONE-OFF'S GENERATED-FILE DIGEST (REQ-PIPE-440 criterion 5) sits at
+            # the top of its folder beside the asset-wide files.
+            if path.name == ONE_OFF_DIGEST and assets.selected().is_one_off:
+                continue
             if path.name not in ASSET_WIDE:
                 problems.append(f"{rel} is at the top of the asset's folder, where only the "
                                 f"asset-wide files belong ({', '.join(ASSET_WIDE)})")
