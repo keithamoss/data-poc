@@ -206,8 +206,6 @@ class Layer:
     evidently: list = field(default_factory=list)
     #: {table: {column: [dbt test]}}
     dbt: dict = field(default_factory=dict)
-    #: [{check_id, dataset_id, assertion, ...}] - what the load records itself.
-    load: list = field(default_factory=list)
 
     def extend(self, other: "Layer") -> "Layer":
         out = copy.deepcopy(self)
@@ -222,7 +220,6 @@ class Layer:
         for t, cols in other.dbt.items():
             for c, tests in cols.items():
                 out.dbt.setdefault(t, {}).setdefault(c, []).extend(copy.deepcopy(tests))
-        out.load.extend(copy.deepcopy(other.load))
         return out
 
 
@@ -244,14 +241,6 @@ def _odcs(cid: str, meta: dict, rule: dict) -> dict:
              for k, v in meta.items() if k != "category"]
     return {"id": cid.replace(".", ":"), **rule, "dimension": meta["category"],
             "severity": "error", "customProperties": props}
-
-
-def _soda(meta: dict) -> dict:
-    return {"check_id": meta["check_id"], **{k: v for k, v in meta.items() if k != "check_id"}}
-
-
-def _dbt(meta: dict) -> dict:
-    return {k: v for k, v in meta.items() if k != "name"} | {"name": meta["name"]}
 
 
 def _literal(value) -> str:
@@ -280,32 +269,27 @@ def default_layer(asset_id: str, tables: list[Table], template: dict[str, dict])
     out: dict[str, Layer] = {}
     for t in tables:
         layer = out.setdefault(t.collection_id, Layer())
-        for a in ("table_arrived", "undeclared_file"):
-            entry = template[a]
-            if "load" in entry["tools"]:
-                layer.load.append({"assertion": a, "dataset_id": t.dataset_id, "table": t.table,
-                                   "file": t.file, "derived": t.derived,
-                                   **_meta(check_id(asset_id, t, a, "file"), entry,
-                                           entry["introduced_date"])})
+        # table_arrived and undeclared_file are the one-off's own file checks
+        # (qa_tools/common/one_off_checks.package_checks), not a tool's.
         entry = template["columns_arrived"]
         if "soda" in entry["tools"]:
             meta = _meta(check_id(asset_id, t, "columns_arrived", "soda"), entry,
                          entry["introduced_date"])
             layer.soda.setdefault(t.table, []).append({"schema": {
                 "fail": {"when required column missing": [c["name"] for c in t.columns]},
-                "attributes": _soda(meta)}})
+                "attributes": meta}})
         entry = template["identifier_not_null"]
         for col in t.identifiers:
             introduced = entry["introduced_date"]
             if "dbt" in entry["tools"]:
                 layer.dbt.setdefault(t.table, {}).setdefault(col, []).append({"not_null": {
-                    "meta": _dbt(_meta(check_id(asset_id, t, "identifier_not_null", "dbt", col),
+                    "meta": (_meta(check_id(asset_id, t, "identifier_not_null", "dbt", col),
                                        entry, introduced))}})
             if "soda" in entry["tools"]:
                 meta = _meta(check_id(asset_id, t, "identifier_not_null", "soda", col),
                              entry, introduced)
                 layer.soda.setdefault(t.table, []).append({f"missing_count({col}) = 0": {
-                    "samples limit": 5, "attributes": _soda(meta)}})
+                    "samples limit": 5, "attributes": meta}})
             if "datacontract" in entry["tools"]:
                 cid = check_id(asset_id, t, "identifier_not_null", "datacontract", col)
                 layer.contract.setdefault(t.table, {"fields": {}, "model": []})["fields"] \
@@ -338,7 +322,7 @@ def recipe_layer(asset_id: str, tables: list[Table], introduced: str) -> dict[st
                 "dbt_utils.expression_is_true": {
                     "expression": (f"is null or pg_input_is_valid(\"{name}\"::text, "
                                    f"'{PG_TYPE[kind]}')"),
-                    "meta": _dbt(_meta(check_id(asset_id, t, "declared_type", "dbt", name),
+                    "meta": (_meta(check_id(asset_id, t, "declared_type", "dbt", name),
                                        words, introduced, reads_columns=[f"{t.table}.{name}"]))}})
             if keys:
                 meta = _meta(check_id(asset_id, t, "declared_type", "soda", name), words,
@@ -347,7 +331,7 @@ def recipe_layer(asset_id: str, tables: list[Table], introduced: str) -> dict[st
                     "name": f"{name} {words['name'].lower()}",
                     "fail query": f"SELECT {keys} FROM {t.table} WHERE {bad}",
                     "fail": "when > 0", "samples limit": 100000,
-                    "attributes": _soda(meta)}})
+                    "attributes": meta}})
             cid = check_id(asset_id, t, "declared_type", "datacontract", name)
             contract["fields"].setdefault(name, []).append(_odcs(
                 cid, _meta(cid, words, introduced, reads_columns=[f"{t.table}.{name}"]),
@@ -365,7 +349,7 @@ def recipe_layer(asset_id: str, tables: list[Table], introduced: str) -> dict[st
                 "dbt_utils.accepted_range": {
                     **{k: (v if isinstance(v, (int, float)) else _literal(v))
                        for k, v in rng.items()},
-                    "meta": _dbt(_meta(check_id(asset_id, t, "cohort_bounds", "dbt", name),
+                    "meta": (_meta(check_id(asset_id, t, "cohort_bounds", "dbt", name),
                                        words, introduced))}})
             reads = [f"{t.table}.{name}"] + [f"{t.table}.{k}" for k in t.identifiers
                                              if k != name]
@@ -376,7 +360,7 @@ def recipe_layer(asset_id: str, tables: list[Table], introduced: str) -> dict[st
                     "name": f"{name} {words['name'].lower()}",
                     "fail query": f"SELECT {keys} FROM {t.table} WHERE {condition}",
                     "fail": "when > 0", "samples limit": 100000,
-                    "attributes": _soda(meta)}})
+                    "attributes": meta}})
             cid = check_id(asset_id, t, "cohort_bounds", "datacontract", name)
             contract["fields"].setdefault(name, []).append(_odcs(
                 cid, _meta(cid, words, introduced, reads_columns=[f"{t.table}.{name}"]),
@@ -387,7 +371,7 @@ def recipe_layer(asset_id: str, tables: list[Table], introduced: str) -> dict[st
             n = int(t.expected_rows)
             meta = _meta(check_id(asset_id, t, "expected_rows", "soda"), words, introduced)
             layer.soda.setdefault(t.table, []).append({f"row_count = {n}": {
-                "attributes": _soda(meta)}})
+                "attributes": meta}})
             cid = check_id(asset_id, t, "expected_rows", "datacontract")
             contract["model"].append(_odcs(cid, _meta(cid, words, introduced),
                                            {"metric": "rowCount", "mustBe": n}))

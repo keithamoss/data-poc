@@ -225,3 +225,35 @@ class TestEachFolderIsGated:
         assert "one-offs" not in check.result_line(tree="t", tree_after="t", counts=(1, 0, 0),
                                                     coverage=None, floor=None, elapsed=1,
                                                     failed_gates=[])
+
+
+class TestTheCollectionsGateAcceptsTheSharedAdapter:
+    """Criterion 4: a one-off's collections are served by its kind's one shared
+    adapter, resolved through the adapter registry - and an enduring asset's
+    collection without an adapter of its own still fails."""
+
+    def test_a_generated_extraction_passes_the_collections_gate(self, extraction):
+        from qa_tools.common import one_off_gating
+
+        code, said = one_off_gating.gate_folder("collections", "cohort-2026-a")
+        assert code == 0, said
+        assert "has no adapter" not in said and "outside every collection" not in said
+
+    def test_the_registry_resolves_the_kinds_adapter(self, extraction):
+        from qa_tools import collections
+
+        assets.select_one_off("cohort-2026-a")
+        got = collections.adapter("cohort-study")
+        assert got.collection_id == "cohort-study"
+        assert got.sample_key == {"cohort_people": ["person_id"],
+                                  "cohort_visits": ["visit_id"]}
+        assert collections.adapter_file("cohort-study").endswith(
+            "qa_tools/collections/kinds/extraction.py")
+
+    def test_an_enduring_assets_collection_without_one_still_fails(self, tmp_path):
+        from qa_tools.common import validate_collections
+
+        package = tmp_path / "adapters"
+        package.mkdir()
+        problems = validate_collections.config_problems(package)
+        assert any("has no adapter" in p for p in problems), problems

@@ -177,10 +177,14 @@ def _id_problems(extraction_id: str) -> list[str]:
              f"re-send is a new extraction, with an id of its own."] if clash else [])
 
 
-def read(location: str, *, s3_client=None) -> Package:
+def read(location: str, *, s3_client=None, opening: bool = True) -> Package:
     """The package at `location` - a local directory or an s3:// prefix -
     with its recipe read and validated, or RecipeRefused naming every problem
-    (criteria 1 to 7). Reads files only; never opens a database."""
+    (criteria 1 to 7). Reads files only; never opens a database.
+
+    `opening` False is the LOAD's read (REQ-PIPE-442), of a package whose
+    folder is already generated: criterion 7's clash with an existing folder is
+    the open's refusal, and the load's own folder is that folder."""
     from jsonschema import Draft202012Validator
 
     source = _source(location, s3_client)
@@ -222,7 +226,8 @@ def read(location: str, *, s3_client=None) -> Package:
                           for c in t["columns"]),
             cohort=tuple(Bound(b["column"], b["lower"], b["upper"]) for b in t["cohort"]),
             expected_rows=t.get("expected_rows")))
-    problems += _id_problems(doc["extraction_id"])
+    problems += (_id_problems(doc["extraction_id"]) if opening else
+                 [p for p in _id_problems(doc["extraction_id"]) if "already a folder" not in p])
     if problems:
         raise RecipeRefused(problems)
     recipe = Recipe(format_version=doc["recipe_format_version"],

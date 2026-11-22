@@ -157,6 +157,66 @@ def open_command(kind_name: str, package: str) -> None:
         f"  mothman one-off load --id {read.recipe.extraction_id}"]))
 
 
+@one_off_group.command("load")
+@id_option
+@click.argument("package")
+def load_command(one_off_id: str, package: str) -> None:
+    """Load a one-off's package - a local directory or an s3:// prefix - into
+    a database of its own, supply_<id>, after its folder is gated: every gate
+    its kind declares, then stage, check with all four tools and record, one
+    delivery per collection (REQ-PIPE-442 criterion 3). A load that stopped
+    is resumed by loading the same package again (criterion 5)."""
+    from asset_model import one_off_kinds
+    from qa_tools.common import git_identity, one_off_load
+
+    chosen = choose(one_off_id)
+    kind = one_off_kinds.get(chosen.kind)
+    client = None
+    if package.startswith("s3://"):
+        import boto3
+
+        client = boto3.client("s3")
+    # THE REFUSALS FIRST, before reading or connecting to anything (REQ-PIPE-440
+    # criteria 8, 9 and 12).
+    refused = one_off_load.refusals(chosen.folder, package, assets.kind_template(chosen.kind),
+                                    s3_client=client)
+    if refused:
+        raise click.ClickException("the load was refused, and nothing was loaded:\n"
+                                   + "\n\n".join(refused))
+    # EVERY GATE ITS KIND DECLARES, OVER ITS FOLDER (criterion 3; Keith
+    # 2026-11-21, architect Q-A4 (a)): a load of an ungated folder could
+    # publish a page from configuration no gate had read.
+    failed = []
+    for label in [g for g, applies in kind.gates.items() if applies]:
+        if run_in_process(label):
+            failed.append(label)
+    if failed:
+        raise click.ClickException(
+            f"the folder {chosen.folder} failed the gate(s) {', '.join(failed)}, so nothing "
+            f"was loaded. Run `mothman one-off gate --id {one_off_id} <gate>` to see why.")
+    try:
+        read = kind.reader(package, s3_client=client, opening=False)
+        if read.recipe.extraction_id != one_off_id:
+            raise ValueError(f"the package at {package} is extraction "
+                             f"{read.recipe.extraction_id!r}, not {one_off_id!r}.")
+        run_by = git_identity.get_run_by()
+        report = one_off_load.load(read, run_by=run_by, s3_client=client,
+                                   say=lambda line: click.echo(line))
+    except (ValueError, one_off_load.LoadRefused) as exc:
+        raise click.ClickException(str(exc)) from None
+    failing = sum(1 for r in report["results"] if r.get("status") in ("fail", "error"))
+    click.echo(f"Loaded {one_off_id} into {report['database']}: {len(report['runs'])} run(s), "
+               f"{len(report['results'])} tool result(s), {failing} failing"
+               + (f"; declared and not arrived: {', '.join(report['missing'])}"
+                  if report["missing"] else "")
+               + (f"; not declared, not filed: {', '.join(report['undeclared'])}"
+                  if report["undeclared"] else "") + ".")
+    # THE NEXT STEP (criterion 12).
+    click.echo("\n".join(["Next: decide what to release, or publish it:",
+                          f"  mothman one-off decide --id {one_off_id}",
+                          f"  mothman one-off publish --id {one_off_id}"]))
+
+
 @one_off_group.command("setup-dbt-utils")
 def setup_dbt_utils_command() -> None:
     """Install this deployment's one local dbt_utils copy for one-offs, at the

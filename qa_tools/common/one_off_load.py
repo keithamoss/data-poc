@@ -19,6 +19,7 @@ THE REFUSALS ARE THE LOAD'S, the load itself is REQ-PIPE-442's: it asks
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -180,3 +181,241 @@ def refusals(folder: Path, package_location: str, template: Path, *, s3_client=N
                          git_refusal(template, "the kind's template"),
                          dbt_utils_refusal()) if r]
     return found
+
+
+# ---- the load (REQ-PIPE-442 criteria 3 to 5; REQ-QAC-441 criterion 3) -------
+
+class LoadRefused(RuntimeError):
+    """The load cannot go ahead. Its message says why and what to do."""
+
+
+#: Where a one-off's database records which package it holds and the commit it
+#: was loaded at (REQ-PIPE-442 criterion 3, REQ-DASH-444 criterion 8).
+LOAD_TABLE = "qa.one_off_load"
+_LOAD_DDL = f"""
+CREATE TABLE IF NOT EXISTS {LOAD_TABLE} (
+    only_row        boolean PRIMARY KEY DEFAULT true CHECK (only_row),
+    one_off_id      text NOT NULL,
+    package_digest  text NOT NULL,
+    recipe_digest   text NOT NULL,
+    loaded_commit   text NOT NULL,
+    deliveries      jsonb NOT NULL DEFAULT '{{}}',
+    loaded_at       timestamptz NOT NULL DEFAULT now()
+)"""
+
+
+def package_digest(location: str, files, *, s3_client=None) -> str:
+    """sha256 over every file of the package, by name and content - what
+    tells a resumed load (the same package) from a re-send (another)."""
+    import hashlib
+
+    from asset_model.kinds import extraction_recipe
+
+    source = extraction_recipe._source(location, s3_client)
+    h = hashlib.sha256()
+    for name in sorted(files):
+        h.update(name.encode() + b"\0" + hashlib.sha256(source.read(name)).digest())
+    return h.hexdigest()
+
+
+def database_name(one_off_id: str) -> str:
+    from qa_tools.common import supply_db
+
+    return f"{supply_db.ASSET_DATABASE_PREFIX}{one_off_id}"
+
+
+def _server() -> str:
+    from qa_tools.common import supply_db
+
+    server = os.environ.get(supply_db.SERVER_ENV)
+    if not server:
+        raise LoadRefused(f"{supply_db.SERVER_ENV} is not set: a one-off's database is created "
+                          f"on the configured local server it names.")
+    return server
+
+
+def ensure_database(one_off_id: str, digest: str, recipe_digest: str, commit: str) -> str:
+    """Create supply_<id> on the configured local server and mark it as the
+    one-off's, recording the package's digest and the commit - or, where it
+    already exists, RESUME a load of the same package and REFUSE another's
+    (criterion 5). Returns 'created' or 'resumed'."""
+    import psycopg
+    from psycopg import sql
+
+    from qa_tools.common import db_identity, environments, supply_db
+
+    server = _server()
+    name = database_name(one_off_id)
+    with psycopg.connect(supply_db.on_server(server, "postgres"), autocommit=True,
+                         application_name="mothman:one-off-load") as admin:
+        exists = admin.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                               [name]).fetchone() is not None
+        if not exists:
+            admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+    dsn = supply_db.on_server(server, name)
+    with psycopg.connect(dsn, autocommit=True, application_name="mothman:one-off-load") as conn:
+        if exists:
+            held = _held(conn)
+            if held is None:
+                raise LoadRefused(f"{name} exists on the server and records no one-off package - "
+                                  f"it is not this load's to use. Nothing was loaded.")
+            if held[0] != digest:
+                raise LoadRefused(
+                    f"{name} already holds another package (digest {held[0]}), and this one is "
+                    f"{digest}. A re-send is a new one-off, with an id of its own. Nothing was "
+                    f"loaded.")
+            return "resumed"
+        db_identity.mark(conn, db_identity.Identity(one_off_id, environments.current().id))
+        conn.execute("CREATE SCHEMA IF NOT EXISTS qa")
+        conn.execute(_LOAD_DDL)
+        conn.execute(f"INSERT INTO {LOAD_TABLE} (one_off_id, package_digest, recipe_digest, "
+                     "loaded_commit) VALUES (%s, %s, %s, %s)",
+                     [one_off_id, digest, recipe_digest, commit])
+    return "created"
+
+
+def _held(conn):
+    found = conn.execute("SELECT to_regclass(%s)", [LOAD_TABLE]).fetchone()[0]
+    if found is None:
+        return None
+    return conn.execute(f"SELECT package_digest, deliveries FROM {LOAD_TABLE}").fetchone()
+
+
+def recorded_load(conn) -> dict | None:
+    """What supply_<id> records about its load: the package digest, the
+    recipe digest and the commit (REQ-DASH-444 criterion 8)."""
+    raw = getattr(conn, "raw", conn)
+    if raw.execute("SELECT to_regclass(%s)", [LOAD_TABLE]).fetchone()[0] is None:
+        return None
+    row = raw.execute(f"SELECT one_off_id, package_digest, recipe_digest, loaded_commit, "
+                      f"deliveries FROM {LOAD_TABLE}").fetchone()
+    return dict(zip(("one_off_id", "package_digest", "recipe_digest", "loaded_commit",
+                     "deliveries"), row)) if row else None
+
+
+def _remember_delivery(collection_id: str, delivery: str) -> None:
+    from qa_tools.common import supply_db
+
+    with supply_db.connect(label="mothman:one-off-load") as conn:
+        conn.raw.execute(f"UPDATE {LOAD_TABLE} SET deliveries = deliveries || %s::jsonb",
+                         [json.dumps({collection_id: delivery})])
+
+
+def head_commit(path: Path) -> str:
+    repo = _repo_of(Path(path))
+    got = _git(["rev-parse", "HEAD"], repo) if repo else None
+    if got is None or got.returncode != 0:
+        raise LoadRefused(f"{path} is in no git commit, so the load cannot record the commit "
+                          f"it ran at.")
+    return got.stdout.strip()
+
+
+def _completed(run_id: str) -> bool:
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:one-off-load") as conn:
+        if conn.execute("SELECT to_regclass(?)", [f"{qa_store.SCHEMA}.run"]).fetchone()[0] \
+                is None:
+            return False
+        rows = conn.execute(f'SELECT completed_at FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchall()
+    return bool(rows) and rows[0][0] is not None
+
+
+def load(package, *, run_by: str, s3_client=None, say=print) -> dict:
+    """Load the selected one-off's package into its own database, after the
+    caller has gated its folder (criterion 3): its database created or resumed,
+    its check workspace materialised from the folder and the kind's template,
+    one delivery per collection filed from the declared files present, each
+    arrival staged, checked by all four tools and recorded, and the package's
+    own facts - a declared table that never arrived, a file nobody declared -
+    recorded as failing default-layer results (REQ-QAC-441 criterion 3).
+    Returns what it did."""
+    import tempfile
+
+    from asset_model import collections, config_yaml
+    from asset_model.kinds import extraction_checks
+    from qa_tools.common import dbt_common, hand_filing, one_off_checks, one_off_package
+    from qa_tools.common import delivery as delivery_mod
+    from qa_tools.tools import orchestrate, run_dbt, stage
+
+    folder = assets.committed_folder()
+    one_off_id = folder.name
+    digest = package_digest(package.location, package.files, s3_client=s3_client)
+    commit = head_commit(folder)
+    how = ensure_database(one_off_id, digest, package.recipe.digest, commit)
+    say(f"{'Created' if how == 'created' else 'Resuming the load into'} "
+        f"{database_name(one_off_id)}.")
+    workspace = one_off_checks.materialise(dbt_utils_path())
+    assets.use_workspace(workspace)
+    try:
+        dbt_common.install_packages(assets.selected().dbt_project, run_dbt.PROFILES_DIR)
+        doc = config_yaml.load(folder / "data-asset.yaml") or {}
+        tables = extraction_checks.declared(doc, config_yaml.load(folder / "calendar.yaml"))
+        found = one_off_package.findings(package.files, tables, "recipe.json")
+        from qa_tools.common import supply_db
+
+        with supply_db.connect(read_only=True, label="mothman:one-off-load") as conn:
+            deliveries = dict((recorded_load(conn) or {}).get("deliveries") or {})
+        home = one_off_package.home_of(tables)
+        received = {}
+        report = {"database": database_name(one_off_id), "how": how, "runs": [],
+                  "missing": [t.dataset_id for t in found.missing],
+                  "undeclared": list(found.undeclared), "results": []}
+        source = None
+        with tempfile.TemporaryDirectory(prefix="mothman-one-off-") as tmp:
+            for coll in collections.all_collections():
+                mine = [t for t in found.present if t.collection_id == coll.id]
+                if not mine:
+                    continue
+                if coll.id in deliveries:
+                    filed_name = deliveries[coll.id]
+                else:
+                    if source is None:
+                        from asset_model.kinds import extraction_recipe
+
+                        source = extraction_recipe._source(package.location, s3_client)
+                    paths = []
+                    for t in mine:
+                        local = Path(tmp) / t.file
+                        local.parent.mkdir(parents=True, exist_ok=True)
+                        local.write_bytes(source.read(t.file))
+                        paths.append(local)
+                    filed = hand_filing.file_supply(
+                        paths, coll.id, coll.run_prefix,
+                        stated_original={"*": delivery_mod.NOT_KNOWN}, route="folder",
+                        filed_by=run_by)
+                    filed_name = filed.delivery_name
+                    _remember_delivery(coll.id, filed_name)
+                    say(f"Filed {coll.name} as delivery {filed_name}.")
+                arrivals = [a for a in hand_filing.arrivals_of(
+                    hand_filing.Filed(filed_name, "", (), None), coll.id, coll.run_prefix)]
+                todo = [a for a in arrivals if not _completed(a.run_id)]
+                for a in arrivals:
+                    received.setdefault("at", a.received_at)
+                    report["runs"].append(a.run_id)
+                for a in todo:
+                    stage.stage_arrival(coll.id, a)
+                    if home.collection_id == coll.id and \
+                            home.dataset_id in a.files_by_dataset:
+                        one_off_package.record_undeclared(found, a.run_id, home.dataset_id,
+                                                          delivery=filed_name)
+                if todo:
+                    report["results"] += orchestrate.run_arrivals(coll.id, todo, run_by)
+        at = received.get("at")
+        if at is None:
+            from asset_model import asset_time
+
+            at = asset_time.now()
+        for t in found.missing:
+            run_id = one_off_package.run_id_for(t.table, at)
+            report["runs"].append(run_id)
+            if _completed(run_id):
+                continue
+            one_off_package.record_missing(
+                t, at, run_by, delivery=deliveries.get(t.collection_id),
+                undeclared=found if t.dataset_id == home.dataset_id else None)
+            say(f"{t.file} is declared and did not arrive - recorded as failing.")
+        return report
+    finally:
+        assets.use_workspace(None)

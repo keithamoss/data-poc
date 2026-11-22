@@ -65,7 +65,10 @@ def _entries(doc, source: str) -> list[dict]:
         if unknown:
             raise FileChecksError(f"{where} names {', '.join(unknown)}, which no file check "
                                   f"allows - allowed: {', '.join(sorted(KEYS))}")
-        if name not in NAMES:
+        if name in ONE_OFF_NAMES and not _for_a_one_off():
+            raise FileChecksError(f"{where} names {name!r}, which only a one-off's default "
+                                  f"check layer runs - its load writes it (REQ-QAC-441)")
+        if name not in NAMES and name not in ONE_OFF_NAMES:
             # ONLY A CHECK THE CODE CAN EVALUATE (REQ-QAC-387 criterion 3; Keith,
             # 2026-11-18): an unknown name passed this gate and then failed every
             # file at the file-check step with 'no evaluator for this check'.
@@ -139,6 +142,26 @@ COLUMN_ORDER = "column_order"
 #: Evaluation order, which is also reading order on the page.
 NAMES = (ENCODING, DELIMITER, HEADER_ROW, HEADER_NAMES_UNIQUE, FIELDS_PER_ROW, COLUMN_ORDER)
 
+#: A ONE-OFF'S PACKAGE CHECKS (REQ-QAC-441 criteria 2 and 3): its default
+#: layer's facts about the package, defined in the kind's template and
+#: materialised into the one-off's check workspace as additions of its own -
+#: never an enduring asset's. `table_arrived` is asked of each declared file as
+#: it is screened, and passes there; the load records it failing for a declared
+#: table whose file never arrived. `undeclared` (the template's `undeclared_file`) is asked of the PACKAGE as
+#: a whole, by the load - its format is PACKAGE, so no file's screening runs it.
+TABLE_ARRIVED = "table_arrived"
+UNDECLARED_FILE = "undeclared"
+ONE_OFF_NAMES = (TABLE_ARRIVED, UNDECLARED_FILE)
+#: The format of a check asked of the whole package rather than one file.
+PACKAGE = "package"
+
+
+def _for_a_one_off() -> bool:
+    try:
+        return assets.selected().is_one_off
+    except assets.AssetError:
+        return False
+
 
 @dataclass(frozen=True)
 class Definition:
@@ -158,7 +181,7 @@ def definitions(path: Path | str | None = None) -> list[Definition]:
                       name=str(raw.get("name") or raw["check"]).strip(),
                       retired=bool(raw.get("retired_as_of")))
            for raw, _source in merged(path)]
-    order = {n: i for i, n in enumerate(NAMES)}
+    order = {n: i for i, n in enumerate(NAMES + ONE_OFF_NAMES)}
     return sorted(out, key=lambda d: order.get(d.check, len(order)))
 
 

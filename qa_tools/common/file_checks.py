@@ -254,7 +254,15 @@ def _column_order(p: _Pass, expected) -> tuple[str, str]:
                   f"where the contract has \"{agreed[i]}\"")
 
 
-_EVALUATORS = {ENCODING: _encoding, DELIMITER: _delimiter, HEADER_ROW: _header_row,
+def _table_arrived(p: _Pass, expected) -> tuple[str, str]:
+    """A ONE-OFF'S DECLARED FILE, SCREENED, HAS ARRIVED (REQ-QAC-441 criterion
+    2): only a file its recipe declares is ever filed, so reaching here is the
+    fact. The load records the failing case - a declared file that never came."""
+    return PASS, "the recipe declares this file, and it arrived"
+
+
+_EVALUATORS = {defs.TABLE_ARRIVED: _table_arrived,
+               ENCODING: _encoding, DELIMITER: _delimiter, HEADER_ROW: _header_row,
                HEADER_NAMES_UNIQUE: _header_names_unique, FIELDS_PER_ROW: _fields_per_row,
                COLUMN_ORDER: _column_order}
 
