@@ -498,7 +498,7 @@ def id_clashes() -> dict[str, list[Path]]:
     return {n: f for n, f in held.items() if len(f) > 1}
 
 
-def _kinds_sentence() -> str:
+def kinds_sentence() -> str:
     """'For one of <n> <kinds>, use mothman one-off.' - each kind that has
     folders, counted in its plural display word, joined with 'or'; empty where
     there are none (REQ-PIPE-363 criteria 4 to 6, wording SETTLED by Keith
@@ -527,7 +527,7 @@ def _refusal(stated: str | None, found: list[str]) -> str:
                 f"acts for.")
     else:
         head = f"{ASSET_ENV} is {stated!r}, which names no asset folder."
-    return (f"{head} Set it to one of: {listed}.{_kinds_sentence()} There is deliberately "
+    return (f"{head} Set it to one of: {listed}.{kinds_sentence()} There is deliberately "
             f"no default - a command that guesses is a command that can act for an asset "
             f"it was not meant to.")
 

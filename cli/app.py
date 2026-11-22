@@ -413,7 +413,7 @@ cli.add_panel(RichCommandPanel(
           f"{', '.join(_assets.names()) or '(no asset folders found)'}."
           # 'For one of <n> <kinds>, use mothman one-off.' WHERE ONE-OFFS EXIST
           # (REQ-PIPE-363 criterion 5, AMENDED 2026-11-21).
-          + _assets._kinds_sentence())))
+          + _assets.kinds_sentence())))
 # A LAZILY LOADED TOOL TOO (the CLI post-build critic, 2026-11-18): `scenarios`
 # is not in cli.commands until first use, and left out here rich-click put it
 # in a third, default panel. Listed only where it can run - a real deployment
