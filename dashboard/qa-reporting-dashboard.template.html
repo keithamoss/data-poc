@@ -708,7 +708,10 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 .supply-cycle-label{display:flex; flex-wrap:wrap; align-items:baseline; column-gap:8px; row-gap:2px; font-size:13px; color:var(--ink-muted); margin-bottom:8px;}
 /* A LONG 'For <period> · ...' HEADING WRAPS AS A UNIT (visual critic on
    REQ-DASH-326, 3): the count and the pill drop under it whole. */
-.supply-cycle-label > span{white-space:nowrap;}
+/* Each part moves to the next line whole; one wider than the row wraps
+   inside itself rather than pushing the page sideways at phone width
+   (post-build-review #493 nit - it was white-space:nowrap). */
+.supply-cycle-label > span{min-width:0;}
 .supply-cycle-label b{color:var(--ink);}
 
 .col-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(196px,1fr)); gap:10px; margin-block:8px 30px;}
@@ -2972,10 +2975,6 @@ const ONE_OFF_NOTICES = [];
 // would clash.
 const ONE_OFF_DECISION_WORDS = {release: "Released", withhold: "Withheld"};
 const ONE_OFF_UNDECIDED = "No release decision recorded. This page reports QA results only; it does not release or withhold the data.";
-// WHAT MOVED TO ANOTHER ASSET (REQ-PIPE-354 criterion 6): [{id, name,
-// asset_name, address}], from data-asset.yaml's moved_to - configuration, so
-// this page never reads the other asset's.
-const MOVED_TO = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -5046,7 +5045,7 @@ function unitTrendBlock(series, o){
       ${yLabels}${xLabels}
     </svg>
     ${n < 2 ? `<div class="not-green-faint">One QA run so far</div>` : ""}
-    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}" aria-expanded="false" aria-controls="${id}-table">View as table</button></div>
     <div class="trend-scroll" id="${id}-table" hidden>
       <table class="trend-table">
         <thead><tr><th>Run date</th><th>Failing</th><th>Warning</th><th>Not passing</th></tr></thead>
@@ -5064,6 +5063,8 @@ document.addEventListener("click", e=>{
   if(!t) return;
   t.hidden = !t.hidden;
   btn.textContent = t.hidden ? "View as table" : "Hide table";
+  // SAID TO A SCREEN READER TOO (post-build-review #493 nit).
+  btn.setAttribute("aria-expanded", t.hidden ? "false" : "true");
 });
 
 // DATASETS NOT GREEN, ON AN AGENCY CARD AND A COLLECTION HEADING
@@ -7816,6 +7817,7 @@ window.addEventListener("popstate", (e)=>{
     if(STATE && STATE.panel) return closePanelInPlace();
   }
   if(leaving && leaving.panel === "requirements" && !(STATE && STATE.panel)) returnFocusToRequirementOpener();
+  if(leaving && leaving.panel && !(STATE && STATE.panel)) returnFocusToPanelOpener();
   returnFocusToCheckOpener(leaving);
 });
 
@@ -9549,45 +9551,7 @@ function agencyCardHtml(ag){
 //
 // Found while removing fourteen datasets at once (REQ-DASH-055), which
 // is what made the case easy to hit, but it was always reachable.
-// THE ROUTE NAMES SOMETHING THAT MOVED TO ANOTHER ASSET (REQ-PIPE-354
-// criterion 6): the deepest of its dataset, collection and agency ids that a
-// MOVED_TO entry names, or null.
-function movedEntryForRoute(state){
-  const s = state || STATE || {};
-  for(const id of [s.datasetId, s.collectionId, s.agencyId]){
-    const hit = id && (MOVED_TO || []).find(m=> m.id === id);
-    if(hit) return hit;
-  }
-  return null;
-}
-// THE MOVED NOTICE'S LINK: the other asset's address, carrying the same hash
-// route and in-place-on, and dropping period=, cmp= and panel= - they name
-// this asset's periods, comparisons and panels.
-function movedHref(entry){
-  const target = new URL(entry.address);
-  const here = new URL(location.href);
-  for(const [k, v] of here.searchParams){
-    if(!["period", "cmp", "panel"].includes(k)) target.searchParams.set(k, v);
-  }
-  target.hash = location.hash;
-  return target.toString();
-}
-// SAID IN THE NOT-FOUND PAGE'S HEAD AND RAIL, never as a redirect (criterion
-// 6; wording SETTLED by Keith 2026-11-01): the name from the entry itself.
-function renderMovedNotice(view, entry){
-  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
-  view.innerHTML = `
-    <div class="view-head" data-moved-notice>
-      <div>
-        <h2>${escHtml(entry.name)} has moved to the ${escHtml(entry.asset_name)}'s dashboard</h2>
-        <div class="view-sub"><a href="${escAttr(movedHref(entry))}" data-moved-link>${escHtml(entry.address)}</a></div>
-        <div class="view-sub" data-moved-signin>That dashboard has its own sign-in.</div>
-      </div>
-    </div>`;
-}
 function renderNotFound(view, what, id){
-  const moved = movedEntryForRoute();
-  if(moved) return renderMovedNotice(view, moved);
   setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   view.innerHTML = `
     <div class="view-head">
@@ -9606,11 +9570,6 @@ function renderNotFound(view, what, id){
 // pushes, so Back still goes where the reader came from rather than
 // through the broken link they just arrived on.
 function forgetStaleSegment(what, id, patch){
-  // A ROUTE UNDER SOMETHING THAT MOVED TO ANOTHER ASSET IS NOT STALE
-  // (REQ-PIPE-354 criterion 6; post-build-review #492 F2): its column and
-  // check are on the other dashboard, so the moved notice is the one line,
-  // and the address stays as it is for that notice's link.
-  if(movedEntryForRoute()) return;
   STATE = {...STATE, ...patch};
   history.replaceState(STATE, "", navUrl({dropArrival: false}));
   const view = document.getElementById("view");
@@ -10325,7 +10284,7 @@ function runTimeTrend(datasetId, on, given, source){
       <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W-padR}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1"/>
       ${line}${points}${hollow}${yLabels}${xLabels}
     </svg>
-    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}" aria-expanded="false" aria-controls="${id}-table">View as table</button></div>
     <div class="trend-scroll" id="${id}-table" hidden>
       <table class="trend-table" data-run-time-table>
         <thead><tr><th>Checked</th><th>Run time</th><th>Tries that did not finish</th><th>Slow</th></tr></thead>
@@ -10800,7 +10759,10 @@ function owedNothingRuns(d, dateStr, supplied){
     r.current = current != null && r.periods[n-1] === current;
     const unit = /^\d{4}-\d{2}-\d{2}$/.test(r.periods[0]) ? "day" : "period";
     r.text = n === 1 ? r.label
-      : `${r.label}, ${fmtPeriodOrDay(r.periods[0])} to ${fmtPeriodOrDay(r.periods[n-1])} (${n} ${pluralize(n, unit)}${r.current ? " so far" : ""})`;
+      // A COLON, NOT A COMMA, before the dates (post-build-review #493 nit):
+      // a day's own commas made 'only on Mondays, Tuesday, 17 November' read
+      // as a list of weekdays.
+      : `${r.label}: ${fmtPeriodOrDay(r.periods[0])} to ${fmtPeriodOrDay(r.periods[n-1])} (${n} ${pluralize(n, unit)}${r.current ? " so far" : ""})`;
   });
   return runs;
 }
@@ -11023,11 +10985,22 @@ function wireSupplyHistorySection(container){
   // (REQ-DASH-414 criterion 8): opening a run's tries opens them, and never
   // also moves the page to the row's date - which re-rendered the row and
   // closed the details before they were seen.
-  container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
+  container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>{
     tr.addEventListener("click", e=>{
       if(e.target && e.target.closest && e.target.closest("a, details")) return;
       applyInPlaceOn(tr.dataset.runDate);
-    }));
+    });
+    // FROM THE KEYBOARD TOO (post-build-review #493 nit): in the tab order,
+    // Enter or Space on the row itself does what a click does; a key pressed
+    // on a link or disclosure inside it is theirs.
+    tr.tabIndex = 0;
+    tr.addEventListener("keydown", e=>{
+      if(e.key !== "Enter" && e.key !== " ") return;
+      if(e.target !== tr) return;
+      e.preventDefault();
+      applyInPlaceOn(tr.dataset.runDate);
+    });
+  });
 }
 
 /* ---- A period's composition (REQ-DASH-209) ------------------------------
@@ -12589,10 +12562,26 @@ function openPanel(name, opts){
     url.searchParams.delete("req");
     history.pushState(STATE, "", url.pathname + url.search + location.hash);
   }
+  // FOCUS MOVES INTO A PANEL A PERSON OPENED, and back to what opened it on
+  // close (post-build-review #493 nit): it had stayed on the header button,
+  // behind the drawer. A requirement link keeps its own (REQ_OPENER).
+  const opener = pushHistory && document.activeElement && !document.activeElement.closest(".drawer")
+    ? document.activeElement : null;
   PANEL_RENDER[name]();
   hideAllPanelsDom();
   showPanelDom(name);
   if(name === "requirements" && STATE.req) showRequirement(STATE.req);
+  if(opener && !REQ_OPENER){
+    PANEL_OPENER = opener;
+    const close = document.getElementById(`${name}-panel-close`);
+    if(close) close.focus({preventScroll: true});
+  }
+}
+let PANEL_OPENER = null;
+function returnFocusToPanelOpener(){
+  const el = PANEL_OPENER;
+  PANEL_OPENER = null;
+  if(el && document.contains(el)) el.focus({preventScroll: true});
 }
 // User-initiated close (X, backdrop, Escape): same back()-not-hide()
 // pattern closeDrawer()/closeCheckPanel() already use, for the same
@@ -12622,6 +12611,7 @@ function closePanelInPlace(){
   history.replaceState(STATE, "", navUrl({dropArrival:false}));
   hideAllPanelsDom();
   returnFocusToRequirementOpener();
+  returnFocusToPanelOpener();
 }
 document.getElementById("snapshots-btn").addEventListener("click", ()=> openPanel("snapshots"));
 document.getElementById("snapshots-backdrop").addEventListener("click", closePanel);
@@ -13866,11 +13856,10 @@ function feedbackEvidence(item){
   if(item.kind === "sprint"){
     return `<span>Road-testing sprint ${item.n}${item.title ? ` — ${escHtml(item.title)}` : ""}</span>`;
   }
-  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): kept where
-  // moved_to covers it - following it shows the moved notice - and otherwise
-  // the label alone, never a link to the not-found page.
+  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): the label
+  // alone, never a link to the not-found page.
   const state = feedbackRouteState(item.href);
-  if(state && !routeHeldHere(state) && !movedEntryForRoute(state))
+  if(state && !routeHeldHere(state))
     return `<span data-fb-unlinked>${escHtml(item.label)}</span>`;
   return `<a href="${escAttr(item.href)}" data-fb-link="${escAttr(JSON.stringify({href:item.href, inPlaceOn:item.inPlaceOn || null}))}">${escHtml(item.label)}</a>`;
 }
@@ -14018,7 +14007,7 @@ function renderDemo(view){
         <div class="view-sub">A real recording of the actual <code>mothman</code> CLI/TUI - the Quality Assurance wizard, run for real against real synthetic Birth Registrations data. Not a mockup: every keystroke and every line of output below is what actually happened, captured with a real pseudo-terminal (see <code>scripts/dev/record_cast.py</code>).</div>
       </div>
     </div>
-    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${escHtml(DEMO_CAPTION)}</div>` : ""}
+    ${DEMO_CAPTION ? `<div class="notice-exhausted" role="note" data-demo-caption style="max-width:900px; margin-bottom:12px;">${withCode(DEMO_CAPTION)}</div>` : ""}
     <div id="demo-player-container" style="max-width:900px;"></div>
   `;
   const container = document.getElementById("demo-player-container");

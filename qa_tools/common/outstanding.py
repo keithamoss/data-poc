@@ -389,8 +389,10 @@ def _from_holds(conn=None) -> list[Item]:
         items.append(Item(
             kind=HELD_SUPPLY, severity=INFORMATIONAL if quiet else NEEDS_ACTION,
             blocking=not quiet,
-            headline=(f"{held.dataset_id} sent a supply while turned off" if quiet else
-                      f"{held.dataset_id} has a supply nothing could place"),
+            # BY ITS NAME, as every other headline says it (post-build-review
+            # #493 nit): the id is the configuration's word, not a reader's.
+            headline=(f"{_name_of(held.dataset_id)} sent a supply while turned off" if quiet else
+                      f"{_name_of(held.dataset_id)} has a supply nothing could place"),
             detail=(f"{held.describe()} Every other dataset in the same delivery "
                      f"was processed as usual."),
             agency_id=agency, collection_id=collection, dataset_id=held.dataset_id,
@@ -484,7 +486,7 @@ def _from_unfilled_periods(conn=None) -> list[Item]:
                 agency, collection = _scope_of(gap.dataset_id)
                 items.append(Item(
                     kind=CLOSED_UNFILLED_SLOT, severity=NEEDS_ACTION, blocking=False,
-                    headline=f"{gap.dataset_id}: {gap.describe()}",
+                    headline=f"{_name_of(gap.dataset_id)}: {gap.describe()}",
                     detail=(f"{gap.describe()} - closed with nothing in it, and "
                             f"{slot_state.CLOSED_NOTE}."),
                     agency_id=agency, collection_id=collection, dataset_id=gap.dataset_id,

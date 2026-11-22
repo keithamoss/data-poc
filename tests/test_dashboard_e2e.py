@@ -10455,6 +10455,22 @@ class TestRunTimesOnTheBuiltPage:
         assert clean_page.locator('.supply-history [data-unit-trend="run-time"]').count() == 1
 
 
+class TestTheSupplyHistoryFitsAPhone:
+    """post-build-review #493 nit: at 390px the supply-cycle label's caption
+    ('supplies with no period yet, two files for one table, ...') was held on
+    one line, 715px wide, and the whole page scrolled sideways. The cycle
+    table itself scrolls inside its own frame, as it should."""
+
+    def test_the_page_does_not_scroll_sideways(self, clean_page, built_dashboard_html):
+        clean_page.set_viewport_size({"width": 390, "height": 844})
+        _goto(clean_page, built_dashboard_html, _CP_CLIENTS)
+        got = clean_page.evaluate("""() => ({
+          labels: document.querySelectorAll('.supply-cycle-label').length,
+          page: document.documentElement.scrollWidth - innerWidth})""")
+        assert got["labels"], "precondition: a supply cycle with its label"
+        assert got["page"] <= 0, got
+
+
 class TestAPeriodLinkOpensWithItsStatement:
     """REQ-DASH-355 criterion 6 on a COLD LOAD (post-build review of group D,
     2026-11-18, found by the functional and UX critics both): a shared link,
@@ -10572,56 +10588,6 @@ class TestAnEmptyArchiveSaysWhenItStarts:
         text = " ".join(body.inner_text().split())
         assert text == ("Snapshots start from this asset's first publish after the split, "
                         "Saturday, 21 November 2026."), text
-
-
-@pytest.mark.shared_page
-class TestAMovedCollectionSaysWhereItWent:
-    """REQ-PIPE-354 criterion 7, on the real quarterly build: a pre-split
-    Birth Registrations dataset route shows the one-line notice, its link to
-    the daily dashboard carries the route and in-place-on and drops period=,
-    the title and the announcement name it, and the page does not navigate."""
-
-    ROUTE = {"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration",
-             "datasetId": "birth-registrations"}
-
-    @pytest.mark.fresh_load  # its own query string
-    def test_the_notice_on_a_pre_split_route(self, clean_page, built_dashboard_html):
-        url = (f"file://{built_dashboard_html.resolve()}?in-place-on=2026-09-01&period=2026-Q3"
-               f"#{_state_to_path(self.ROUTE)}")
-        clean_page.goto(url)
-        clean_page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
-        line = "Birth Registrations has moved to the Daily data asset's dashboard"
-        assert clean_page.locator("#view h2").inner_text().strip() == line
-        href = clean_page.locator("[data-moved-link]").get_attribute("href")
-        from urllib.parse import parse_qs, urlsplit
-
-        parts = urlsplit(href)
-        assert f"{parts.scheme}://{parts.netloc}" == "https://data-poc-daily.pages.dev"
-        assert parts.fragment == _state_to_path(self.ROUTE)
-        query = parse_qs(parts.query)
-        assert query.get("in-place-on") == ["2026-09-01"] and "period" not in query
-        assert clean_page.locator("[data-moved-signin]").is_visible()
-        assert line in clean_page.title()
-        assert clean_page.locator("#route-announcer").inner_text().strip() == line
-        assert clean_page.url.startswith(f"file://{built_dashboard_html.resolve()}"), "it did not navigate"
-
-
-    @pytest.mark.fresh_load  # its own route
-    def test_a_check_link_under_it_shows_only_the_notice(self, clean_page, built_dashboard_html):
-        """post-build-review #492 F2: a ticket's check link - column and check
-        segments under a moved dataset - showed a contradictory 'column no longer
-        exists' notice above the moved one, and rewrote the address."""
-        route = {**self.ROUTE, "columnName": "date_of_birth", "checkKey": "not_null"}
-        path = _state_to_path(route)
-        clean_page.goto(f"file://{built_dashboard_html.resolve()}#{path}")
-        clean_page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
-        assert clean_page.locator("#view h2").inner_text().strip() == (
-            "Birth Registrations has moved to the Daily data asset's dashboard")
-        assert clean_page.locator(".stale-link-notice").count() == 0
-        assert clean_page.evaluate("location.hash") == f"#{path}", "the address was rewritten"
-        from urllib.parse import urlsplit
-
-        assert urlsplit(clean_page.locator("[data-moved-link]").get_attribute("href")).fragment == path
 
 
 @pytest.mark.shared_page

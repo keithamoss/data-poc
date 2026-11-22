@@ -127,6 +127,16 @@ describe("side panels - openPanel()/closePanel() real history integration", () =
     expect(new w.URLSearchParams(w.location.search).get("panel")).toBe("requirements");
   });
 
+  it("moves focus into a panel opened from its header button, and back to the button on close (#493 nit)", () => {
+    const w = load();
+    const btn = w.document.getElementById("snapshots-btn");
+    btn.focus();
+    btn.click();
+    expect(w.document.activeElement.id).toBe("snapshots-panel-close");
+    w.closePanelInPlace();
+    expect(w.document.activeElement).toBe(btn);
+  });
+
   it("a plain navigate() call closes any open panel", () => {
     const w = load();
     w.openPanel("snapshots");
