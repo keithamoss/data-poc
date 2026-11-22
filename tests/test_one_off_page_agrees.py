@@ -116,9 +116,16 @@ def trip(tmp_path_factory):
             opened = _invoke(["open", "--kind", "extraction", str(w.package)])
             assert opened.exit_code == 0, opened.output
             w.commit("open")
+            # EACH STEP, AND `list` AFTER IT (REQ-PIPE-442 criterion 10 as
+            # amended 2026-11-22): loaded, decided, published.
             for step, args in (("load", ["load", "--id", w.id, str(w.package)]),
                                ("list", ["list"]),
-                               ("publish", ["publish", "--id", w.id, "--yes"])):
+                               ("decide", ["decide", "--id", w.id, "--decision", "withhold",
+                                           "--reason", "The visits table never arrived.",
+                                           "--yes"]),
+                               ("list-decided", ["list"]),
+                               ("publish", ["publish", "--id", w.id, "--yes"]),
+                               ("list-published", ["list"])):
                 w.said[step] = _invoke(args)
                 assert w.said[step].exit_code == 0, (step, w.said[step].output[-3000:],
                                                      w.said[step].exception)
@@ -129,6 +136,16 @@ def trip(tmp_path_factory):
             w.results_in_db = w.query(
                 "SELECT count(*) FROM qa.check_result c JOIN qa.run r USING (run_key) "
                 "WHERE r.completed_at IS NOT NULL")[0][0]
+            # DROPPED AFTER PUBLISHING: its page stays, its database goes, and
+            # `list` must not offer the load the publish refuses (the mock
+            # run's D3).
+            from cli import common
+
+            mp.setattr(common, "require_tty", lambda hint: None)
+            w.said["drop"] = _invoke(["drop", "--id", w.id], input=w.id + "\n")
+            assert w.said["drop"].exit_code == 0, w.said["drop"].output[-2000:]
+            w.said["list-dropped"] = _invoke(["list"])
+            w.said["load-dropped"] = _invoke(["load", "--id", w.id, str(w.package)])
             yield w
         finally:
             assets.deselect_one_off()
@@ -185,6 +202,38 @@ class TestTheListsDatabases:
         listed = said.split("One-off databases on the server:")[1]
         assert f"supply_{trip.id} " in listed, said
         assert trip.plain_db not in listed, said
+
+
+# ---- D3: `list` says decided and published, and never offers a refused step
+
+def _row(trip, step) -> tuple[str, str]:
+    """(the one-off's own line, its next step) in one `list`'s output."""
+    lines = trip.said[step].output.splitlines()
+    at = next(i for i, line in enumerate(lines) if line.startswith(trip.id + " "))
+    return lines[at], lines[at + 1]
+
+
+class TestTheListFollowsTheStages:
+    def test_loaded(self, trip):
+        line, _next = _row(trip, "list")
+        assert line.split()[2] == "loaded", line
+
+    def test_decided(self, trip):
+        line, nxt = _row(trip, "list-decided")
+        assert line.split()[2] == "decided", line
+        assert nxt.strip() == f"next: mothman one-off publish --id {trip.id}", nxt
+
+    def test_published(self, trip):
+        line, nxt = _row(trip, "list-published")
+        assert line.split()[2] == "published", line
+        assert "load" not in nxt and f"mothman one-off drop --id {trip.id}" in nxt, nxt
+
+    def test_published_and_dropped_offers_no_load(self, trip):
+        assert trip.said["load-dropped"].exit_code != 0, "the fixture's load must be refused"
+        line, nxt = _row(trip, "list-dropped")
+        assert line.split()[2] == "published", line
+        assert "mothman one-off load" not in nxt, nxt
+        assert str(trip.page) in nxt, nxt
 
 
 # ---- D1 and D2 on the page --------------------------------------------------

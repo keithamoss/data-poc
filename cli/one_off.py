@@ -153,8 +153,9 @@ def _age(hours: float | None) -> str:
 
 @one_off_group.command("list")
 def list_command() -> None:
-    """Every one-off with its stage - opened, committed, pushed or loaded - how
-    long since its database was created, and the command for its next step;
+    """Every one-off with its stage - opened, committed, pushed, loaded, decided
+    or published - how long since its database was created, and the command for
+    its next step, never one that would be refused;
     then every one-off database still on the server, with its age
     (REQ-PIPE-442 criterion 10). Reads the one-offs root and git, and lists the
     server's databases through one administrative connection; never opens a
@@ -365,6 +366,11 @@ def decide_command(one_off_id: str, decision: str | None, reason: str | None,
     except one_off_decision.DecisionRefused as exc:
         raise click.ClickException(str(exc)) from None
     click.echo(f"Recorded: {one_off_decision.words(got).rstrip('.')}.")
+    # ITS DATABASE'S MARK SAYS DECIDED (REQ-PIPE-442 criterion 10 as amended
+    # 2026-11-22), so `list` reads the stage without opening it.
+    from qa_tools.common import one_off_load
+
+    one_off_load.remark(one_off_id, "decided")
     # THE PUBLISHED PAGE IS NOW BEHIND (REQ-PIPE-435 criterion 11), read from
     # the destination itself.
     from qa_tools.common import one_off_publish
@@ -510,6 +516,10 @@ def publish_command(one_off_id: str, yes: bool) -> None:
         message = exc.format_message() if isinstance(exc, click.ClickException) else str(exc)
         raise click.ClickException(f"nothing was published: {message}") from None
     click.echo(f"Published -> {address}")
+    # ITS DATABASE'S MARK SAYS PUBLISHED (REQ-PIPE-442 criterion 10 as amended).
+    from qa_tools.common import one_off_load
+
+    one_off_load.remark(one_off_id, "published")
     # THE NEXT STEP (REQ-PIPE-442 criterion 12).
     click.echo("\n".join(["Next: record a decision, or drop it:",
                           f"  mothman one-off decide --id {one_off_id}",

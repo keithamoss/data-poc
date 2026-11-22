@@ -268,7 +268,9 @@ releases:
             description: >
               `mothman one-off list` listed any database whose name started
               supply_ as a one-off's, including a data asset's own. It now lists
-              only the databases a one-off load created.
+              only the databases a one-off load created, and says when a
+              one-off has been decided or published. A published one-off is no
+              longer offered a load that would be refused.
           - headline: Quieter one-off loads and publishes, and no GitHub links
             components: ["Pipeline & publishing"]
             description: >

@@ -5852,7 +5852,8 @@ function oneOffUndeclaredHtml(){
 // A DERIVED PRODUCT THAT FAILS, SAID ON THE HOME VIEW (Keith 2026-11-22, on
 // the mock run): it counts in no status (REQ-PIPE-438), so without this line
 // a reader of the home view never learns a table is failing. One line per
-// derived product with a failing check, in the kind's word. DRAFT WORDING.
+// derived product with a failing check, in the kind's word. Wording approved by
+// Keith 2026-11-22.
 function oneOffDerivedFailingHtml(){
   const lines = [];
   for(const ag of DATA.agencies) for(const col of ag.collections) for(const ds of col.datasets){
@@ -7839,7 +7840,7 @@ window.addEventListener("popstate", (e)=>{
 const ONE_OFF_ABSENT = ["snapshots-panel", "snapshots-backdrop", "in-place-on-panel",
   "in-place-on-backdrop", "period-panel", "period-backdrop", "leaderboard-panel",
   "leaderboard-backdrop", "feedback-btn"];
-// DRAFT WORDING FOR KEITH (2026-11-22): a one-off's footer.
+// A ONE-OFF'S FOOTER, wording approved by Keith 2026-11-22.
 const ONE_OFF_FOOTER = ONE_OFF ? `QA report for one ${ONE_OFF.kind.singular} — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every result on this page was computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against the files the ${ONE_OFF.kind.singular} supplied.` : "";
 const SITE_NAME = ONE_OFF ? ONE_OFF.siteName
   : ASSET_DISPLAY_NAME ? `${ASSET_DISPLAY_NAME} \u00b7 Data Asset QA Register`

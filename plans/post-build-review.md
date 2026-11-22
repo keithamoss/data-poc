@@ -17386,7 +17386,7 @@ twice. It deliberately did not re-find the `TypeError`.
        is not keyboard-reachable; an empty current cycle hides the newest
        tries note behind 'Show all history'.
 
-494. **[in-progress, 2026-11-22]** **[Dashboard UI]** **[Pipeline & publishing]** **The worked mock run of a one-off (the ED readmissions extraction) - what it found and what was done.**
+494. **[done, 2026-11-22]** **[Dashboard UI]** **[Pipeline & publishing]** **The worked mock run of a one-off (the ED readmissions extraction) - what it found and what was done.**
      A real `mothman one-off` run end to end in a scratch clone at db7d7aa1
      (open, load, list, decide, publish, drop), its findings verified against
      the code before being written up here. Each defect fixed against
@@ -17409,19 +17409,17 @@ twice. It deliberately did not re-find the `TypeError`.
        no prose: the publish built from the committed folder, which never
        holds the default layer. It now builds from the materialised check
        workspace, as the load does. REQ-QAC-441.
-     - **D3, NOT BUILT - needs a criterion change, for Keith**: `list` has no
-       decided or published stage, and after a published one-off is dropped it
-       recommends a load that is refused. REQ-PIPE-442 c1 limits list to the
-       one-offs root, git and one administrative connection, and c10 lists the
-       four stages, so either fix changes signed wording. Proposed: c10 "...
-       its stage - opened, committed, pushed, loaded, decided or published -
-       ... and the command for its next step, never a step that would be
-       refused ..."; c1 "... list reads the one-offs root, git and its kind's
-       publishing destination, and connects to the configured local server
-       only through an administrative connection that lists its databases and
-       reads the mark each one-off's database carries ...". With that, the
-       decide step would re-mark the database's comment ('decided') so list
-       still opens no one-off's database.
+     - **D3, DEFECT, FIXED after Keith amended REQ-PIPE-442 c1 and c10
+       (2026-11-22)**: `list` had no decided or published stage, and after a
+       published one-off was dropped it recommended a load that is refused.
+       The criteria limited list to the one-offs root, git and one
+       administrative connection, and named four stages; Keith approved the
+       amended wording (six stages, never a refused step; list also reads the
+       kind's publishing destination and each one-off database's mark).
+       Built: decide and publish re-mark the database's comment ('; decided',
+       '; published'); list reads the mark, and with no database the
+       destination, so a published one-off is never offered a load. Tested
+       first (tests/test_one_off_page_agrees.py TestTheListFollowsTheStages).
      - **D4, DEFECT, FIXED**: `list` showed enduring-asset databases on a
        suffixed DSN (supply_daily_c) as one-offs'. A one-off load now marks
        its database's comment on the server; list reads it through its one
@@ -17437,8 +17435,8 @@ twice. It deliberately did not re-find the `TypeError`.
        duplication bug - the agency blurb is the agency's name because the
        recipe gives no blurb, and the dataset's provider is its agency, left
        for Keith.
-     - **Keith's asks on the run, BUILT WITH DRAFT WORDING, awaiting his
-       approval before push**: a one-off's page hides the time travel,
+     - **Keith's asks on the run, BUILT, wording approved by Keith
+       2026-11-22**: a one-off's page hides the time travel,
        cadence-aware viewing and leaderboard drawers and the feedback link,
        shows no cross-table section, and words its footer, home and agency
        lines, verdict line and receipt for one supply; a failing derived

@@ -287,13 +287,40 @@ def ensure_database(one_off_id: str, digest: str, recipe_digest: str, commit: st
 #: The comment a one-off's database carries on the server, read by `mothman
 #: one-off list` through its administrative connection: the prefix, then the id.
 SERVER_MARK = "mothman one-off: "
+#: The stages the mark carries after the id, once reached (REQ-PIPE-442
+#: criterion 10 as amended 2026-11-22): decide and publish re-mark it, so
+#: `list` reads them without opening the one-off's database.
+MARKED_STAGES = ("decided", "published")
 
 
-def mark_on_server(admin, one_off_id: str) -> None:
+def mark_on_server(admin, one_off_id: str, stage: str | None = None) -> None:
     from psycopg import sql
 
+    if stage is not None and stage not in MARKED_STAGES:
+        raise ValueError(f"no stage {stage!r} is marked - only {', '.join(MARKED_STAGES)}")
+    words = SERVER_MARK + one_off_id + (f"; {stage}" if stage else "")
     admin.execute(sql.SQL("COMMENT ON DATABASE {} IS {}").format(
-        sql.Identifier(database_name(one_off_id)), sql.Literal(SERVER_MARK + one_off_id)))
+        sql.Identifier(database_name(one_off_id)), sql.Literal(words)))
+
+
+def marked_stage(comment: str | None) -> str | None:
+    """The stage a database's mark carries, or None (loaded, or no mark)."""
+    if not (comment or "").startswith(SERVER_MARK) or "; " not in comment:
+        return None
+    stage = comment.rsplit("; ", 1)[1]
+    return stage if stage in MARKED_STAGES else None
+
+
+def remark(one_off_id: str, stage: str) -> None:
+    """Mark the one-off's database as having reached `stage` - decide's and
+    publish's last act, through an administrative connection."""
+    import psycopg
+
+    from qa_tools.common import supply_db
+
+    with psycopg.connect(supply_db.on_server(_server(), "postgres"), autocommit=True,
+                         application_name="mothman:one-off-mark") as admin:
+        mark_on_server(admin, one_off_id, stage)
 
 
 def _held(conn):

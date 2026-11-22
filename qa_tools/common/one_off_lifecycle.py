@@ -47,12 +47,15 @@ def _admin(server_url: str):
 
 
 class Ages(dict):
-    """{database name: hours since it was created}, and `one_offs`: the names
-    among them marked as a one-off's database on the server."""
+    """{database name: hours since it was created}, `one_offs`: the names
+    among them marked as a one-off's database on the server, and `stages`:
+    the stage each one's mark carries where it carries one (decided,
+    published)."""
 
-    def __init__(self, ages, one_offs=()):
+    def __init__(self, ages, one_offs=(), stages=None):
         super().__init__(ages)
         self.one_offs = frozenset(one_offs)
+        self.stages = dict(stages or {})
 
 
 def database_ages() -> Ages | None:
@@ -74,9 +77,11 @@ def database_ages() -> Ages | None:
             "'/PG_VERSION', true)).modification) / 3600, shobj_description(d.oid, 'pg_database') "
             "FROM pg_database d WHERE d.datname LIKE %s ORDER BY d.datname",
             [supply_db.ASSET_DATABASE_PREFIX.replace("_", r"\_") + "%"]).fetchall()
-    return Ages({name: float(age) for name, age, _c in rows if age is not None},
-                [name for name, age, comment in rows if age is not None
-                 and (comment or "").startswith(one_off_load.SERVER_MARK)])
+    marked = {name: comment for name, age, comment in rows if age is not None
+              and (comment or "").startswith(one_off_load.SERVER_MARK)}
+    return Ages({name: float(age) for name, age, _c in rows if age is not None}, marked,
+                {name: one_off_load.marked_stage(c) for name, c in marked.items()
+                 if one_off_load.marked_stage(c)})
 
 
 def _git(args, cwd) -> str | None:
@@ -106,7 +111,7 @@ class Row:
     one_off_id: str
     kind: str          # the kind's display word
     project: str
-    stage: str         # opened, committed, pushed or loaded
+    stage: str         # opened, committed, pushed, loaded, decided or published
     age_hours: float | None
     next_step: str
 
@@ -118,17 +123,41 @@ def _word(kind: str) -> str:
     return plug.singular if plug else kind
 
 
-def _next(stage: str, one_off_id: str, folder: Path) -> str:
+def _next(stage: str, one_off_id: str, folder: Path, *, has_database: bool = True,
+          address: str | None = None) -> str:
+    """The next step - NEVER ONE THAT WOULD BE REFUSED (REQ-PIPE-442 criterion
+    10 as amended 2026-11-22): a published one-off is not loaded again
+    (REQ-PIPE-443 criterion 7), and one whose database is gone has nothing
+    left to decide or drop."""
     rel = folder
     try:
         rel = folder.relative_to(assets.ROOT)
     except ValueError:
         pass
+    if stage == "published":
+        if not has_database:
+            return f"none - its page is published at {address}"
+        return (f"mothman one-off drop --id {one_off_id}, or decide again with "
+                f"mothman one-off decide --id {one_off_id}")
     return {"opened": f"git add {rel} && git commit && git push",
             "committed": "git push",
             "pushed": f"mothman one-off load --id {one_off_id} <package>",
             "loaded": f"mothman one-off publish --id {one_off_id}, or drop it with "
-                      f"mothman one-off drop --id {one_off_id}"}[stage]
+                      f"mothman one-off drop --id {one_off_id}",
+            "decided": f"mothman one-off publish --id {one_off_id}"}[stage]
+
+
+def _published_at(kind: str, one_off_id: str) -> str | None:
+    """The address of the one-off's published page, read from its kind's
+    destination (criterion 1 as amended 2026-11-22), or None - including
+    where the destination cannot be read, which `list` does not fail on."""
+    from qa_tools.common import one_off_publish
+
+    try:
+        found = one_off_publish.published(kind, one_off_id)
+    except Exception:  # noqa: BLE001 - list shows the stage it can read
+        return None
+    return found.address if found is not None else None
 
 
 def rows(ages: dict[str, float] | None) -> list[Row]:
@@ -143,9 +172,18 @@ def rows(ages: dict[str, float] | None) -> list[Row]:
             if (folder / "data-asset.yaml").is_file() else {}
         db = one_off_load.database_name(name)
         age = (ages or {}).get(db)
-        stage = "loaded" if age is not None else git_stage(folder)
+        # THE DATABASE'S MARK, THEN THE DESTINATION, THEN GIT (REQ-PIPE-442
+        # criteria 1 and 10 as amended 2026-11-22): decide and publish re-mark
+        # the database; a page with no database left is still published.
+        address = None
+        if age is not None:
+            stage = getattr(ages, "stages", {}).get(db) or "loaded"
+        else:
+            address = _published_at(kind, name)
+            stage = "published" if address else git_stage(folder)
         out.append(Row(name, _word(kind), str((doc or {}).get("project") or "(no project)"),
-                       stage, age, _next(stage, name, folder)))
+                       stage, age, _next(stage, name, folder, has_database=age is not None,
+                                         address=address)))
     return out
 
 
