@@ -6114,18 +6114,12 @@ could never have computed it), and it belongs with batch 5's check work.
      configuration injected at deploy time. This is configuration
      architecture, not code architecture (REQ-PIPE-240 to 248).
 
-141. **[todo, 2026-11-18]** **[Pipeline & publishing]** **[QA pipeline]** **A project extraction's supplies have never run end to end - scope how a no-period supply is filed, checked and gated.**
-     Found building REQ-PIPE-379 criterion 5's test: an asset whose one
-     dataset declares `no_calendar: never`, put through `mothman pipeline
-     run`. Filing raised NoCalendarAgreed (it is not a ValueError, so
-     file_arrivals' handlers missed it); past that, the supply is held as
-     "waiting for a person to place it", so no tool checks it; and the
-     promotion gate raises NoCalendarAgreed again. The dashboard build's
-     agreement.cadence() raises it too. **Keith, 2026-11-18: scope it
-     separately** - what filing, the run's view and promotion mean when a
-     supply has no period is a design question, not a fix. REQ-PIPE-379
-     criterion 5 stays unmet pointing here; REQ-PIPE-385's no-synthetic-folder
-     test runs on an asset with a calendar instead. Not scoped yet.
+141. **[done, 2026-11-22]** **[Pipeline & publishing]** **[QA pipeline]** **A project extraction's supplies have never run end to end - scope how a no-period supply is filed, checked and gated.**
+     Scoped and built as plans/supply-model.md sprint 29's requirements
+     (REQ-PIPE-434 to REQ-DASH-447); REQ-PIPE-379 criterion 5, which pointed
+     here, was retired 2026-11-22 for REQ-TEST-437, which runs a real recipe
+     package end to end. What is still open lives in those requirements'
+     unmet criteria.
 
 142. **[todo, 2026-11-18]** **[Testing & dev tooling]** **The session-start hook drops every leftover test database - including those of a test run still going.**
      Seen 2026-11-18 evening: a context compaction re-ran the SessionStart

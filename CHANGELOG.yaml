@@ -177,8 +177,35 @@ releases:
               file nobody declared, now counts in the dataset's status, so the
               dataset reads Fail rather than No data. A recipe whose table
               names no primary identifier is now refused.
+          - headline: Publish an extraction's QA page
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off publish --id <id>` builds the extraction's page
+              and writes it, with its fonts, to the folder or S3 prefix the
+              kind's template names, after showing you the address, the
+              decision in force and anything not yet checked. Publishing again
+              replaces its own page and never another one-off's, and a drop
+              warns you first when no page, or only an out-of-date one,
+              records its results.
+          - headline: An extraction's page says what was decided
+            components: ["Dashboard UI"]
+            description: >
+              A one-off's page is named for its id and project, says on every
+              view whether the data was released or withheld, by whom and why -
+              or that no decision is recorded - and when, where and from which
+              commits it was built and checked. Each table's view shows what
+              the recipe declared beside the checks made from it, and the
+              development tools, dates and trends are gone from it.
       - category: Fixed
         items:
+          - headline: Datasets left out of a status are left out on the page too
+            components: ["Dashboard UI"]
+            description: >
+              The page counted a dataset with no schedule agreed yet, a derived
+              product or a dataset not yet checked in its collection's status,
+              though the build had marked each one out. They are now left out
+              on the page as well, and a table that never arrived shows its
+              failing check rather than No data on its own view.
           - headline: A supply with no schedule is checked when it arrives
             components: ["Pipeline & publishing"]
             description: >

@@ -5480,3 +5480,15 @@ urgent.
     and only a guarded `mothman env reset-synthetic` clears them. Built
     straight after REQ-PIPE-131. Delete this entry when REQ-PIPE-144 is
     built.
+
+89. **[todo, 2026-11-22]** **[Pipeline & publishing]** **A one-off load that dies inside a run's checks is not resumed by loading again.**
+    Found building REQ-TEST-437's journey (2026-11-22), when a test watch
+    made Evidently raise mid-run: the run was left recorded (run_seq 1)
+    with no completed_at, so the next `mothman one-off load --id` saw it
+    as not completed, ran it again, and the writer refused with
+    NoOpenAttempt (REQ-PIPE-279 criterion 8) - so the load cannot finish.
+    A stop BETWEEN runs resumes (REQ-PIPE-442 criterion 5, tested); a stop
+    WITHIN one does not. Not fixed: the fix is either a re-check opening a
+    new attempt for a half-recorded run, or the load treating such a run as
+    a could-not-check outcome - a design choice for Keith. Reproduce by
+    raising inside qa_tools.tools.run_evidently.evaluate during a load.
