@@ -51,6 +51,15 @@ class EvidentlyChecks(NamedTuple):
     checks: dict          # {check_id: metadata}
     psi: tuple            # the drift checks' ids, in file order (REQ-QAC-231)
     row_drop: dict        # {table: the row-drop check's id}
+    #: THE ASSERTION CHECKS (REQ-QAC-441): a check with no reference at all -
+    #: a one-off's `missing` (no value empty) and `row_count` (exactly the
+    #: declared rows) - in file order.
+    assertions: tuple = ()
+
+
+#: The Evidently methods that assert a fact about one supply, and need no
+#: reference supply (REQ-QAC-441).
+ASSERTION_METHODS = ("missing", "row_count")
 
 
 def collection_checks(collection_id: str) -> EvidentlyChecks:
@@ -69,13 +78,14 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     rel = coll.check_file("evidently")
     checks = check_lifecycle.load_evidently_checks(ROOT / rel)
     psi = [i for i, m in checks.items() if m.get("method") == "psi"]
+    assertions = tuple(i for i, m in checks.items() if m.get("method") in ASSERTION_METHODS)
     if not checks:
         # A COLLECTION MAY DECLARE NO EVIDENTLY CHECK (REQ-QAC-333 criterion
         # 5: Linkage Products' file is present and empty) - its runs then ask
         # Evidently for nothing, rather than failing the run. A file that
         # declares checks but no drift check is still refused: that is a slip.
         return EvidentlyChecks({}, (), {})
-    if not psi:
+    if not psi and not assertions:
         raise ValueError(f"{rel}: expected at least one psi check, found none")
     # DRIFT CHECKS ON SEVERAL DATASETS (REQ-QAC-297 criterion 11): each run
     # evaluates its OWN dataset's, against that dataset's last promoted
@@ -83,7 +93,7 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     # (REQ-PIPE-105) - so two datasets no longer need one shared reference.
     row_drop = {hierarchy.dataset(i.split(".")[3]).table: i
                 for i, m in checks.items() if m.get("method") == "row_drop"}
-    return EvidentlyChecks(checks, tuple(psi), row_drop)
+    return EvidentlyChecks(checks, tuple(psi), row_drop, assertions)
 
 
 def status_for(value: float, entry: dict) -> str:

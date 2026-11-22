@@ -210,6 +210,64 @@ def _volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id) -> 
     return out
 
 
+def _assertion_table(coll, entry: dict, check_id: str) -> str:
+    """The table an assertion check is about: its own `table`, else its
+    check id's dataset's."""
+    return entry.get("table") or _table_of(check_id)
+
+
+def _assertion_result(coll, entry: dict, check_id: str, run_id: str,
+                      run_timestamp: str) -> dict:
+    """ONE ASSERTION ABOUT THIS SUPPLY ALONE (REQ-QAC-441), measured by the
+    real Evidently Report - RowCount for `row_count`, MissingValueCount for
+    `missing` - over the run's own view. Needs no reference, so it never
+    reads as having none."""
+    import pandas as pd
+    from evidently import Dataset, DataDefinition, Report
+    from evidently.metrics import MissingValueCount, RowCount
+
+    table = _assertion_table(coll, entry, check_id)
+    schema = supply_db.run_schema(run_id)
+    with supply_db.connect(read_only=True, label="mothman:evidently-assert") as conn:
+        conn.execute(f'SET search_path TO "{schema}"')
+        if entry["method"] == "row_count":
+            total = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            frame = pd.DataFrame({"n": range(total)})
+            column = None
+        else:
+            column = entry["column"]
+            rows = conn.execute(f'SELECT "{column}" FROM {table}').fetchall()
+            frame = pd.DataFrame({column: [None if r[0] is None else str(r[0]) for r in rows]},
+                                 dtype=object)
+            total = len(frame)
+    metric = (RowCount() if column is None else MissingValueCount(column=column))
+    dataset = Dataset.from_pandas(frame, data_definition=DataDefinition(
+        text_columns=[] if column is None else [column]))
+    got = Report([metric]).run(dataset, None).dict()["metrics"][0]["value"]
+    if column is None:
+        value, bad = int(got), None
+        status = "pass" if value == int(entry["expected"]) else "fail"
+        unit, label = "rows", "Row count"
+        threshold = int(entry["expected"])
+    else:
+        value = bad = int(got["count"])
+        status = "pass" if value == 0 else "fail"
+        unit, label, threshold = "rows", "Null rate", 0
+    return {
+        "agency_id": coll.agency_id, "collection_id": coll.id,
+        "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+        "check_id": check_id, "column_name": column or "(table)",
+        "check_name": f"evidently:{entry['method']}",
+        "dimension": entry.get("category") or "completeness", "label": label,
+        "run_id": run_id, "run_timestamp": run_timestamp,
+        "metric_value": value, "unit": unit,
+        "warn_threshold": None, "fail_threshold": threshold,
+        "status": status, "on_fail_action": "flag",
+        "row_count_total": total, "row_count_invalid": bad,
+        "engine": ENGINE_TAG,
+    }
+
+
 def _psi_applies(run_id: str, table: str) -> bool:
     """ONLY A RUN THAT CAN READ the drift check's table (2026-10-02), and only
     one that is FOR that table where the run names one: the check is about
@@ -246,10 +304,17 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
     # of its snapshot), so the shape is free to say which.
     raw_output = {"psi": {r["check_id"]: r.pop("_snapshot") for r in results} or None}
     results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
+    # EACH ASSERTION, for the run that is FOR its table and can read it, as a
+    # drift check is (REQ-QAC-441).
+    for c in checks.assertions:
+        if _psi_applies(run_id, _assertion_table(coll, checks.checks[c], c)):
+            results.append(_assertion_result(coll, checks.checks[c], c, run_id, run_timestamp))
     evaluated = {r["check_id"] for r in results}
     left_out.note(run_id, "evidently", [
-        c for c in (*checks.psi, *checks.row_drop.values())
-        if c not in evaluated and _unreadable(run_id, _table_of(c))])
+        c for c in (*checks.psi, *checks.row_drop.values(), *checks.assertions)
+        if c not in evaluated and _unreadable(
+            run_id, _assertion_table(coll, checks.checks[c], c) if c in checks.assertions
+            else _table_of(c))])
 
     drift_reference.judge(results, assessment)
     write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp, "evidently",

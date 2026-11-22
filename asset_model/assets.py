@@ -429,13 +429,17 @@ def handoff() -> tuple:
 
     # A ONE-OFF TRAVELS AS ITSELF (REQ-PIPE-446 criterion 7): its id and that it
     # is one, never written into MOTHMAN_ASSET, which criterion 9 refuses.
+    # ITS CHECK WORKSPACE TRAVELS WITH IT (REQ-QAC-441): a tool's worker reads
+    # the same merged layers as the run - the path in place of True.
     chosen = selected()
+    one_off = (str(_workspace) if chosen.is_one_off and _workspace is not None
+               else chosen.is_one_off)
     return (chosen.name, _describe(_layout), config_pin.installed(),
-            arrivals.installed_tree(), history_anchor.installed(), chosen.is_one_off)
+            arrivals.installed_tree(), history_anchor.installed(), one_off)
 
 
 def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None,
-          anchor=None, one_off: bool = False) -> Asset:
+          anchor=None, one_off: "bool | str" = False) -> Asset:
     """A started process's first act: take the layout and the asset it was
     handed (`handoff()`), select the asset - refused as `select` refuses - pin
     the configuration snapshot it was handed, verified against its digest
@@ -445,6 +449,9 @@ def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None,
     global _layout
     _layout = _rebuild(layout)
     asset = select_one_off(name) if one_off else select(name)
+    if isinstance(one_off, str):
+        use_workspace(Path(one_off))
+        asset = selected()
     from asset_model import arrivals, config_pin, history_anchor
 
     config_pin.adopt(snapshot)
@@ -561,6 +568,12 @@ def _names_a_one_off(stated: str, kind: str, listed: str) -> str:
 #: The one-off this process acts for, chosen by `--id` or in the TUI - never
 #: from MOTHMAN_ASSET (REQ-PIPE-446 criteria 3 and 9).
 _one_off: str | None = None
+#: THE CHECK WORKSPACE A ONE-OFF'S LOAD MATERIALISED (REQ-QAC-441 criterion 1,
+#: REQ-PIPE-440 criterion 13): its committed configuration with the kind's
+#: default check layer, read live from the template, merged in - under its own
+#: data/<id>/, never its folder. While set, the selected one-off's
+#: configuration folder and dbt project are read from there.
+_workspace: Path | None = None
 
 
 def _stated_beside(what: str) -> None:
@@ -577,7 +590,7 @@ def select_one_off(name: str) -> Asset:
     refused, before any configuration is read, with MOTHMAN_ASSET set at all,
     and refused for an id that is not a one-off or that clashes (criterion 4).
     Never writes MOTHMAN_ASSET (criterion 7)."""
-    global _one_off
+    global _one_off, _workspace
     _stated_beside(f"--id {name}")
     found = [(k, n) for k, n in one_offs() if n == name]
     if not found:
@@ -588,14 +601,35 @@ def select_one_off(name: str) -> Asset:
     if clash:
         raise OneOffRefused(_clash_words(name, clash))
     _one_off = name
+    _workspace = None
     return selected()
+
+
+def use_workspace(folder: Path | None) -> None:
+    """Read the selected one-off's configuration from its check workspace
+    (qa_tools/common/one_off_checks.materialise), or, with None, from its
+    folder again. Only for a one-off already selected."""
+    global _workspace
+    if folder is not None and _one_off is None:
+        raise OneOffRefused("a check workspace is for a selected one-off only")
+    _workspace = Path(folder) if folder is not None else None
+
+
+def committed_folder() -> Path:
+    """The selected one-off's own folder under one-offs/<kind>/, whether or
+    not a check workspace is in use - what git and the digest are asked of."""
+    found = [(k, n) for k, n in one_offs() if n == _one_off]
+    if _one_off is None or not found:
+        raise OneOffRefused("no one-off is selected")
+    return _layout.one_offs.root / found[0][0] / found[0][1]
 
 
 def deselect_one_off() -> None:
     """Back to no one-off - the TUI choosing another, and the suite between
     tests."""
-    global _one_off
+    global _one_off, _workspace
     _one_off = None
+    _workspace = None
 
 
 def _clash_words(name: str, folders: list[Path]) -> str:
@@ -615,7 +649,14 @@ def selected() -> Asset:
         if not found:
             raise OneOffRefused(f"the one-off {_one_off!r} chosen for this process is no "
                                 f"longer under {one_offs_root()}.")
-        return _layout.one_offs.asset(*found[0])
+        found_asset = _layout.one_offs.asset(*found[0])
+        if _workspace is not None:
+            from dataclasses import replace
+
+            return replace(found_asset, folder=_workspace, adapters=_workspace / "collections",
+                           providers=_workspace / "synthetic" / "collections",
+                           dbt_project=_workspace / "dbt")
+        return found_asset
     stated = os.environ.get(ASSET_ENV) or None
     found = names()
     if stated is None or stated not in found:

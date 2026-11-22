@@ -155,7 +155,9 @@ def run_against_warehouse(contract_path: str, schema: str, *,
 
     fields = supply_db.connection_fields()
     d = copy.deepcopy(contract_dict)
-    d["servers"].append({
+    # A ONE-OFF'S GENERATED CONTRACT NAMES NO SERVER (REQ-PIPE-440): the package
+    # has no standing location, and the warehouse is the one server read.
+    d.setdefault("servers", []).append({
         "server": "warehouse",
         "type": "postgres",
         "host": fields["host"],

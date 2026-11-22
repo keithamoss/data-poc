@@ -15,7 +15,9 @@ COPY NOTHING FROM THE KIND'S TEMPLATE (Keith 2026-11-21, criterion 13): no
 people.yaml, no default check layer, no publishing destination - each is read
 live from one-offs/extraction/_template/ at the step that needs it - and no
 synthetic/ folder and no QA adapter module of its own (one shared adapter per
-kind). The recipe check layer is REQ-QAC-441's, and is not generated here.
+kind, qa_tools/collections/kinds/extraction.py). THE RECIPE CHECK LAYER IS
+generated here (REQ-QAC-441 criteria 4 and 5), from
+asset_model/kinds/extraction_checks.py, into each tool's own file.
 
 CONFIGURATION ONLY: reads the recipe it is handed and the folder names under
 assets/ and one-offs/, and writes the new folder. No database.
@@ -23,6 +25,7 @@ assets/ and one-offs/, and writes the new folder. No database.
 from __future__ import annotations
 
 import hashlib
+from datetime import date
 import json
 import os
 import re
@@ -217,19 +220,51 @@ def _dbt(recipe, folder: Path) -> dict[str, str]:
     return out
 
 
-def files_for(recipe, folder: Path, facts: dict | None = None) -> dict[str, str]:
+def files_for(recipe, folder: Path, facts: dict | None = None,
+              introduced: str | None = None) -> dict[str, str]:
     """{path relative to the folder: text} for every generated file but the
-    digest."""
+    digest. `introduced` is the recipe checks' introduced_date - the day the
+    folder is opened."""
     facts = facts or _deployment_facts()
     out = {"data-asset.yaml": yaml.safe_dump(_data_asset(recipe, facts), sort_keys=False),
            "calendar.yaml": yaml.safe_dump(_calendar(recipe), sort_keys=False),
            "presentation.yaml": yaml.safe_dump(_presentation(recipe), sort_keys=False)}
-    for t in recipe.tables:
-        rel = f"{t.agency_id}/{t.collection_id}-contract.yaml"
-        if rel not in out:
-            out[rel] = yaml.safe_dump(_contract(recipe, t.collection_id), sort_keys=False)
+    out.update(_check_files(recipe, out["data-asset.yaml"], out["calendar.yaml"],
+                            introduced or date.today().isoformat()))
     out.update(_dbt(recipe, folder))
     return out
+
+
+def _check_files(recipe, data_asset: str, calendar: str, introduced: str) -> dict[str, str]:
+    """Each collection's contract and THE RECIPE CHECK LAYER (REQ-QAC-441
+    criteria 4 and 5), in each tool's own file: the contract's quality rules,
+    the SodaCL checks, the Evidently checks and the dbt tests, each with its
+    retired sibling (REQ-QAC-241) - empty, since nothing in a one-off is ever
+    retired. The default layer is never written here: the load reads it from
+    the kind's template (REQ-PIPE-440 criterion 13)."""
+    from asset_model.kinds import extraction_checks as checks
+
+    tables = checks.declared(yaml.safe_load(data_asset), yaml.safe_load(calendar))
+    layers = checks.recipe_layer(recipe.extraction_id, tables, introduced)
+    out = {}
+    for coll in dict.fromkeys(t.collection_id for t in recipe.tables):
+        mine = [t for t in tables if t.collection_id == coll]
+        stem = f"{mine[0].agency_id}/{coll}"
+        layer = layers[coll]
+        names = [t.table for t in mine]
+        out[f"{stem}-contract.yaml"] = _dump(checks.contract_doc(_contract(recipe, coll), layer))
+        out[f"{stem}-soda-checks.yml"] = _dump(checks.soda_doc(layer, names))
+        out[f"{stem}-evidently-checks.yml"] = _dump(checks.evidently_doc(layer))
+        for kind, suffix in (("contract", "contract-retired.yaml"),
+                             ("soda", "soda-checks-retired.yml"),
+                             ("evidently", "evidently-checks-retired.yml")):
+            out[f"{stem}-{suffix}"] = _dump(checks.RETIRED[kind])
+        out[f"dbt/models/{coll}/schema.yml"] = _dump(checks.dbt_schema_doc(layer, names))
+    return out
+
+
+def _dump(doc) -> str:
+    return yaml.safe_dump(doc, sort_keys=False, width=100, allow_unicode=True)
 
 
 def digest_of(folder: Path, names) -> dict[str, str]:

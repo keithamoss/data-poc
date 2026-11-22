@@ -1,0 +1,59 @@
+# The extraction kind's DEFAULT CHECK LAYER (REQ-QAC-441 criteria 1 to 3): the
+# floor every extraction is held to, whatever its recipe declares.
+#
+# DEFINED ONCE, HERE, AND READ LIVE AT EACH LOAD (REQ-PIPE-440 criterion 13):
+# never copied into an extraction's folder, so a change here reaches every
+# extraction loaded after it, and the commit a page names says which version
+# checked it. Like the rest of the template it must be committed and pushed
+# before a load reads it (REQ-PIPE-440 criterion 9).
+#
+# EACH ENTRY IS AN ASSERTION, not a tool's check: `mothman one-off load`
+# renders it, per declared table and column, into the configuration of each
+# tool named under `tools` (asset_model/kinds/extraction_checks.py, which
+# also says which tools each assertion can take). Leave `tools` out for all of
+# them. `table_arrived` and `undeclared_file` are facts about the package, so
+# the load records them itself.
+#
+# The prose is held to docs/check-authoring-rules.md like every other check's.
+checks:
+  - assertion: table_arrived
+    name: Declared table arrived
+    category: completeness
+    introduced_date: "2026-11-22"
+    description: >
+      Every table the recipe declares must arrive in the supply.
+    failure_indicates: >
+      The extraction was run without this table, or the file holding it was
+      left out when the supply was put together.
+    changelog: []
+
+  - assertion: undeclared_file
+    name: Only declared files
+    category: conformity
+    introduced_date: "2026-11-22"
+    description: >
+      Every file in the supply must be one the recipe declares. A file it
+      does not declare is not checked.
+    failure_indicates: >
+      The supply carries a table the recipe does not describe, or a declared
+      file arrived under another name.
+    changelog: []
+
+  - assertion: columns_arrived
+    name: Declared columns arrived
+    category: completeness
+    introduced_date: "2026-11-22"
+    description: >
+      Every column the recipe declares for this table must arrive in the
+      supply.
+    failure_indicates: self-evident
+    changelog: []
+
+  - assertion: identifier_not_null
+    name: Identifier recorded
+    category: completeness
+    introduced_date: "2026-11-22"
+    description: >
+      This value must never be empty.
+    failure_indicates: self-evident
+    changelog: []
