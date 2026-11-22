@@ -22177,7 +22177,9 @@ requirements:
         THE SYSTEM SHALL report such a dataset's own checks with their
         REAL verdicts - red, amber or green as the checks actually
         found - because developing a check means seeing whether it
-        passes.
+        passes. AMENDED 2026-11-22 by REQ-PIPE-438 criterion 1: "such a
+        dataset" is one declaring `no_calendar: not-yet-agreed`; a `never`
+        dataset's verdicts are real quality history (REQ-PIPE-438).
       - >
         THE SYSTEM SHALL label such a dataset as one whose schedule is
         not agreed, alongside those verdicts and IN WORDS rather than
@@ -22186,12 +22188,18 @@ requirements:
       - >
         THE SYSTEM SHALL exclude such a dataset's verdicts from every
         collection-level and asset-level rollup, so that a dataset
-        nobody has agreed cannot turn an agreed one's status.
+        nobody has agreed cannot turn an agreed one's status. AMENDED
+        2026-11-22 by REQ-PIPE-438 criterion 1: for a dataset declaring
+        `no_calendar: not-yet-agreed` only; a `never` dataset rolls up, and
+        a derived one is left out by REQ-PIPE-438 criterion 3.
       - >
         THE SYSTEM SHALL keep the record of that QA distinguishable
         from the QA history of agreed supplies, so that check
         development never counts toward a dataset's real quality
-        history.
+        history. AMENDED 2026-11-22 by REQ-PIPE-438 criterion 1: for a
+        dataset declaring `no_calendar: not-yet-agreed` only; a `never`
+        dataset's results are recorded agreed unless it is declared
+        `derived` (REQ-PIPE-438 criterion 2).
       - >
         THE SYSTEM SHALL place a dataset without a calendar in the same
         agency, collection and dataset hierarchy as every other dataset,

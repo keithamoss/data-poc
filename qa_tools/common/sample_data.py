@@ -43,10 +43,12 @@ SCHEMA = supply_db.SAMPLE_SCHEMA
 def is_sample(dataset_id: str) -> bool:
     """Whether this dataset has declared that it has no calendar.
 
-    True for BOTH kinds - `not-yet-agreed` and `never` - because
-    everything this module does is the same for both. Which kind it is
-    matters to a person reading the dashboard (criterion 3) and not to
-    where the data goes or how the record is keyed.
+    True for BOTH kinds - `not-yet-agreed` and `never` - because this is
+    the ROUTING question (REQ-PIPE-438's MAINTAINABILITY NFR): neither has a
+    period, so both are filed to none (REQ-PIPE-434) and staged into the
+    no-period schema. Whether the RECORD counts as quality history is a
+    different question, supply_state()'s, and no caller asks one for the
+    other.
     """
     return schedule.no_calendar(dataset_id) is not None
 

@@ -29,6 +29,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from asset_model import schedule  # NoCalendarAgreed: no slots to close (REQ-DASH-436)
+
 from qa_tools.common import decision_log, supply_db
 
 
@@ -86,7 +88,7 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     try:
         own = slots_mod.slots_for_dataset(
             dataset_id, until=slots_mod.claimable_until(dataset_id, now.date()))
-    except (ValueError, KeyError, FileNotFoundError):
+    except (ValueError, KeyError, FileNotFoundError, schedule.NoCalendarAgreed):
         return []
     # WHAT WAS FILED TO EACH SLOT, by each supply's own receipt
     # (qa.supply_receipt, REQ-PIPE-144).
@@ -184,7 +186,7 @@ def late_slots(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     try:
         own = slots_mod.slots_for_dataset(
             dataset_id, until=slots_mod.claimable_until(dataset_id, now.date()))
-    except (ValueError, KeyError, FileNotFoundError):
+    except (ValueError, KeyError, FileNotFoundError, schedule.NoCalendarAgreed):
         return []
     first_filed = {slot: at for slot, at in conn.execute(
         "SELECT f.slot, min(r.received_instant) FROM qa.filing_current f "

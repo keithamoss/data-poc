@@ -927,7 +927,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         })
 
     # From the dataset's participation in contract/calendar.yaml (REQ-PIPE-110).
-    cadence = agreement.cadence(dataset_id)
+    # NONE FOR A DATASET WITH NO CALENDAR (REQ-DASH-436 criteria 1 and 2): no
+    # cadence to read, so no due date or lateness to show - never a raise.
+    cadence = None if sample_data.is_sample(dataset_id) else agreement.cadence(dataset_id)
 
     # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2): the arrival verdict
     # is recorded against the filing, keyed on the run's own `received_at`.
