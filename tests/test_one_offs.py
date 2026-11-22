@@ -257,6 +257,13 @@ class TestTheOneOffSentence:
         said = _said(_mothman("--help", root=two_audits))
         assert f"Set MOTHMAN_ASSET to one of: daily, quarterly. {SENTENCE}" in said
 
+    def test_one_folder_is_counted_in_the_singular(self, one_offs):
+        """Criterion 4 as AMENDED 2026-11-22 (Keith)."""
+        one_offs.add("cohort-a")
+        said = _said(_mothman("collections", root=one_offs.root))
+        assert "For one of 1 audit, use mothman one-off." in said, said
+        assert "1 audits" not in said
+
     def test_help_leaves_it_out_where_there_are_none(self, one_offs):
         said = _said(_mothman("--help", root=one_offs.root))
         assert "Set MOTHMAN_ASSET to one of: daily, quarterly." in said

@@ -500,7 +500,8 @@ def id_clashes() -> dict[str, list[Path]]:
 
 def kinds_sentence() -> str:
     """'For one of <n> <kinds>, use mothman one-off.' - each kind that has
-    folders, counted in its plural display word, joined with 'or'; empty where
+    folders, counted in its plural display word (its singular for exactly one
+    folder, Keith 2026-11-22), joined with 'or'; empty where
     there are none (REQ-PIPE-363 criteria 4 to 6, wording SETTLED by Keith
     2026-11-21). A kind with no plug-in has no display word, so it is left out
     of the sentence - `mothman check` fails its folder (REQ-PIPE-446 c2)."""
@@ -513,7 +514,9 @@ def kinds_sentence() -> str:
     for kind in sorted(counts):
         plug = one_off_kinds.get(kind)
         if plug is not None:
-            parts.append(f"{counts[kind]} {plug.plural}")
+            # THE SINGULAR FOR EXACTLY ONE FOLDER (Keith 2026-11-22): 'For one
+            # of 1 extraction'; the plural otherwise, as approved.
+            parts.append(f"{counts[kind]} {plug.singular if counts[kind] == 1 else plug.plural}")
     return f" For one of {' or '.join(parts)}, use mothman one-off." if parts else ""
 
 

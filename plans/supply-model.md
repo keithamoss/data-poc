@@ -2413,15 +2413,23 @@ exist.
     inheriting it would let an unchecked supply become a period's answer by
     default.
 
-29. **[todo, 2026-09-27]** **[Pipeline & publishing]** **The
-    project-extraction asset shape.** QA of one-off data extractions for
+29. **[in-progress, 2026-11-22]** **[Pipeline & publishing]** **One-offs,
+    the extraction the first kind.** QA of one-off data extractions for
     individual projects - the third asset shape `CLAUDE.md` has named
     since 2026-09-21 ("supplies but no cadence at all") and nobody had
     scoped. Scoped with Keith 2026-09-27 over five rounds of questions,
     at his own ask, and then explicitly deprioritised: "write it all up
     as its own sprint and we'll tackle it later."
 
-    **Owns:** nothing yet - the five requirements below are not drafted.
+    **Owns:** `REQ-PIPE-434`, `REQ-PIPE-435`, `REQ-DASH-436`, `REQ-TEST-437`,
+    `REQ-PIPE-438`, `REQ-PIPE-439`, `REQ-PIPE-440`, `REQ-PIPE-446`,
+    `REQ-PIPE-448`, `REQ-QAC-441`, `REQ-PIPE-442`, `REQ-PIPE-443`,
+    `REQ-DASH-444`, `REQ-DASH-447` - drafted 2026-11-21, with the no-period
+    lifecycle beneath them.
+
+    **Build order** (delivery-architect, post-sign-off review, 2026-11-21):
+    434, 438, 436, 433 (any time), 446, 439, 440, 448 (split out of 446 in v7,
+    built once 440's digest exists), 441, 442, 435, 444, 447, 443, 437.
 
     **THE MODEL, as his answers produce it.** Nine points, each his own
     decision rather than an inference:
