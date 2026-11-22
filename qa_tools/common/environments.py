@@ -69,6 +69,11 @@ class Environment:
     confirm_changes: bool = False
     #: The only switch for ticketing (criterion 10).
     ticketing: bool = False
+    #: HOW OFTEN THIS ENVIRONMENT'S SCHEDULER RUNS `mothman pipeline process`,
+    #: in whole minutes, where it declares it (REQ-GHUB-433 criterion 12): a
+    #: slot ticket says so, so nobody re-posts a command not yet read. None
+    #: where undeclared, and then the ticket says nothing about how often.
+    processing_interval_minutes: int | None = None
 
 
 #: The declared environments, keyed on the file's content (REQ-PIPE-192):
@@ -116,6 +121,7 @@ def _parse_environments(path: Path, text: str) -> list[Environment]:
             production=bool(entry.get("production")),
             confirm_changes=bool(entry.get("confirm_changes")),
             ticketing=bool(entry.get("ticketing")),
+            processing_interval_minutes=_interval(path, env_id, entry),
         ))
 
     productions = [e.id for e in out if e.production]
@@ -130,6 +136,26 @@ def _parse_environments(path: Path, text: str) -> list[Environment]:
             f"({', '.join(publishing)}) - exactly one may, or two deployments "
             f"race to overwrite the same published dashboard")
     return out
+
+
+def _interval(path: Path, env_id: str, entry: dict) -> int | None:
+    value = entry.get("processing_interval_minutes")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise EnvironmentError_(
+            f"{path}: {env_id!r} declares processing_interval_minutes: {value!r} - a whole "
+            f"number of minutes, 1 or more, is how often its scheduler runs a pass")
+    return value
+
+
+def interval_words(minutes: int) -> str:
+    """'every 15 minutes', 'every hour', 'every 2 hours' - the declared
+    interval in the words a slot ticket says it in (REQ-GHUB-433 c12)."""
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return "every hour" if hours == 1 else f"every {hours} hours"
+    return "every minute" if minutes == 1 else f"every {minutes} minutes"
 
 
 def all_environments(path: Path | str | None = None) -> list[Environment]:

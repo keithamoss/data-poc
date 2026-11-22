@@ -193,11 +193,62 @@ class GitHubTickets:
         _gh(["issue", "reopen", str(ticket.number), "--repo", self._repo])
         ticket.closed = False
 
+    # ---- REQ-GHUB-433: reading commands posted on slot tickets ----------
+    # TWO REPOSITORY-LEVEL PAGED LISTINGS PER PASS (criterion 2), never a
+    # request per ticket: the repository's issue comments, and the slot
+    # tickets with their labels - a comment says nothing about its slot, so
+    # the ticket's label is what names it. Outbound only (criterion 3).
+
+    def issue_comments_since(self, since: str | None) -> list[dict]:
+        """Every issue comment on the repository UPDATED since `since` (all of
+        them where it is None), as GitHub records them: id, body, the author's
+        login, the creation instant and the issue it is on."""
+        query = "per_page=100" + (f"&since={since}" if since else "")
+        out = _gh(["api", "--paginate", f"repos/{self._repo}/issues/comments?{query}"])
+        return [{"id": int(c["id"]), "body": c.get("body") or "",
+                 "author": ((c.get("user") or {}).get("login") or ""),
+                 "created_at": c["created_at"],
+                 "issue": int(str(c.get("issue_url") or "").rsplit("/", 1)[-1])}
+                for c in _pages(out)]
+
+    def slot_tickets(self) -> dict[int, str]:
+        """{issue number: slot key} for every ticket of this scheme, open or
+        closed - fenced by SCHEME_LABEL (REQ-PIPE-083 criterion 19)."""
+        out = _gh(["api", "--paginate",
+                   f"repos/{self._repo}/issues?labels={SCHEME_LABEL}&state=all&per_page=100"])
+        found = {}
+        for issue in _pages(out):
+            keys = [lab.get("name", "")[len(SLOT_LABEL_PREFIX):]
+                    for lab in issue.get("labels") or []
+                    if str(lab.get("name", "")).startswith(SLOT_LABEL_PREFIX)]
+            if keys:
+                found[int(issue["number"])] = keys[0]
+        return found
+
+    def own_login(self) -> str:
+        """The login the service itself posts as (criterion 6)."""
+        return _gh(["api", "user", "--jq", ".login"]).strip()
+
     def comments(self, ticket: Ticket) -> list[str]:
         out = _gh(["issue", "view", str(ticket.number), "--repo", self._repo,
                    "--json", "comments"])
         payload = json.loads(out or "{}")
         return [c.get("body") or "" for c in (payload.get("comments") or [])]
+
+
+def _pages(text: str) -> list:
+    """Every item of a `gh api --paginate` listing. gh prints each page's JSON
+    array as it arrives, one after another, so the output is a stream of
+    arrays rather than one document - read value by value and flattened."""
+    decoder, out, at = json.JSONDecoder(), [], 0
+    text = text or ""
+    while True:
+        while at < len(text) and text[at].isspace():
+            at += 1
+        if at >= len(text):
+            return out
+        value, at = decoder.raw_decode(text, at)
+        out.extend(value if isinstance(value, list) else [value])
 
 
 def _number_from_url(text: str) -> int:

@@ -261,6 +261,9 @@ def _say_pass(report) -> None:
                       f"`mothman schedule check-agreement` names each change.", style="red")
     for what, why in report.failures:
         console.print(f"FAILED {what}: {why}", style="red")
+    # COMMENTS READ, DECISIONS RAISED, REFUSALS (REQ-GHUB-433 criterion 14).
+    if report.comments is not None:
+        console.print(report.comments.line(), style="dim")
     for line in report.tickets:
         console.print(line, style="dim")
     if report.red and not report.failures:

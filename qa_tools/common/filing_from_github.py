@@ -175,8 +175,20 @@ def _reason_from(body: str, match: re.Match) -> str:
     return "\n".join(lines[:start] + lines[start + 1:]).strip()
 
 
+#: What handling one comment came to (REQ-GHUB-433 criterion 14): a decision
+#: raised, a refusal posted, or nothing to do (no known command).
+RAISED, REFUSED, IGNORED = "raised", "refused", "ignored"
+
+
 def handle(comment: Comment, *, collection_id: str, effective_at: str,
            service=None, ticket=None) -> filing_decisions.Outcome | None:
+    """handle_counted(), for a caller that needs only the outcome."""
+    return handle_counted(comment, collection_id=collection_id, effective_at=effective_at,
+                          service=service, ticket=ticket)[1]
+
+
+def handle_counted(comment: Comment, *, collection_id: str, effective_at: str,
+                   service=None, ticket=None) -> tuple[str, filing_decisions.Outcome | None]:
     """Read a comment, raise its decision, and say so on the thread.
 
     RETURNS None WHERE THERE IS NOTHING TO DO, which is criterion 5's
@@ -199,11 +211,11 @@ def handle(comment: Comment, *, collection_id: str, effective_at: str,
     try:
         request = read(comment)
     except NoDecisionHere:
-        return None
+        return IGNORED, None
     except (decision_log.DecisionRefused, people.UnknownActor,
             filing_decisions.NotOffered) as exc:
         _say_no(service, ticket, exc)
-        return None
+        return REFUSED, None
 
     try:
         # NO TYPED ENVIRONMENT ID HERE (REQ-PIPE-093 criterion 9): a decision
@@ -213,13 +225,13 @@ def handle(comment: Comment, *, collection_id: str, effective_at: str,
     except (decision_log.DecisionRefused, people.UnknownActor,
             filing_decisions.NotOffered) as exc:
         _say_no(service, ticket, exc)
-        return None
+        return REFUSED, None
     except Exception as exc:  # noqa: BLE001 - criterion 22: never silently
         _say_no(service, ticket, exc)
-        return None
+        return REFUSED, None
 
     filing_decisions.reconcile_after(outcome, collection_id)
-    return outcome
+    return RAISED, outcome
 
 
 def _say_no(service, ticket, exc: Exception) -> None:

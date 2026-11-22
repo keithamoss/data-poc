@@ -34,6 +34,13 @@
 # contract/data-asset.yaml's `ticket_repository`, and an environment that
 # turns ticketing on where none is named is refused before it connects.
 #
+# `processing_interval_minutes:` (optional) is how often this environment's
+# scheduler runs `mothman pipeline process`, in whole minutes. A slot ticket
+# says commands posted on it are acted on at the next pass, and how often
+# passes run where this is declared; where it is not, the ticket says nothing
+# about how often (REQ-GHUB-433 criterion 12). No environment declares one
+# until a scheduler exists to declare it for.
+#
 # `ci` WAS ADDED 2026-09-28, and the alternative is worth recording
 # because it looked cheaper: labelling a GitHub Actions runner `sandbox`.
 # That is a lie of exactly the kind this list exists to prevent - the
