@@ -243,8 +243,14 @@ class TestARequiredCollectionIsRequired:
         ran = []
         for path, cmd in required:
             monkeypatch.setattr(cmd, "callback", lambda *a, _p=path, **k: ran.append(_p))
-            got = CliRunner().invoke(cli, list(path))
-            assert got.exit_code == 2 and "Missing option" in got.output, (path, got.output)
+            # A ONE-OFF'S COMMANDS REFUSE MOTHMAN_ASSET BESIDE THEM (REQ-PIPE-363
+            # criterion 12) before reading an option, so they run without it.
+            env = {"MOTHMAN_ASSET": None} if path[0] == "one-off" else None
+            got = CliRunner().invoke(cli, list(path), env=env)
+            # A command that also takes a required argument stops on that
+            # first - the same refusal, before its callback runs.
+            assert got.exit_code == 2 and ("Missing option" in got.output
+                                           or "Missing argument" in got.output), (path, got.output)
         assert ran == []
 
 #: Birth Registrations is the daily asset's (the asset split).

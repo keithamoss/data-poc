@@ -228,6 +228,15 @@ def _database_holds(name: str, url: str) -> str:
     return f"{len(tables)} table(s), {rows} row(s)"
 
 
+def _shown(path) -> str:
+    """A state path as a person reads it: its tree and its own folder, as
+    `data/<id>` - taken from the resolver's path, wherever the state root is."""
+    from pathlib import Path
+
+    path = Path(path)
+    return f"{path.parent.name}/{path.name}"
+
+
 def inventory() -> list[Item]:
     """Everything the drop of the selected one-off would remove, each with what
     it holds - only what is there."""
@@ -240,9 +249,11 @@ def inventory() -> list[Item]:
     db = one_off_load.database_name(asset.name)
     if url is not None and db in (database_ages() or {}):
         out.append(Item(f"the database {db}", _database_holds(db, url), "database", db))
-    for path, what in ((asset.data, f"data/{asset.name}/ (its filed files, check workspace "
+    # THE RESOLVER'S PATHS, NAMED AS THEY ARE (REQ-PIPE-342 criterion 6): the
+    # words show where each one is rather than building a path of their own.
+    for path, what in ((asset.data, f"{_shown(asset.data)}/ (its filed files, check workspace "
                                      f"{one_off_checks.WORKSPACE} and dbt scratch)"),
-                       (asset.reports, f"reports/{asset.name}/")):
+                       (asset.reports, f"{_shown(asset.reports)}/")):
         if path.exists():
             out.append(Item(what, f"{_files(path)} file(s)", "path", str(path)))
     for name in DBT_ARTEFACTS:
