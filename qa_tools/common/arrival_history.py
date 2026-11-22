@@ -19,16 +19,14 @@ and a supplier sending garbage on Tuesday becomes invisible: the
 timeline would show Monday. And the dashboard build may never touch
 data/, so it could not read the catalogue even if that were safe.
 
-WHAT IS NOT HERE, and why it is absent rather than approximated:
-MOST RECENTLY PROMOTED. The requirement asks for it, and the
-derivation signed off with it - "the newest table for the dataset in
-the newest period schema holding one" - is a WAREHOUSE CATALOGUE read,
-which the paragraph above forbids for the arrived side and forbids
-here for exactly the same reason. That defect was found after sign-off
-and recorded on the requirement itself. Its real source is the
-committed append-only decision log, which does not exist until batch
-4, so this module answers the arrived question honestly and leaves the
-promoted one to the sprint that can answer it.
+WHAT IS NOT HERE: MOST RECENTLY PROMOTED. The requirement asks for it
+(criterion 3), and the derivation signed off with it - "the newest
+table for the dataset in the newest period schema holding one" - is a
+WAREHOUSE CATALOGUE read, which the paragraph above forbids for the
+arrived side and forbids there for exactly the same reason. It is
+answered from the append-only decision log instead, by
+decision_log.promoted_supply() through promotion_state.state_for(),
+which carries it beside the latest arrival so the two are never one.
 
 COST. Answering "when did this dataset last arrive" must not walk
 every arrival ever received. It does not: delivery-log filenames carry
@@ -192,18 +190,6 @@ def last_arrived(dataset_id: str, conn=None) -> Arrival | None:
                               **delivery_log.supply_ids_by_file(names, conn=conn)})
         if found:
             return max(found, key=lambda a: a.sort_key)
-    return None
-
-
-def last_promoted(dataset_id: str, conn=None) -> None:
-    """Always None, and deliberately so - see this module's docstring.
-
-    A function that returns None is here rather than nothing at all
-    because the question is real and will be asked; answering it with
-    the most recent ARRIVAL would be the exact conflation the
-    requirement splits apart, and would read fine right up until a
-    supplier sends a broken file.
-    """
     return None
 
 

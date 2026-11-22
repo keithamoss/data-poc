@@ -135,24 +135,6 @@ class TestTheMostRecentArrival:
         assert arrival_history.last_arrived("cp-clients", conn=logs) is None
 
 
-class TestPromotedIsNotAnswered:
-    """Criterion 3, absent on purpose.
-
-    The derivation signed off with it reads the warehouse catalogue,
-    which this requirement's own reasoning forbids for the arrived side
-    and forbids here for the same reason. Recorded as a defect after
-    sign-off; its real source arrives in batch 4.
-    """
-
-    def test_it_never_reports_an_arrival_as_promoted(self, tmp_path, logs):
-        _drop(tmp_path, logs, "monday", ["cp_clients.csv"], "2026-01-01T09:00:00+08:00", 1)
-        assert arrival_history.last_arrived("cp-clients", conn=logs) is not None
-        assert arrival_history.last_promoted("cp-clients", conn=logs) is None, (
-            "answering the promoted question with the latest ARRIVAL is the exact "
-            "conflation this requirement splits apart, and it reads fine until a red "
-            "supply arrives")
-
-
 class TestItCostsLessThanTheWholeHistory:
     """The non-functional constraint, measured rather than asserted.
 

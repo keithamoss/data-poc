@@ -1518,37 +1518,7 @@ requirements:
   
       '
     - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-    - criterion: 'Criterion 1, in part - a supply HELD BY THE ASSIGNMENT RULE (REQ-PIPE-064) does not reach the queue. REQ-PIPE-059''s delivery-level hold does, from delivery_log/, and so do failed loads, contested files and unrecognised artefacts.
-  
-        '
-      why: 'supply_holds.holds_in() takes a run''s decisions in memory and deliberately writes nothing, because the resolution path that would read a store does not exist and a store invented now would have to be unpicked. So there is no committed record for this to read, and this requirement may never open data/ or re-run the rule. Re-check when filings are recorded.
-  
-        '
-      owner: the promotion sprint (batch 4)
-      blocked_by:
-        sprints:
-        - 11
-    - criterion: 'Criterion 1, in part - a slot closed by monotonic filling and left unfilled produces no item. The derivation is built and criterion 7''s framing is written, but it is structurally empty.
-  
-        '
-      why: 'Only a PROMOTION fills a slot, and nothing closes until a later one is filled. filing.filled_slots() returns an empty set on purpose until promotion exists, so no slot can be closed and none can therefore be closed-and-unfilled. Built against the real rule rather than stubbed, so it lights up on its own.
-  
-        '
-      owner: the promotion sprint (batch 4)
-      blocked_by:
-        sprints:
-        - 11
-    - criterion: 'Criterion 9, in part - the uncertain-filing qualifier is rendered at all three sites an assignment appears (the Tier 2 arrival cell, the Latest arrival tile and the supply-history Timing column) and is covered by tests, but no real supply carries it today.
-  
-        '
-      why: 'REQ-PIPE-062''s filings are deliberately not recorded until promotion exists (Keith, 2026-09-25), so filings/ is empty and the reader finds nothing. The reader is built now rather than later for the reason REQ-PIPE-065''s rule was: a reader written when the writer turns on is written by somebody who has forgotten why the shape is what it is.
-  
-        '
-      owner: the promotion sprint (batch 4)
-      blocked_by:
-        sprints:
-        - 11
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): criterion 1's two missing kinds reach the one queue. A supply held by the assignment rule is read from the hold store (qa_tools/common/outstanding.py _from_holds, reading supply_holds.outstanding; REQ-PIPE-078 criterion 3 records both kinds on the same terms and assignment-rule is the store's one kind) - tests/test_orchestrate_single_run.py::test_the_held_supplys_outstanding_item_stays_open raises an assignment-rule hold and finds its held-supply item in outstanding.survey(), and tests/test_outstanding.py::TestAHoldLeavesTheQueueWhenItIsResolved covers its resolution. A closed, unfilled slot is one item per run of consecutive periods (outstanding._from_unfilled_periods, through filing_queue.closed_gaps; REQ-PIPE-132 criteria 10 and 11) - tests/test_outstanding.py::TestClosedUnfilledPeriodsAreOneItemPerRun."
     decisions:
     - 'SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT OWNS THE PRESENTATION, drafted now rather than left to delivery sprint 22. Rejected leaving it to sprint 22 with each pipeline requirement carrying its own presentational criteria, because six independent builds would land before anything reconciled them. The eleven keep only the obligation to RECORD the fact and its severity; how those combine on screen is here.
   
@@ -1581,6 +1551,13 @@ requirements:
     - 'A CLOSED, UNFILLED SLOT IS BOTH AN ITEM AND A RED (Keith, 2026-10-04), reversing criterion 7 as signed 2026-09-24 (''SHALL NOT render it as a red data verdict''). Keith chose red ''very clearly'' for REQ-DASH-133, rolling up to the agency. ''Closed by monotonic filling'' also went: REQ-PIPE-131 closes a period when the next period''s claim window opens. REJECTED leaving 070 criterion 7 as built beside REQ-DASH-133 criterion 4, which would be two signed criteria saying opposite things.'
     - 'THE QUEUE, THE MARKERS AND THE RED ARE JUDGED AT ONE IN-PLACE-ON INSTANT (Keith, 2026-10-04). Today outstanding.survey() reads only what is open NOW, so the in-place-on picker could show a past dataset red while the queue beside it lists today''s items. REJECTED leaving the queue as ''now'' only: the reds REQ-PIPE-115 and REQ-DASH-148 add are judged as at the instant on show, and the two would disagree on every past date.'
     - HIGH-VALUE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, each presented to and signed by Keith that evening (the routine ones went in separately on his blanket approval).
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): both halves of criterion 1 the 2026-09-25 deferrals named are built - the assignment-rule hold reaches the queue through _from_holds (REQ-PIPE-078) and a closed unfilled slot through _from_unfilled_periods (REQ-PIPE-132). Criterion 1's 'an assignment made under ambiguity' goes with criterion 9's retirement in substance but its signed words are left as they are (rewording a signed criterion waits on Keith's approval of the words): since REQ-PIPE-131 a file is filed only to the one open period, so no such assignment can exist (REQ-PIPE-065 criteria 1 and 2, retired 2026-10-04) and the clause names nothing."
+    retired_criteria:
+      - criterion: 9
+        date: "2026-11-22"
+        by: Keith
+        replaced_by: [REQ-PIPE-131]
+        reason: "Retired 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): nothing is assigned under ambiguity since REQ-PIPE-131 - a file is filed only to the one open period - so there is no qualifier to render (REQ-PIPE-065 criteria 1 and 2 retired 2026-10-04 for the same reason, and the dashboard's 'Uncertain filing' chip was removed with them). The same holds for criterion 1's 'an assignment made under ambiguity'."
 
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
@@ -3005,32 +2982,17 @@ requirements:
       - tests/test_arrival_history.py
       - tests/test_cli_supply.py
       - tests/test_delivery_log.py
+      - tests/test_promotion_state.py
     implemented_by:
       - qa_tools/common/arrival_history.py::arrivals_of
       - qa_tools/common/arrival_history.py::last_arrived
-      - qa_tools/common/arrival_history.py::last_promoted
       - qa_tools/common/arrival_history.py::delivery_companions
       - qa_tools/common/arrival_history.py::load_outcome
       - qa_tools/common/delivery_log.py::records_carrying
       - asset_model/asset_time.py::arrival_key
       - cli/supply.py::history_command
-    unmet_criteria:
-      - criterion: >-
-          Criterion 3 - hold, for every dataset, the identity of its most
-          recently PROMOTED supply.
-        why: >-
-          This requirement's own decision 8 found the defect after sign-off:
-          the derivation signed off with it reads the WAREHOUSE CATALOGUE,
-          which decision 4 forbids for the arrived side, and the identical
-          argument applies here and was not applied. The real source is
-          Thread G's committed append-only decision log, which does not
-          exist until batch 4. Answering it from the latest ARRIVAL instead
-          would be the exact conflation this requirement splits apart, so
-          last_promoted() returns None and says so in words rather than
-          approximating. REQ-DASH-056 cannot be computed until this lands.
-        owner: batch 4 (Thread G's decision log)
-        blocked_by:
-          sprints: [12]
+      - qa_tools/common/decision_log.py::promoted_supply
+      - qa_tools/common/promotion_state.py::state_for
     evidence:
       - >
         2026-09-25: built against the real committed history rather than a
@@ -3085,6 +3047,7 @@ requirements:
         duckdb. Verified by loading delivery_log in a fresh interpreter and
         confirming duckdb is absent from sys.modules.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criterion 3 is met from the append-only decision log, not the warehouse catalogue. decision_log.promoted_supply() returns the newest supply a slot still holds by a promotion or re-file (qa.slot_holds, REQ-PIPE-130 criterion 9), and promotion_state.state_for() carries it as promoted_supply beside the latest ARRIVED supply from the filings - two separate answers, so an arrival never reads as the promoted one. tests/test_promotion_state.py::TestItShowsBothWhenTheyDiffer and ::TestItSaysWhyTheArrivalIsNotPromoted. The always-None stub arrival_history.last_promoted(), which only its own test called, is deleted with that test."
     source: >
       Keith, plans/publishing-and-history.md item 6 - "per dataset runs
       against a shared warehouse composed of the current good version of
@@ -3219,6 +3182,7 @@ requirements:
         source is Thread G's committed append-only decision log, which
         does not exist until batch 4 - a build-order fact to record, not
         a design to ship.
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): decision 8's real source exists - the committed append-only decision log, read through decision_log.promoted_supply() and promotion_state.state_for() - so criterion 3 is met there, and criterion 4's 'derived from append-only records' holds for the promoted side too. The stub arrival_history.last_promoted() was deleted rather than wired to it: product code only a test calls is dead code (CLAUDE.md), and one answer to the promoted question is the point of the requirement."
   - id: REQ-PIPE-035
     title: QA runs against one period's schema, with the staged delivery overlaid
     date_written: "2026-09-21"
@@ -4094,35 +4058,7 @@ requirements:
         the comparison was always false and the "green" seed survived.
         Both section renderers now call `rollupStatuses()`.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-      - criterion: >
-          Criterion 3 - evaluating a cross-table check against a single
-          period's schema with the staged delivery overlaid, the
-          surface REQ-PIPE-035 defines.
-        why: >
-          REQ-PIPE-035 built that surface and could not wire it: a run
-          cannot be scoped to a period until a supply has one, and
-          REQ-PIPE-062's filings are deliberately unrecorded until
-          promotion exists. Cross-table checks are evaluated today
-          exactly as every other check is, against the run's own view
-          schema.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
-      - criterion: >
-          Criteria 4 and 5 - re-evaluating a cross-table check when a
-          table it depends on arrives, only within the same period, and
-          naming the arrival that caused the re-evaluation.
-        why: >
-          Both are period-scoped rules and inherit criterion 3's
-          blocker. Criterion 5 additionally needs a re-evaluation to
-          point at, which cannot exist until 4 does. What IS built and
-          carried is the dependency itself - REQ-PIPE-036's
-          reads_tables declares which tables each check reads, which is
-          what a re-evaluation trigger will be keyed on.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criteria 3 to 5 are restated and built as REQ-PIPE-079 criteria 2, 6 and 7. Every arrival is filed and its period's schema rebuilt with the staged delivery overlaid before any check runs (qa_tools/tools/orchestrate.py file_and_overlay, called first by arrival_lifecycle.process), so a cross-table check reads one period. A 'readers' run re-evaluates only the cross-table checks reading the arriving table in that period, and its qa.run row names its cause (qa_store.py run: scope, period, reads_table, caused_by_decision, caused_by_load). tests/test_reevaluation.py (TestWhichChecksAreSetOff, TestItNeverLeavesThePeriod, TestTheResultSaysWhatCausedIt) and tests/test_period_overlay.py."
     decisions:
       - >
         A CHECK RENDERED IN A POOLED SECTION IS KEYED BY ITS OWN COLUMN
@@ -4269,6 +4205,7 @@ requirements:
         publishing-and-history item 6 answer 2 and propagated unchecked
         into a signed criterion.
       - 'A CROSS-TABLE ROW NAMES ITS TABLE, COLUMN AND TOOL (Keith, 2026-10-06, post-build-review #121 D7): nine rows reading ''Client reference'' could not be told apart. The collection page''s row now says the dataset the check is declared on, its column and its tool, from the check''s key and tool_ref.'
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): the promotion sprint's period scoping landed as REQ-PIPE-079, whose criteria 2, 6 and 7 restate this requirement's 3, 4 and 5 and are met with no unmet criteria; the two deferrals were waiting on work that has shipped."
 
   - id: REQ-PIPE-038
     title: Committed history is keyed per dataset and regenerated from scratch
@@ -7050,24 +6987,7 @@ requirements:
         shape plans/INDEX.md already has, because a generated file that
         can drift from its source is one that will.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-      - criterion: >
-          Criteria 1 and 2 pass VACUOUSLY on the real repo today: there
-          are zero injected scenarios, so the map names no dataset, no
-          supply, no period and no in-place-on date for anything. Both are
-          built and are exercised against a real placement record in
-          the tests.
-        why: >
-          REQ-GEN-044 is the requirement that places scenarios into the
-          generated history and writes the record this reads. It is not
-          built - it needs schedule-configuration decisions that are
-          Keith's, because three of its daily scenarios require three
-          different due times for Birth Registrations. Recorded here
-          rather than claimed, because a vacuous pass reads identically
-          to a real one in a register.
-        owner: REQ-GEN-044
-        blocked_by:
-          requirements: [REQ-GEN-044]
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criteria 1 and 2 are no longer vacuous. The generator records each injected scenario's placement as it lands (generator/driver.py, scenario_injection.write_placements after resolve_run_ids against what recognition found), and the committed maps carry them: SCENARIOS-quarterly.md and SCENARIOS-daily.md carry 78 and 26 entries whose coordinates name a dataset, its supplies, a period and an inPlaceOn date - e.g. ed-presentations, ed_presentations__202604161000000800, 2026-Q2, 2026-05-01."
     decisions:
       - Decided the map carries COORDINATES and the dashboard constructs
         the LINK (Keith's own framing, 2026-09-22). The generator knows
@@ -7088,6 +7008,7 @@ requirements:
         so for several sprints the committed markdown on GitHub is the
         ONLY way anyone sees it. A coordinates-only list would have been
         adequate with a renderer and is not adequate without one."
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): the premise of the deferral - zero injected scenarios - no longer holds: scenarios are placed by the generator and the regenerated maps carry real coordinates, so criteria 1 and 2 are exercised by the real history rather than only by the tests."
 
   - id: REQ-DASH-046
     title: The scenario map is browsable, and each entry lands you on the thing itself
@@ -7188,22 +7109,7 @@ requirements:
         gate cannot cover both, and the pair drifts the first time
         somebody regenerates one.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
-    unmet_criteria:
-      - criterion: >
-          Criterion 2 - navigating to the in-place-on date and the page an
-          entry names - is built and unit-tested through
-          scenarioTarget(), but no entry carries coordinates today, so
-          the click path is never exercised end to end in a browser.
-        why: >
-          REQ-GEN-044 places the scenarios and writes the coordinates,
-          and it is not built - it needs schedule-configuration
-          decisions that are Keith's. Recorded rather than claimed,
-          because "every entry renders as plain text" is simultaneously
-          criterion 4 passing properly and criterion 2 passing
-          vacuously, and those read identically in a register.
-        owner: REQ-GEN-044
-        blocked_by:
-          requirements: [REQ-GEN-044]
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criterion 2's click path is exercised end to end in a real browser - tests/test_dashboard_e2e.py::TestScenariosTabOnTheDailyAsset::test_a_coordinate_lands_on_the_right_page_and_date clicks TS-47's entry and asserts the URL carries its placement's in-place-on date and the Birth Registrations dataset page. TS-47 is placed in the committed daily map (inPlaceOn 2026-09-08). The test skips where TS-47 is not placed, so it proves the path only on a history that places it."
     decisions:
       - Decided this is a separate requirement from the map's
         generation, because the two are verified in entirely different
@@ -7223,6 +7129,7 @@ requirements:
         only because promotion did not yet exist. The map's own
         coordinates are exactly such a shape while slot assignment and
         promotion are unbuilt."
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): entries carry coordinates now that scenarios are placed (REQ-GEN-045), and the browser test that follows one is the end-to-end proof the deferral asked for."
     open_questions:
       - Whether a scenario link should be able to target an INSTANT
         rather than a date. Sprint 24's time-granular in-place-on makes it
@@ -10962,25 +10869,6 @@ requirements:
       - qa_tools/common/filing.py::filled_slots
       - qa_tools/common/filing.py::file_arrivals
       - cli/supply.py::filings_command
-    unmet_criteria:
-      - criterion: >-
-          Criterion 1, in part - assignment happens for every arrival BEFORE
-          any check runs over it. The rule runs and is tested; it is not
-          wired into the pipeline run, so no filing is recorded today.
-        why: >-
-          Keith's call, 2026-09-25, on measured evidence rather than in
-          principle. Only a PROMOTION fills a slot (decision 10) and
-          promotion does not exist until batch 4, so filled_slots() is
-          permanently empty and "the oldest claimable unfilled slot" is
-          always the first slot in the calendar. A real run filed 102 of
-          108 supplies against 2023-Q1. Criterion 10 makes a filing
-          WRITE-ONCE, so recording that would bake a known artefact of a
-          missing dependency into permanent history where it later reads
-          as data. filing.file_arrivals() is the single call that turns it
-          on, and both orchestrators carry a comment saying so.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
     evidence:
       - >
         2026-09-25: both cascades are tested as REAL SEQUENCES rather than
@@ -11032,6 +10920,7 @@ requirements:
         reason - it asserted against an empty list - and now asserts the
         fixture produced an arrival before asserting anything about it.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): filing is wired in, before any check. arrival_lifecycle.process() runs file_and_overlay (qa_tools/tools/orchestrate.py: filing.file_arrivals for the arrival and its simultaneous siblings, then period_overlay.rebuild_for_arrival) before run_one checks it and before the promotion gate - tests/test_arrival_lifecycle.py::test_each_arrival_is_filed_checked_and_gated_before_the_next."
     source: "Keith, delivery sprint 9 - the highest-risk sprint in the plan. plans/supply-model.md Thread E in full, including both cascades found by his own stress tests, plus Thread D's split of assignment from promotion. Test scenario register TS-1, TS-2, TS-3a-d, TS-6a, TS-6b, TS-9, TS-10. Honours the deferral REQ-PIPE-052 wrote: 'the rules that USE it - oldest claimable unfilled slot, on-time-wins-for-the-current-slot, monotonic filling, hold for a human - are slot ASSIGNMENT and belong to batch 3'. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHEN a supply arrives and is attributed to a dataset, THE SYSTEM SHALL assign it to exactly one of that dataset's own slots, record it as a resupply of a filled slot, or hold it - and SHALL do so before any check runs over it."
@@ -11114,6 +11003,7 @@ requirements:
 
       - "CRITERIA 2, 3 AND 4 AMENDED 2026-10-04 by REQ-PIPE-131 (Keith, signed): the rule reads 'the open slot if unfilled, else a resupply of it'. The old three branches - on-time-for-the-current-slot, oldest-claimable-unfilled, resupply-of-the-most-recently-filled - are replaced by open-slot-unfilled, resupply-of-open-slot and held-no-open-slot. The decision recorded above that 'Rejected CLOSING a slot's window when the next one opens' is REVERSED: Keith judged a closed, visibly empty Monday better than Monday's data filed backward. Filings already recorded are not re-derived (criterion 10); deployments regenerate."
       - "NFRs 1 AND 4 AMENDED 2026-10-04 (routine, on Keith's blanket approval; delivery-critic finding after REQ-PIPE-131): both still described the retired rule - a helper that no longer exists, and 'the oldest claimable unfilled' slot."
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): promotion exists, so filled_slots() is no longer permanently empty and the reason filings were left unrecorded (Keith, 2026-09-25) is gone; filing.file_arrivals() is called for every arrival ahead of its checks."
   - id: REQ-PIPE-063
     title: A slot stops being claimable once a later one is filled
     date_written: "2026-09-23"
@@ -11231,21 +11121,6 @@ requirements:
       - asset_model/assignment.py::_why_unavailable
       - asset_model/assignment.py::Assignment
       - cli/supply.py::holds_command
-    unmet_criteria:
-      - criterion: >-
-          Criterion 3, in part - a held supply is kept staged and is not
-          promoted or arrival-classified. The rule refuses to place it and
-          nothing promotes or classifies it, but that is by absence rather
-          than by a mechanism, because neither promotion nor arrival
-          classification is wired to filings yet.
-        why: >-
-          REQ-PIPE-062's filings are deliberately not recorded until
-          promotion exists, so there is no stored hold for a promotion step
-          to skip. Satisfied today by there being nothing to do it wrong,
-          which is not the same as satisfied. Re-check when promotion lands.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
     evidence:
       - >
         2026-09-25: the refusal is tested against a CONTROL that must not be
@@ -11277,6 +11152,7 @@ requirements:
         resolve() or assign_to_slot(), and the write path stays with the
         decision log in sprint 12.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): a held supply is refused by mechanism, not by absence. The promotion gate refuses one with no slot (promotion.py, should_promote(held_without_slot=...)) and may_arrival_classify refuses it too - tests/test_promotion_gate.py; a supply with no slot is recorded UNFILED, never a punctuality verdict (qa_tools/common/verdict.py judge) - tests/test_verdict_record.py; and it stays staged (REQ-PIPE-078 criterion 7)."
     source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 and Thread E's standing principle - where a rule genuinely cannot know, SAY SO rather than commit silently. Test scenario register TS-7 and TS-6c's tail. Honours REQ-PIPE-052's deferral, in which 'hold for a human' appears exactly once in the whole register and nowhere else. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "IF no slot of the dataset is open at the supply's receipt instant, THEN THE SYSTEM SHALL hold it for a human (amended by REQ-PIPE-131)."
@@ -11341,6 +11217,7 @@ requirements:
         a referential check against it.
 
       - "CRITERION 1 AMENDED 2026-10-04 by REQ-PIPE-131 (Keith, signed): the trigger is 'no slot of the dataset is open at the receipt instant'. Two triggers remain reachable - an arrival before the dataset's first claim window, and one during a calendar period a partially-participating dataset is not in. The old worked case - a backfill into a slot monotonic filling had closed - cannot happen any more: the backfill is filed to the open period and a person re-files it. A hold now names the two slots either side of the arrival (the closed one, and the one not yet open), found by bisection."
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): promotion and recorded arrival classification both exist now, and each refuses a held supply explicitly, so criterion 3 no longer passes only because there was nothing to do it wrong."
   - id: REQ-PIPE-065
     title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported
     date_written: '2026-09-23'
@@ -11462,50 +11339,6 @@ requirements:
     implemented_by:
       - asset_model/arrival_classification.py::classify
       - asset_model/arrival_classification.py::describe
-    unmet_criteria:
-      - criterion: >-
-          Criterion 9, in part - recording the classification with the supply
-          so every consumer reads it rather than recomputing. The classifier
-          is built and tested; nothing records its output yet.
-        why: >-
-          It classifies against the ASSIGNED SLOT, and REQ-PIPE-062's filings
-          are deliberately not recorded until promotion exists. With no
-          filing there is no slot, so every real supply would classify as
-          UNFILED - correct by criterion 8 and useless as a record.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
-      - criterion: >-
-          Criteria 10 and 11 - retiring the arrival-date derivation, and
-          retiring the path that blanks a resupply's recorded classification
-          in the dashboard template.
-        why: >-
-          Keith's call, 2026-09-25, on measured evidence: retiring the old
-          derivation today would replace the dashboard's current answer with
-          352 supplies reading "unfiled", because the new classifier has no
-          filings to measure against. Un-blanking the resupply status has the
-          same shape in reverse - it would surface the OLD derivation's
-          answer for resupplies, which decision 9 establishes is meaningless,
-          so the blanking's own justification still holds until the new
-          derivation is live. Both retirements are one change with the
-          recording above, not before it.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
-      - criterion: >-
-          Criterion 12, in part - the arrival block's `earliest_extract`
-          survives.
-        why: >-
-          max_lag_hours is retired, verified dead first. earliest_extract is
-          not dead: it feeds lastArrival.arrivedAt, which the template
-          renders in eight places, and it feeds the live classify_arrival()
-          that criteria 10 and 11 cannot yet retire. It is a supplier-derived
-          instant that REQ-PIPE-060 criterion 11 already forbids as an
-          arrival time, so it goes when our own receipt instant replaces it -
-          in the same change as the rest.
-        owner: the promotion sprint (batch 4)
-        blocked_by:
-          sprints: [11]
     evidence:
       - >
         2026-09-25: both failures of the derivation this replaces are tested
@@ -11536,6 +11369,7 @@ requirements:
         that classification is retained for now. It goes with criteria 10 and
         11, and its reason for existing goes with it.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criteria 9 to 12 are restated and built as REQ-PIPE-080 criteria 1 to 4 (recorded classification with its agreement; the arrival-date derivation removed; the resupply blanking removed; our receipt instant replacing the extract instant). Checked on this tree: no classify_arrival() definition and no earliest_extract or max_lag_hours producer remain - only comments naming them as history. tests/test_recorded_arrival_classification.py, tests-js/recorded-arrival.test.js."
     source: "Keith, delivery sprint 10, plans/supply-model.md Thread D - settled 2026-09-21, and every substantive decision in that thread is uncarried by any requirement. Test scenario register TS-9, TS-10, TS-16. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "THE SYSTEM SHALL classify a supply's arrival as early, on time or late against the due instant of the slot it was ASSIGNED to."
@@ -11627,6 +11461,7 @@ requirements:
         plans/running-thoughts.md #43. Note it needs THIS requirement's
         receipt instant to compute, so it is not the deleted field
         wearing a new name.
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): REQ-PIPE-080 carried out every retirement these deferrals waited on, and is built with no unmet criteria."
 
   - id: REQ-PIPE-067
     title: An arrival verdict follows its filing, and is never a frozen fact
@@ -11644,22 +11479,6 @@ requirements:
       - qa_tools/common/filing.py::refile
       - qa_tools/common/filing.py::classification_of
       - asset_model/arrival_classification.py::classify
-    unmet_criteria:
-      - criterion: >-
-          Criterion 4, in part - presenting the classification current for a
-          supply's present filing. The verdict is computed from the current
-          filing on every read and is never cached; nothing presents it to a
-          reader yet.
-        why: >-
-          It travels with the supply, and REQ-PIPE-062's filings are not
-          recorded until promotion exists - so there is nothing to present.
-          The dashboard side is REQ-DASH-070's. Recorded rather than counted
-          as done, because "computed correctly" and "shown correctly" are
-          different claims and this requirement makes both.
-        owner: the promotion sprint (batch 4), with REQ-DASH-070 for the UI
-        blocked_by:
-          sprints: [11]
-          requirements: [REQ-DASH-070]
     evidence:
       - >
         2026-09-25: the fixture deliberately STARTS FROM THE WRONG ANSWER and
@@ -11697,6 +11516,7 @@ requirements:
         same change rather than left as a second account: the arrival TIME
         still never changes, the VERDICT is a function of the current filing.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criterion 4 is REQ-PIPE-080 criterion 5, built - the page presents the newest recorded verdict for the supply's current filing and says it follows that filing (tests/test_recorded_arrival_classification.py, tests-js/recorded-arrival.test.js); REQ-DASH-070, the other blocker, is built."
     source: "Keith, delivery sprint 10, plans/supply-model.md Thread D's second correction, settled conditionally 2026-09-21 and unconditionally once re-filing was confirmed in scope 2026-09-22. Test scenario register TS-11. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHEN a supply is re-filed to a different slot, THE SYSTEM SHALL recompute its arrival classification against the slot it is now filed to."
@@ -11733,6 +11553,7 @@ requirements:
         builds it to discover, because the alternative failure is
         specific: five of six criteria built, the sixth quietly skipped
         as un-buildable, and the requirement reported done.
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): filings are recorded and REQ-PIPE-080 criterion 5 presents the verdict for the current filing, so 'shown correctly' is met as well as 'computed correctly'."
   - id: REQ-DASH-071
     title: One way to write a date, everywhere a person reads one
     story: >-
@@ -19735,6 +19556,7 @@ requirements:
     - '`supply` ON THE DECISION LOG LOST ITS NOT NULL, narrowly. Criterion 10 asks for a refused inheritance to be RECORDED, and the thing it could not find IS a supply - so there is nothing honest to put in the column. Every other action still requires one, enforced by a CHECK that names `inherit-refused` as the single exception, and decision_log refuses a refusal that DOES carry a supply for the same reason.
 
       '
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): inheritance fires on the real corpus. REQ-GEN-251's evidence (2026-10-19 bootstrap from empty) records 2015-Q4 inheriting ed-presentations@201507221000000800, 2015-Q3's supply, by the rule when 2015-Q4 opened, and the page on 2015-12-01 reading 'Inherited from 2015-Q3'; the committed quarterly map's cp-case-workers scenario reads 'Inherited from 2026-Q2' from the calendar's participation."
     signed_off:
       by: Keith
       date: '2026-09-28'
@@ -19816,20 +19638,6 @@ requirements:
       owner: nobody yet - Keith, 2026-10-19
       blocked_by:
         unowned: true
-    - criterion: 'All seventeen criteria are met by the code, and NONE of them is exercised by this repository''s own configuration: no dataset declares a `not_expected` period, so inheritance never fires on the real corpus. Every test states the schedule''s answer rather than reading it from contract/data-asset.yaml.
-
-        '
-      why: 'Declaring that a dataset is genuinely not due in some period is a domain claim about a supplier''s obligations, not a test fixture. It belongs with Keith and with the generator''s scenario register (REQ-GEN-044), which is where the awkward supply shapes get real instances.
-
-        FLAGGED RATHER THAN LEFT IMPLICIT because this project was bitten by the opposite habit the same night: outstanding._from_closed_slots() sat behind a guard that made it unreachable, carried two faults, and ran for the first time on the evening the guard stopped holding (plans/post-build-review.md #63). A rule nothing exercises is a rule nobody has seen work.
-
-        '
-      owner: 'Keith, for the domain claim; REQ-GEN-044 for the instance.
-
-        '
-      blocked_by:
-        requirements:
-        - REQ-GEN-044
     decisions:
     - 'THREE CRITERIA BACKPORTED FROM REQ-PIPE-084 by the mirror-check Keith asked for, 2026-09-28, each of which substitution stated and inheritance only implied. The view SHALL NOT COPY the data, which is the whole point of the mechanism. It is VISIBLE TO ANYTHING QUERYING BY THE LOGICAL NAME, which is the downstream-consumer promise this requirement''s story makes and had no criterion behind. And a supply ARRIVING INTO AN INHERITED PERIOD is held for a person rather than silently replacing the view - REQ-PIPE-099''s decisions had recorded that as falling out of REQ-PIPE-075 criterion 4, which is true and left one disposition explicit while the other relied on a reader knowing.
 
@@ -19885,6 +19693,7 @@ requirements:
 
       '
     - 'post-build-review #493 M4 (2026-11-21): criterion 10''s refusals are one queue item per dataset, its periods in date order, counted in what it owes; a weekly dataset''s first four days had read as four items, Thursday last.'
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): the configuration now declares non-participation (each asset's calendar.yaml participation, REQ-PIPE-345), so the seventeen criteria are exercised by the real history rather than vacuously. Criterion 4's open-a-period instruction stays unmet - Keith's 'leave until needed'."
   - id: REQ-PIPE-099
     title: "Inherit and un-inherit are operator actions, and un-inherit is what frees a blocked withdrawal"
     date_written: "2026-09-26"
@@ -27664,6 +27473,11 @@ requirements:
         by: Keith
         replaced_by: [REQ-TEST-393]
         reason: "retired by Keith 2026-11-15: their corpus fixture has failed since the asset split, and they no longer prove anything worth keeping"
+      - criterion: 6
+        date: "2026-11-22"
+        by: Keith
+        replaced_by: [REQ-PIPE-403, REQ-PIPE-431, REQ-PIPE-432]
+        reason: "Retired 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): the bootstrap's time is now measured by stage, quietly, as REQ-PIPE-403's evidence for REQ-PIPE-250's budget, and the tool overlap whose benefit this criterion could not trust was redone as REQ-PIPE-431 (datacontract-cli in its own worker) and REQ-PIPE-432 (dbt's threads, profiled before and after)."
     linked_tests:
       - tests/test_bootstrap.py
       - tests/test_tools_beside.py
@@ -27688,21 +27502,6 @@ requirements:
         sequential and parallel, compared IDENTICAL on decision log,
         filings, check results, runs and tables - criterion 4. Timings in
         decisions, and provisional.
-    unmet_criteria:
-      - criterion: >
-          Criterion 6's purpose, in part - the gain is measured but not
-          trustworthy: see the timing decision.
-        why: >
-          The sequential reference ran beside other work on a 4-core
-          sandbox, and whether criterion 3's tool overlap helps or fights
-          collection parallelism there is unknown. Keith chose not to
-          re-measure now.
-        owner: >
-          Nobody yet - a clean re-measure (parallel with and without the
-          tool overlap, idle machine), then keep the overlap on by default
-          only if it measurably helps.
-        blocked_by:
-          unowned: true
     decisions:
       - "CRITERION 4 IS NOW KEPT AS A TEST, ON DEMAND (Keith, 2026-10-04). tests/test_bootstrap_equivalence.py runs the real bootstrap twice - sequential and parallel - over a reduced real corpus (11 runs: both collections, all four tools, pass/fail/warn/nodata, promote and promotion-withheld, three filing branches) into scratch databases, and compares every row of every qa table and every supply table, leaving out only the clock stamps and surrogate ids it names. Proved both ways when written: a reintroduced regression (the parallel path skipping the delivery log) fails it, as did 16 of 16 planted differences, and it passed on the real code; it also found the full-size 2026-10-03 pair identical under the same wider comparison (7,210 results, 84 decisions, 151 supply tables). ~3-4 minutes, so it is DESELECTED from every ordinary run and from CI and run with `uv run pytest --run-on-demand tests/test_bootstrap_equivalence.py` when the bootstrap's parallelism changes. REJECTED the fast CI half (~1-2 min on the first red signal) and the deployment half (+3-4 min on the whole run). Deselected rather than skipped, because the fast half treats any skip as a test in the wrong half."
       - >
@@ -27751,6 +27550,7 @@ requirements:
         arrival. Its companion for CI is REQ-TEST-117's cache, which covers
         the pushes that touch no pipeline input; this covers the rest.
       - 'SUPERSEDED IN PART, 2026-10-06 (REQ-TEST-159, Keith''s signing answer): a bootstrap no longer records every delivery once before either collection starts. Each collection stages an arrival and records its delivery just before processing it (arrival_lifecycle.staged_as_it_arrives), and the deliveries neither collection claims are recorded once both finish. This decision''s reason - two collections writing one delivery at once is a race - is answered by delivery_log.record writing a delivery and its files in ONE transaction under its existing ON CONFLICT DO NOTHING. The on-demand equivalence test this requirement owns had been failing on every run since scripted decisions arrived, and is repaired and now run by CI on every push (post-build-review #128).'
+      - "Retired 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): criterion 6 - a trustworthy wall-clock measure of the parallel bootstrap - is owned by REQ-PIPE-403 and REQ-PIPE-431/432, which measure the bootstrap by stage on a quiet machine and re-measure the tool overlap; keeping it here would be a second account of the same claim."
   - id: REQ-TEST-117
     title: CI reuses a bootstrapped database whose inputs have not changed, and never one whose inputs have
     date_written: "2026-10-03"
@@ -33722,12 +33522,7 @@ requirements:
     - 'CRITERION 4''S READER STATUS STAYS OPEN (Keith, 2026-10-14): the not-evaluated-as-contested record is built and tested; the status it reads as follows running-thoughts #95, unscoped. Listed under unmet_criteria rather than shown provisionally.'
     - 'A TRIAL CHECKS WHAT ITS FOLDER HOLDS (Keith, SETTLED by Keith 2026-11-01): the tables present are checked against what is in place in the warehouse for the rest, as a real arrival is; this replaces ''a trial needs every table''. Built in cli/many_tables.py (run_check_local_folder, _borrow_the_rest) and period_schema.borrow_from_period; tests/test_terminal_routes.py''s one-table trial replaced the test pinning the old rule.'
     - 'WHICH PERIOD A TRIAL READS THE REST FROM, AND WHAT (build, 2026-11-01; CHANGED by Keith 2026-11-02, morning report B1, against the recommendation, and BUILT): the period the filing rule would give a supply of the first table the folder holds if received at the trial''s own instant (filing.assignment_at, asked and not recorded); each other table is read there as a real arrival''s overlay reads a sibling - the one supply filed to that period and still staged, not yet decided, where exactly one is, behind the real load-record gate (period_overlay.staged_for_period); where several are, contested and recorded so, and the period''s promoted version answers, as it does where none is staged; a table neither holds is recorded no data, as any table a trial cannot read is. Applies to every collection''s folder trial, Linkage Products'' among them. REJECTED, as first built: the promoted version only - a trial would then read a different period from the one a real arrival received at the same instant reads.'
-    unmet_criteria:
-    - criterion: 'Criterion 4, its last clause - the status a reader''s contested not-evaluated record reads as.'
-      why: 'Keith, signing 2026-10-14: today it reads not evaluated, red, which is a false red; a reader whose cross-table check cannot run against everything it reads should shout, and the shape is still being scoped. The record itself (once per reader, contested as its reason) is built and tested.'
-      owner: 'plans/running-thoughts.md #95 (Keith), not yet scoped'
-      blocked_by:
-        unowned: true
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): criterion 4's last clause said the status follows #95's outcome; #95 settled on strict red with the reason on the record and a notice on the reader's page (REQ-PIPE-270 criterion 4, REQ-DASH-204 criterion 1), both built, so the clause is met. Keith confirmed it."
     linked_tests:
     - tests/test_cp_pair.py
     - tests/test_cp_load_by_pattern.py
@@ -33751,6 +33546,7 @@ requirements:
     - 'tests/test_cp_load_by_pattern.py: every folder route attributes by pattern, refuses a missing or contested table naming the files and where it is settled (criterion 8); the picker marks and refuses a pair (criterion 13). tests/test_cp_clients_pattern.py: the pattern, TS-38''s names unrecognised, every other pattern unchanged, the comment, the ODCS keyPattern unchanged (criteria 1, 2, 11). tests/test_holds.py: the reachable shape and TS-39 (criterion 9). tests/test_asset_time_semantics.py reproduces the characterization pin unchanged (criterion 10).'
     - 'REQ-GEN-196''s superseding decision and TS-39/TS-34/TS-42 in plans/supply-model.md updated in the same change (criterion 12).'
     - '2026-11-02 Perth, worktree bans, DECISION 17 AS CHANGED (B1): tests/test_period_overlay.py::TestAFolderTrialReadsTheRestAsARealArrivalDoes against the worker''s own database - a staged undecided supply read over the promoted one, its supply named; the promoted version where nothing is staged; two staged supplies contested and the period answering; one staged for another period not read; and behind the real load-record gate an unloaded supply not read - the first three seen failing before the change (the trial read the promoted version).'
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): #95's outcome is built (plans/running-thoughts.md #95, done 2026-10-25) as STRICT red. A reader's cross-table check that cannot read a contested table records red for the table that asks, with 'contested' kept as its structured reason (REQ-PIPE-270 criterion 4; tests/test_strict_cross_table.py::TestEveryReasonIsRed::test_each_reason_records_red_and_is_described, tests/test_unrunnable.py::test_a_contested_sibling_is_reported_too), and the reader's page says so at the top, naming the table (REQ-DASH-204 criterion 1; tests/test_dashboard_e2e.py::TestAnotherTableCouldNotBeRead::test_a_reader_shows_one_line_while_the_pair_is_open_and_none_after)."
   - id: REQ-GEN-203
     title: Child Protection's generated history has a contested Client Register pair that a later file supersedes (TS-42) and
       one a scripted person settles (TS-80)
@@ -38306,6 +38102,7 @@ requirements:
       - "BUILT 2026-10-18 (3e50868): a sixteen-line adapter declaring only what its checks need read - dbt's dimension and label per generic test, Soda's data source, the recorded value counts Evidently's drift reference is rebuilt from, and the claim-window dataset. No legacy flag, no temporary pointer."
       - "TESTS READ THE REGISTRY (2eb5a80, CLAUDE.md test rule 4): tests that assumed exactly two real collections went red because Emergency Department arrived; they were made to read the registry rather than the third collection being hidden from them."
       - "THE SCENARIO REGISTER NAMES ed-presentations: generator/scenario_injection.py's INJECTIONS is scenario configuration, as it is for every other collection's scenarios, and the collections gate passes with nothing allowlisted."
+      - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): criterion 5's CI run happened after the Emergency Department push, against a bootstrap holding every collection, and its duration is recorded on REQ-PIPE-336."
     open_questions: []
     linked_tests:
       - "tests/test_collections_registry.py"
@@ -38321,18 +38118,13 @@ requirements:
       - "The collections gate (criterion 2's 'no Emergency Department name outside its configuration, check files, adapter and provider'): `mothman check --only collections`, same tree, 2026-10-19, 'passed', reporting '0 file(s) still wait on the requirement that rewires them'."
       - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth)."
       - "2026-10-19 bootstrap from empty (scratch database, 1464s): all three collections generated and replayed, Birth Registrations alone and Child Protection with Emergency Department as one stream (criterion 3 as amended 2026-10-19): Birth Registrations 506s, Child Protection and Emergency Department 1342s. Emergency Department filed 57 supplies over 56 runs, each staged and checked by datacontract-cli (280 results), dbt (168), Soda (168) and Evidently (112) plus file checks (330), recorded and gated (51 promotions, 5 refusals). The corrections were confirmed across all three collections after every stream finished: REQ-GEN-218 (cp-carers), REQ-GEN-205 (ED's quarters) and REQ-PIPE-181."
+      - "2026-11-22 (triage of signed-but-unbuilt criteria): criterion 5 - REQ-PIPE-336's evidence records CI run 41144293386 (commit 2226719, then 1963c75's dbt fix): the deployment half on a cache miss, against a bootstrap holding Emergency Department and Linkage Products beside Child Protection and Birth Registrations, took 62m17s - the bootstrap 29m47s, its tests 30m15s (plans/morning-reports.md #11)."
     unmet_criteria:
       - criterion: "Criterion 3, in part - each collection's bootstrap time logged in CLAUDE.md's running log."
         why: "No entry naming Emergency Department is in CLAUDE.md's running log on this tree. The bootstrap reported in plans/morning-reports.md #6 (1303s; Birth Registrations 613s, Child Protection 1184s, Emergency Department 222s) predates 880b6ec and 45c3347, so the figure to log is the final bootstrap's."
         owner: "the main session, from the final Emergency Department bootstrap"
         blocked_by:
           unowned: true
-      - criterion: "Criterion 5 - CI's deployment half run against a bootstrap holding all three collections, with its duration recorded."
-        why: "Nothing on this branch has been pushed, so no CI run holds Emergency Department."
-        owner: "the main session, after the Emergency Department push"
-        blocked_by:
-          unowned: true
-
   - id: REQ-DASH-234
     title: "The dashboard shows Department of Health as a third real agency, from the executive view down to its dataset page"
     signed_off:
@@ -46302,6 +46094,7 @@ requirements:
     - 'DATACONTRACT-CLI SAMPLES THE DECLARED KEY (post-build-review #296, item 4): while a run declares keys (datacontract_common.declared_sample_keys), the tool''s identifier lookup returns the adapter''s key, so a rule on a table whose key columns are neither primaryKey nor unique - Linkage Keys'' - records them rather than raising. REJECTED marking the columns primaryKey in the in-memory contract: the tool then creates uniqueness checks of its own. A sensitive-classified key column is still dropped by the tool, and criterion 8 then fails the run.'
     - 'THE KEY GATE IS PER COLLECTION (post-build-review #296, item 5): keys are held by (collection, table) and each Soda file is checked against its own collection''s, since two collections may name a table alike. REJECTED merging by bare table name.'
     - 'ONE-COLUMN ORDER IS EACH TOOL''S OWN, AS BEFORE (post-build-review #296, item 6, accepted): dbt orders a one-column key in its column''s native type, Soda and datacontract-cli as text. It predates this build, criterion 2''s shared text order covers several-column keys only, and changing it would move recorded one-column samples.'
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): REQ-PIPE-296 added the geocoding tables and their keys were declared as the criterion asks, N being the identifiers the source declares (REQ-QAC-294 criterion 9)."
     implemented_by:
     - qa_tools/common/sample_keys.py::value_of
     - qa_tools/common/sample_keys.py::pick
@@ -46365,12 +46158,7 @@ requirements:
     - 'EVERY CONSUMER, BY GREP for failing_sample_key over qa_tools, pipeline, dashboard, cli and generator (NFR 1): soda_common.failing_sample_keys, dbt_common.failing_sample_keys_direct and failing_sample_keys_via_values, datacontract_common.failing_sample_keys, run_soda/run_dbt/run_datacontract.evaluate, sample_keys, pipeline/build_dashboard_data (slot and history entry), and the template''s sample block, compare block and pills. The writer, the reader and results_history carry it through qa.check_result.extra untouched, which test_qa_results_reader proves for the new shape.'
     - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [22]): MET - the page asserted in a real browser."
     - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [23]) and post-build-review #324: tests/test_thirty_linked_datasets.py --run-on-demand 27 passed (2026-11-15), TestEveryLinkageResultNamesItsRowsByTheWholeKey among them: MET."
-    unmet_criteria:
-    - criterion: 'Criterion 3, the geocoding half - each geocoding table''s key as id_1 to id_N and census_year.'
-      why: 'No geocoding table exists yet; the list shape takes such a key unchanged.'
-      owner: REQ-PIPE-296, which adds the geocoding tables
-      blocked_by:
-        requirements: [REQ-PIPE-296]
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): the geocoding tables exist (REQ-PIPE-296), and assets/quarterly/collections/linkage_products.py declares each geo_<source> table's sample key as the identifiers its source declares and census_year - ['id_1', 'census_year'], both sources declaring one identifier (REQ-QAC-294 criterion 9) - beside linkage_keys' ['dataset', 'id_1', 'id_2']. tests/test_sample_keys_composite.py asserts each geocoding key is id_1..id_N for its source's identifiers plus census_year."
   - id: REQ-TEST-374
     title: mothman check warns on every unanswered `PROVISIONAL` choice in a built requirement, naming each
     date_written: '2026-11-01'
@@ -47293,6 +47081,7 @@ requirements:
     - 'WHAT THE HOOK SEES AND DOES NOT (post-build-review #338, the critic on 0d07a178): it sees every open made through Python (open, Path.read_text, os.open, io.open_code), every listing through os.listdir, os.scandir (a descriptor resolved through /proc/self/fd) and glob, and every subprocess.Popen whose executable, arguments (a path inside one too) or working directory is under synthetic/. It does NOT see an os.stat or exists() check (no audit event), a C extension''s own file opens, or what a child process reads without being handed the path (dbt runs as one). A relative path opened against a directory descriptor is unresolvable, but getting the descriptor opens the folder, which is seen. Accepted as the limit of an in-process check; REQ-PIPE-385 criterion 14 blocks the generator side''s imports in a subprocess.'
     - 'c9 READ AFTER THE 2026-11-15 RETIREMENTS (PROVISIONAL, the T4 builder): of its five tests, three belong to retired criteria and go with them - the folder-removed fixture "passing criterion 8" (REQ-PIPE-385 criteria 1 and 14), population applying one asset''s presets (c6, REQ-GEN-392) and the fold''s byte compare (c4, REQ-GEN-392). The two live ones are built: a provider found by path under each asset (tests/test_assets.py, quarterly and daily) and a provider importing another provider refused (tests/test_provider_imports.py). The folder-removed runs of c3''s tests overlap REQ-PIPE-385 criterion 1 for staging to the dashboard build only; they do not block imports, run the gates or the CLI, which REQ-PIPE-385 criterion 14 does.'
     - 'c3 MET (2026-11-15, step 3 of #134, with REQ-GEN-381 and REQ-PIPE-383): the batch pass builds no scripted-decision Player, so tests/synthetic_unread_support.py''s excuse for orchestrate._begin (excused_player_frame, the "allowed" list) is deleted and every read under synthetic/ fails. Seen failing first against a mutant restoring the Player default in _begin: tests/test_synthetic_folder_unread.py''s test_nothing_under_synthetic_was_read[present] and test_the_batch_pass_plays_no_scripted_decision failed, and pass on the built tree.'
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): REQ-GEN-371 created eras.yaml under each asset's synthetic/ folder, the one half of criterion 1 left."
     linked_tests:
     - tests/test_provider_imports.py
     - tests/test_synthetic_folder_unread.py
@@ -47322,13 +47111,7 @@ requirements:
     - '2026-11-15: tests/test_validate_check_lifecycle.py::test_the_fingerprint_reads_nothing_under_synthetic failed first (#337), then the module 33 passed.'
     - '2026-11-15: tests/test_assets.py::TestLoadingByPath::test_a_provider_is_loaded_from_the_daily_assets_folder_too NOT seen failing first - it was written after the behaviour it tests (REQ-GEN-370 c2, built 2026-11-02) and passed on arrival; it was shown able to fail against a mutant that loaded providers from the adapters folder.'
     - '2026-11-15: c3 - tests/test_synthetic_folder_unread.py failed first against a mutant restoring the batch pass''s Player (test_nothing_under_synthetic_was_read[present] and test_the_batch_pass_plays_no_scripted_decision), then passed; the daily and quarterly modules both green in the full non-deployment run of 2026-11-16.'
-    unmet_criteria:
-    - criterion: Criterion 1, its eras.yaml half - eras.yaml under assets/<asset>/synthetic/.
-      why: eras.yaml does not exist yet; REQ-GEN-371 creates it (a feature after
-      owner: REQ-GEN-371
-      blocked_by:
-        requirements:
-        - REQ-GEN-371
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): assets/daily/synthetic/eras.yaml and assets/quarterly/synthetic/eras.yaml both exist (REQ-GEN-371, built), beside each asset's synthetic/collections/, scripted_decisions.yaml and, for the quarterly asset, synthetic_inputs.yaml."
     open_questions: []
   - id: REQ-GEN-371
     title: Each asset's synthetic-era setting versions - back-dated, or named a synthetic era in their changelog - move from data-asset.yaml to synthetic/eras.yaml, and the merged timeline is unchanged
@@ -49059,6 +48842,7 @@ requirements:
     - 'BUILT WITH c7''s FOOTER HALF OPEN (the step-3 builder): the register records a partly met requirement as built with unmet_criteria, as REQ-GEN-370 is, and refuses unmet_criteria on in_progress; the one open half waits for REQ-PIPE-385 criterion 12, which has no footer wording to read the declaration yet.'
     - 'THE CORRECTION TRIAL READS THE ONE CLOCK; THE GIT GATE KEEPS ITS OWN (post-build-review #360): correction_trial''s frozen_changes, trial and preview default `at` to asset_time.now(), so a bootstrap''s confirmation (correction_replay.confirm_due -> correction_apply.confirm -> trial_for) compares freezes with the replay''s instant. agreement_freeze''s git-gate defaults and correction_trial.drafts_for''s ''today'' stay on the wall clock: they compare git refs and never run inside a replay.'
     - 'A PIN ON A REAL ASSET IS REFUSED BEFORE IT IS PARSED (post-build-review #362): asset_time.ambient runs the synthetic gate first, so a malformed MOTHMAN_PINNED_NOW on a real asset raises PinnedClockRefused, not a parse error.'
+    - "Marked met 2026-11-22 (Keith, triage of signed-but-unbuilt criteria): REQ-PIPE-385 criterion 12's footer wording is built and reads asset_time.declared_synthetic() through the embedded ASSET_SYNTHETIC, so criterion 7's last reader asks the one place too."
     linked_tests:
     - tests/test_one_clock.py
     - tests/test_replay_clock.py
@@ -49109,13 +48893,7 @@ requirements:
     - '2026-11-15: tests/test_one_clock.py, green in the full run below. Seen failing first against mutants: the old lag rule on the wall clock in orchestrate.effective_at_of (4 of TestWhenAPromotionTakesEffect failed); asset_time.installed without its gate (3 failed across test_one_clock and test_bootstrap_package); ReplayClock.processing_arrival without correction staging (1 failed); decision_log._recorded_at not announcing taking_effect (tests/test_replay_clock.py''s test_a_rule_decision_is_recorded_as_it_takes_effect failed).'
     - '2026-11-16, the full non-deployment suite on this tree (`-m ''not needs_deployment'' -n 3 -v`, scratchpad basetemp): 7470 passed, 1 failed, 0 skipped in 1985s - the one failure tests/test_distribution_groups.py::test_a_module_outside_the_browser_tests_is_one_group, present on the base (post-build-review #340). The run before it, on the same code, also had tests/test_carried.py''s module fixture erroring (4 errors) on a 2026-Q1 inherit left in its worker database by an earlier module; it passed in this run, alone and after its likeliest neighbours, so it is order-dependent and reported open rather than waived.'
     - '2026-11-16, real bootstraps from empty into scratch databases (marked test, dropped after): daily 791s, quarterly 3402s, both exit 0 with no target disagreement; 19 and 40 scripted decisions played; no decision or run recorded on 2026-11-14 or later (the replay clock stamped every record with the replay''s own time). Both shared the sandbox with the test suite, so neither is a timing for the 5 percent NFR.'
-    unmet_criteria:
-    - criterion: Criterion 7, its footer half - the dashboard footer's synthetic wording takes its answer from asset_time.declared_synthetic.
-      why: 'The footer wording that would read it is REQ-PIPE-385 criterion 12''s, not built; every other reader of `synthetic: true` (the clock''s gate, synthetic_reset.is_synthetic, checkpoints.require_synthetic, the scripted-decision player, the bootstrap''s refusal, pipeline run''s dim line) asks the one reader.'
-      owner: REQ-PIPE-385, criterion 12
-      blocked_by:
-        requirements:
-        - REQ-PIPE-385
+    - "2026-11-22 (triage of signed-but-unbuilt criteria): the footer takes its answer from the one reader - dashboard/embed_dashboard_data.py embeds ASSET_SYNTHETIC from asset_time.declared_synthetic() (and BUILD_PROVENANCE's synthetic fields from the same call), and the template's footer wording reads ASSET_SYNTHETIC (REQ-PIPE-385 criterion 12, built). tests/test_real_deployment.py, tests-js/scenario-panel.test.js."
     open_questions: []
   - id: REQ-PIPE-383
     title: Scripted decisions are played by the bootstrap through the player a replay takes, scripted corrections are staged through REQ-PIPE-382's arrival event, and the real pipeline neither builds a player nor imports scripted_decisions or correction_replay
