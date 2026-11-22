@@ -692,6 +692,9 @@ class DataAsset(_Strict):
     #: only an environment with ticketing on needs it, and that refuses
     #: without one (environments.for_connection).
     ticket_repository: NonEmptyStr | None = None
+    #: The project a one-off is for (REQ-PIPE-446 criterion 13): required of
+    #: every one-off by the folders gate, never asked of an enduring asset.
+    project: NonEmptyStr | None = None
     #: The PostgreSQL major this asset targets (REQ-PIPE-146). Optional
     #: HERE so this model's own tests can build a minimal asset; its
     #: presence and shape are gated by postgres_version.declaration_errors,

@@ -80,6 +80,9 @@ def list_ticket_numbers(owner: str, repo: str) -> list[int]:
     MOVED HERE from acceptance_sync.py when REQ-PIPE-122 criterion 23
     retired that module with REQ-QAC-017's per-run /accept - this was the
     one piece of it anything else still used."""
+    from asset_model import assets as _assets_guard
+
+    _assets_guard.refuse_github("`gh issue list`")   # REQ-PIPE-446 c14
     out = subprocess.run(
         ["gh", "issue", "list", "--repo", f"{owner}/{repo}", "--label", TICKET_LABEL,
          "--state", "all", "--json", "number", "--limit", "100"],
@@ -88,6 +91,9 @@ def list_ticket_numbers(owner: str, repo: str) -> list[int]:
 
 
 def _run_gh(args: list[str]) -> str:
+    from asset_model import assets as _assets_guard
+
+    _assets_guard.refuse_github(f"`gh {' '.join(args[:2])}`")   # REQ-PIPE-446 c14
     result = subprocess.run(["gh", *args], capture_output=True, text=True, check=True)
     return result.stdout
 

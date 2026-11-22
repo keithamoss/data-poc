@@ -87,6 +87,17 @@ class ModuleNameClash(AssetError):
     """Two different asset modules would register one module name."""
 
 
+class OneOffRefused(AssetNotSelected):
+    """A one-off named in a way that cannot select it (REQ-PIPE-446 criteria 3,
+    4 and 9, REQ-PIPE-363 criterion 12): MOTHMAN_ASSET set beside `--id`, an id
+    that is not one, or one id under two roots, or MOTHMAN_ASSET naming one."""
+
+
+class NeverGitHub(AssetError):
+    """A GitHub API call while a one-off is selected (REQ-PIPE-446 criterion
+    14, Keith 2026-11-21: 'One offs should never use GitHub.')."""
+
+
 class OneAssetPerProcess(AssetError):
     """A connection for a second asset in a process that already opened one
     for another (REQ-PIPE-343 criterion 5)."""
@@ -105,6 +116,14 @@ class Asset:
     dbt_project: Path
     data: Path
     reports: Path
+    #: THE KIND FOLDER IT WAS FOUND UNDER (REQ-PIPE-446 criterion 12) - None
+    #: for an enduring asset under assets/. Read from where the folder is,
+    #: never from a declaration inside it.
+    kind: str | None = None
+
+    @property
+    def is_one_off(self) -> bool:
+        return self.kind is not None
 
     def file(self, name: str) -> Path:
         """An asset-wide file, e.g. `file("calendar.yaml")`."""
@@ -132,13 +151,87 @@ class Asset:
         return self.name.replace("-", "_")
 
 
+#: Where one-offs live, beside assets/ (REQ-PIPE-446 criterion 1):
+#: one-offs/<kind>/<id>/, each kind's template at one-offs/<kind>/_template/.
+ONE_OFFS = "one-offs"
+
+
+def _listable(path: Path) -> tuple | None:
+    """(mtime_ns, inode) of a directory, or None where it is not one."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_ino) if stat.S_ISDIR(st.st_mode) else None
+
+
+def _subfolders(path: Path) -> list[str]:
+    return sorted(p.name for p in path.iterdir()
+                  if p.is_dir() and not p.name.startswith((".", "_")))
+
+
+class _OneOffs:
+    """one-offs/<kind>/<id>/ (REQ-PIPE-446 criterion 1): every kind folder,
+    and every folder in it - directories only, '_' and '.' names skipped. No
+    list of kinds or one-offs is held anywhere in code.
+
+    A STAT STAMP PER FOLDER (the SCALABILITY NFR): the root's for which kinds
+    exist, and each kind folder's for which one-offs it holds - so the
+    two-level listing is re-read only where an entry changed."""
+
+    def __init__(self, root: Path):
+        self.root = Path(root)
+        self._kinds: tuple | None = None
+        self._ids: dict[str, tuple] = {}
+
+    def kinds(self) -> list[str]:
+        stamp = _listable(self.root)
+        if stamp is None:
+            return []
+        if self._kinds is None or self._kinds[0] != stamp:
+            self._kinds = (stamp, tuple(_subfolders(self.root)))
+        return list(self._kinds[1])
+
+    def names_in(self, kind: str) -> list[str]:
+        """Every one-off folder of a kind, its name good or bad."""
+        folder = self.root / kind
+        stamp = _listable(folder)
+        if stamp is None:
+            return []
+        held = self._ids.get(kind)
+        if held is None or held[0] != stamp:
+            held = self._ids[kind] = (stamp, tuple(_subfolders(folder)))
+        return list(held[1])
+
+    def listing(self) -> list[tuple[str, str]]:
+        """(kind, id) for every one-off whose name meets NAME_PATTERN. A bad
+        name is left out, so it can never be selected - `mothman check` names
+        it (bad_names)."""
+        return [(k, n) for k in self.kinds() for n in self.names_in(k)
+                if NAME_PATTERN.fullmatch(n)]
+
+    def bad_names(self) -> list[Path]:
+        return [self.root / k / n for k in self.kinds() for n in self.names_in(k)
+                if not NAME_PATTERN.fullmatch(n)]
+
+    def asset(self, kind: str, name: str) -> "Asset":
+        folder = self.root / kind / name
+        return Asset(name=name, folder=folder, adapters=folder / "collections",
+                     providers=folder / "synthetic" / "collections",
+                     dbt_project=folder / "dbt",
+                     data=ROOT / "data" / name, reports=ROOT / "reports" / name, kind=kind)
+
+
 class _Assets:
     """assets/<asset>/ (REQ-PIPE-342 criterion 1): one folder per asset,
     found from the folder itself. A file at the top - environments.yaml - is
-    not an asset; nor is a hidden or underscored folder."""
+    not an asset; nor is a hidden or underscored folder. The one-offs root is
+    held beside it (REQ-PIPE-446 criterion 11)."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, one_offs: Path | None = None):
         self.root = root
+        self.one_offs = _OneOffs(Path(one_offs) if one_offs is not None
+                                 else ROOT / ONE_OFFS)
         # REMEMBERED BY THE FOLDER'S OWN STAT, so still "as it is now": a
         # folder added, removed or renamed under assets/ changes the
         # directory's mtime, and the next call lists it afresh. selected() is
@@ -211,8 +304,33 @@ def use_root(root: Path | None):
     folders are not this repository's (REQ-PIPE-342) and for the suite's fixture."""
     global _layout
     before = _layout
-    _layout = _DEFAULT if root is None else _Assets(Path(root))
+    _layout = _DEFAULT if root is None else _Assets(Path(root), _innermost(before).one_offs.root)
     return before
+
+
+def _innermost(layout) -> "_Assets":
+    while isinstance(layout, _Folder):
+        layout = layout.base
+    return layout
+
+
+def use_one_offs_root(root: Path | None):
+    """Point the resolver's one-offs root elsewhere - a deployment's, a test's
+    temporary folder - or back at one-offs/ with None, as use_root does for
+    assets/ (REQ-PIPE-446 criterion 7); returns what it pointed at before."""
+    global _layout
+    before = _layout
+    inner = _innermost(before)
+    replaced = _Assets(Path(inner.root), Path(root) if root is not None else ROOT / ONE_OFFS)
+    _layout = _with_base(before, replaced)
+    return before
+
+
+def _with_base(layout, base):
+    if isinstance(layout, _Folder):
+        return _Folder(_with_base(layout.base, base), layout.name, layout.folder,
+                       layout.adapters)
+    return base
 
 
 def root_injected() -> bool:
@@ -236,6 +354,10 @@ class _Folder:
 
     def names(self) -> list[str]:
         return self.base.names()
+
+    @property
+    def one_offs(self) -> "_OneOffs":
+        return self.base.one_offs
 
     def asset(self, name: str) -> Asset:
         found = self.base.asset(name)
@@ -267,7 +389,7 @@ def restore(layout) -> None:
 def _describe(layout):
     """A picklable description of a layout, for a process this one starts."""
     if isinstance(layout, _Assets):
-        return ("root", str(layout.root))
+        return ("root", str(layout.root), str(layout.one_offs.root))
     if isinstance(layout, _Folder):
         return ("folder", _describe(layout.base), layout.name, str(layout.folder),
                 str(layout.adapters) if layout.adapters is not None else None)
@@ -277,7 +399,8 @@ def _describe(layout):
 def _rebuild(described):
     kind = described[0]
     if kind == "root":
-        return _Assets(Path(described[1]))
+        return _Assets(Path(described[1]),
+                       Path(described[2]) if len(described) > 2 else None)
     if kind == "folder":
         _, base, name, folder, adapters = described
         return _Folder(_rebuild(base), name, Path(folder),
@@ -304,12 +427,15 @@ def handoff() -> tuple:
     called in a started process generates for the run's anchor."""
     from asset_model import arrivals, config_pin, history_anchor
 
-    return (selected().name, _describe(_layout), config_pin.installed(),
-            arrivals.installed_tree(), history_anchor.installed())
+    # A ONE-OFF TRAVELS AS ITSELF (REQ-PIPE-446 criterion 7): its id and that it
+    # is one, never written into MOTHMAN_ASSET, which criterion 9 refuses.
+    chosen = selected()
+    return (chosen.name, _describe(_layout), config_pin.installed(),
+            arrivals.installed_tree(), history_anchor.installed(), chosen.is_one_off)
 
 
 def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None,
-          anchor=None) -> Asset:
+          anchor=None, one_off: bool = False) -> Asset:
     """A started process's first act: take the layout and the asset it was
     handed (`handoff()`), select the asset - refused as `select` refuses - pin
     the configuration snapshot it was handed, verified against its digest
@@ -318,7 +444,7 @@ def adopt(name: str, layout: tuple = ("default",), snapshot=None, tree=None,
     the history's anchor it was handed (REQ-GEN-404 criterion 10)."""
     global _layout
     _layout = _rebuild(layout)
-    asset = select(name)
+    asset = select_one_off(name) if one_off else select(name)
     from asset_model import arrivals, config_pin, history_anchor
 
     config_pin.adopt(snapshot)
@@ -341,35 +467,171 @@ def every() -> list[Asset]:
     return [_layout.asset(n) for n in names()]
 
 
+def one_offs() -> list[tuple[str, str]]:
+    """(kind, id) for every one-off found (REQ-PIPE-446 criterion 1) - its
+    own reader, never through names() (criterion 6)."""
+    return _layout.one_offs.listing()
+
+
+def one_off_kinds() -> list[str]:
+    """Every kind folder under one-offs/."""
+    return _layout.one_offs.kinds()
+
+
+def one_offs_root() -> Path:
+    return _layout.one_offs.root
+
+
+def bad_one_off_names() -> list[Path]:
+    """One-off folders whose names do not meet NAME_PATTERN - never selectable;
+    `mothman check` names each (criterion 1)."""
+    return _layout.one_offs.bad_names()
+
+
+def id_clashes() -> dict[str, list[Path]]:
+    """{id: every folder holding it} for an id under assets/ and a kind, or
+    under two kinds (criterion 4) - they would share data/, reports/, a
+    database and a module tag."""
+    held: dict[str, list[Path]] = {n: [_layout.asset(n).folder] for n in names()}
+    for kind, name in one_offs():
+        held.setdefault(name, []).append(_layout.one_offs.root / kind / name)
+    return {n: f for n, f in held.items() if len(f) > 1}
+
+
+def _kinds_sentence() -> str:
+    """'For one of <n> <kinds>, use mothman one-off.' - each kind that has
+    folders, counted in its plural display word, joined with 'or'; empty where
+    there are none (REQ-PIPE-363 criteria 4 to 6, wording SETTLED by Keith
+    2026-11-21). A kind with no plug-in has no display word, so it is left out
+    of the sentence - `mothman check` fails its folder (REQ-PIPE-446 c2)."""
+    from asset_model import one_off_kinds
+
+    counts: dict[str, int] = {}
+    for kind, _name in one_offs():
+        counts[kind] = counts.get(kind, 0) + 1
+    parts = []
+    for kind in sorted(counts):
+        plug = one_off_kinds.get(kind)
+        if plug is not None:
+            parts.append(f"{counts[kind]} {plug.plural}")
+    return f" For one of {' or '.join(parts)}, use mothman one-off." if parts else ""
+
+
 def _refusal(stated: str | None, found: list[str]) -> str:
     listed = ", ".join(found) if found else "(no asset folders found)"
+    kind = _kind_of_one_off(stated) if stated else None
+    if kind is not None:
+        return _names_a_one_off(stated, kind, listed)
     if not stated:
         head = (f"{ASSET_ENV} is not set, so this command cannot say which data asset it "
                 f"acts for.")
     else:
         head = f"{ASSET_ENV} is {stated!r}, which names no asset folder."
-    return (f"{head} Set it to one of: {listed}. There is deliberately no default - a "
-            f"command that guesses is a command that can act for an asset it was not "
-            f"meant to.")
+    return (f"{head} Set it to one of: {listed}.{_kinds_sentence()} There is deliberately "
+            f"no default - a command that guesses is a command that can act for an asset "
+            f"it was not meant to.")
+
+
+def _kind_of_one_off(name: str) -> str | None:
+    found = [k for k, n in one_offs() if n == name]
+    return found[0] if found else None
+
+
+def _names_a_one_off(stated: str, kind: str, listed: str) -> str:
+    """REQ-PIPE-363 criterion 12, in the words Keith approved (v7 review)."""
+    from asset_model import one_off_kinds
+
+    plug = one_off_kinds.get(kind)
+    word = plug.singular if plug is not None else kind
+    return (f"{ASSET_ENV} is {stated!r}, which is an {word}, not an asset. A one-off is "
+            f"chosen by --id, with {ASSET_ENV} unset: mothman one-off <step> --id {stated}. "
+            f"To run this command for an asset instead, set it to one of: {listed}.")
+
+
+#: The one-off this process acts for, chosen by `--id` or in the TUI - never
+#: from MOTHMAN_ASSET (REQ-PIPE-446 criteria 3 and 9).
+_one_off: str | None = None
+
+
+def _stated_beside(what: str) -> None:
+    stated = os.environ.get(ASSET_ENV)
+    if stated:
+        raise OneOffRefused(
+            f"{ASSET_ENV} is {stated!r}, and a one-off is being named ({what}). "
+            f"{ASSET_ENV} is for the enduring assets only - unset it, and name the "
+            f"one-off by --id alone.")
+
+
+def select_one_off(name: str) -> Asset:
+    """Select one-off `name` for this process (REQ-PIPE-446 criterion 3) -
+    refused, before any configuration is read, with MOTHMAN_ASSET set at all,
+    and refused for an id that is not a one-off or that clashes (criterion 4).
+    Never writes MOTHMAN_ASSET (criterion 7)."""
+    global _one_off
+    _stated_beside(f"--id {name}")
+    found = [(k, n) for k, n in one_offs() if n == name]
+    if not found:
+        listed = ", ".join(sorted(n for _k, n in one_offs())) or "(no one-off folders found)"
+        raise OneOffRefused(f"{name!r} is not a one-off - none of {one_offs_root()}/<kind>/ "
+                            f"holds a folder of that name. One-offs found: {listed}.")
+    clash = id_clashes().get(name)
+    if clash:
+        raise OneOffRefused(_clash_words(name, clash))
+    _one_off = name
+    return selected()
+
+
+def deselect_one_off() -> None:
+    """Back to no one-off - the TUI choosing another, and the suite between
+    tests."""
+    global _one_off
+    _one_off = None
+
+
+def _clash_words(name: str, folders: list[Path]) -> str:
+    return (f"{name!r} is the name of more than one folder - "
+            f"{', '.join(str(f) for f in folders)} - so it is selected as neither: they "
+            f"would share data/{name}, reports/{name}, the database supply_{name} and a "
+            f"module tag. Rename all but one.")
 
 
 def selected() -> Asset:
-    """The asset MOTHMAN_ASSET names, resolved now. Refused, naming the
-    variable and every asset folder found, when it is unset or names none."""
+    """The asset MOTHMAN_ASSET names, or the one-off chosen by `--id`, resolved
+    now. Refused, naming the variable and every asset folder found, when
+    neither is there."""
+    if _one_off is not None:
+        _stated_beside(f"--id {_one_off}")
+        found = [(k, n) for k, n in one_offs() if n == _one_off]
+        if not found:
+            raise OneOffRefused(f"the one-off {_one_off!r} chosen for this process is no "
+                                f"longer under {one_offs_root()}.")
+        return _layout.one_offs.asset(*found[0])
     stated = os.environ.get(ASSET_ENV) or None
     found = names()
     if stated is None or stated not in found:
-        raise AssetNotSelected(_refusal(stated, found))
+        refusal = _refusal(stated, found)
+        raise (OneOffRefused if stated and _kind_of_one_off(stated) else
+               AssetNotSelected)(refusal)
+    # AN ID UNDER assets/ AND A KIND IS SELECTED AS NEITHER (REQ-PIPE-446 c4);
+    # asked only where one-offs exist, since selected() is asked millions of
+    # times in one generation.
+    if one_offs():
+        clash = id_clashes().get(stated)
+        if clash:
+            raise OneOffRefused(_clash_words(stated, clash))
     return _layout.asset(stated)
 
 
 def why_not_selected() -> str | None:
-    """The refusal `selected()` would raise, or None when an asset is
-    selected - for a caller that says it rather than raising it, such as the
-    CLI meeting a command it cannot place (REQ-PIPE-363 criterion 4)."""
-    stated = os.environ.get(ASSET_ENV) or None
-    found = names()
-    return None if stated in found else _refusal(stated, found)
+    """The refusal `selected()` would raise, or None when an asset or a
+    one-off is selected - for a caller that says it rather than raising it,
+    such as the CLI meeting a command it cannot place (REQ-PIPE-363
+    criterion 4)."""
+    try:
+        selected()
+    except AssetNotSelected as exc:
+        return str(exc)
+    return None
 
 
 def selected_or_none() -> Asset | None:
@@ -382,13 +644,25 @@ def selected_or_none() -> Asset | None:
 
 
 def select(name: str) -> Asset:
-    """Select `name` for this process and any it starts - what a spawned
+    """Select asset `name` for this process and any it starts - what a spawned
     process runs first with the asset it was handed (REQ-PIPE-369
-    criterion 4). Refused as `selected()` refuses."""
+    criterion 4). Refused as `selected()` refuses - a one-off's id included
+    (REQ-PIPE-446 criterion 9)."""
     if name not in names():
-        raise AssetNotSelected(_refusal(name, names()))
+        raise (OneOffRefused if _kind_of_one_off(name) else AssetNotSelected)(
+            _refusal(name, names()))
     os.environ[ASSET_ENV] = name
     return selected()
+
+
+def refuse_github(what: str) -> None:
+    """Refused for a one-off (REQ-PIPE-446 criterion 14): no ticket, no
+    comment, no GitHub API call of any kind. Every `gh` boundary asks."""
+    chosen = selected_or_none()
+    if chosen is not None and chosen.is_one_off:
+        raise NeverGitHub(f"{what} is a GitHub API call, and {chosen.name!r} is a one-off: "
+                          f"one-offs never use GitHub (tickets, comments or the API). "
+                          f"Pushing its configuration with git is not an API call.")
 
 
 def _repo_rel(path: Path, what: str, root: Path | None = None) -> str:

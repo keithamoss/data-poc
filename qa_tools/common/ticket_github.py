@@ -88,6 +88,10 @@ def _gh(args: list[str]) -> str:
     a container without gh at all can only ever take the first branch,
     so nothing here could see the second one was thinner.
     """
+    # ONE-OFFS NEVER USE GITHUB (REQ-PIPE-446 criterion 14).
+    from asset_model import assets
+
+    assets.refuse_github(f"`gh {' '.join(args[:2])}`")
     try:
         result = subprocess.run(["gh", *args], capture_output=True, text=True,
                                  check=True)

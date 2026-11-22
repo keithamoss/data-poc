@@ -88,6 +88,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     ("layout", ["uv", "run", "mothman", "dashboard", "validate-layout"],
      "only asset folders at the top of assets/, and no collection's file in shared code",
      False),
+    # REQ-PIPE-446 criteria 1, 2, 4, 5 and 13: folder names, kind plug-ins, one
+    # id namespace, data_asset_id against the folder, and a project per
+    # one-off. Repository-wide: it reads folder names and data_asset_id.
+    ("folders", ["uv", "run", "python3", "-m", "qa_tools.common.validate_folders"],
+     "every asset and one-off folder is named for its data_asset_id, and one id is one folder",
+     False),
     # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
     # would draw the same rows. REQ-GEN-370 criterion 5: and no provider
     # imports another provider, an adapter or anything under assets/.
@@ -205,7 +211,7 @@ _DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 #: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
 #: criterion 9).
 _REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "imports", "dbt packages",
-                              "layout", "npm test", "pytest"})
+                              "layout", "folders", "npm test", "pytest"})
 
 
 #: Gates about synthetic configuration (REQ-PIPE-385 criterion 8): run only for

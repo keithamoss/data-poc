@@ -350,6 +350,11 @@ def service_from_env():
     env = environments.current_or_none()
     if env is None or not env.ticketing:
         return None
+    # NO TICKETING FOR A ONE-OFF, EVER (REQ-PIPE-446 criterion 14), whatever
+    # the environment says.
+    chosen = _assets.selected_or_none()
+    if chosen is not None and chosen.is_one_off:
+        return None
     slug = environments.ticket_repository() or ""
     if "/" not in slug:
         # Unreachable through supply_db.connect, which refuses this before

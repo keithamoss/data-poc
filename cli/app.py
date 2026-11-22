@@ -52,7 +52,7 @@ try:
         # 3): it imports the generator and scenarios/, which a real deployment
         # leaves out, so importing it here would fail `mothman --help` there.
         from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
-                       pipeline, plans, population, schedule, supply, synthetic)
+                       one_off, pipeline, plans, population, schedule, supply, synthetic)
         from asset_model import collections as _registry
         from asset_model import assets as _assets
 
@@ -394,6 +394,9 @@ cli.add_command(schedule.schedule_group)
 cli.add_command(supply.supply_group)
 cli.add_command(population.population_command)
 cli.add_command(check.check_command)
+# EVERY ONE-OFF STEP, IN ONE GROUP (REQ-PIPE-446 criterion 8; CLI C8: Tier 1,
+# in the Tools panel), run with MOTHMAN_ASSET unset.
+cli.add_command(one_off.one_off_group)
 
 # TWO PANELS IN `mothman --help`, AT EVERY SIZE (REQ-TEST-252 criterion 2,
 # Keith 2026-10-16): every collection group in hierarchy order, then every
@@ -406,7 +409,11 @@ _COLLECTION_NAMES = [g.name for g in _GROUPS]
 cli.add_panel(RichCommandPanel(
     "Collections", commands=_COLLECTION_NAMES,
     help=None if _ASSET is not None
-    else f"Set {_assets.ASSET_ENV} to one of: {', '.join(_assets.names()) or '(no asset folders found)'}"))
+    else (f"Set {_assets.ASSET_ENV} to one of: "
+          f"{', '.join(_assets.names()) or '(no asset folders found)'}."
+          # 'For one of <n> <kinds>, use mothman one-off.' WHERE ONE-OFFS EXIST
+          # (REQ-PIPE-363 criterion 5, AMENDED 2026-11-21).
+          + _assets._kinds_sentence())))
 # A LAZILY LOADED TOOL TOO (the CLI post-build critic, 2026-11-18): `scenarios`
 # is not in cli.commands until first use, and left out here rich-click put it
 # in a third, default panel. Listed only where it can run - a real deployment
