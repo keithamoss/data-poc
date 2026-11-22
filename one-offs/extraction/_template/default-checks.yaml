@@ -23,8 +23,8 @@ checks:
     description: >
       Every table the recipe declares must arrive in the supply.
     failure_indicates: >
-      The extraction was run without this table, or the file holding it was
-      left out when the supply was put together.
+      The table was never drawn, or the file holding it was left out when
+      the supply was put together.
     changelog: []
 
   - assertion: undeclared_file

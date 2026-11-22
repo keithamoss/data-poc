@@ -164,9 +164,15 @@ _LOGICAL_TO_PHYSICAL = {"string": "varchar", "integer": "bigint", "number": "num
 
 def _contract(recipe, collection_id: str) -> dict:
     tables = [t for t in recipe.tables if t.collection_id == collection_id]
+    # A ONE-TABLE COLLECTION'S CONTRACT CARRIES ITS DATASET'S id AND name
+    # (REQ-QAC-039), as every enduring asset's does; several tables, the
+    # collection's.
+    one = tables[0] if len(tables) == 1 else None
     return {
-        "apiVersion": "v3.2.0", "kind": "DataContract", "id": collection_id,
-        "status": "draft", "version": "1.0.0", "name": tables[0].collection_name,
+        "apiVersion": "v3.2.0", "kind": "DataContract",
+        "id": one.dataset_id if one else collection_id,
+        "status": "draft", "version": "1.0.0",
+        "name": one.dataset_name if one else tables[0].collection_name,
         "domain": tables[0].agency_id,
         "description": {"purpose": f"Extraction {recipe.extraction_id} for {recipe.project}. "
                                    f"Filter: {recipe.filter}"},

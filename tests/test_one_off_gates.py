@@ -257,3 +257,26 @@ class TestTheCollectionsGateAcceptsTheSharedAdapter:
         package.mkdir()
         problems = validate_collections.config_problems(package)
         assert any("has no adapter" in p for p in problems), problems
+
+
+class TestTheScheduleGateRefusesAOneOffASchedule:
+    """REQ-PIPE-438 criterion 9: a one-off declaring a dataset `not-yet-agreed`
+    or with a calendar fails the schedule gate, naming the dataset."""
+
+    @pytest.mark.parametrize("entry", [{"no_calendar": "not-yet-agreed"},
+                                       {"calendar": "baseline"}])
+    def test_it_fails_naming_the_dataset(self, extraction, entry):
+        from qa_tools.common import one_off_gating
+
+        calendar = extraction / "calendar.yaml"
+        doc = yaml.safe_load(calendar.read_text())
+        doc["datasets"][0] = {"id": doc["datasets"][0]["id"], **entry}
+        calendar.write_text(yaml.safe_dump(doc))
+        code, said = one_off_gating.gate_folder("schedule", "cohort-2026-a")
+        assert code != 0 and "cohort-people" in said, said
+
+    def test_its_generated_calendar_passes(self, extraction):
+        from qa_tools.common import one_off_gating
+
+        code, said = one_off_gating.gate_folder("schedule", "cohort-2026-a")
+        assert code == 0, said

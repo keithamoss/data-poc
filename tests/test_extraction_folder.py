@@ -66,11 +66,17 @@ class TestGeneratedFromTheRecipeAlone:
         assert names == [
             "calendar.yaml", "data-asset.yaml",
             "dbt/dbt_project.yml",
+            "dbt/models/cohort-study/schema.yml",
             "dbt/models/cohort-study/sources.yml",
             "dbt/models/cohort-study/stg_cohort_people.sql",
             "dbt/models/cohort-study/stg_cohort_visits.sql",
             "dbt/packages.yml", "generated.sha256.json",
-            "health-agency/cohort-study-contract.yaml", "presentation.yaml"]
+            "health-agency/cohort-study-contract-retired.yaml",
+            "health-agency/cohort-study-contract.yaml",
+            "health-agency/cohort-study-evidently-checks-retired.yml",
+            "health-agency/cohort-study-evidently-checks.yml",
+            "health-agency/cohort-study-soda-checks-retired.yml",
+            "health-agency/cohort-study-soda-checks.yml", "presentation.yaml"]
 
     def test_nothing_of_the_template_and_no_adapter_or_synthetic_folder(self, opened):
         for absent in ("people.yaml", "synthetic", "collections"):
@@ -344,3 +350,19 @@ class TestTheLocalDbtUtils:
 
 
 pytestmark = pytest.mark.asset("daily")
+
+
+class TestAOneTableCollectionsContract:
+    """A defect found building REQ-QAC-441 (2026-11-22): a one-table
+    collection's contract carries its DATASET's id and name (REQ-QAC-039), and
+    the generator wrote the collection's, so the hierarchy gate - which the
+    load runs (REQ-PIPE-442 criterion 3) - failed every such extraction."""
+
+    def test_it_passes_the_hierarchy_gate(self, root, tmp_path):
+        from qa_tools.common import one_off_gating
+
+        doc = ex.recipe()
+        doc["tables"][1]["collection"] = {"id": "visit-study", "name": "Visit Study"}
+        _open(ex.package(tmp_path / "pkg", doc))
+        code, said = one_off_gating.gate_folder("hierarchy", "cohort-2026-a")
+        assert code == 0, said

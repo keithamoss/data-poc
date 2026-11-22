@@ -643,6 +643,19 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                     f"declares `{schedule.DERIVED_KEY}:` on {src.asset_label}, an enduring asset.",
                     f"`{schedule.DERIVED_KEY}: true` marks a one-off's derived product, which "
                     f"lives under one-offs/, never under assets/. Remove it."))
+        else:
+            # A ONE-OFF HAS SUPPLIES AND NO CADENCE (REQ-PIPE-438 criterion 9):
+            # every dataset `never`, so `not-yet-agreed` or a calendar fails.
+            if declared_none == schedule.NOT_YET_AGREED or named is not None or (
+                    declared_none is None):
+                found = (f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}`"
+                         if declared_none == schedule.NOT_YET_AGREED else
+                         f"the calendar {named!r}" if named is not None else "no `no_calendar:`")
+                out.append(ConfigError(
+                    src.name, scope, f"declares {found} on {src.asset_label}, a one-off.",
+                    f"A one-off has supplies and no schedule: every one of its datasets "
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {schedule.NEVER}`, and nothing "
+                    f"else."))
         if derived is not None and declared_none is None:
             out.append(ConfigError(
                 src.name, scope,
