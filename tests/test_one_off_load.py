@@ -517,3 +517,197 @@ class TestEveryGeneratedCheckCarriesItsWords:
                 if column:
                     assert column not in text, (c.check_id, field, text)
             assert c.category, c.check_id
+
+
+class TestTheEnvironmentLineNamesTheOneOff:
+    """Criterion 13: 'One-off: <id> (extraction)', the kind in its display word,
+    wherever the asset is named - the TUI's toolbar reads the same line."""
+
+    def test_the_line(self, world):
+        from cli import common
+
+        assets.select_one_off(world.id)
+        line = common.environment_statement()
+        assert line.endswith(f" · One-off: {world.id} (extraction)"), line
+        assert "Asset:" not in line
+
+
+class TestTheToolsPanel:
+    """Criterion 14: `mothman one-off` is listed in --help's Tools panel."""
+
+    def test_it_is_listed(self, monkeypatch):
+        import subprocess as sp
+        import sys
+
+        env = {k: v for k, v in os.environ.items() if k != assets.ASSET_ENV}
+        env["COLUMNS"] = "200"
+        out = sp.run([sys.executable, "-m", "cli.app", "--help"], cwd=ROOT, env=env,
+                     capture_output=True, text=True).stdout
+        tools = out[out.index("Tools"):]
+        assert "one-off" in tools, out
+
+
+class TestTheList:
+    """Criteria 1 and 10: every one-off with its stage, its database's age and
+    its next step, and every one-off database on the server - read from the
+    folder, git and the server's list of databases, claiming no asset."""
+
+    def test_a_loaded_one_off(self, world):
+        got = _invoke(["list"])
+        assert got.exit_code == 0, got.output
+        line = next(ln for ln in got.output.splitlines() if ln.startswith(world.id))
+        assert "extraction" in line and "loaded" in line and "A test project" in line
+        assert f"mothman one-off publish --id {world.id}" in got.output
+        assert f"  {world.database}  " in got.output
+        assert assets.claimed() is None
+
+    def test_an_opened_one_off_and_its_next_step(self, tmp_path, monkeypatch):
+        other = World(tmp_path)
+        _point(other, monkeypatch)
+        try:
+            assert _invoke(["open", "--kind", "extraction", str(other.package)]).exit_code == 0
+            got = _invoke(["list"])
+            line = next(ln for ln in got.output.splitlines() if ln.startswith(other.id))
+            assert "opened" in line
+            assert "git add" in got.output and "git push" in got.output
+            other.commit("open", push=None)
+            assert "pushed" in next(ln for ln in _invoke(["list"]).output.splitlines()
+                                    if ln.startswith(other.id))
+        finally:
+            assets.use_one_offs_root(None)
+
+    def test_none_says_so_and_names_open(self, tmp_path, monkeypatch):
+        empty = tmp_path / "one-offs"
+        empty.mkdir()
+        assets.use_one_offs_root(empty)
+        monkeypatch.delenv(assets.ASSET_ENV, raising=False)
+        try:
+            got = _invoke(["list"])
+            assert "No one-offs found" in got.output
+            assert "mothman one-off open --kind extraction <package>" in got.output
+        finally:
+            assets.use_one_offs_root(None)
+
+
+class TestTheTui:
+    """Criterion 2: bare `mothman one-off` opens a menu of its own, listing the
+    one-offs and offering a new package; once one is chosen, every step acts
+    on it for the rest of the session."""
+
+    def test_choose_then_steps_act_on_it(self, world, monkeypatch):
+        from cli import common, one_off
+
+        asked = []
+        answers = iter([lambda c: next(x for x in c if x.startswith(world.id)),
+                        lambda c: "List every one-off", lambda c: None])
+
+        def select(message, choices, hint, default=None):
+            asked.append((message, list(choices)))
+            return next(answers)(choices)
+
+        monkeypatch.setattr(common, "select", select)
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        got = _invoke([])
+        assert got.exit_code == 0, got.output
+        first, second = asked[0], asked[1]
+        assert one_off.OPEN_NEW in first[1]
+        assert any(c.startswith(world.id) and "[loaded]" in c for c in first[1])
+        assert second[0] == f"{world.id}: which step?"
+        assert assets.selected().name == world.id
+        assert "another one-off needs a new session" in got.output
+
+
+    def test_open_a_new_package_from_it(self, tmp_path, monkeypatch):
+        from cli import common, one_off
+
+        other = World(tmp_path)
+        _point(other, monkeypatch)
+        answers = iter([one_off.OPEN_NEW, "extraction"])
+        monkeypatch.setattr(common, "select", lambda *a, **k: next(answers))
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        try:
+            got = CliRunner().invoke(one_off.one_off_group, [], input=f"{other.package}\n")
+            assert got.exit_code == 0, got.output
+            assert _folder(other).is_dir()
+            assert f"mothman one-off load --id {other.id}" in got.output
+        finally:
+            assets.use_one_offs_root(None)
+
+
+class TestTheDropIsOnlyEverAsked:
+    """Criterion 9. READS SOURCE ON PURPOSE: 'nothing drops a one-off
+    automatically' is an architecture rule with no behaviour to observe - the
+    one removal function is called by the drop command and nothing else."""
+
+    def test_only_the_drop_command_removes(self):
+        callers = []
+        for path in ROOT.rglob("*.py"):
+            if any(p in path.parts for p in (".venv", "node_modules", "tests")):
+                continue
+            text = path.read_text(errors="ignore")
+            if "one_off_lifecycle.remove(" in text:
+                callers.append(path.relative_to(ROOT).as_posix())
+        assert callers == ["cli/one_off.py"]
+        source = (ROOT / "cli" / "one_off.py").read_text()
+        body = source[source.index("def drop_command"):source.index("def setup_dbt_utils")]
+        assert "one_off_lifecycle.remove(" in body
+        assert source.count("one_off_lifecycle.remove(") == 1
+
+
+class TestTheDrop:
+    """Criteria 6 to 8, on the module's loaded one-off - so LAST in this module.
+    The typed id only, the inventory with what each holds, 'Deleted' as each
+    goes, the configuration kept, and a partial failure re-runnable."""
+
+    def test_no_terminal_is_refused(self, world):
+        got = _invoke(["drop", "--id", world.id])
+        assert got.exit_code != 0
+        said = _said(got)
+        assert "no flag stands in for it" in said and "nothing was removed" in said
+        assert world.query("SELECT 1")  # the database is still there
+
+    def test_a_wrong_id_removes_nothing(self, world, monkeypatch):
+        from cli import common
+
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        got = CliRunner().invoke(__import__("cli.one_off", fromlist=["x"]).one_off_group,
+                                 ["drop", "--id", world.id], input="wrong\n")
+        assert "Did not match" in got.output and "nothing was removed" in got.output
+        assert (world.state / "data" / world.id).is_dir()
+
+    def test_the_typed_id_removes_each_item_and_a_failure_is_rerun(self, world, monkeypatch):
+        from cli import common
+        from cli.one_off import one_off_group
+        from qa_tools.common import one_off_lifecycle
+
+        monkeypatch.setattr(common, "require_tty", lambda hint: None)
+        (_folder(world) / "dbt" / "target").mkdir(exist_ok=True)
+        (_folder(world) / "dbt" / "target" / "manifest.json").write_text("{}")
+        # A results file, as a build of its page writes (REQ-DASH-444).
+        reports = world.state / "reports" / world.id
+        reports.mkdir(parents=True, exist_ok=True)
+        (reports / "results.json").write_text("{}")
+        real = one_off_lifecycle.remove
+        monkeypatch.setattr(one_off_lifecycle, "remove", lambda item: (
+            (_ for _ in ()).throw(OSError("busy")) if item.kind == "database" else real(item)))
+        first = CliRunner().invoke(one_off_group, ["drop", "--id", world.id],
+                                   input=world.id + "\n")
+        said = _said(first)
+        assert f"the database {world.database}:" in said and "table(s)" in said \
+            and "row(s)" in said
+        assert f"data/{world.id}/" in said and f"reports/{world.id}/" in said \
+            and "its dbt target" in said and "file(s)" in said
+        assert first.exit_code != 0 and "could not be removed" in said and "again" in said
+        assert f"Deleted data/{world.id}/" in said
+        assert not (world.state / "data" / world.id).exists()
+        monkeypatch.setattr(one_off_lifecycle, "remove", real)
+        second = CliRunner().invoke(one_off_group, ["drop", "--id", world.id],
+                                    input=world.id + "\n")
+        assert second.exit_code == 0, second.output
+        assert f"Deleted the database {world.database}" in second.output
+        with psycopg.connect(world.admin) as conn:
+            assert conn.execute("SELECT 1 FROM pg_database WHERE datname = %s",
+                                [world.database]).fetchone() is None
+        assert (_folder(world) / "data-asset.yaml").is_file()
+        assert not (_folder(world) / "dbt" / "target").exists() and not reports.exists()
+        assert second.output.rstrip().endswith("Next: mothman one-off list")

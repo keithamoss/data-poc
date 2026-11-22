@@ -105,6 +105,13 @@ def environment_statement() -> str | None:
     from asset_model import assets
 
     asset = assets.selected_or_none()
+    if asset is not None and asset.is_one_off:
+        # A ONE-OFF IN WORDS TOO (REQ-PIPE-442 criterion 13): its id and its
+        # kind's display word, never its folder name.
+        from asset_model import one_off_kinds
+
+        kind = one_off_kinds.get(asset.kind)
+        return statement + f" · One-off: {asset.name} ({kind.singular if kind else asset.kind})"
     return statement + (f" · Asset: {asset.name}" if asset is not None else "")
 
 

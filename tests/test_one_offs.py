@@ -321,7 +321,9 @@ class TestTheOneOffGroup:
     def test_it_runs_with_mothman_asset_unset(self, two_audits):
         result = _mothman("one-off", "list", root=two_audits)
         assert result.returncode == 0, _said(result)
-        assert re.search(r"cohort-a\s+audit\s+A test project", result.stdout), result.stdout
+        # The stage board since REQ-PIPE-442 criterion 10: id, kind, stage, age, project.
+        assert re.search(r"cohort-a\s+audit\s+opened\s+-\s+A test project", result.stdout), \
+            result.stdout
 
     @pytest.mark.parametrize("stated", ["daily", "cohort-a"])
     def test_it_is_refused_with_mothman_asset_set(self, two_audits, stated):

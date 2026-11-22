@@ -355,8 +355,9 @@ def cli(ctx: click.Context) -> None:
 
 
 def _state_the_environment_on_first_connection() -> None:
-    """One line naming the environment before a one-off command's own output
-    once it connects (REQ-TEST-114 criteria 2 and 3), on STANDARD ERROR so a
+    """One line naming the environment before the output of a single command
+    run outside the wizard (REQ-PIPE-442 criterion 15: 'one-off' is only ever a
+    one-off), once it connects (REQ-TEST-114 criteria 2 and 3), on STANDARD ERROR so a
     piped table is unchanged. At the first connection rather than at start,
     so a command that never touches a database says nothing."""
     from qa_tools.common import supply_db

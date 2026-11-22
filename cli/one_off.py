@@ -54,45 +54,68 @@ def choose(one_off_id: str):
         raise click.ClickException(str(exc)) from None
 
 
-def _rows() -> list[tuple[str, str, str]]:
-    """(id, kind's singular display word, project) for every one-off found."""
-    from asset_model import config_yaml, one_off_kinds
-
-    out = []
-    for kind, name in assets.one_offs():
-        plug = one_off_kinds.get(kind)
-        doc = config_yaml.load(assets.one_offs_root() / kind / name / "data-asset.yaml") \
-            if (assets.one_offs_root() / kind / name / "data-asset.yaml").is_file() else {}
-        out.append((name, plug.singular if plug else kind,
-                    str((doc or {}).get("project") or "(no project named)")))
-    return out
+#: The TUI's choice for a package not yet opened (REQ-PIPE-442 criterion 2).
+OPEN_NEW = "Open a new package"
+#: The TUI's steps once a one-off is chosen, each the command of that name.
+STEPS = {"Load its package": "load", "Drop it": "drop", "List every one-off": "list"}
 
 
 @click.group("one-off", invoke_without_command=True)
 @click.pass_context
 def one_off_group(ctx: click.Context) -> None:
-    """One-offs - browse and select one in the TUI (bare `mothman one-off`),
+    """One-offs - browse and work on one in the TUI (bare `mothman one-off`),
     or name it with --id in a step. Runs with MOTHMAN_ASSET unset."""
     refuse_an_asset_beside()
     if ctx.invoked_subcommand is None:
         common.require_tty("mothman one-off list (every one-off), then a step with --id <id>")
-        _tui()
+        _tui(ctx)
 
 
-def _tui() -> None:
-    """Browse the one-offs and select one (Keith 2026-11-21, CLI Q1 (a))."""
-    rows = _rows()
-    if not rows:
-        console.print(f"No one-offs found under {assets.one_offs_root()}.", style="yellow")
-        return
-    labels = {f"{name}  ({word}) - {project}": name for name, word, project in rows}
-    picked = common.select("Which one-off?", list(labels),
+def _tui(ctx: click.Context) -> None:
+    """THE ONE-OFF TUI (Keith 2026-11-21, CLI Q1 (a); REQ-PIPE-442 criterion 2):
+    a menu of its own, needing no asset, listing the one-offs as `list` does
+    and offering to open a new package. Once one is chosen, every step acts on
+    it for the rest of the session - the per-process claim allows one - and
+    another needs a new session."""
+    from qa_tools.common import one_off_lifecycle
+
+    rows = one_off_lifecycle.rows(_ages_or_none())
+    labels = {f"{r.one_off_id}  ({r.kind}) - {r.project} [{r.stage}]": r.one_off_id
+              for r in rows}
+    picked = common.select("Which one-off?", [*labels, OPEN_NEW],
                            "mothman one-off list, then a step with --id <id>")
     if picked is None:
         return
-    chosen = choose(labels[picked])
-    console.print(f"One-off: {chosen.name} ({_word(chosen.kind)}), folder {chosen.folder}.",
+    if picked == OPEN_NEW:
+        from asset_model import one_off_kinds
+
+        kinds = [k.name for k in one_off_kinds.registered() if k.reader and k.generator]
+        kind = common.select("Which kind?", kinds, "mothman one-off open --kind <kind>")
+        if kind is None:
+            return
+        package = click.prompt(common._named("Where is the package (a folder or s3:// prefix)?"))
+        ctx.invoke(open_command, kind_name=kind, package=package)
+        return
+    one_off_id = labels[picked]
+    chosen = choose(one_off_id)
+    console.print(f"One-off: {chosen.name} ({_word(chosen.kind)}), folder {chosen.folder}. "
+                  f"Every step now acts on it; another one-off needs a new session.",
                   style="green")
+    while True:
+        step = common.select(f"{one_off_id}: which step?", list(STEPS),
+                             f"mothman one-off <step> --id {one_off_id}")
+        if step is None:
+            return
+        try:
+            if STEPS[step] == "load":
+                package = click.prompt(common._named("Where is its package?"))
+                ctx.invoke(load_command, one_off_id=one_off_id, package=package)
+            elif STEPS[step] == "drop":
+                ctx.invoke(drop_command, one_off_id=one_off_id)
+            else:
+                ctx.invoke(list_command)
+        except click.ClickException as exc:
+            exc.show()
 
 
 def _word(kind: str) -> str:
@@ -102,17 +125,54 @@ def _word(kind: str) -> str:
     return plug.singular if plug else kind
 
 
+def _ages_or_none():
+    """The server's databases' ages, or None where no server is configured or
+    it cannot be reached - list still shows the stages git can see."""
+    from qa_tools.common import one_off_lifecycle
+
+    try:
+        return one_off_lifecycle.database_ages()
+    except Exception as exc:  # noqa: BLE001 - said, and the stages still shown
+        console.print(f"The server's databases could not be listed ({type(exc).__name__}); "
+                      f"stages are from git alone.", style="yellow")
+        return None
+
+
+def _age(hours: float | None) -> str:
+    if hours is None:
+        return "-"
+    return f"{hours:.0f}h" if hours < 48 else f"{hours / 24:.0f}d"
+
+
 @one_off_group.command("list")
 def list_command() -> None:
-    """Every one-off found, one per line: its id, its kind and its project.
-    Reads folder names and each one's data-asset.yaml; opens no connection."""
-    rows = _rows()
+    """Every one-off with its stage - opened, committed, pushed or loaded - how
+    long since its database was created, and the command for its next step;
+    then every one-off database still on the server, with its age
+    (REQ-PIPE-442 criterion 10). Reads the one-offs root and git, and lists the
+    server's databases through one administrative connection; never opens a
+    one-off's own database."""
+    from qa_tools.common import one_off_lifecycle
+
+    ages = _ages_or_none()
+    rows = one_off_lifecycle.rows(ages)
     if not rows:
         click.echo(f"No one-offs found under {assets.one_offs_root()}.")
-        return
-    widths = [max(len(r[i]) for r in rows) for i in range(2)]
-    for name, word, project in rows:
-        click.echo(f"{name.ljust(widths[0])}  {word.ljust(widths[1])}  {project}")
+        click.echo("Next: open one from its package:\n"
+                   "  mothman one-off open --kind extraction <package>")
+    else:
+        widths = [max(len(getattr(r, f)) for r in rows) for f in ("one_off_id", "kind", "stage")]
+        for r in rows:
+            click.echo(f"{r.one_off_id.ljust(widths[0])}  {r.kind.ljust(widths[1])}  "
+                       f"{r.stage.ljust(widths[2])}  {_age(r.age_hours):>4}  {r.project}")
+            click.echo(f"  next: {r.next_step}")
+    stray = one_off_lifecycle.stray_databases(ages)
+    if stray:
+        click.echo("One-off databases on the server:")
+        for db, age in stray.items():
+            click.echo(f"  {db}  {_age(age)}")
+    if rows:
+        click.echo("Next: a step with --id <id>, as each line says.")
 
 
 @one_off_group.command("open")
@@ -154,7 +214,7 @@ def open_command(kind_name: str, package: str) -> None:
         f"  git add {rel}",
         f'  git commit -m "Open {kind.singular} {read.recipe.extraction_id}"',
         "  git push",
-        f"  mothman one-off load --id {read.recipe.extraction_id}"]))
+        f"  mothman one-off load --id {read.recipe.extraction_id} {package}"]))
 
 
 @one_off_group.command("load")
@@ -215,6 +275,57 @@ def load_command(one_off_id: str, package: str) -> None:
     click.echo("\n".join(["Next: decide what to release, or publish it:",
                           f"  mothman one-off decide --id {one_off_id}",
                           f"  mothman one-off publish --id {one_off_id}"]))
+
+
+@one_off_group.command("drop")
+@id_option
+def drop_command(one_off_id: str) -> None:
+    """Drop a one-off: its database supply_<id>, data/<id>/ and reports/<id>/
+    (the dbt scratch among them), and its dbt target/, logs/ and dbt_packages -
+    each listed with what it holds - once you type its id (REQ-PIPE-442
+    criteria 6 to 8). No flag stands in for the typed id, and its committed
+    configuration stays. A drop that stops part-way is finished by running it
+    again."""
+    from qa_tools.common import one_off_lifecycle
+
+    chosen = choose(one_off_id)
+    # THE TYPED ID ONLY (Keith 2026-11-21): no flag, no --yes, and no terminal
+    # is a refusal in NeedsATerminal's words.
+    try:
+        common.require_tty("")
+    except common.NotInteractive:
+        raise common.NeedsATerminal(
+            f"Dropping {one_off_id} removes its database and files, and has to be confirmed "
+            f"by typing {one_off_id} at a terminal - no flag stands in for it. There is no "
+            f"terminal here, so nothing was removed. Run it from one.") from None
+    items = one_off_lifecycle.inventory()
+    if not items:
+        click.echo(f"{one_off_id} has nothing to remove: no database, no data/{one_off_id}/ "
+                   f"and no reports/{one_off_id}/. Its committed configuration stays.")
+        click.echo("Next: mothman one-off list")
+        return
+    click.echo(f"This removes, for {chosen.name} ({_word(chosen.kind)}):")
+    for item in items:
+        click.echo(f"  {item.what}: {item.holds}")
+    click.echo(f"Its committed configuration, {chosen.folder}, stays.")
+    typed = click.prompt(common._named(f"Type {one_off_id} to remove them"), default="",
+                         show_default=False)
+    if typed.strip() != one_off_id:
+        click.echo(f"Did not match {one_off_id!r} - nothing was removed.")
+        return
+    left = []
+    for item in items:
+        try:
+            one_off_lifecycle.remove(item)
+        except Exception as exc:  # noqa: BLE001 - each named, the rest still removed
+            left.append(f"{item.what} ({type(exc).__name__}: {exc})")
+            continue
+        click.echo(f"Deleted {item.what}")
+    if left:
+        raise click.ClickException(
+            "these could not be removed and remain: " + "; ".join(left)
+            + f". Run `mothman one-off drop --id {one_off_id}` again to finish.")
+    click.echo("Next: mothman one-off list")
 
 
 @one_off_group.command("setup-dbt-utils")
