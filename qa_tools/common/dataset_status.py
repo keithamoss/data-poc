@@ -248,8 +248,12 @@ def rollup_datasets(datasets) -> str:
     # NOT YET CHECKED is out too, with that reason (REQ-DASH-436 criterion 4).
     counted = [d for d in datasets if not in_no_rollup(d) and not d.get("turnedOffOutOfRollup")
                and not d.get("notYetChecked")]
+    # A ONE-OFF'S DECLARED TABLE THAT NEVER ARRIVED (packageOnly) has no data
+    # and a failing package check - a verdict, counted like one (the mock
+    # run's D1, 2026-11-22; the page's inRollup()).
     live = [d for d in counted
-            if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
+            if d.get("packageOnly")
+            or (not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted"))]
     if not live:
         if any(d.get("scheduleExhausted") for d in counted):
             return "exhausted"
@@ -260,8 +264,13 @@ def rollup_datasets(datasets) -> str:
         if datasets and all(d.get("turnedOffOutOfRollup") for d in datasets):
             return "turnedoff"
         return "notcounted" if datasets else "green"
+    # EACH BY ITS OWN VERDICT, PACKAGE CHECKS AND ALL: a one-off's undeclared
+    # file failed its home dataset while this read its columns alone and the
+    # collection above it said Pass (the mock run's D1, 2026-11-22). As the
+    # page's rollup() reads ownVerdict().
     return rollup_statuses([rollup_statuses(
-        [c.get("status") for c in (d.get("columns") or [])]) for d in live])
+        [*(c.get("status") for c in (d.get("columns") or [])), *package_statuses(d)])
+        for d in live])
 
 
 def dashboard_status(tool_status: str | None) -> str | None:

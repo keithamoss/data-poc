@@ -861,7 +861,12 @@ def embed() -> None:
           + ("" if os.path.exists(open_tickets_json) else " (no reports/open_tickets.json - local build, embedding empty)"))
 
     sha = current_commit_sha()
-    github_links, outside = github_links_or_none(sha=sha)
+    # A ONE-OFF NEVER USES GITHUB (REQ-PIPE-446 criterion 14; the mock run of
+    # 2026-11-22 found 'View on GitHub' on a one-off's page), so its page
+    # links to no repository path at all.
+    github_links, outside = github_links_or_none(sha=sha) if one_off is None else (
+        json.loads(json.dumps(_NO_GITHUB_LINKS)),
+        "GITHUB_LINKS left out: a one-off never uses GitHub.")
     html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
     print(outside or f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
 

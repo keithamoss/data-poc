@@ -46,11 +46,24 @@ def _admin(server_url: str):
                            application_name="mothman:one-off")
 
 
-def database_ages() -> dict[str, float] | None:
+class Ages(dict):
+    """{database name: hours since it was created}, and `one_offs`: the names
+    among them marked as a one-off's database on the server."""
+
+    def __init__(self, ages, one_offs=()):
+        super().__init__(ages)
+        self.one_offs = frozenset(one_offs)
+
+
+def database_ages() -> Ages | None:
     """{database name: hours since it was created} for every database on the
     configured local server whose name is supply_<something> - through one
-    administrative connection, claiming no asset - or None with no server."""
-    from qa_tools.common import supply_db
+    administrative connection, claiming no asset - or None with no server.
+    Which of them are one-offs' is read from the same connection: the comment
+    a one-off load marks its database with (one_off_load.SERVER_MARK). A
+    database dropped while this reads - another session's - has no files left
+    to stat: missing_ok, so it is left out rather than failing the list."""
+    from qa_tools.common import one_off_load, supply_db
 
     url = server()
     if url is None:
@@ -58,10 +71,12 @@ def database_ages() -> dict[str, float] | None:
     with _admin(url) as conn:
         rows = conn.execute(
             "SELECT d.datname, EXTRACT(EPOCH FROM now() - (pg_stat_file('base/' || d.oid || "
-            "'/PG_VERSION')).modification) / 3600 FROM pg_database d "
-            "WHERE d.datname LIKE %s ORDER BY d.datname",
+            "'/PG_VERSION', true)).modification) / 3600, shobj_description(d.oid, 'pg_database') "
+            "FROM pg_database d WHERE d.datname LIKE %s ORDER BY d.datname",
             [supply_db.ASSET_DATABASE_PREFIX.replace("_", r"\_") + "%"]).fetchall()
-    return {name: float(age) for name, age in rows if age is not None}
+    return Ages({name: float(age) for name, age, _c in rows if age is not None},
+                [name for name, age, comment in rows if age is not None
+                 and (comment or "").startswith(one_off_load.SERVER_MARK)])
 
 
 def _git(args, cwd) -> str | None:
@@ -135,12 +150,12 @@ def rows(ages: dict[str, float] | None) -> list[Row]:
 
 
 def stray_databases(ages: dict[str, float] | None) -> dict[str, float]:
-    """One-off databases on the server: every supply_<name> that is no enduring
-    asset's - a one-off's, with or without its folder still here."""
-    from qa_tools.common import one_off_load
-
-    enduring = {one_off_load.database_name(n) for n in assets.names()}
-    return {db: age for db, age in sorted((ages or {}).items()) if db not in enduring}
+    """One-off databases on the server: every supply_<name> marked as a
+    one-off's (database_ages), with or without its folder still here - never
+    an enduring asset's, whatever it is named (the mock run of 2026-11-22
+    listed supply_daily_c, an enduring asset's database on a suffixed DSN)."""
+    marked = getattr(ages, "one_offs", frozenset())
+    return {db: age for db, age in sorted((ages or {}).items()) if db in marked}
 
 
 # ---- the drop ---------------------------------------------------------------

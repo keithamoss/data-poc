@@ -252,6 +252,11 @@ def ensure_database(one_off_id: str, digest: str, recipe_digest: str, commit: st
                                [name]).fetchone() is not None
         if not exists:
             admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+            # MARKED AS A ONE-OFF'S WHERE `list` CAN SEE IT (the mock run of
+            # 2026-11-22, D4): list reads the server through one administrative
+            # connection (REQ-PIPE-442 criterion 1), which can read a
+            # database's comment and not its tables.
+            mark_on_server(admin, one_off_id)
     dsn = supply_db.on_server(server, name)
     with psycopg.connect(dsn, autocommit=True, application_name="mothman:one-off-load") as conn:
         if exists:
@@ -277,6 +282,18 @@ def ensure_database(one_off_id: str, digest: str, recipe_digest: str, commit: st
                      "loaded_commit) VALUES (%s, %s, %s, %s)",
                      [one_off_id, digest, recipe_digest, commit])
     return "created"
+
+
+#: The comment a one-off's database carries on the server, read by `mothman
+#: one-off list` through its administrative connection: the prefix, then the id.
+SERVER_MARK = "mothman one-off: "
+
+
+def mark_on_server(admin, one_off_id: str) -> None:
+    from psycopg import sql
+
+    admin.execute(sql.SQL("COMMENT ON DATABASE {} IS {}").format(
+        sql.Identifier(database_name(one_off_id)), sql.Literal(SERVER_MARK + one_off_id)))
 
 
 def _held(conn):
@@ -340,6 +357,26 @@ def _completed(run_id: str) -> bool:
         rows = conn.execute(f'SELECT completed_at FROM "{qa_store.SCHEMA}".run '
                             "WHERE run_key = ?", [run_id]).fetchall()
     return bool(rows) and rows[0][0] is not None
+
+
+def recorded_counts(run_ids) -> dict:
+    """What the load's runs recorded, from the database: every check result,
+    how many of them are file and package checks (the rest the four tools'),
+    and how many fail - the one count the load reports, so it agrees with the
+    page (the mock run of 2026-11-22: the load counted the tools' results
+    alone and said '0 failing' of a one-off whose undeclared file failed)."""
+    from asset_model import file_check_definitions
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:one-off-load") as conn:
+        rows = conn.execute(
+            f'SELECT c.tool, c.status FROM "{qa_store.SCHEMA}".check_result c '
+            f'JOIN "{qa_store.SCHEMA}".run r USING (run_key) '
+            "WHERE r.completed_at IS NOT NULL AND c.run_key = ANY(?)",
+            [list(run_ids)]).fetchall()
+    return {"total": len(rows),
+            "file": sum(1 for tool, _s in rows if tool == file_check_definitions.TOOL),
+            "failing": sum(1 for _t, status in rows if status in ("fail", "error"))}
 
 
 def load(package, *, run_by: str, s3_client=None, say=print) -> dict:

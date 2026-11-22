@@ -297,19 +297,36 @@ def publication() -> dict | None:
 def publish(planned: Plan, steps, *, s3_client=None, say=print) -> str:
     """Build the page by `steps` (build_page) and write it to its destination;
     return its address."""
-    from asset_model import asset_time
-
     asset = assets.selected()
     dest = destination(asset.kind)
-    with tempfile.TemporaryDirectory(prefix="mothman-one-off-publish-") as tmp:
-        page = build_page(Path(tmp), {"at": asset_time.now().isoformat(),
-                                      "address": planned.address}, steps, say=say)
-        # ASKED AGAIN AT THE MOMENT OF WRITING: another package's page may have
-        # arrived while this one was building.
-        held = read_page(dest, planned.one_off_id, s3_client=s3_client)
-        if held is not None and (identity_of(held) or {}).get("package_digest") \
-                != planned.package_digest:
-            raise PublishRefused(f"a page for another package was published at "
-                                 f"{planned.address} while this one was building, so nothing "
-                                 f"was written over it.")
-        return write_page(dest, page, planned.one_off_id, s3_client=s3_client)
+    # THE CHECK WORKSPACE, AS THE LOAD BUILT IT (the mock run's D2,
+    # 2026-11-22): the committed folder holds the recipe layer only, and the
+    # default layer's names and prose live in the kind's template, read live
+    # and never copied in (REQ-PIPE-440 criterion 13). Built from the folder
+    # and the template, so the page words every check as the load did.
+    from qa_tools.common import one_off_checks
+
+    workspace = one_off_checks.materialise()
+    assets.use_workspace(workspace)
+    try:
+        with tempfile.TemporaryDirectory(prefix="mothman-one-off-publish-") as tmp:
+            return _build_and_write(planned, dest, Path(tmp), steps, s3_client=s3_client,
+                                    say=say)
+    finally:
+        assets.use_workspace(None)
+
+
+def _build_and_write(planned: Plan, dest, tmp: Path, steps, *, s3_client, say) -> str:
+    from asset_model import asset_time
+
+    page = build_page(tmp, {"at": asset_time.now().isoformat(),
+                            "address": planned.address}, steps, say=say)
+    # ASKED AGAIN AT THE MOMENT OF WRITING: another package's page may have
+    # arrived while this one was building.
+    held = read_page(dest, planned.one_off_id, s3_client=s3_client)
+    if held is not None and (identity_of(held) or {}).get("package_digest") \
+            != planned.package_digest:
+        raise PublishRefused(f"a page for another package was published at "
+                             f"{planned.address} while this one was building, so nothing "
+                             f"was written over it.")
+    return write_page(dest, page, planned.one_off_id, s3_client=s3_client)

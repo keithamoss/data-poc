@@ -278,9 +278,14 @@ def load_command(one_off_id: str, package: str) -> None:
                                    say=lambda line: click.echo(line))
     except (ValueError, one_off_load.LoadRefused) as exc:
         raise click.ClickException(str(exc)) from None
-    failing = sum(1 for r in report["results"] if r.get("status") in ("fail", "error"))
+    # EVERY RESULT RECORDED, FROM THE DATABASE (the mock run of 2026-11-22):
+    # the tools' results alone left out the package's own, and said '0
+    # failing' of a one-off whose undeclared file failed.
+    counted = one_off_load.recorded_counts(report["runs"])
     click.echo(f"Loaded {one_off_id} into {report['database']}: {len(report['runs'])} run(s), "
-               f"{len(report['results'])} tool result(s), {failing} failing"
+               f"{counted['total']} check result(s) recorded ({counted['total'] - counted['file']} "
+               f"from the four tools, {counted['file']} file and package checks), "
+               f"{counted['failing']} failing"
                + (f"; declared and not arrived: {', '.join(report['missing'])}"
                   if report["missing"] else "")
                + (f"; not declared, not filed: {', '.join(report['undeclared'])}"
