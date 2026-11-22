@@ -103,10 +103,14 @@ class TestTheCommand:
         assert code != 0
         assert "not run - one-off kind(s) audit do not declare whether it applies" in said, said
 
-    def test_a_declared_gate_runs(self, one_offs):
+    def test_a_declared_gate_runs_and_over_the_one_off_folder_too(self, one_offs):
+        """The asset passes, then the one-off's row: a hand-made test folder has
+        no recorded digest, so it is named failing - criterion 2 at work."""
         one_offs.add("cohort-a")
         code, said = self._check(one_offs.root, "people")
-        assert code == 0, said
+        assert "people validation OK" in said
+        assert "people (audits: 1 in full, 0 by digest; failed: cohort-a)" in said, said
+        assert "no generated.sha256.json" in said and code != 0
 
 
 class TestNoWorkflowOrHookTouchesAOneOff:
@@ -143,3 +147,81 @@ class TestNoWorkflowOrHookTouchesAOneOff:
 
 
 pytestmark = pytest.mark.asset("daily")
+
+
+# ---- criterion 2 and 3's rows: changed folders in full, the rest by digest ----
+
+import extraction_support as ex  # noqa: E402
+
+
+@pytest.fixture
+def extraction(tmp_path, monkeypatch):
+    """One generated extraction folder, under a one-offs root pointed elsewhere."""
+    from asset_model.kinds import extraction_folder as ef
+    from asset_model.kinds import extraction_recipe as er
+
+    root = tmp_path / "one-offs"
+    root.mkdir()
+    before = assets.use_one_offs_root(root)
+    monkeypatch.delenv(assets.ASSET_ENV, raising=False)
+    folder = ef.generate(er.read(str(ex.package(tmp_path / "pkg"))), root)
+    yield folder
+    assets.deselect_one_off()
+    assets.restore(before)
+
+
+class TestEachFolderIsGated:
+    def test_a_changed_folder_is_gated_in_full_through_the_hidden_command(self, extraction):
+        from qa_tools.common import one_off_gating
+
+        code, said = one_off_gating.gate_folder("people", "cohort-2026-a")
+        assert code == 0, said
+        assert "people validation OK" in said
+
+    def test_the_row_counts_in_full_and_by_digest(self, extraction, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda folder, base=None: True)
+        ((shown, code, *_rest, got),) = check.one_off_rows("people", "why", False)
+        assert code == 0 and got == {"full": 1, "digest": 0, "failed": {}}
+        assert shown == "people (extractions: 1 in full, 0 by digest)"
+
+    def test_an_unchanged_folder_is_checked_by_digest(self, extraction, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda folder, base=None: False)
+        monkeypatch.setattr(one_off_gating, "gate_folder",
+                            lambda *a: pytest.fail("gated in full"))
+        ((shown, code, *_rest),) = check.one_off_rows("people", "why", False)
+        assert code == 0 and shown == "people (extractions: 0 in full, 1 by digest)"
+
+    def test_a_digest_failure_names_the_folder_and_the_first_file(self, extraction, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda folder, base=None: False)
+        (extraction / "presentation.yaml").write_text("edited by hand\n")
+        ((shown, code, *_rest, got),) = check.one_off_rows("people", "why", False)
+        assert code == 1 and "failed: cohort-2026-a" in shown
+        assert "presentation.yaml differs" in got["failed"]["cohort-2026-a"]
+
+    def test_an_untracked_file_counts_and_dbt_artefacts_do_not(self, extraction):
+        from qa_tools.common import one_off_gating
+
+        (extraction / "dbt" / "target").mkdir()
+        (extraction / "dbt" / "target" / "manifest.json").write_text("{}")
+        assert one_off_gating.digest_problem(extraction) is None
+        (extraction / "notes.txt").write_text("added by hand")
+        assert "notes.txt is not one of its generated files" in \
+            one_off_gating.digest_problem(extraction)
+
+    def test_a_gate_that_does_not_apply_gives_no_row(self, extraction):
+        assert check.one_off_rows("providers", "why", False) == []
+
+    def test_the_result_line_counts_them(self):
+        line = check.result_line(tree="t", tree_after="t", counts=(1, 0, 0), coverage=None,
+                                 floor=None, elapsed=1, failed_gates=[],
+                                 one_offs=[{"full": 2, "digest": 5}, {"full": 1, "digest": 0}])
+        assert "one-offs: 3 folder-gate(s) in full, 5 by digest" in line
+        assert "one-offs" not in check.result_line(tree="t", tree_after="t", counts=(1, 0, 0),
+                                                    coverage=None, floor=None, elapsed=1,
+                                                    failed_gates=[])
