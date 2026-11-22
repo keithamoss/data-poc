@@ -46,6 +46,9 @@ def record(monkeypatch):
     monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
     # The tree is read with git; a gate run here records gates, not git.
     monkeypatch.setattr(check_cli, "_tree_state", lambda: "HEAD abc1234 (clean)")
+    # A kind's template is gated by asking git whether it changed (REQ-PIPE-448
+    # criterion 6, tests/test_one_off_gates.py); here, gates, not git.
+    monkeypatch.setattr(check_cli, "template_rows", lambda: [])
     return calls, codes
 
 
@@ -449,6 +452,7 @@ class TestEveryFailureNamesItsAsset:
             return result
 
         monkeypatch.setattr(check_cli.subprocess, "run", fake_run)
+        monkeypatch.setattr(check_cli, "template_rows", lambda: [])
 
     def test_each_line_of_a_pass_names_its_asset(self, two_passes):
         result = _runner.invoke(check_cli.check_command, ["--only", "schedule"])
