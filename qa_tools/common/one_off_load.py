@@ -315,6 +315,21 @@ def head_commit(path: Path) -> str:
     return got.stdout.strip()
 
 
+def _opened(run_id: str) -> bool:
+    """Whether the orchestrator has already opened an attempt at this run -
+    its run_seq drawn - so it was staged, and its staging's results recorded,
+    before a load stopped inside its checks (REQ-PIPE-442 criterion 16)."""
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:one-off-load") as conn:
+        if conn.execute("SELECT to_regclass(?)", [f"{qa_store.SCHEMA}.run"]).fetchone()[0] \
+                is None:
+            return False
+        rows = conn.execute(f'SELECT run_seq FROM "{qa_store.SCHEMA}".run '
+                            "WHERE run_key = ?", [run_id]).fetchall()
+    return bool(rows) and rows[0][0] is not None
+
+
 def _completed(run_id: str) -> bool:
     from qa_tools.common import qa_store, supply_db
 
@@ -400,6 +415,16 @@ def load(package, *, run_by: str, s3_client=None, say=print) -> dict:
                     received.setdefault("at", a.received_at)
                     report["runs"].append(a.run_id)
                 for a in todo:
+                    # A RUN THAT DIED INSIDE ITS CHECKS IS RETRIED, NOT RE-STAGED
+                    # (Keith 2026-11-22, REQ-PIPE-442 criterion 16): it was staged
+                    # and its staging's results recorded before its attempt was
+                    # opened, and writing them again outside an attempt is refused
+                    # (REQ-PIPE-279 criterion 8). The orchestrator below opens a
+                    # fresh attempt at it, as a recurring asset's retry does.
+                    if _opened(a.run_id):
+                        say(f"{a.run_id} stopped inside its checks - retried on a fresh attempt.")
+                        stage.rebuild_run_views(coll.id, a)
+                        continue
                     stage.stage_arrival(coll.id, a)
                     if home.collection_id == coll.id and \
                             home.dataset_id in a.files_by_dataset:
