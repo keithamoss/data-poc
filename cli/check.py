@@ -224,6 +224,49 @@ NOT_APPLICABLE = -1
 NOT_APPLICABLE_TEXT = "not applicable (no synthetic/ folder)"
 
 
+# ---- one-offs (REQ-PIPE-448) ----------------------------------------------
+
+def one_off_kinds_with_folders() -> list:
+    """The kind plug-ins whose kind has one-off folders - those are the kinds
+    whose (gate, kind) declarations a run of `mothman check` asks. With no
+    one-offs, none, and check says nothing about one-offs (criterion 3)."""
+    from asset_model import assets, one_off_kinds
+
+    held = sorted({kind for kind, _name in assets.one_offs()})
+    return [k for k in (one_off_kinds.get(n) for n in held) if k is not None]
+
+
+def per_asset_gates() -> list[str]:
+    """Every gate run once per asset - the ones a kind declares for."""
+    return [label for label, _argv, _why, _w in _GATES if label not in _REPOSITORY_WIDE]
+
+
+def undeclared(label: str) -> list[str]:
+    """The kinds with folders that do not declare whether `label` applies to
+    them (REQ-PIPE-448 criterion 1): no default - 'applies' would fail every
+    calendar or scenario gate, 'does not apply' would leave a new gate unrun."""
+    if label in _REPOSITORY_WIDE:
+        return []
+    return [k.name for k in one_off_kinds_with_folders() if label not in k.gates]
+
+
+def not_applicable_text(kind) -> str:
+    """'not applicable (<kind>)', in the kind's display word - never 'no
+    synthetic/ folder', which is not why a gate skips a one-off."""
+    return f"not applicable ({kind.singular})"
+
+
+def not_applicable_lines() -> list[str]:
+    """One line per kind with folders: every gate that does not apply to it -
+    never a row each, never shown passed (criterion 3)."""
+    out = []
+    for kind in one_off_kinds_with_folders():
+        skipped = [g for g in per_asset_gates() if kind.gates.get(g) is False]
+        if skipped:
+            out.append(f"{not_applicable_text(kind)}: {', '.join(skipped)}")
+    return out
+
+
 def _has_synthetic(extra: dict) -> bool:
     from asset_model import assets
 
@@ -541,6 +584,11 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             label, argv, why, can_warn = gate
             if label in _SYNTHETIC_GATES and not _asset_passes(label):
                 return label, NOT_APPLICABLE, why, can_warn, 0.0, f"{label}: {NOT_APPLICABLE_TEXT}."
+            missing = undeclared(label)     # REQ-PIPE-448 criterion 1
+            if missing:
+                return (f"{label} (undeclared for {', '.join(missing)})", 2, why, can_warn, 0.0,
+                        f"{label}: not run - one-off kind(s) {', '.join(missing)} do not "
+                        f"declare whether it applies to them.")
             started = time.monotonic()
             code, output, failed = _run_captured(label, argv, can_warn)
             return _shown(label, failed), code, why, can_warn, time.monotonic() - started, output
@@ -568,6 +616,17 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             continue
         if label == "pytest":
             argv = _pytest_argv(argv, reports)
+        # A (GATE, KIND) PAIR UNDECLARED IS REFUSED (REQ-PIPE-448 criterion 1),
+        # before the gate runs.
+        missing = undeclared(label)
+        if missing:
+            console.rule(f"[bold]{label}", style="dim")
+            console.print(f"{label}: not run - one-off kind(s) {', '.join(missing)} do not "
+                          f"declare whether it applies to them (asset_model/kinds/).",
+                          style="red")
+            results.append((f"{label} (undeclared for {', '.join(missing)})", 2, why,
+                            can_warn, 0.0))
+            continue
         started = time.monotonic()
         code, failed = _run(label, argv, can_warn)
         results.append((_shown(label, failed), code, why, can_warn, time.monotonic() - started))
@@ -591,6 +650,10 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             outcome = f"[red]FAILED ({code})[/red]"
         table.add_row(label, outcome, f"{took:.1f}s", why)
     console.print(table)
+    # THE GATES THAT DO NOT APPLY TO A KIND, ON ONE LINE EACH (REQ-PIPE-448
+    # criterion 3) - and nothing at all where there are no one-offs.
+    for line in ([] if docs else not_applicable_lines()):
+        console.print(line, style="dim")
 
     def _warned(code: int, can_warn: bool) -> bool:
         return can_warn and code == WARNING_EXIT
