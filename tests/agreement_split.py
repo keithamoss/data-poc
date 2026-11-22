@@ -29,7 +29,7 @@ import yaml
 from asset_model import schedule
 from qa_tools.common.validate_schedule import _merged_view, _walk_datasets
 
-_MOVED = ("calendar", schedule.NO_CALENDAR_KEY, "delivery_months", "dates",
+_MOVED = ("calendar", schedule.NO_CALENDAR_KEY, schedule.DERIVED_KEY, "delivery_months", "dates",
           "not_expected", "owes_from")
 
 #: The author a test-written changelog entry carries.

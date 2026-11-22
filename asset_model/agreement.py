@@ -162,6 +162,11 @@ class DatasetAgreement:
     no_calendar: str | None
     participation: tuple[ParticipationVersion, ...]
     not_expected: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+    #: A DERIVED PRODUCT, declared beside `no_calendar` (REQ-PIPE-438
+    #: criterion 2): its results are recorded in development and it is left
+    #: out of every rollup. Read from calendar.yaml only; the schedule gate
+    #: refuses it on an enduring asset and without a `no_calendar`.
+    derived: bool = False
 
 
 @dataclass(frozen=True)
@@ -602,7 +607,8 @@ def _from_doc(doc: dict, path: Path | str) -> Agreement:
         # 2): the schedule gate refuses it, naming the asset and the file.
         datasets[ds] = DatasetAgreement(
             dataset_id=ds, no_calendar=raw.get("no_calendar"),
-            participation=versions, not_expected=MappingProxyType(not_expected))
+            participation=versions, not_expected=MappingProxyType(not_expected),
+            derived=raw.get("derived") is True)
     return Agreement(path=Path(path), calendars=MappingProxyType(calendars),
                      datasets=MappingProxyType(datasets),
                      defaults=MappingProxyType({k: v for k, v in defaults.items() if v}),

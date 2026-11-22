@@ -792,6 +792,8 @@ class DatasetAgreementConfig(_Strict):
     gate refuses either by name."""
     id: NonEmptyStr
     no_calendar: NonEmptyStr | None = None
+    #: A derived product beside its `no_calendar` (REQ-PIPE-438 criterion 2).
+    derived: bool | None = None
     participation: Participation | None = None
     not_expected: list[NotExpectedPeriod] | None = None
     #: Declared corrections to this dataset's frozen items (REQ-PIPE-111).

@@ -582,6 +582,22 @@ def _no_calendar(dataset_id: str, agreement) -> str | None:
     return declared
 
 
+#: The calendar.yaml key that marks a no-calendar dataset a DERIVED PRODUCT
+#: (REQ-PIPE-438 criterion 2).
+DERIVED_KEY = "derived"
+
+
+def is_derived(dataset_id: str, agreement=None) -> bool:
+    """Whether calendar.yaml declares this dataset `derived: true` beside its
+    `no_calendar` (REQ-PIPE-438 criterion 2) - read from there only. Its
+    results are recorded in development and it is in no rollup; whether the
+    declaration is allowed where it is made is the schedule gate's question,
+    never this reader's (criteria 8 and 9)."""
+    hierarchy.dataset(dataset_id)
+    entry = agreement_to_read(agreement).dataset(dataset_id)
+    return bool(entry and entry.derived)
+
+
 def owes_from(dataset_id: str, agreement=None) -> date | None:
     """The date a graduated dataset started owing supplies, or None.
 

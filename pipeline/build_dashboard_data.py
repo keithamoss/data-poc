@@ -55,6 +55,7 @@ from qa_tools.common import (
     drift_reference,
     qa_store,
     root_cause,
+    sample_data,
     schedule_ended,
     supply_db,
     supply_status,
@@ -377,6 +378,14 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     return schedule.no_calendar(dataset_id)
 
 
+def _derived(dataset_id: str) -> bool:
+    """Whether calendar.yaml declares this dataset a derived product
+    (REQ-PIPE-438 criterion 2) - configuration, so safe here."""
+    from asset_model import schedule
+
+    return schedule.is_derived(dataset_id)
+
+
 def _agreement_refusal(dataset_id: str) -> dict | None:
     """This dataset's REQ-PIPE-173 refusal as the page renders it, or None."""
     from qa_tools.common import agreement_drift
@@ -399,7 +408,13 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
     HELD FROM (criterion 14, K2 = A): a result that read no supply of a table
     - ABSENT or NO-SUPPLY - is not about that table, so it stays on the page
     of the dataset it is declared on and goes nowhere else.
+
+    AN AGREED RESULT GOES TO EVERY PARTICIPANT, a derived product included
+    (REQ-PIPE-438 criterion 4); build_one_table leaves it out of the derived
+    product's own status. An in-development one goes only to the participants
+    whose own results are in development - never to a counted one.
     """
+    kinds = sample_data.uncounted()
     for r in results:
         for other, read in sorted((r.get("reads") or {}).items()):
             if read.get("state") not in _SHOWN_ELSEWHERE and not _contested_read(read):
@@ -411,8 +426,8 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
             # it, but don't let it affect the agreed data set"). It is still
             # run, recorded and reported on the calendar-less participant's
             # page, which is where somebody developing the check is looking.
-            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and \
-                    not _schedule_not_agreed(hierarchy.dataset_for_table(other).dataset_id):
+            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and sample_data.supply_state(
+                    hierarchy.dataset_for_table(other).dataset_id, kinds=kinds) == qa_store.AGREED:
                 continue
             by_table[other].append(r)
 
@@ -488,6 +503,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     """
 
     table, dataset_id = dataset.table, dataset.dataset_id
+    derived_here = _derived(dataset_id)
     view = {} if warehouse_cache is None else warehouse_cache
     slot_timelines = view.setdefault("timelines", {})
 
@@ -567,6 +583,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
             "unreadable": {}, "due_at": {}, "distribution": {}, "band": {}, "member_set": {},
         })
+        # AN AGREED RESULT ON THIS PAGE (REQ-PIPE-438 criterion 4): on a derived
+        # product's page that can only be a cross-table result counted on its
+        # counted participants' side, so it is left out of this one's status.
+        if r.get("supply_state") != qa_store.IN_DEVELOPMENT:
+            slot["agreed"] = True
         # A RECORDED BINNED DISTRIBUTION (REQ-DASH-337 criterion 14) and the
         # BAND IN THE DIRECTION THE RESULT RECORDS (criterion 13), where the
         # result carries them - any check's, never named here.
@@ -782,6 +803,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 "between": (_between(slot["check_id"],
                                      {t for got in slot["reads"].values() for t in (got or ())})
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
+                # COUNTED ON THE OTHER SIDE, NOT HERE (REQ-PIPE-438 criterion 4):
+                # an agreed cross-table result shared onto a derived product's
+                # page is left out of that page's own status, in both status
+                # implementations (the template's and dataset_status.py's).
+                **({"notCountedHere": True}
+                   if derived_here and col == CROSS_TABLE_PSEUDO_COLUMN and slot.get("agreed")
+                   else {}),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 # THE REPLACED RUNS' ENTRIES, apart from the history so nothing
@@ -1028,6 +1056,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # (REQ-PIPE-106). None in the ordinary case, so the page renders
         # nothing extra - a marker on every tile is noise at 30 datasets.
         "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
+        # A DERIVED PRODUCT (REQ-PIPE-438 criteria 3 and 5): in no rollup,
+        # and said so in words. Absent in the ordinary case.
+        **({"derived": True} if derived_here else {}),
         "lastArrival": last_arrival,
         # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081 criteria
         # 1, 2, 3 and 6): the ANSWERS, from the decision log, never the rule.
