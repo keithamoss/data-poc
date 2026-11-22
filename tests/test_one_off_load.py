@@ -11,7 +11,7 @@ Never supply_quarterly or supply_daily.
 
 THE PACKAGE: two collections. `cohort-study` declares people.csv (three rows:
 one empty identifier, one date outside the cohort, one value that is no
-date) and visits.csv, a derived product that NEVER ARRIVES; `lab-study`
+date) and visits.csv, which NEVER ARRIVES; `lab-study`
 declares labs.csv, expecting ten rows and holding eight, seven of them with
 a value that is no number. extra.csv is declared by nobody.
 """
@@ -57,7 +57,7 @@ def _recipe(one_off_id: str, *, labs_expected: int = 10) -> dict:
              "expected_rows": 3},
             {"file": "visits.csv", "format": "csv", "agency": AGENCY, "collection": cohort,
              "dataset": {"id": "cohort-visits", "name": "Visits", "table": "cohort_visits"},
-             "derived": True,
+             "derived": False,
              "columns": [{"name": "visit_id", "type": "string", "primary_identifier": True}],
              "cohort": []},
             {"file": "labs.csv", "format": "csv", "agency": AGENCY, "collection": labs,
