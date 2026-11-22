@@ -52355,19 +52355,18 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: 'Criterion 2''s second half - a one-off''s declared table that did not arrive shows as Fail from its failing default-layer result, never No data.'
-      why: 'That failing result is REQ-QAC-441 criterion 3''s, not built. Built now: such a dataset''s page carries no period, slot, due date or lateness (periodSlots None, no cadence, nothing owed, no slot timeline).'
-      owner: REQ-QAC-441
+    - criterion: Criterion 2's second half - a one-off's declared table that did not arrive shows as Fail from its failing default-layer result, never No data.
+      why: REQ-QAC-441 criterion 3's failing result is built and recorded - the one-off's own `table_arrived` file check, failing, in a completed run of the missing table's own (tests/test_one_off_load.py). But a file check never rolls up into its dataset's status (REQ-DASH-097 criterion 2), so built from that history the dataset reads Inactive, not Fail - found 2026-11-22 by the dashboard builder's own dataset_status. Which way it reaches the status is a question for Keith (REQ-QAC-441's build report), not a build decision.
+      owner: Keith's answer on how a one-off's package checks reach a dataset's status (2026-11-22)
       blocked_by:
-        requirements:
-        - REQ-QAC-441
-    - criterion: 'Criterion 3 - such a dataset''s checks with their real verdicts, on a rendered page.'
-      why: 'Needs a built page with real recorded results for a no-calendar dataset, which is REQ-TEST-437''s fixture. Verdicts are not altered for such a dataset (counted_cases), but no page with one has been rendered.'
+        unowned: true
+    - criterion: Criterion 3 - such a dataset's checks with their real verdicts, on a rendered page.
+      why: Needs a built page with real recorded results for a no-calendar dataset, which is REQ-TEST-437's fixture. Verdicts are not altered for such a dataset (counted_cases), but no page with one has been rendered.
       owner: REQ-TEST-437
       blocked_by:
         requirements:
         - REQ-TEST-437
-    - criterion: 'Criteria 5 and 6 - a one-off''s page without the schedule controls, trends, run comparison and supply history, and removed tools'' routes opening the nearest view with a notice.'
+    - criterion: Criteria 5 and 6 - a one-off's page without the schedule controls, trends, run comparison and supply history, and removed tools' routes opening the nearest view with a notice.
       why: 'The page must know it is a one-off, which needs the Asset''s kind (REQ-PIPE-446 criterion 12); Keith 2026-11-22: these wait for REQ-PIPE-446.'
       owner: REQ-PIPE-446
       blocked_by:
@@ -52429,19 +52428,12 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: 'Criterion 5 - the label ''Derived product, not counted in the <kind>''s status'' in the kind''s display word.'
+    - criterion: Criterion 5 - the label 'Derived product, not counted in the <kind>'s status' in the kind's display word.
       why: 'The kind''s display words are REQ-PIPE-446 criterion 2''s plug-in, not built. Built now: the build marks a derived dataset `derived: true`, it is in no rollup, and the not-counted line names derived products (''derived product'').'
       owner: REQ-PIPE-446
       blocked_by:
         requirements:
         - REQ-PIPE-446
-    - criterion: 'Criterion 9 - a one-off declaring a dataset `not-yet-agreed` or with a calendar fails the schedule gate, and fails its load.'
-      why: 'No folder under one-offs/ can be selected or gated until REQ-PIPE-446 (its Asset states its kind, criterion 12), and a one-off''s load is REQ-PIPE-442 criterion 3''s. The gate already tells an enduring asset from a one-off by the Asset''s kind (validate_schedule._enduring_asset).'
-      owner: REQ-PIPE-446
-      blocked_by:
-        requirements:
-        - REQ-PIPE-446
-        - REQ-PIPE-442
     source: Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off B and G and delivery-dashboard-ux B, C and the display-words point. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - 'THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only.'
@@ -52478,12 +52470,15 @@ requirements:
     - 'BUILT 2026-11-22: `derived` WITHOUT `no_calendar` FAILS THE GATE too, wherever it is declared: criterion 2 puts it beside no_calendar, and a dataset with a calendar is never a derived product. The asset-level omission message no longer suggests `never` (Keith 2026-11-22: ''your reworded gate advice stands'').'
     - 'PARITY (the CORRECTNESS NFR): status-cases.json counted_cases is read by tests/test_counted_parity.py and tests-js/counted-parity.test.js - recorded state, cross-table recording and sharing, the derived-side exclusion, both rollups, the marker and ''Not yet checked'' - neither suite owning it. tests/test_no_calendar.py''s existing node comparison of the two rollup implementations stays.'
     - 'SETTLED by Keith 2026-11-22: REQ-PIPE-106 criteria 8 and 15 are amended as 7, 9 and 10 are - they apply to `not-yet-agreed` only, and `never` and derived datasets follow this requirement.'
+    - 'BUILT 2026-11-22 WITH REQ-PIPE-442: CRITERION 9. The schedule gate (validate_schedule._dataset_errors) fails a one-off''s dataset declaring `not-yet-agreed`, a calendar, or no `no_calendar:` at all, naming it - every one-off dataset is `never` - and a one-off''s load runs that gate over its folder and refuses on it. Seen failing first for `not-yet-agreed`, which passed the gate before.'
     linked_tests:
     - tests/test_counted_parity.py
     - tests-js/counted-parity.test.js
     - tests/test_no_calendar.py
     - tests/test_agreement.py
     - tests-js/status-rollups.test.js
+    - tests/test_one_off_gates.py
+    - tests/test_one_off_load.py
     implemented_by:
     - asset_model/schedule.py::is_derived
     - asset_model/agreement.py::DatasetAgreement
@@ -52501,8 +52496,10 @@ requirements:
     - qa_tools/common/validate_schedule.py::_enduring_asset
     - dashboard/qa-reporting-dashboard.template.html
     - status-cases.json
+    - qa_tools/common/validate_schedule.py::_dataset_errors
     evidence:
     - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work).'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 9: tests/test_one_off_gates.py TestTheScheduleGateRefusesAOneOffASchedule and tests/test_one_off_load.py TestTheLoadGatesItsFolder.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52513,13 +52510,11 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: 'Criterion 8''s steps - open, load, decide, publish and drop - in `mothman one-off`.'
-      why: 'The group, its TUI (browse and select) and `list` are built and take --id; each step is its own requirement''s: open and load REQ-PIPE-440 and REQ-PIPE-442, decide REQ-PIPE-435, publish REQ-PIPE-443, drop REQ-PIPE-442. `list` as the status board (CLI D2) is REQ-PIPE-442''s.'
-      owner: REQ-PIPE-440
+    - criterion: Criterion 8's decide and publish steps in `mothman one-off`.
+      why: 'Decide is REQ-PIPE-435''s and publish REQ-PIPE-443''s. Built: the group, its TUI, list (as REQ-PIPE-442''s stage board), open (REQ-PIPE-440), load and drop (REQ-PIPE-442), each taking --id.'
+      owner: REQ-PIPE-435
       blocked_by:
         requirements:
-        - REQ-PIPE-440
-        - REQ-PIPE-442
         - REQ-PIPE-435
         - REQ-PIPE-443
     source: Keith 2026-11-21, round 3 (one-offs apart from the enduring assets), round 4 (one-offs/<kind>/<id>/, the extraction the first kind) and round 5 (architect Q2 (b)); delivery-architect v4 findings 6, 7 and 9 and its reuse list. Checked against asset_model/assets.py, cli/check.py's _GATES and _asset_passes, qa_tools/common/diff_base.py and REQ-PIPE-342/363. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A, H, J, K, L and M, delivery-cli-ux G4, G7 and C5, and Keith's answers (--id; never GitHub; every kind declares a project; copy nothing). Shared by every kind. v7 folds in Keith's answers to the v6 questions (Q2, MOTHMAN_ASSET for enduring assets only; Q6, the `mothman check` criteria split out as REQ-PIPE-448). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
@@ -52579,6 +52574,7 @@ requirements:
     linked_tests:
     - tests/test_one_offs.py
     - tests/one_off_support.py
+    - tests/test_one_off_load.py
     implemented_by:
     - asset_model/assets.py::select_one_off
     - asset_model/assets.py::selected
@@ -52601,6 +52597,7 @@ requirements:
     - qa_tools/common/ci_usage.py::_run_gh
     evidence:
     - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). The CLI tests for REQ-PIPE-363 criteria 11 and 12 failed against the code before 446 (13 errors - the resolver had no one-offs root to point at), and pass.'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Load, list and drop through `mothman one-off --id`: tests/test_one_off_load.py.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52610,20 +52607,6 @@ requirements:
     story: As whoever maintains the pipeline, I want `mothman check` to gate every one-off folder at a cost near today's and to say exactly what it checked, so that hundreds of generated folders stay trustworthy configuration without slowing the gate or reaching CI.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: 'Criterion 4 - the collections gate accepting a one-off''s collections served by its kind''s shared adapter.'
-      why: 'A kind''s shared adapter says how its collections are checked, which is REQ-QAC-441''s check layers; no kind provides one yet, so a generated extraction folder still fails the collections gate for want of an adapter and its check files.'
-      owner: REQ-QAC-441
-      blocked_by:
-        requirements:
-        - REQ-QAC-441
-    - criterion: 'Criterion 6 - a kind''s changed _template/ gated with every gate its kind declares for the template.'
-      why: 'The template holds the default check layer (REQ-QAC-441) and people.yaml (REQ-PIPE-435); neither is built, so there is nothing in it yet for a gate to read live.'
-      owner: REQ-QAC-441
-      blocked_by:
-        requirements:
-        - REQ-QAC-441
-        - REQ-PIPE-435
     source: 'Split out of REQ-PIPE-446 by Keith 2026-11-21 (v6 Q6 (b)), carrying v6''s criteria 10-14 and 20 unchanged in substance: Keith round 5 (architect Q2 (b)); delivery-architect v4 findings 6 and 7 and post-sign-off H and K; delivery-cli-ux C5. Drafted by delivery-scoper 2026-11-21, v7. Shared by every kind. v7, PROPOSAL until signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - THE SYSTEM SHALL have every per-asset gate in `mothman check` declare, for each one-off kind, whether it applies, SHALL refuse to run a gate with any (gate, kind) pair undeclared, SHALL decide a one-off's synthetic gates from that declaration and never from _has_synthetic's default for a name it does not find, and SHALL word a gate that does not apply to a kind 'not applicable (<kind>)' with the kind's display word, keeping 'not applicable (no synthetic/ folder)' for an enduring asset.
@@ -52659,8 +52642,11 @@ requirements:
     - 'BUILT 2026-11-22 (criteria 2 and 3): qa_tools/common/one_off_gating.py. A folder changed since the diff base, committed or not, untracked files included, is gated in full through `mothman one-off gate --id <id> <gate>` - a subprocess per (folder, gate), carrying a one-offs root pointed elsewhere by a hidden --root, never MOTHMAN_ASSET - and digest-checked too; every other folder is digest-checked in process. The gitignored dbt artefacts (target/, logs/, dbt_packages, package-lock.yml) are left out of the digest. One row per (gate, kind) follows the gate''s own row - ''<gate> (<kinds>: <n> in full, <m> by digest; failed: <ids>)'' - each failure printed with its folder and first differing file, and the one-line result counts folder-gates in full and by digest.'
     - 'BUILT 2026-11-22: `mothman one-off gate` runs the gate''s own argv in process - a module run as __main__, or a mothman command invoked - with the one-off selected; it lives in cli/, since qa_tools may not import cli (the import gate).'
     - 'SETTLED by Keith 2026-11-22: THE SCHEDULE GATE DOES NOT ASK amber_setting OR replacement_setting OF A ONE-OFF - a no-period supply is never promoted (REQ-PIPE-435 criterion 7) - so neither the schema''s ''required'' nor either setting''s own frozen-past checks run for an Asset stating a kind; an enduring asset must still state both. REJECTED fixed values written into every one-off folder. Tested in tests/test_extraction_folder.py, the whole schedule gate seen failing first for a generated folder and passing after.'
+    - 'BUILT 2026-11-22 WITH REQ-QAC-441: CRITERION 4. qa_tools/collections.adapter_module() serves a one-off''s collection from its kind''s shared adapter, qa_tools/kind_adapters/<kind>.py''s adapter_for(collection) - outside qa_tools/collections/, which the layout gate keeps to the registry and its base (REQ-PIPE-342 criterion 10). The collections gate counts every collection of a one-off as served where the selected asset is one, and still fails an enduring asset''s collection without a module. Its dbt-layout check now compares by where a file is, so a folder outside the repository is gated as one inside it (a defect, seen failing first).'
+    - 'BUILT 2026-11-22: CRITERION 6. A kind declares its template''s gates as named checks (Kind.template_gates); `mothman check` runs them, where the template changed since the diff base, after the per-asset gates - one row each, ''<gate> (<kind> template)'', nothing where it did not change. The extraction''s one is its default check layer (extraction_checks.read_template). people.yaml (REQ-PIPE-435) and the destination (REQ-PIPE-443) add theirs when built.'
     linked_tests:
     - tests/test_one_off_gates.py
+    - tests/test_cli_check.py
     implemented_by:
     - qa_tools/common/one_off_gating.py::kind_pass
     - qa_tools/common/one_off_gating.py::digest_problem
@@ -52677,9 +52663,14 @@ requirements:
     - cli/check.py::one_off_kinds_with_folders
     - cli/check.py::check_command
     - asset_model/one_off_kinds.py::Kind
+    - qa_tools/common/one_off_gating.py::template_pass
+    - cli/check.py::template_rows
+    - qa_tools/common/validate_collections.py::config_problems
+    - qa_tools/kind_adapters/extraction.py::adapter_for
     evidence:
     - '2026-11-22, tree e76f814f: criteria 2 and 3 built; tests/test_one_off_gates.py 17 tests (7 new: a changed folder gated in full through the hidden command, the row''s counts in full and by digest, an unchanged folder by digest alone, a digest failure naming the folder and file, an untracked file counted and dbt artefacts not, no row for a gate that does not apply, the result line''s counts) in the 50-module run, 1451 passed in 2m03s.'
     - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_one_off_gates.py is new behaviour (10 tests); its criterion 1 tests cannot pass on the code before it, which has no undeclared().'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 4: tests/test_one_off_gates.py TestTheCollectionsGateAcceptsTheSharedAdapter (seen failing first on the missing adapter and the dbt layout); criterion 6: TestAChangedTemplateIsGated. `MOTHMAN_ASSET=daily mothman check --no-pytest` on the same code: every gate passed but patterns (daily), which refuses supply_daily''s qa schema at version 52 against this checkout''s 53 - the deployment database, not touched here - and, before the shared adapter moved to qa_tools/kind_adapters/, layout, which then passed.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52688,7 +52679,21 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a one-off, I want it worked in a database of its own that I remove, with everything it left on disk, when I am done, so that one one-off's rows never sit beside another's and never outlast the work.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 2's and criterion 12's later steps - decide and publish in the TUI's menu, and the next step said after publish.
+      why: 'Decide is REQ-PIPE-435''s and publish REQ-PIPE-443''s, neither built. Built now: the TUI lists the one-offs, opens a new package, and once one is chosen offers load, drop and list for it for the rest of the session; open, load, list and drop each end with the next step. The load''s names decide and publish, as criterion 12 says, though neither command exists yet.'
+      owner: REQ-PIPE-435
+      blocked_by:
+        requirements:
+        - REQ-PIPE-435
+        - REQ-PIPE-443
+    - criterion: Criterion 6's warnings - any warning REQ-PIPE-443 adds to the drop's confirmation (an unpublished page, a stale published one).
+      why: They need the publishing destination, which is REQ-PIPE-443's. The confirmation lists each item and what it holds, and has a place for them.
+      owner: REQ-PIPE-443
+      blocked_by:
+        requirements:
+        - REQ-PIPE-443
     source: plans/supply-model.md sprint 29 points 7 and 9 (Keith, 2026-09-27); Keith 2026-11-21 Q4.3 (a), Q4.6 (a), round 2 Q1 (a) and Q5 (b), round 5 architect Q4 (a); delivery-architect v4 findings 2 and 9 and its reuse list. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-cli-ux G1-G3, G6, C1, C7, C8, D1 and D2, delivery-architect A2, F, L and the two contradictions, and Keith's answers (the TUI; --id; drop by typed id only; load gates its folder; no 259 hold). Shared by every kind. v7 folds in Keith's answers to v6 Q1 (load records its commit), Q2 (MOTHMAN_ASSET refused beside --id), Q3 and Q5 (as drafted). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - 'THE SYSTEM SHALL run every `mothman one-off` command with MOTHMAN_ASSET unset, and refuse one with it set (REQ-PIPE-446 criterion 3), as an exemption from REQ-PIPE-363 criteria 6 and 7 - bare `mothman one-off`, open and list selecting nothing, and load, decide, publish and drop selecting the one-off their `--id` names (REQ-PIPE-446 criterion 3): open reads the package, the kind''s template and the folder names under assets/ and one-offs/, and connects to nothing; list reads the one-offs root and git, and connects to the configured local server only through an administrative connection that lists its databases and claims no asset for the process.'
@@ -52740,8 +52745,39 @@ requirements:
     - 'SETTLED by Keith 2026-11-21 (v6 Q5 (a)): LIST SHOWS THE CHEAP STAGES ONLY - opened, committed, pushed, loaded, age and next step (criterion 10). REJECTED (b) opening every one-off''s database and reading the destination per row.'
     - 'v7, LOAD RECORDS ITS COMMIT (Keith 2026-11-21, v6 Q1 (a)): criterion 3 stores the commit the load ran at beside the package digest, so the page can say ''checked at'' as well as ''built at'' (REQ-DASH-444 criterion 8).'
     - 'v7, MOTHMAN_ASSET SET BESIDE A ONE-OFF COMMAND IS REFUSED (Keith 2026-11-21, v6 Q2 (b)): criterion 1 now says so, pointing at REQ-PIPE-446 criterion 3.'
-    open_questions:
-    - 'Where load finds the package: given again as an argument, or recorded at open. A build decision - the recipe digest check (REQ-PIPE-440 criterion 8) refuses a wrong package either way.'
+    - 'BUILT 2026-11-22 (the open question): LOAD IS GIVEN THE PACKAGE AGAIN, `mothman one-off load --id <id> <package>`. Recording it at open would put one machine''s path - or an S3 prefix and its credentials'' reach - into committed configuration; the recipe digest (REQ-PIPE-440 criterion 8) and the package''s own digest (criterion 5) refuse a wrong one either way, and a package whose recipe names another id is refused.'
+    - 'BUILT 2026-11-22: THE LOAD (qa_tools/common/one_off_load.load) after the CLI has asked REQ-PIPE-440''s refusals and run every gate the kind declares in process (cli/one_off.run_in_process, as `mothman one-off gate` does): supply_<id> is created on MOTHMAN_PG''s server through one administrative connection, marked (db_identity.mark) and given qa.one_off_load - the package''s digest, the recipe''s, the commit the load ran at, and each collection''s delivery once filed. Then the check workspace (REQ-QAC-441), one hand-filed delivery per collection holding its declared files only (route `folder`, originally received `not-known`), each arrival staged and run through orchestrate.run_arrivals, and the package''s own facts recorded (qa_tools/common/one_off_package.py).'
+    - 'BUILT 2026-11-22: THE PACKAGE''S DIGEST is sha256 over every file''s name and content - not the recipe''s alone, so a re-send with the same recipe and other data is a different package and refused (criterion 5). RESUME reads the recorded deliveries rather than filing again, and skips every run already completed, a missing table''s included.'
+    - 'KNOWN LIMIT 2026-11-22: a package where NO declared table arrived has no receipt to name its missing tables'' runs by, so the load''s own instant is used; a resumed load of such a package would record them again under a new instant.'
+    - 'BUILT 2026-11-22: LIST IS THE STAGE BOARD (qa_tools/common/one_off_lifecycle.rows): `loaded` where supply_<id> is on the server, else `pushed`, `committed` or `opened` from git; the age from the database''s own PG_VERSION file, as `mothman env tidy-test-databases` reads it; and every supply_<name> that is no enduring asset''s is listed as a one-off database, with or without its folder. Through one administrative connection, claiming no asset; where no server is configured or reachable, the stages git can see are still shown and it says so.'
+    - 'BUILT 2026-11-22: THE DROP (cli/one_off.drop_command) lists only what is there - the database with its tables and rows, data/<id>/ (filed files, check workspace, dbt scratch), reports/<id>/ and any dbt artefact in the folder, each with its count - asks for the typed id through click''s prompt after common.require_tty, refuses with no terminal in NeedsATerminal, says ''Deleted <item>'' as each goes, and on a failure names what remains and the command that finishes it. one_off_lifecycle.remove is called by the drop command only (criterion 9, held by a source-reading test).'
+    - 'BUILT 2026-11-22: THE ENVIRONMENT LINE names a selected one-off as ''One-off: <id> (<kind''s display word>)'' in cli/common.environment_statement, which the TUI''s toolbar and the line at the first connection both read (criterion 13). cli/app.py''s ''one-off command'' docstring now says a single command run outside the wizard (criterion 15).'
+    open_questions: []
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_offs.py
+    - tests/test_one_off_gates.py
+    implemented_by:
+    - cli/one_off.py::one_off_group
+    - cli/one_off.py::_tui
+    - cli/one_off.py::load_command
+    - cli/one_off.py::list_command
+    - cli/one_off.py::drop_command
+    - cli/one_off.py::open_command
+    - qa_tools/common/one_off_load.py::load
+    - qa_tools/common/one_off_load.py::ensure_database
+    - qa_tools/common/one_off_load.py::package_digest
+    - qa_tools/common/one_off_load.py::recorded_load
+    - qa_tools/common/one_off_lifecycle.py::rows
+    - qa_tools/common/one_off_lifecycle.py::stray_databases
+    - qa_tools/common/one_off_lifecycle.py::database_ages
+    - qa_tools/common/one_off_lifecycle.py::inventory
+    - qa_tools/common/one_off_lifecycle.py::remove
+    - cli/common.py::environment_statement
+    - asset_model/kinds/extraction_recipe.py::read
+    evidence:
+    - '2026-11-22, code tree ca76f6a0 (the commits after it touch only requirements.yaml and CHANGELOG.yaml): 31 named test modules, pytest -n 4 (tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs, test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, test_evidently_reads_its_entry, test_run_evidently_cp, test_run_evidently_bdm, test_run_datacontract_cp, test_run_datacontract_bdm, test_datacontract_common, test_datacontract_worker, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_run_soda_cp, test_run_dbt_cp, test_validate_soda, test_reads_columns, test_validate_imports, test_adapter_imports, test_hand_filing, test_counted_parity, test_no_calendar_dashboard, test_two_asset_gates) 804 passed in 65s; ruff clean. The full suite, the needs_deployment half and the browser tests were NOT run (no page change); npm test ran in `mothman check --no-pytest`.'
+    - 'tests/test_one_off_load.py drives every criterion through `mothman one-off` (Click''s runner, the real one-offs root pointed at a temporary repository with a bare remote, the database a throwaway supply_<id>): the database marked as the one-off''s with the package digest and HEAD recorded, one delivery per collection holding only declared files, the same package resumed with no new run, another refused as a re-send, a folder failing the schedule gate refused naming the gate and the folder with no database made; list as the stage board (opened, pushed, loaded with age and the database), claiming no asset, and ''No one-offs'' naming open; the TUI choosing a one-off then steps acting on it, and opening a new package; the drop refused with no terminal, nothing removed on a wrong id, each item listed with its counts, a failed item named and the same drop finishing it, the folder kept; the environment line; one-off in --help''s Tools panel. Criterion 11 is REQ-PIPE-448 criterion 5''s test (no workflow or hook names `mothman one-off`).'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52915,24 +52951,11 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: 'Criterion 1''s TUI route - opening a package from the `mothman one-off` TUI.'
-      why: '`mothman one-off open --kind extraction <package>` is built; the TUI''s ''open a new package'' choice is REQ-PIPE-442 criterion 2''s menu.'
-      owner: REQ-PIPE-442
+    - criterion: Criterion 13's other live readers - people.yaml and the publishing destination read from the kind's template at each step.
+      why: 'people.yaml is REQ-PIPE-435''s and the destination REQ-PIPE-443''s, neither built. Built now: the default check layer is read from one-offs/extraction/_template/default-checks.yaml at every load and never copied into the folder (REQ-QAC-441 criterion 1).'
+      owner: REQ-PIPE-435
       blocked_by:
         requirements:
-        - REQ-PIPE-442
-    - criterion: 'Criterion 4''s recipe check layer - each dataset''s recipe checks generated into the folder.'
-      why: 'The recipe layer''s checks are REQ-QAC-441''s (criteria 4 to 6). Built now: the contract per collection with its schema from the recipe''s columns, presentation.yaml from the recipe''s names, and the dbt project.'
-      owner: REQ-QAC-441
-      blocked_by:
-        requirements:
-        - REQ-QAC-441
-    - criterion: 'Criterion 13''s live readers - the default check layer, people.yaml and the destination read from the kind''s template at each step.'
-      why: 'assets.kind_template() names the template and nothing is copied from it; reading each part at its step is REQ-QAC-441 (the default layer), REQ-PIPE-435 (people.yaml) and REQ-PIPE-443 (the destination).'
-      owner: REQ-QAC-441
-      blocked_by:
-        requirements:
-        - REQ-QAC-441
         - REQ-PIPE-435
         - REQ-PIPE-443
     source: plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b), round 3 Q1 (a) and addition, round 4 (one-offs/<kind>/<id>/); delivery-architect v4 findings 1, 3 and 5. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A2, B, F, H, I and M, delivery-cli-ux C4, and Keith's answers (copy nothing; pushed before load; dbt_utils a local copy; no 259 hold). The extraction kind's own. v7 folds in Keith's answer to v6 Q1 (the template half of criterion 9 settled) and the REQ-PIPE-448 split (criterion 5's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
@@ -52992,9 +53015,13 @@ requirements:
     - 'BUILT 2026-11-22: THE LOAD''S REFUSALS ARE qa_tools/common/one_off_load.refusals() - the recipe digest (criterion 8), the folder and the template committed and on the tracked remote branch, with `git add`, `git commit` and `git push <remote> <branch>` filled in and the reason (criterion 9), and the dbt_utils copy (criterion 12) - for REQ-PIPE-442''s load to ask first.'
     - 'SETTLED by Keith 2026-11-22: what the generated data-asset.yaml must state that a recipe does not - the zone its instants are read in and the PostgreSQL major - is inherited from the enduring assets, and generation is refused where they disagree.'
     - 'SETTLED by Keith 2026-11-22: NEITHER amber_setting NOR replacement_setting IS GENERATED: the schedule gate does not ask either of a one-off, since a no-period supply is never promoted (REQ-PIPE-448''s decision). REJECTED fixed values written into every folder.'
+    - 'BUILT 2026-11-22 WITH REQ-QAC-441: CRITERION 4''S RECIPE CHECK LAYER is generated into the folder by extraction_folder.files_for from asset_model/kinds/extraction_checks.py - each collection''s contract with its quality rules, its Soda, Evidently and dbt schema files, and their empty -retired siblings (REQ-QAC-241) - under the digest. A one-table collection''s contract carries its dataset''s id and name (REQ-QAC-039), a defect the first two-collection recipe found.'
+    - 'BUILT 2026-11-22 WITH REQ-PIPE-442: CRITERION 1''S TUI ROUTE is the `mothman one-off` menu''s ''Open a new package'', which asks the kind and the package and runs open.'
+    - 'BUILT 2026-11-22: THE LOAD READS THE PACKAGE WITHOUT CRITERION 6''s FOLDER CLASH (extraction_recipe.read(opening=False)): the folder that clash would name is the load''s own.'
     linked_tests:
     - tests/test_extraction_folder.py
     - tests/extraction_support.py
+    - tests/test_one_off_load.py
     implemented_by:
     - asset_model/kinds/extraction_folder.py::generate
     - asset_model/kinds/extraction_folder.py::files_for
@@ -53011,8 +53038,12 @@ requirements:
     - qa_tools/common/validate_collections.py::check_file_problems
     - cli/one_off.py::open_command
     - cli/one_off.py::setup_dbt_utils_command
+    - asset_model/kinds/extraction_checks.py::recipe_layer
+    - qa_tools/common/one_off_checks.py::materialise
+    - cli/one_off.py::_tui
     evidence:
     - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_folder.py is new behaviour (24 tests): the generated files and nothing else, read back by the real hierarchy, calendar loader, schedule gate and folders gate with the one-off selected; the digest; each refusal; and the load''s refusals against a temporary repository and bare remote.'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 4: TestTheRecipeLayer reads the recipe layer''s check ids out of the generated folder and the real tools'' verdicts on them; criterion 13: TestTheDefaultLayerIsReadLive; criterion 1''s TUI: TestTheTui.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -53021,7 +53052,13 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want a standard floor of checks on every extraction plus checks derived from what its recipe declares, so that every extract is held to the same baseline and to its own promises.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 6 - a cross-table relationship the recipe declares, checked as a cross-table check.
+      why: 'Recipe format version 1 is a stand-in that is never extended (Keith 2026-11-22, REQ-PIPE-439''s decisions): it declares no relationship, so there is nothing to check. The real format is set downstream and arrives through a translator (plans/running-thoughts.md #145).'
+      owner: a translator from the downstream recipe format (Keith 2026-11-22), not yet scoped
+      blocked_by:
+        unowned: true
     source: plans/supply-model.md sprint 29 point 6 and its tool-agnostic note (Keith, 2026-09-27); Keith 2026-11-21 Q4.5 (b), round 2 Q6 (b), Q7 (a), Q8 (a). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in Keith's 'copy nothing' and delivery-architect A2. The extraction kind's own. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL apply a default check layer to every extraction, defined once in the kind's template (one-offs/extraction/_template/) and read from it at each load (REQ-PIPE-440 criterion 13), and SHALL NOT copy it into any extraction's folder.
@@ -53050,6 +53087,52 @@ requirements:
     - 'NOT IN SCOPE, by Keith''s call 2026-09-27: lineage, and plans/wider.md #9''s reconciliation and aggregation checks, which stay parked there.'
     - 'v6, THE DEFAULT LAYER IS READ LIVE (Keith 2026-11-21, ''copy nothing''): REVERSES v5''s criterion 1, ''copied into each generated folder''. REJECTED keeping a copy per folder.'
     - 'v6, AN UNDECLARED FILE IS NOT FILED (delivery-architect A2): recording it as failing without filing it is what lets QA carry on past it, as round 2 Q7 (a) requires, given that hand_filing refuses a file with no arrival pattern.'
+    - 'SETTLED by Keith 2026-11-22: ALL FOUR TOOLS EVALUATE A ONE-OFF, as for an enduring asset - dbt-core, Soda Core, datacontract-cli and Evidently, each taking the assertions it fits. REJECTED datacontract-cli only.'
+    - 'SETTLED by Keith 2026-11-22: RECIPE FORMAT VERSION 1 IS A STAND-IN, never extended; the real format comes from downstream through a translator (plans/running-thoughts.md #145), so criterion 6 waits on that, unowned.'
+    - 'BUILT 2026-11-22: WHICH TOOL EVALUATES WHICH ASSERTION is one table, asset_model/kinds/extraction_checks.py''s ASSERTION_TOOLS. Table arrived and undeclared file: the load. Columns arrived: Soda''s schema check - datacontract-cli''s own field-present checks are dropped by its runner as duplicates, and a missing column makes a dbt test or SQL rule error rather than fail. Identifier not null: all four (Evidently by MissingValueCount). Declared type: dbt (dbt_utils.expression_is_true), Soda (failed rows) and datacontract-cli (SQL), each through PostgreSQL''s pg_input_is_valid over the value as text, because the loader infers types from the file and a column holding one bad date arrives as text; a string column has no type check. Cohort bounds: dbt_utils.accepted_range, Soda failed rows, datacontract-cli SQL. Expected rows, exactly: Soda row_count, datacontract-cli rowCount and Evidently RowCount - not dbt, which has no generic test counting a model exactly without a second model to compare against.'
+    - 'BUILT 2026-11-22: THE DEFAULT LAYER''S DEFINITION is one-offs/extraction/_template/default-checks.yaml - each assertion''s name, words, category, introduced date and, optionally, a narrower set of tools; how an assertion becomes each tool''s configuration is code (extraction_checks.default_layer). The kind''s template gate (REQ-PIPE-448 criterion 6) refuses an undefined assertion, missing words, or a tool the assertion cannot take.'
+    - 'BUILT 2026-11-22: THE CHECK WORKSPACE. What the tools must read as files is materialised into data/<id>/qa/config/ - the committed folder''s files with the default layer merged into each collection''s contract, Soda, Evidently and dbt files - rebuilt at every load and removed by the drop (REQ-PIPE-442 criterion 6). assets.use_workspace points the selected one-off''s configuration folder and dbt project there for the load, and assets.handoff carries it to a tool''s worker process. dbt runs there, so the committed folder never gets a target/, logs/ or dbt_packages, and the workspace''s packages.yml names the deployment''s local dbt_utils by path. REJECTED each tool reading the two layers from two places: dbt refuses one model''s properties declared in two files, and datacontract-cli takes one contract per run.'
+    - 'BUILT 2026-11-22: TABLE ARRIVED AND UNDECLARED FILE ARE THE ONE-OFF''S OWN FILE CHECKS (asset_model/file_check_definitions.py ONE_OFF_NAMES), written into the workspace''s file-checks.yaml from the template''s words, and refused in any enduring asset''s file. `table_arrived` passes as each declared file is screened, and the load records it failing, in a run of its own named as the table''s arrival would have been, for a declared table that never came. `undeclared` (format `package`, so no file''s screening asks it) is asked of the package once, by the load. Their words, check ids and definition fingerprints so come from where every file check''s do.'
+    - 'PROVISIONAL (2026-11-22): THE PACKAGE''S ONE UNDECLARED-FILE RESULT IS RECORDED AGAINST ITS FIRST COUNTED DATASET (qa_tools/common/one_off_package.home_of) - a file that belongs to no table has no dataset of its own, and the first counted one keeps the failure in the one-off''s own status rather than in a derived product''s, which no rollup counts. The alternatives were every dataset (one stray file would fail them all) or a one-off-level scope the page does not yet have (REQ-DASH-444).'
+    - 'BUILT 2026-11-22: EVIDENTLY''S ASSERTION METHODS, `missing` and `row_count` (asset_model/drift.py ASSERTION_METHODS), run the real evidently Report over the run''s own view and need no reference supply, so they never read as having none. A file of only those is accepted; a file declaring checks with neither psi nor an assertion is still refused.'
+    - 'BUILT 2026-11-22: FAILING-ROW KEYS ARE THE DECLARED PRIMARY IDENTIFIERS (criterion 9): the kind''s shared adapter (qa_tools/kind_adapters/extraction.py) gives each table''s identifiers as its sample key, and a generated failed-rows query selects those columns only. datacontract-cli''s SQL rules record no keys - the existing gap for custom SQL rules (qa_tools/tools/run_datacontract.py).'
+    - 'KNOWN LIMIT 2026-11-22: A TABLE DECLARING NO PRIMARY IDENTIFIER gets no Soda failed-rows check for its types or bounds, having no key to sample; its other tools'' checks stand.'
+    - 'THE WORDS (docs/check-authoring-rules.md): the recipe layer''s are extraction_checks.RECIPE_WORDS, the default layer''s the template''s. No figure, no tool, not the check''s own column, `supply` for a delivery - held by tests/test_one_off_load.py''s TestEveryGeneratedCheckCarriesItsWords over both layers as the lifecycle parser reads them. The standard itself was not changed.'
+    - 'DEFECTS FOUND BUILDING IT, each fixed test-first: a one-table collection''s generated contract carried the collection''s id and name where REQ-QAC-039 wants its dataset''s, failing the hierarchy gate the load runs (tests/test_extraction_folder.py TestAOneTableCollectionsContract, seen failing); the collections gate failed a one-off''s collections for want of an adapter module and compared a dbt folder outside the repository by its spelling (tests/test_one_off_gates.py TestTheCollectionsGateAcceptsTheSharedAdapter, seen failing); and datacontract_common appended to a `servers` list a generated contract does not carry (found by the first real run, KeyError ''servers'').'
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_off_gates.py
+    - tests/test_extraction_folder.py
+    implemented_by:
+    - asset_model/kinds/extraction_checks.py::declared
+    - asset_model/kinds/extraction_checks.py::read_template
+    - asset_model/kinds/extraction_checks.py::default_layer
+    - asset_model/kinds/extraction_checks.py::recipe_layer
+    - asset_model/kinds/extraction_checks.py::contract_doc
+    - asset_model/kinds/extraction_checks.py::soda_doc
+    - asset_model/kinds/extraction_checks.py::evidently_doc
+    - asset_model/kinds/extraction_checks.py::dbt_schema_doc
+    - asset_model/kinds/extraction_folder.py::files_for
+    - asset_model/kinds/extraction.py::_default_layer_problems
+    - asset_model/file_check_definitions.py::definitions
+    - asset_model/drift.py::collection_checks
+    - asset_model/assets.py::use_workspace
+    - asset_model/assets.py::committed_folder
+    - qa_tools/common/one_off_checks.py::materialise
+    - qa_tools/common/one_off_checks.py::package_checks
+    - qa_tools/common/one_off_package.py::findings
+    - qa_tools/common/one_off_package.py::record_missing
+    - qa_tools/common/one_off_package.py::record_undeclared
+    - qa_tools/common/file_checks.py::evaluate
+    - qa_tools/common/datacontract_common.py::run_against_warehouse
+    - qa_tools/tools/run_evidently.py::evaluate
+    - qa_tools/kind_adapters/__init__.py::adapter_module
+    - qa_tools/kind_adapters/extraction.py::adapter_for
+    - qa_tools/collections/__init__.py::adapter_module
+    evidence:
+    - '2026-11-22, code tree ca76f6a0 (the commits after it touch only requirements.yaml and CHANGELOG.yaml): 31 named test modules, pytest -n 4 (tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs, test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, test_evidently_reads_its_entry, test_run_evidently_cp, test_run_evidently_bdm, test_run_datacontract_cp, test_run_datacontract_bdm, test_datacontract_common, test_datacontract_worker, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_run_soda_cp, test_run_dbt_cp, test_validate_soda, test_reads_columns, test_validate_imports, test_adapter_imports, test_hand_filing, test_counted_parity, test_no_calendar_dashboard, test_two_asset_gates) 804 passed in 65s; ruff clean. The full suite, the needs_deployment half and the browser tests were NOT run (no page change); npm test ran in `mothman check --no-pytest`.'
+    - 'tests/test_one_off_load.py is new behaviour (40 tests over ONE REAL LOAD): a two-collection package in a temporary repository with a bare remote, opened, committed, pushed and loaded by `mothman one-off load`, the four real tools running over the generated checks into a throwaway supply_<id> on the test server, named for the session''s MOTHMAN_TEST_DB_TAG and dropped at the end. An empty identifier fails in all four tools; a value that is no number fails its declared type in dbt, Soda and datacontract-cli; a date outside the cohort fails its bound in the same three; an exact row count passes at three rows and fails at eight of ten in Soda, datacontract-cli and Evidently; the declared table that never arrived fails table_arrived in a completed run of its own, the undeclared file fails naming it and is never filed, and QA carries on; the shared file checks screen every arrived file; failing keys are identifiers only, at most five. The folder holds the recipe layer only; the workspace holds both; a template edit reaches the next materialisation.'
+    - 'Run first by hand before the tests, 2026-11-22 (a scratch script over the same entry points): every tool''s results for a generated extraction printed - e.g. cohort_bounds_dbt fail [None], declared_type_soda fail [''v2''], expected_rows_evidently pass 3 - and the database''s qa.check_result read back, table_arrived_file fail ''visits.csv is declared by the recipe and is not in the supply'', undeclared_file fail naming extra.csv.'
     signed_off:
       by: Keith
       date: '2026-11-21'

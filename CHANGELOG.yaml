@@ -113,7 +113,8 @@ releases:
     summary: >
       A dataset with no delivery schedule is now checked when its supply
       arrives, and a dashboard holding one builds. Filing commands posted on
-      a slot's ticket are acted on again.
+      a slot's ticket are acted on again. An extraction can now be loaded,
+      checked by all four tools and dropped.
     changes:
       - category: New
         items:
@@ -143,6 +144,24 @@ releases:
               you had made it in the terminal. The ticket says so, and the
               pass reports how many comments it read, how many decisions they
               raised and how many it refused.
+          - headline: An extraction is checked by all four tools
+            components: ["QA checks & contract"]
+            description: >
+              Every extraction now gets a default set of checks - each declared
+              table and column arrived, no identifier empty, no file the recipe
+              does not declare - read from the kind's template each time, plus
+              checks from its own recipe: each column's type, the cohort's
+              bounds and an exact row count. dbt, Soda, datacontract-cli and
+              Evidently each evaluate the ones they fit.
+          - headline: Load an extraction into a database of its own, and drop it
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off load --id <id> <package>` gates the folder,
+              creates its own database and checks the package, resuming if it
+              stopped and refusing a different package. `mothman one-off list`
+              shows each one-off's stage and next step, and `mothman one-off
+              drop --id <id>` removes its database and files once you type its
+              id. Bare `mothman one-off` offers the same steps as a menu.
       - category: Fixed
         items:
           - headline: A supply with no schedule is checked when it arrives
