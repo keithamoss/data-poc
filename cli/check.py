@@ -256,6 +256,29 @@ def not_applicable_text(kind) -> str:
     return f"not applicable ({kind.singular})"
 
 
+def one_off_rows(label: str, why: str, can_warn: bool) -> list[tuple]:
+    """One row per kind with folders for an applicable gate (REQ-PIPE-448
+    criteria 2 and 3): how many folders were gated in full and how many by
+    digest, and the name of each that failed. Nothing where the gate does not
+    apply to a kind, and nothing at all where there are no one-offs."""
+    from qa_tools.common import one_off_gating
+
+    rows = []
+    for kind in one_off_kinds_with_folders():
+        if kind.gates.get(label) is not True:
+            continue
+        started = time.monotonic()
+        got = one_off_gating.kind_pass(label, kind)
+        for name, problem in sorted(got["failed"].items()):
+            console.print(f"[{name}] {label}: {problem}", markup=False, highlight=False)
+        shown = (f"{label} ({kind.plural}: {got['full']} in full, {got['digest']} by digest"
+                 + (f"; failed: {', '.join(sorted(got['failed']))}" if got["failed"] else "")
+                 + ")")
+        rows.append((shown, 1 if got["failed"] else 0, why, can_warn,
+                     time.monotonic() - started, got))
+    return rows
+
+
 def not_applicable_lines() -> list[str]:
     """One line per kind with folders: every gate that does not apply to it -
     never a row each, never shown passed (criterion 3)."""
@@ -521,7 +544,7 @@ def _fail_under() -> float | None:
 
 def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed: float,
                 failed_gates: list[str], not_run: list[str] = (),
-                not_applicable: list[str] = ()) -> str:
+                not_applicable: list[str] = (), one_offs: list[dict] = ()) -> str:
     """REQ-TEST-375 criterion 10: the full gate's result, on one line, fit to
     paste into a commit message. It never claims more than ran: a missing
     report says so, and a tree that changed mid-run is not a claim about
@@ -537,6 +560,11 @@ def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed:
         f"not run (no toolchain): {', '.join(not_run)}" if not_run else ""])) \
         or (f"every gate that applies passed ({NOT_APPLICABLE_TEXT}: {', '.join(not_applicable)})"
             if not_applicable else "every gate passed")
+    # FOLDERS GATED IN FULL AND BY DIGEST (REQ-PIPE-448 criterion 3), so a green
+    # line cannot claim more than ran; nothing where there are no one-offs.
+    if one_offs:
+        gates += (f"; one-offs: {sum(c['full'] for c in one_offs)} folder-gate(s) in full, "
+                  f"{sum(c['digest'] for c in one_offs)} by digest")
     where = (tree if tree == tree_after
              else f"TREE CHANGED DURING THE RUN ({tree} -> {tree_after}), so this is no claim")
     return f"Full gate (mothman check): {gates}; {tests}; {cov}; {minutes}m{seconds:02d}s; {where}"
@@ -606,6 +634,7 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     import tempfile
 
     reports = Path(tempfile.mkdtemp(prefix="mothman-check-"))
+    one_off_counts: list[dict] = []
     for label, argv, why, can_warn in (() if docs else gates):
         if no_pytest and label == "pytest":
             continue
@@ -630,6 +659,10 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
         started = time.monotonic()
         code, failed = _run(label, argv, can_warn)
         results.append((_shown(label, failed), code, why, can_warn, time.monotonic() - started))
+        # AND OVER EVERY ONE-OFF FOLDER IT APPLIES TO (REQ-PIPE-448 criterion 2).
+        for row in one_off_rows(label, why, can_warn):
+            results.append(row[:5])
+            one_off_counts.append(row[5])
 
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")
@@ -668,7 +701,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
                            counts=_pytest_counts(reports / "junit.xml"),
                            coverage=_coverage_percent(reports / "coverage.json"),
                            floor=_fail_under(), elapsed=time.monotonic() - gate_started,
-                           failed_gates=failed, not_run=skipped, not_applicable=not_applicable)
+                           failed_gates=failed, not_run=skipped, not_applicable=not_applicable,
+                           one_offs=one_off_counts)
         console.print("Paste into the commit message:", style="bold")
         console.out(line, highlight=False)
     shutil.rmtree(reports, ignore_errors=True)

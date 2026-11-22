@@ -170,3 +170,66 @@ def setup_dbt_utils_command() -> None:
         raise click.ClickException(str(exc)) from None
     click.echo(f"dbt_utils {one_off_load.locked_revision()} installed at {path}.")
 
+
+# ---- a per-asset gate over one one-off (REQ-PIPE-448, Keith 2026-11-22) ----
+
+def _gate_argv(label: str) -> list[str]:
+    from cli import check
+
+    found = [argv for name, argv, _w, _c in check._GATES if name == label]
+    if not found:
+        raise KeyError(f"no gate called {label!r}")
+    return found[0]
+
+
+def run_in_process(label: str) -> int:
+    """Run one gate in this process for the selected one-off - what `mothman
+    one-off gate --id` does. Its argv is the gate's own: a module run as
+    __main__, or a mothman command invoked."""
+    import runpy
+    import sys
+
+    argv = _gate_argv(label)
+    tail = argv[2:] if argv[:2] == ["uv", "run"] else argv
+    try:
+        if tail[:2] == ["python3", "-m"]:
+            before = sys.argv
+            sys.argv = [tail[2], *tail[3:]]
+            try:
+                runpy.run_module(tail[2], run_name="__main__")
+            finally:
+                sys.argv = before
+            return 0
+        if tail[:1] == ["mothman"]:
+            from cli.app import cli
+
+            cli.main(args=tail[1:], prog_name="mothman", standalone_mode=False)
+            return 0
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+    except Exception as exc:  # noqa: BLE001 - a gate that raises has failed, said
+        print(f"{label}: {type(exc).__name__}: {exc}")
+        return 1
+    raise ValueError(f"gate {label!r} has no in-process form ({' '.join(argv)})")
+
+
+
+
+@one_off_group.command("gate", hidden=True)
+@id_option
+@click.option("--root", "root", default=None, hidden=True,
+              help="The one-offs root, where `mothman check` was pointed elsewhere.")
+@click.argument("label")
+def gate_command(one_off_id: str, root: str | None, label: str) -> None:
+    """Run one of `mothman check`'s per-asset gates for one one-off, in this
+    process - what `mothman check` runs over a changed one-off folder. Hidden:
+    a person runs `mothman check`."""
+    from pathlib import Path
+
+    if root:
+        assets.use_one_offs_root(Path(root))
+    choose(one_off_id)
+    code = run_in_process(label)
+    if code:
+        raise SystemExit(code)
+

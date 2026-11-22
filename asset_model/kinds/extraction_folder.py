@@ -94,7 +94,9 @@ def _deployment_facts() -> dict:
     refused where they disagree."""
     zones, majors = set(), set()
     for a in assets.every():
-        doc = yaml.safe_load(a.data_asset_yaml.read_text()) or {}
+        from asset_model import config_yaml
+
+        doc = config_yaml.load(a.data_asset_yaml) or {}
         versions = (doc.get("timezone") or {}).get("versions") or []
         if versions:
             zones.add(versions[-1]["zone"])

@@ -93,10 +93,10 @@ def digest_refusal(folder: Path, package_location: str, *, s3_client=None) -> st
 def locked_revision() -> str:
     """The dbt_utils revision the enduring assets lock (the dbt packages gate
     holds them equal)."""
-    import yaml
+    from asset_model import config_yaml
 
     first = assets.every()[0]
-    lock = yaml.safe_load((first.dbt_project / "package-lock.yml").read_text())
+    lock = config_yaml.load(first.dbt_project / "package-lock.yml")
     return next(p for p in lock["packages"] if p.get("name") == "dbt_utils")["revision"]
 
 
