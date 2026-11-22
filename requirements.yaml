@@ -48191,7 +48191,7 @@ requirements:
     - THE SYSTEM SHALL archive each publish's snapshot under dashboard/snapshots/<asset>/, the pre-split archive having been deleted (REQ-DASH-373).
     - THE SYSTEM SHALL keep each built dashboard a single file openable from file:// with no live external dependency, with the fonts and vendor assets copied into each asset's site tree (REQ-PIPE-092 criterion 3).
     - 'THE SYSTEM SHALL keep the repository-wide tabs - Plans, Release Notes, Demo and Feedback - in each asset''s dashboard, the Demo tab on both sites and captioned on the quarterly one as a recording of the daily asset''s commands (caption SETTLED by Keith 2026-11-01: ''Recorded on the daily asset: these commands are run with MOTHMAN_ASSET=daily''), and the Scenarios tab showing that asset''s own scenario map (REQ-PIPE-352 criterion 3).'
-    - WHERE a Feedback card links to a route this asset does not hold, THE SYSTEM SHALL keep the link and show the moved notice of criterion 6 when it is followed WHERE moved_to covers that route, and otherwise SHALL show the card's label as plain text with no link; shown by a test with one card of each kind.
+    - 'WHERE a Feedback card links to a route this asset does not hold, THE SYSTEM SHALL show the card''s label as plain text with no link; shown by a test with one card of each kind. AMENDED 2026-11-22 (Keith): the moved-notice half went with criterion 6.'
     - THE SYSTEM SHALL show the moved notice on deep links only, SHALL add no note about moved collections to the agencies list or home page, and SHALL add no persistent link to the other asset's dashboard in the masthead.
     non_functional_requirements:
     - 'PRIVACY: a build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27) - and now never another asset''s results either. Each publish runs where its own asset''s database is (REQ-PIPE-092).'
@@ -48217,9 +48217,6 @@ requirements:
     - tests/test_publish_per_asset.py
     - tests/test_snapshot_archive.py
     implemented_by:
-    - dashboard/qa-reporting-dashboard.template.html::movedEntryForRoute
-    - dashboard/qa-reporting-dashboard.template.html::movedHref
-    - dashboard/qa-reporting-dashboard.template.html::renderMovedNotice
     - dashboard/qa-reporting-dashboard.template.html::renderNotFound
     - dashboard/qa-reporting-dashboard.template.html::feedbackEvidence
     - dashboard/qa-reporting-dashboard.template.html::routeHeldHere
@@ -48229,11 +48226,11 @@ requirements:
     evidence:
     - '2026-11-21: tests-js/asset-identity.test.js 8 passed (the masthead ''Quarterly data asset · Quality Assurance'' and the title; the moved notice''s words, its link to the daily address keeping the route and in-place-on and dropping period=, cmp= and panel=, the sign-in line; the not-found page otherwise; a Feedback card''s link kept where moved_to covers it, the label alone where nothing does; the Demo caption). Real-browser, on the built quarterly page: TestAMovedCollectionSaysWhereItWent (criterion 7: the line, the link and its parameters, the title, the announcement, no navigation) and TestTheDemoSaysWhereItWasRecorded (criterion 10) passed. Criterion 5: TestTheUpload::test_each_asset_publishes_to_its_own_project names data-poc-quarterly and data-poc-daily to the stub wrangler.'
     unmet_criteria:
-      - criterion: "Criteria 3 and 4 - each asset's Pages project configured with its own Access applications and allow-list, and the daily asset's new project."
-        why: "Console configuration by Keith from docs/dashboard-hosting.md, the same steps as REQ-PIPE-257 criteria 1 to 5: the Pages projects and the Zero Trust team do not exist yet. Recorded 2026-11-21 (Keith, post-build-review #492 F3) - the build had claimed them met."
-        owner: "Keith, in the Cloudflare console"
-        blocked_by:
-          unowned: true
+    - criterion: Criteria 3 and 4 - each asset's Pages project configured with its own Access applications and allow-list, and the daily asset's new project.
+      why: 'Console configuration by Keith from docs/dashboard-hosting.md, the same steps as REQ-PIPE-257 criteria 1 to 5: the Pages projects and the Zero Trust team do not exist yet. Recorded 2026-11-21 (Keith, post-build-review #492 F3) - the build had claimed them met.'
+      owner: Keith, in the Cloudflare console
+      blocked_by:
+        unowned: true
     decisions:
     - 'ONE CLOUDFLARE PROJECT PER ASSET, EACH WITH ITS OWN ACCESS ALLOW-LIST (Keith, 2026-10-31, architect Q1 (a)): matches the two-team target and removes per-path publishing. It SUPERSEDES v1''s ''two dashboards on one site, /quarterly/ and /daily/'' (Keith''s earlier (a), which predated knowing REQ-PIPE-255 uploads a whole tree). REJECTED (b), one combined project rebuilt from both databases on every publish.'
     - TODAY'S PROJECT BECOMES THE QUARTERLY ASSET'S; THE DAILY ASSET GETS A NEW ONE; NO LANDING PAGE AND NO REDIRECT SCRIPT; AN OLD BIRTH REGISTRATIONS LINK SHOWS A ONE-LINE NOTICE (Keith, 2026-10-31, old address (a)). REJECTED (b), new projects for both with a linking page at today's address. This drops v1's landing page and old-link redirect, and with them UX MUST 5 and UX Q2.
@@ -48248,11 +48245,31 @@ requirements:
     - 'DEEP LINKS ONLY (Keith, 2026-11-01): no one-line note on the quarterly agencies list, and no persistent cross-link in the masthead, since each site has its own allow-list. REJECTED the home-page note, which the reviewer recommended.'
     - 'THE DEMO TAB ON BOTH SITES, CAPTIONED ON QUARTERLY (Keith, 2026-11-01, (b)): DEMO_CAST records the Birth Registrations wizard, which answers ''No such command'' on the quarterly asset. REJECTED (a), the daily site only until re-recorded.'
     - 'THEME AND WHAT''S NEW READ-STATE ARE PER SITE (dashboard UX v3 NIT): both live in localStorage, which is per origin, so neither carries from one asset''s dashboard to the other''s. Accepted, not built around.'
-    - "NO ASSET SWITCHER (Keith, 2026-10-31, #131): one dashboard switching between assets was REJECTED because it mixes both assets into one build; each asset's dashboard is built only from its own database."
+    - 'NO ASSET SWITCHER (Keith, 2026-10-31, #131): one dashboard switching between assets was REJECTED because it mixes both assets into one build; each asset''s dashboard is built only from its own database.'
     - 'THE DEMO''S ASSET IS THE RECORDING''S OWN FACT, NOT CODE (built 2026-11-21, criterion 10): dashboard/demos/qa_wizard.yaml says the cast was recorded on the daily asset and carries the settled caption; any other asset''s build captions the tab, so no code names an asset.'
     - 'A ROUTE THIS ASSET DOES NOT HOLD IS READ FROM THE EMBEDDED HIERARCHY (built 2026-11-21, criterion 11): its agency, collection and dataset ids against HIERARCHY; with none embedded (the raw template) every route counts as held.'
     - 'PROJECT NAMES (Keith, 2026-11-21): data-poc-quarterly and data-poc-daily, production branch main, at <project>.pages.dev.'
+    - 'RETIRED by Keith 2026-11-22, criteria 6, 7 and 12 (the moved notice, its moved_to entries, and its deep-links-only rule), and criterion 11''s moved half: a proof of concept needs no migration courtesy for a collection that moved. REJECTED keeping the notice and only rewording its link (post-build-review #493''s open question, which this answers).'
     open_questions: []
+    retired_criteria:
+    - criterion: 6
+      date: '2026-11-22'
+      by: Keith
+      replaced_by:
+      - REQ-DASH-055
+      reason: 'Keith, 2026-11-22: ''we don''t need any migration stuff or any sort of nice things around a collection that''s moved. This is a proof of concept, I don''t care. So get rid of that.'' An old link to Birth Registrations on the quarterly dashboard now reads as any missing route does, the not-found page; the template''s moved notice, the MOVED_TO embed, the moved_to key in data-asset.yaml and its schema, and their tests were deleted in the same change.'
+    - criterion: 7
+      date: '2026-11-22'
+      by: Keith
+      replaced_by:
+      - REQ-DASH-055
+      reason: 'Keith, 2026-11-22: ''we don''t need any migration stuff or any sort of nice things around a collection that''s moved. This is a proof of concept, I don''t care. So get rid of that.'' An old link to Birth Registrations on the quarterly dashboard now reads as any missing route does, the not-found page; the template''s moved notice, the MOVED_TO embed, the moved_to key in data-asset.yaml and its schema, and their tests were deleted in the same change.'
+    - criterion: 12
+      date: '2026-11-22'
+      by: Keith
+      replaced_by:
+      - REQ-DASH-055
+      reason: 'Keith, 2026-11-22: ''we don''t need any migration stuff or any sort of nice things around a collection that''s moved. This is a proof of concept, I don''t care. So get rid of that.'' An old link to Birth Registrations on the quarterly dashboard now reads as any missing route does, the not-found page; the template''s moved notice, the MOVED_TO embed, the moved_to key in data-asset.yaml and its schema, and their tests were deleted in the same change.'
   - id: REQ-DASH-355
     title: A global period control sits beside the date control, is carried in the URL and across navigation, and with no period chosen every page renders as it did before the change
     date_written: '2026-10-31'

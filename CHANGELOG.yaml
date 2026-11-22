@@ -109,11 +109,31 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-22"
+    summary: >
+      Small fixes for keyboard, screen-reader and phone use, and plainer
+      names in the queue.
+    changes:
+      - category: Improved
+        items:
+          - headline: The dashboard works better from a keyboard and on a phone
+            components: ["Dashboard UI"]
+            description: >
+              A header panel now takes focus when it opens and gives it back
+              when it closes, a supply row answers Enter as well as a click,
+              and "View as table" tells a screen reader whether the table is
+              open. On a phone, the supply history no longer makes the page
+              scroll sideways.
+          - headline: The queue names datasets as you know them
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Items for a supply nothing could place, and for periods that
+              closed with no supply, now name the dataset ("Case Workers")
+              rather than its configuration id.
   - date: "2026-11-21"
     summary: >
       Each data asset now publishes to its own private site, keeps its own
-      snapshot archive and says which asset it is. A collection that moved to
-      the other asset says where it went.
+      snapshot archive and says which asset it is.
     changes:
       - category: New
         items:
@@ -125,12 +145,6 @@ releases:
               sign-in before and after every upload. Until the sign-in is set up
               (`docs/dashboard-hosting.md`), every publish stops and says why,
               and the GitHub Pages site no longer updates.
-          - headline: A moved collection says where it went
-            components: ["Dashboard UI"]
-            description: >
-              Opening a link to Birth Registrations on the quarterly dashboard
-              now says it has moved to the daily asset's dashboard, with a link
-              to the same page there, rather than "not found".
       - category: Fixed
         items:
           - headline: A publish that fails can be tried again

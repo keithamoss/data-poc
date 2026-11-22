@@ -17372,8 +17372,7 @@ twice. It deliberately did not re-find the `TypeError`.
        left out still numbers truly). REQ-DASH-413 gains criterion 12;
        decisions on 413, 414, 415, 347 and REQ-PIPE-098.
      - **Nits, 2026-11-21 (branch wip/nits493, each against a test seen
-       failing first unless said)**: a moved page drops this asset's period
-       statement; 'View as table' says aria-expanded; a header panel takes
+       failing first unless said)**: 'View as table' says aria-expanded; a header panel takes
        focus on opening and gives it back on close (all of them, not only
        snapshots); the Demo caption shows its command as code, words
        unchanged; an owed-nothing run puts a colon, not a comma, before its
@@ -17391,8 +17390,16 @@ twice. It deliberately did not re-find the `TypeError`.
      - **Left, with the reason**: the runway notice keeps the calendar's and
        the dataset's ids - it is about editing calendar.yaml and names both in
        the file's own words; hollow trend markers stay labelled by the axis
-       title and the table, which say each in words. **For Keith**: the moved
-       notice's link text is its bare address, beside wording he settled on
-       2026-11-01 - new words there are his call. **Not yet looked at**: an
+       title and the table, which say each in words.
+     - **Keith, 2026-11-22, on the moved notice's bare-address link**: "we
+       don't need any migration stuff or any sort of nice things around a
+       collection that's moved. This is a proof of concept, I don't care. So
+       get rid of that." REMOVED: REQ-PIPE-354 criteria 6, 7 and 12 retired
+       (successor REQ-DASH-055's not-found page) and criterion 11's moved
+       half; the template's moved notice, MOVED_TO, the moved_to key and its
+       schema, and their tests deleted - and with them the nit above that
+       hid the period statement on a moved page, and #492 F2's moved check
+       for a stale segment. Its 2026-11-21 release note went too: nothing was
+       published with it, publishing being paused. **Not yet looked at**: an
        empty current cycle hides the newest tries note behind 'Show all
        history'.

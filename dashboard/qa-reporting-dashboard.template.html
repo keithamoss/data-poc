@@ -2892,10 +2892,6 @@ const ASSET_SYNTHETIC = true;
 // data-asset.yaml's display_name, in the masthead and every page title. Null in
 // the raw template.
 const ASSET_DISPLAY_NAME = null;
-// WHAT MOVED TO ANOTHER ASSET (REQ-PIPE-354 criterion 6): [{id, name,
-// asset_name, address}], from data-asset.yaml's moved_to - configuration, so
-// this page never reads the other asset's.
-const MOVED_TO = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -9184,45 +9180,7 @@ function agencyCardHtml(ag){
 //
 // Found while removing fourteen datasets at once (REQ-DASH-055), which
 // is what made the case easy to hit, but it was always reachable.
-// THE ROUTE NAMES SOMETHING THAT MOVED TO ANOTHER ASSET (REQ-PIPE-354
-// criterion 6): the deepest of its dataset, collection and agency ids that a
-// MOVED_TO entry names, or null.
-function movedEntryForRoute(state){
-  const s = state || STATE || {};
-  for(const id of [s.datasetId, s.collectionId, s.agencyId]){
-    const hit = id && (MOVED_TO || []).find(m=> m.id === id);
-    if(hit) return hit;
-  }
-  return null;
-}
-// THE MOVED NOTICE'S LINK: the other asset's address, carrying the same hash
-// route and in-place-on, and dropping period=, cmp= and panel= - they name
-// this asset's periods, comparisons and panels.
-function movedHref(entry){
-  const target = new URL(entry.address);
-  const here = new URL(location.href);
-  for(const [k, v] of here.searchParams){
-    if(!["period", "cmp", "panel"].includes(k)) target.searchParams.set(k, v);
-  }
-  target.hash = location.hash;
-  return target.toString();
-}
-// SAID IN THE NOT-FOUND PAGE'S HEAD AND RAIL, never as a redirect (criterion
-// 6; wording SETTLED by Keith 2026-11-01): the name from the entry itself.
-function renderMovedNotice(view, entry){
-  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
-  view.innerHTML = `
-    <div class="view-head" data-moved-notice>
-      <div>
-        <h2>${escHtml(entry.name)} has moved to the ${escHtml(entry.asset_name)}'s dashboard</h2>
-        <div class="view-sub"><a href="${escAttr(movedHref(entry))}" data-moved-link>${escHtml(entry.address)}</a></div>
-        <div class="view-sub" data-moved-signin>That dashboard has its own sign-in.</div>
-      </div>
-    </div>`;
-}
 function renderNotFound(view, what, id){
-  const moved = movedEntryForRoute();
-  if(moved) return renderMovedNotice(view, moved);
   setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   view.innerHTML = `
     <div class="view-head">
@@ -9241,11 +9199,6 @@ function renderNotFound(view, what, id){
 // pushes, so Back still goes where the reader came from rather than
 // through the broken link they just arrived on.
 function forgetStaleSegment(what, id, patch){
-  // A ROUTE UNDER SOMETHING THAT MOVED TO ANOTHER ASSET IS NOT STALE
-  // (REQ-PIPE-354 criterion 6; post-build-review #492 F2): its column and
-  // check are on the other dashboard, so the moved notice is the one line,
-  // and the address stays as it is for that notice's link.
-  if(movedEntryForRoute()) return;
   STATE = {...STATE, ...patch};
   history.replaceState(STATE, "", navUrl({dropArrival: false}));
   const view = document.getElementById("view");
@@ -13516,11 +13469,10 @@ function feedbackEvidence(item){
   if(item.kind === "sprint"){
     return `<span>Road-testing sprint ${item.n}${item.title ? ` — ${escHtml(item.title)}` : ""}</span>`;
   }
-  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): kept where
-  // moved_to covers it - following it shows the moved notice - and otherwise
-  // the label alone, never a link to the not-found page.
+  // A ROUTE THIS ASSET DOES NOT HOLD (REQ-PIPE-354 criterion 11): the label
+  // alone, never a link to the not-found page.
   const state = feedbackRouteState(item.href);
-  if(state && !routeHeldHere(state) && !movedEntryForRoute(state))
+  if(state && !routeHeldHere(state))
     return `<span data-fb-unlinked>${escHtml(item.label)}</span>`;
   return `<a href="${escAttr(item.href)}" data-fb-link="${escAttr(JSON.stringify({href:item.href, inPlaceOn:item.inPlaceOn || null}))}">${escHtml(item.label)}</a>`;
 }
@@ -13931,10 +13883,6 @@ function changedSinceNote(onDateStr){
 function renderInPlaceOnPastNotice(){
   const notice = document.getElementById("in-place-on-past-notice");
   if(!notice) return;
-  // A MOVED PAGE SAYS NOTHING OF THIS ASSET'S PERIODS OR DATES (post-build-
-  // review #493 nit): it shows only where the thing went, and its link drops
-  // period= already.
-  if(movedEntryForRoute()){ notice.hidden = true; notice.innerHTML = ""; return; }
   // WHILE A PERIOD IS CHOSEN, ONE STATEMENT (REQ-DASH-355 criterion 6).
   if(typeof CURRENT_PERIOD !== "undefined" && CURRENT_PERIOD) return renderPeriodStatement(notice);
   const past = CURRENT_IN_PLACE_ON && DEFAULT_IN_PLACE_ON && CURRENT_IN_PLACE_ON !== DEFAULT_IN_PLACE_ON;
