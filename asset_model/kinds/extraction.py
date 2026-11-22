@@ -105,7 +105,10 @@ def _declaration(folder) -> dict:
             "cohort": [{**dict(b), "checks": keys("cohort_bounds")} for b in t.cohort],
             "expectedRows": t.expected_rows,
             "expectedRowsChecks": keys("expected_rows") if t.expected_rows is not None else []}
-    return {"undeclaredCheck": f"{extraction_checks.CHECK_NAME['undeclared_file']}_file",
+    from asset_model import file_check_definitions
+
+    # The package check's key on the page: the file check's name and its tool.
+    return {"undeclaredCheck": f"{file_check_definitions.UNDECLARED_FILE}_file",
             "recipe": {"formatVersion": recipe.get("format_version"),
                        "digest": recipe.get("digest"), "filter": recipe.get("filter")},
             "tables": tables}

@@ -12,10 +12,11 @@ REQ-PIPE-442 criterion 4).
   file no arrival pattern matches, architect A2) and is recorded as a failing
   `undeclared_file` result naming it. One result for the package, passing
   where every file is declared, recorded against the one-off's first counted
-  dataset - PROVISIONAL (2026-11-22): a file that belongs to no table has no
-  dataset of its own, and the first counted one keeps the failure in the
-  one-off's own status rather than in a derived product's, which no rollup
-  counts.
+  dataset - SETTLED by Keith 2026-11-22 ('first dataset + home'): a file that
+  belongs to no table has no dataset of its own, and the first counted one
+  keeps the failure in the one-off's own status rather than in a derived
+  product's, which no rollup counts; the page also names the file once on the
+  one-off's home view (REQ-DASH-444).
 
 QA CARRIES ON PAST BOTH (Keith 2026-11-21, round 2 Q7 (a)): these are
 results, never a refusal of the package.
@@ -88,7 +89,7 @@ def _undeclared_words(f: Findings) -> tuple[str, str]:
 
 def home_of(tables):
     """The dataset the package's undeclared-file result is recorded against:
-    the first counted one, else the first (PROVISIONAL, module docstring)."""
+    the first counted one, else the first (SETTLED, module docstring)."""
     return next((t for t in tables if not t.derived), tables[0])
 
 
