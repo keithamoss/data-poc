@@ -254,11 +254,11 @@ def plan(one_off_id: str, *, s3_client=None) -> Plan:
                 [d.dataset_id for d in summary if not d.outcome], load["package_digest"], replaces)
 
 
-def build_page(into: Path, publication: dict, say=print) -> Path:
-    """Build the selected one-off's page in `into`: the rebuild, reshape, embed
-    and render-gate steps of any asset's build, then its data inlined into one
-    page, render-gated again. Returns the page."""
-    from cli import dashboard as steps
+def build_page(into: Path, publication: dict, steps, say=print) -> Path:
+    """Build the selected one-off's page in `into`: `steps`, the caller's
+    [(words, step)] - the rebuild, reshape, embed and render-gate steps of any
+    asset's build, which are the CLI's - then its data inlined into one page,
+    render-gated again. Returns the page."""
     from dashboard import check_dashboard_renders, data_files
     from qa_tools.common import build_output
 
@@ -266,14 +266,9 @@ def build_page(into: Path, publication: dict, say=print) -> Path:
     os.environ[PUBLICATION_ENV] = json.dumps(publication)
     try:
         build_output.use(into)
-        say("Rebuilding check results from the recorded QA history...")
-        steps._rebuild_results()
-        say("Reshaping into dashboard JSON...")
-        steps._build_data()
-        say("Embedding...")
-        steps._embed()
-        say("Gate - dashboard structural + real-browser render check...")
-        steps._check_renders()
+        for words, step in steps:
+            say(words)
+            step()
         built = Path(into) / build_output.PAGE_NAME
         one = Path(into) / "page" / page_name(assets.selected().name)
         one.parent.mkdir(parents=True, exist_ok=True)
@@ -299,15 +294,16 @@ def publication() -> dict | None:
     return json.loads(raw) if raw else None
 
 
-def publish(planned: Plan, *, s3_client=None, say=print) -> str:
-    """Build the page and write it to its destination; return its address."""
+def publish(planned: Plan, steps, *, s3_client=None, say=print) -> str:
+    """Build the page by `steps` (build_page) and write it to its destination;
+    return its address."""
     from asset_model import asset_time
 
     asset = assets.selected()
     dest = destination(asset.kind)
     with tempfile.TemporaryDirectory(prefix="mothman-one-off-publish-") as tmp:
         page = build_page(Path(tmp), {"at": asset_time.now().isoformat(),
-                                      "address": planned.address}, say=say)
+                                      "address": planned.address}, steps, say=say)
         # ASKED AGAIN AT THE MOMENT OF WRITING: another package's page may have
         # arrived while this one was building.
         held = read_page(dest, planned.one_off_id, s3_client=s3_client)

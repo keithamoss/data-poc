@@ -5750,9 +5750,6 @@ function turnOffMarker(d, dateStr){
 // FOR A NOT-YET-AGREED DATASET ONLY (REQ-PIPE-438 criterion 7): a `never`
 // dataset carries no marker - the one-off page says that once (REQ-DASH-444).
 function unagreedMarker(d){
-  // THE RAW DATASET CARRIES `derived` (the build's), the clipped one need not.
-  const raw = d && d.id ? rawRealDatasetById(d.id) : null;
-  if(d && (d.derived || (raw && raw.derived))) return derivedMarker(d);
   if(!d || d.scheduleNotAgreed !== "not-yet-agreed") return "";
   return `<span class="pill unagreed sm" title="This dataset is not counted in any \
 collection or asset rollup."><span class="ico"></span>No delivery schedule agreed yet</span>`;
@@ -5857,6 +5854,11 @@ function wireDeclaredChecks(root, ag, col, ds){
 }
 // A DERIVED PRODUCT SAYS SO IN WORDS (REQ-PIPE-438 criterion 5), in the
 // kind's display word - never its folder name.
+// BESIDE THE NO-SCHEDULE MARKER, never as it (status-cases.json's counted
+// cases: a derived product carries no no-schedule marker).
+function derivedMarkerOf(d){
+  return d && d.derived ? " " + derivedMarker(d) : "";
+}
 function derivedMarker(d){
   const kind = ONE_OFF ? ONE_OFF.kind.singular : "asset";
   return `<span class="derived-marker" data-derived-product style="font-size:12px; color:var(--ink-muted);">Derived product, not counted in the ${escHtml(kind)}'s status</span>`;
@@ -9610,7 +9612,7 @@ function renderAgency(view, agencyId){
           if(ds.blocked){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-blocked="${ds.blocked.kind}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">${escHtml(blockerReasonText(ds.blocked))}
                 — ${blockerReceivedText(ds.blocked)}; nothing is checked until it is resolved</td>
             </tr>`;
@@ -9627,7 +9629,7 @@ function renderAgency(view, agencyId){
           if(ds.noSupply && !ds.lastArrival){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
                 Closed with nothing in it, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
@@ -9635,7 +9637,7 @@ function renderAgency(view, agencyId){
           if(ds.scheduleExhausted){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
             </tr>`;
@@ -9643,7 +9645,7 @@ function renderAgency(view, agencyId){
           if(ds.noDataInPlaceOn && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)}${noSupplyNote(ds)}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">${noRunWords(ds)}</td>
             </tr>`;
           }
@@ -9657,7 +9659,7 @@ function renderAgency(view, agencyId){
                                               {col, ds});
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-            <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}${noPromotedNote(ds)}</td>
+            <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)}${noSupplyNote(ds)}${noPromotedNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply" data-latest-arrival>${escHtml(latestArrivalWords(ds))}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -11429,7 +11431,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${datasetProvenanceNote(ds)}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${amberPromotedTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${amberPromotedTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${recheckedAmberTag(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${derivedMarkerOf(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
     ${turnOffReasonLine(ds)}

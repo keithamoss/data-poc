@@ -452,6 +452,17 @@ def _drop_warnings(chosen) -> tuple[list[str], bool]:
             False
 
 
+def _build_steps():
+    """THE FOUR STEPS OF ANY ASSET'S BUILD (REQ-PIPE-443 criteria 1 and 2) -
+    `mothman dashboard`'s own, and none of its publish()'s others."""
+    from cli import dashboard as steps
+
+    return [("Rebuilding check results from the recorded QA history...", steps._rebuild_results),
+            ("Reshaping into dashboard JSON...", steps._build_data),
+            ("Embedding...", steps._embed),
+            ("Gate - dashboard structural + real-browser render check...", steps._check_renders)]
+
+
 @one_off_group.command("publish")
 @id_option
 @click.option("--yes", is_flag=True, help="Skip the one confirmation (the scripted form).")
@@ -488,7 +499,8 @@ def publish_command(one_off_id: str, yes: bool) -> None:
             click.echo("Not published.")
             return
     try:
-        address = one_off_publish.publish(planned, say=lambda line: click.echo(line))
+        address = one_off_publish.publish(planned, _build_steps(),
+                                          say=lambda line: click.echo(line))
     except (one_off_publish.PublishRefused, click.ClickException) as exc:
         message = exc.format_message() if isinstance(exc, click.ClickException) else str(exc)
         raise click.ClickException(f"nothing was published: {message}") from None

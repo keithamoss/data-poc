@@ -46,6 +46,22 @@ def people_yaml() -> Path:
     return chosen.file("people.yaml")
 
 
+def _where_people_are() -> str:
+    """The people.yaml a refusal names: the selected asset's, or - for a
+    one-off, whose people are read from its kind's template - the template's,
+    never the one-off's own folder, which has none and must not."""
+    from asset_model import assets
+
+    chosen = assets.selected_or_none()
+    if chosen is not None and chosen.is_one_off:
+        path = people_yaml()
+        try:
+            return path.relative_to(assets.ROOT).as_posix()
+        except ValueError:
+            return str(path)
+    return f"{assets.config_dir()}/people.yaml"
+
+
 #: The three levels an assignment may name, exactly one each (REQ-GHUB-171
 #: criterion 2) - the key it is written under in contract/people.yaml.
 DATA_ASSET = "data_asset"
@@ -182,7 +198,7 @@ def person_by_email(email: str, config: dict | None = None) -> dict:
     person = (config["people"] or {}).get((email or "").strip())
     if person is None:
         raise UnknownActor(
-            f"{email!r} is not in {_assets.config_dir()}/people.yaml, so a filing decision "
+            f"{email!r} is not in {_where_people_are()}, so a filing decision "
             f"raised by them could not be attributed to anybody. Add them "
             f"there first - an unattributable decision is worse than none, "
             f"because saying who is what the log is for.")

@@ -91,6 +91,7 @@ class Journey(World):
         self.said: dict[str, object] = {}
         self.pages: dict[str, str] = {}
         self.github: list[str] = []
+        self.hosting: list[str] = []
 
     @property
     def page(self) -> Path:
@@ -121,6 +122,13 @@ def _watch_github(journey: Journey, mp) -> None:
             super().__init__(args, *a, **kw)
 
     mp.setattr(subprocess, "Popen", Watched)
+    # AND THE RECURRING ASSETS' HOSTING (REQ-PIPE-443 criterion 10).
+    from dashboard import hosting, snapshot_dashboard
+
+    for module, name in ((hosting, "upload"), (hosting, "wrangler"), (hosting, "find_wrangler"),
+                         (snapshot_dashboard, "take_snapshot"),
+                         (snapshot_dashboard, "page_fingerprint")):
+        mp.setattr(module, name, lambda *a, __n=name, **kw: journey.hosting.append(__n))
 
 
 def _step(journey, name, args, **kw):
@@ -222,7 +230,11 @@ def journey(tmp_path_factory):
                 "target": (folder / "dbt" / "target").exists(),
                 "configuration": (folder / "data-asset.yaml").is_file()}
             _step(j, "reloaded", ["load", "--id", j.id, str(j.package)])
-            # PUBLISHED UNDECIDED.
+            # PUBLISHED UNDECIDED - in an environment that does not publish the
+            # recurring assets' dashboards, whose gate is not a one-off's.
+            from qa_tools.common import environments
+
+            j.environment_publishes = environments.current().publishes
             _step(j, "publish-no-terminal", ["publish", "--id", j.id])
             _step(j, "publish-undecided", ["publish", "--id", j.id, "--yes"])
             j.keep("undecided")
@@ -442,6 +454,14 @@ class TestPublishing:
         current = [d for d in _one_off(journey.pages["withheld"])["decisions"] if d["current"]]
         assert current[0]["decision"] == "withhold"
         assert journey.final == {"database": False, "page": True}
+
+    def test_not_the_recurring_assets_publish(self, journey):
+        """Criteria 2 and 10: no publish-environment gate - the suite's
+        environment publishes nothing - and no snapshot, fingerprint, upload
+        or wrangler."""
+        assert journey.environment_publishes is False
+        assert "undecided" in journey.pages
+        assert journey.hosting == []
 
     def test_no_snapshot_archived(self, journey):
         tracked = subprocess.run(["git", "status", "--porcelain", "dashboard/snapshots"],
@@ -682,3 +702,52 @@ class TestTheTablesDeclaration:
             section.locator("[data-declared-derived]").inner_text()
         assert section.locator("[data-declared-expected-rows]").inner_text() == \
             "The recipe gave no expected row count"
+
+
+class TestTheTuiOffersPublish:
+    """REQ-PIPE-442 criterion 2 (and REQ-PIPE-446 criterion 8): the TUI's step
+    menu has publish, and choosing it runs the publish for the chosen one-off."""
+
+    def test_publish_from_the_menu(self, journey, monkeypatch):
+        import click
+
+        from cli import common
+        from cli import one_off as module
+
+        _point(journey, monkeypatch)
+        asked, ran = [], []
+
+        def select(message, choices, hint, default=None):
+            asked.append(list(choices))
+            if message == "Which one-off?":
+                return next(c for c in choices if c.startswith(journey.id))
+            return "Publish its page" if len(asked) == 2 else None
+
+        monkeypatch.setattr(common, "select", select)
+        monkeypatch.setattr(module, "publish_command",
+                            lambda one_off_id, yes: ran.append((one_off_id, yes)))
+        with click.Context(module.one_off_group) as ctx:
+            module._tui(ctx)
+        _reset()
+        assert "Publish its page" in asked[1]
+        assert ran == [(journey.id, False)]
+
+
+class TestAnUnknownDeciderIsToldWhichFile:
+    """A DEFECT FOUND ON THIS JOURNEY (2026-11-22): the refusal of a decider
+    not in people.yaml named the ONE-OFF'S FOLDER's people.yaml, which does not
+    exist and must not - adding one there would break its digest. It names the
+    kind's template's, which is where a one-off's people are read from
+    (REQ-PIPE-435 criterion 4)."""
+
+    def test_the_template_is_named(self, journey, monkeypatch):
+        from qa_tools.common import git_identity
+
+        _point(journey, monkeypatch)
+        monkeypatch.setattr(git_identity, "get_run_by", lambda: "nobody@example.org")
+        got = _invoke(["decide", "--id", journey.id, "--decision", "release", "--reason", "x",
+                       "--yes"])
+        _reset()
+        said = _said(got).replace(" ", "")
+        template = str(journey.root / "extraction" / "_template" / "people.yaml").replace(" ", "")
+        assert got.exit_code != 0 and template in said, said

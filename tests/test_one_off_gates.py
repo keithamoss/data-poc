@@ -309,7 +309,30 @@ class TestAChangedTemplateIsGated:
 
         monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: True)
         assert [(r[0], r[1]) for r in self._row()] == \
-            [("default check layer (extraction template)", 0)]
+            [("default check layer (extraction template)", 0),
+             ("publishing destination (extraction template)", 0)]
+
+    @pytest.mark.parametrize("text,said", [
+        (None, "publishing.yaml is missing"),
+        ("destination: ''\n", "names no `destination:`"),
+        ("destination: s3://\n", "names no bucket")])
+    def test_a_template_without_a_usable_destination_fails(self, template, monkeypatch,
+                                                           text, said):
+        """REQ-PIPE-443 criterion 1 and REQ-PIPE-448 criterion 6: the
+        destination every one-off of the kind is published to is gated with
+        the template that names it."""
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: True)
+        path = template / "publishing.yaml"
+        if text is None:
+            path.unlink()
+        else:
+            path.write_text(text)
+        rows = {r[0]: r[1] for r in self._row()}
+        assert rows["publishing destination (extraction template)"] == 1
+        problems = one_off_gating.template_pass(one_off_kinds.get("extraction"))
+        assert said in " ".join(problems["publishing destination"])
 
     def test_a_broken_default_layer_fails(self, template, monkeypatch):
         from qa_tools.common import one_off_gating
@@ -320,8 +343,8 @@ class TestAChangedTemplateIsGated:
         doc["checks"] = [c for c in doc["checks"] if c["assertion"] != "identifier_not_null"]
         doc["checks"][0]["tools"] = ["evidently"]
         path.write_text(yaml.safe_dump(doc))
-        ((_shown, code, *_),) = self._row()
-        assert code == 1
+        rows = {r[0]: r[1] for r in self._row()}
+        assert rows["default check layer (extraction template)"] == 1
         problems = one_off_gating.template_pass(one_off_kinds.get("extraction"))
         said = " ".join(problems["default check layer"])
         assert "'identifier_not_null' is not defined" in said and "evidently" in said
