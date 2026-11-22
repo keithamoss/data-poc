@@ -117,6 +117,14 @@ releases:
     changes:
       - category: New
         items:
+          - headline: A home for one-offs, beside the data assets
+            components: ["Pipeline & publishing"]
+            description: >
+              One-off pieces of QA work now have their own folders, under
+              `one-offs/`, kept apart from the enduring data assets. You browse
+              and choose one with `mothman one-off`, with MOTHMAN_ASSET unset,
+              and `mothman check` refuses a badly named or clashing folder. A
+              one-off never touches GitHub.
           - headline: Commands on a slot's ticket are acted on at the next pass
             components: ["GitHub workflow & people"]
             description: >

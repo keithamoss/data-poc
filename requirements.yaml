@@ -46811,6 +46811,7 @@ requirements:
     - REQ-PIPE-369
     - REQ-GEN-370
     linked_tests:
+    - tests/test_one_offs.py::TestTheListing
     - tests/test_assets.py::TestTheRealLayout
     - tests/test_assets.py::TestTheFixture
     - tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt
@@ -46822,6 +46823,8 @@ requirements:
     - tests/test_collections_registry.py::TestTheLiteralGate::test_the_shared_collections_trees_are_no_longer_exempt
     - tests/test_github_links.py::test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository
     implemented_by:
+    - asset_model/assets.py::one_offs
+    - asset_model/one_off_kinds.py::registered
     - cli/dashboard.py::validate_layout_command
     - asset_model/assets.py::_Assets::names
     - asset_model/assets.py::selected
@@ -46836,6 +46839,7 @@ requirements:
     - assets/environments.yaml
     - .github/CODEOWNERS
     evidence:
+    - '2026-11-22, built with REQ-PIPE-446 (tree 68a8cf7a): criterion 5 as amended - one-off folders found from one-offs/<kind>/ itself for every kind, and kind plug-ins discovered from asset_model/kinds/, with no list of assets, kinds or one-offs in code - in tests/test_one_offs.py''s TestTheListing. The unmet entry owned by REQ-PIPE-446 is closed.'
     - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: assets/ holds environments.yaml and the two asset folders only, each with data-asset.yaml, calendar.yaml, presentation.yaml, people.yaml, file-checks.yaml, dbt/, collections/ and synthetic/ (c1, c2); quarterly holds child-protection-family-support and department-of-health, daily registry-services (c3); assets._Assets.names lists the folder, and no asset name is held in product code (c5); the resolver answers state paths at call time (c6), the constants it replaced are gone from product code (grep); CODEOWNERS names /assets/*/ (c9); qa_tools/collections/ and generator/collections/ hold __init__.py and base.py only and dbt_shared/ macros/ and tests/generic/ only (c10).'
     - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate among them) - `layout OK - only environments.yaml and asset folders at the top of assets/, and no collection''s file in the shared code tree.`'
     - '2026-11-15, split T1 (branch wip/split-t1, merged 9dce1e9b), from its decisions: tests/test_two_asset_gates.py 26 passed, its refusals seen failing first (c4, c10); the move map deleted in c8531b7b (c2). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run. The earlier criteria''s proof is the move commit de009e91 and its follow-ons recorded in decisions.'
@@ -46869,13 +46873,6 @@ requirements:
     - 'STATUS PASS 2026-11-15 (split T0): every live criterion met at HEAD 8df9ddb5, flipped to built.'
     - 'THE SPLIT INCLUDES TEST DATASETS OFF THE BASELINE''S CADENCE (Keith, 2026-10-31, #131 (b)): an annual dataset on the quarterly asset (REQ-QAC-348) and a weekly one on the daily (REQ-QAC-350), so the period control is designed against slower-than-baseline participation from the start. REJECTED (a), splitting with today''s datasets only.'
     open_questions: []
-    unmet_criteria:
-    - criterion: Criteria 5 as amended 2026-11-21 for one-offs.
-      why: Amended by Keith's re-sign of the one-offs batch (deferred-rescope-v7, 2026-11-21); not yet built.
-      owner: REQ-PIPE-446
-      blocked_by:
-        requirements:
-        - REQ-PIPE-446
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
     date_written: '2026-10-31'
@@ -46912,8 +46909,11 @@ requirements:
     - REQ-TEST-114
     - REQ-TEST-252
     linked_tests:
+    - tests/test_one_offs.py
     - tests/test_cli_asset_selection.py
     implemented_by:
+    - asset_model/assets.py::kinds_sentence
+    - cli/one_off.py::refuse_an_asset_beside
     - cli/app.py::_MothmanGroup::resolve_command
     - cli/app.py::cli
     - asset_model/assets.py::_refusal
@@ -46924,6 +46924,7 @@ requirements:
     - cli/env.py::list_command
     - tests/conftest.py::module_selects_its_asset
     evidence:
+    - '2026-11-22, built with REQ-PIPE-446 (tree 68a8cf7a): criteria 1, 4, 5, 6, 11 and 12 as amended for one-offs - the one-off sentence in --help, criterion 4''s and 6''s refusals and left out where there are none, MOTHMAN_ASSET naming a one-off refused in criterion 12''s approved words and selecting nothing, and every `mothman one-off` command running unset and refused set - in tests/test_one_offs.py''s TestTheOneOffSentence, TestMothmanAssetNamingAOneOff and TestTheOneOffGroup, each in a real non-TTY subprocess. They failed against the code before 446 (13 errors: no one-offs root to point the resolver at) and pass; with test_cli_asset_selection in the 41-module run, 1286 passed, 1 failed (a marker guard, fixed; see REQ-PIPE-446). The unmet entry owned by REQ-PIPE-446 is closed.'
     - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: cli/app.py builds collection groups only for assets.selected_or_none() and none with no asset (c2); _MothmanGroup answers an unknown command with "Commands for asset ''<asset>'':" (c3); the Collections panel says ''Set MOTHMAN_ASSET to one of: ...'' with no asset (c5); assets._refusal names the variable, the folders found and that there is deliberately no default (c4, c6); environment_statement adds '' · Asset: <asset>'' and env current/list name it (c8); tests/conftest.py refuses a test module with no asset mark (c9). tests/test_cli_asset_selection.py holds a test for each case c10 lists.'
     - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate among them), run with MOTHMAN_ASSET unset (c5, PORTABILITY). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run; the suite last passed whole in the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading agents'' worktrees, since fixed (post-build-review #329). ''Seen failing first'' is the build''s record, not re-checked here.'
     decisions:
@@ -46948,13 +46949,6 @@ requirements:
     - 'v7, THE CRITERION 2 AMENDMENT IS WITHDRAWN: see withdrawn_from_v6. The architect''s A concern (groups built at import) is met by the criterion as built, because a one-off never sits in MOTHMAN_ASSET.'
     - A KIND WITH NO FOLDERS IS LEFT OUT, AND --help MATCHES (Keith 2026-11-21, yes to both delivery-cli-ux D3 edge cases); under v6 Q2 (b) 'left out' means the whole one-off sentence goes when there are none. REJECTED the architect's L 'leave criterion 5 deliberately'.
     open_questions: []
-    unmet_criteria:
-    - criterion: Criteria 1, 4, 5, 6, 11, 12 as amended 2026-11-21 for one-offs.
-      why: Amended by Keith's re-sign of the one-offs batch (deferred-rescope-v7, 2026-11-21); not yet built.
-      owner: REQ-PIPE-446
-      blocked_by:
-        requirements:
-        - REQ-PIPE-446
   - id: REQ-PIPE-364
     title: mothman check runs every configuration gate once per asset folder, needing no asset and no database, keeps identifiers unique within each asset, and compares nothing across assets
     date_written: '2026-10-31'
@@ -52514,7 +52508,17 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever maintains the pipeline, I want one-offs of any kind found and selected like assets while staying out of everything that serves the enduring assets, so that hundreds of them never reach a command, a CI run or GitHub that was built for the enduring assets.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: 'Criterion 8''s steps - open, load, decide, publish and drop - in `mothman one-off`.'
+      why: 'The group, its TUI (browse and select) and `list` are built and take --id; each step is its own requirement''s: open and load REQ-PIPE-440 and REQ-PIPE-442, decide REQ-PIPE-435, publish REQ-PIPE-443, drop REQ-PIPE-442. `list` as the status board (CLI D2) is REQ-PIPE-442''s.'
+      owner: REQ-PIPE-440
+      blocked_by:
+        requirements:
+        - REQ-PIPE-440
+        - REQ-PIPE-442
+        - REQ-PIPE-435
+        - REQ-PIPE-443
     source: Keith 2026-11-21, round 3 (one-offs apart from the enduring assets), round 4 (one-offs/<kind>/<id>/, the extraction the first kind) and round 5 (architect Q2 (b)); delivery-architect v4 findings 6, 7 and 9 and its reuse list. Checked against asset_model/assets.py, cli/check.py's _GATES and _asset_passes, qa_tools/common/diff_base.py and REQ-PIPE-342/363. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A, H, J, K, L and M, delivery-cli-ux G4, G7 and C5, and Keith's answers (--id; never GitHub; every kind declares a project; copy nothing). Shared by every kind. v7 folds in Keith's answers to the v6 questions (Q2, MOTHMAN_ASSET for enduring assets only; Q6, the `mothman check` criteria split out as REQ-PIPE-448). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL list one-offs from one-offs/<kind>/ for every kind folder under one-offs/ - directories only, '_' and '.' names skipped - and SHALL NOT hold a list of one-offs anywhere in code; IF a one-off folder's name does not meet NAME_PATTERN, THEN `mothman check` SHALL fail, naming it, and THE SYSTEM SHALL NOT select any other folder in its place.
@@ -52559,6 +52563,40 @@ requirements:
     - 'v7, NO ONE-OFF IN MOTHMAN_ASSET, EVEN INTERNALLY (delivery-scoper, checked against asset_model/assets.py): assets.select() writes the selected name into os.environ so a spawned process inherits it. Doing that for a one-off would hand the child a MOTHMAN_ASSET that criterion 9 refuses, so criterion 7 carries a one-off through handoff()/adopt() instead.'
     - 'v7, CRITERION 8 NO LONGER SAYS ''WHILE A ONE-OFF IS SELECTED'' (following v6 Q2 (b)): with MOTHMAN_ASSET unset whenever a one-off is worked, REQ-PIPE-363 criterion 2 as built already builds no collection group, so its v6 amendment is withdrawn (amendments-v7) and this criterion just states the rule.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q6 (b)): SPLIT BEFORE RE-SIGNING. v6''s criteria 10-14 and 20 - every per-(gate, kind) declaration, the changed-folder and digest passes, check''s output, the collections gate, the CI/hook test and the template gate - with the NFRs and decisions only about them, are REQ-PIPE-448. REJECTED (a) re-signing one 20-criterion requirement. Criteria 15-19 are renumbered 10-14.'
+    - 'BUILT 2026-11-22 AGAINST A TEST KIND (''audit'' / ''audits'', tests/one_off_support.py), not the extraction, whose recipe reader and generated folder are REQ-PIPE-439''s and REQ-PIPE-440''s (Keith 2026-11-22: do not invent the extraction''s files).'
+    - 'BUILT 2026-11-22: THE KIND PLUG-IN REGISTRY is asset_model/one_off_kinds.py - a Kind (folder name, singular, plural, check layer''s name, reader, generator, check layers, and its (gate -> applies) declarations for REQ-PIPE-448) that each kind''s module under asset_model/kinds/ registers itself; the package is discovered, so no list of kinds is held in code (REQ-PIPE-342 criterion 5). None is registered today.'
+    - 'BUILT 2026-11-22: THE ONE-OFFS ROOT LIVES ON THE LAYOUT (_Assets.one_offs, criterion 11), with a stat stamp for the root and one per kind folder (the SCALABILITY NFR). use_one_offs_root() points it elsewhere; use_root() keeps it. handoff() gains a sixth element, whether the selection is a one-off, and adopt() selects it by select_one_off() - never through MOTHMAN_ASSET (criterion 7).'
+    - 'BUILT 2026-11-22: THE SELECTED ONE-OFF IS A PROCESS GLOBAL set only by assets.select_one_off() (--id or the TUI). selected() refuses it with MOTHMAN_ASSET set at all. The clash check (criterion 4) runs in selected() for an asset only where one-offs exist, since selected() is asked millions of times in one generation.'
+    - 'BUILT 2026-11-22: A BAD ONE-OFF NAME IS LEFT OUT OF THE LISTING rather than raising as a bad asset name does: a raise there would break every enduring asset''s selection over one badly named one-off. The folders gate names it, and it can never be selected (criterion 1).'
+    - 'BUILT 2026-11-22: THE FOLDERS GATE (qa_tools/common/validate_folders.py, repository-wide) owns criteria 1, 2, 4, 5 and 13''s `mothman check` failures; it reads folder names and each data-asset.yaml''s data_asset_id and project only. `project:` is an optional key of the asset schema, required of a one-off by the gate.'
+    - 'BUILT 2026-11-22: NEVER GITHUB (criterion 14) is enforced at every `gh` boundary - ticket_github, ticket_sync, leaderboard and ci_usage refuse with NeverGitHub when a one-off is selected - and service_from_env() returns no ticket service for one, whatever the environment says.'
+    - 'BUILT 2026-11-22: `mothman one-off` REFUSES MOTHMAN_ASSET SET AT ALL, before reading anything, in its own words naming the variable and its value; REQ-PIPE-363 criterion 12''s approved words are for MOTHMAN_ASSET naming a one-off''s id outside the group.'
+    - 'A KIND WITH FOLDERS BUT NO PLUG-IN IS LEFT OUT OF ''For one of <n> <kinds>'' - it has no display word, and the folders gate fails its folder (criterion 2).'
+    linked_tests:
+    - tests/test_one_offs.py
+    - tests/one_off_support.py
+    implemented_by:
+    - asset_model/assets.py::select_one_off
+    - asset_model/assets.py::selected
+    - asset_model/assets.py::one_offs
+    - asset_model/assets.py::use_one_offs_root
+    - asset_model/assets.py::handoff
+    - asset_model/assets.py::adopt
+    - asset_model/assets.py::id_clashes
+    - asset_model/assets.py::kinds_sentence
+    - asset_model/assets.py::refuse_github
+    - asset_model/assets.py::Asset
+    - asset_model/one_off_kinds.py::Kind
+    - asset_model/one_off_kinds.py::register
+    - qa_tools/common/validate_folders.py::problems
+    - cli/one_off.py::one_off_group
+    - cli/one_off.py::list_command
+    - cli/one_off.py::choose
+    - qa_tools/common/ticket_reconciler.py::service_from_env
+    - qa_tools/common/ticket_github.py::_gh
+    - qa_tools/common/ci_usage.py::_run_gh
+    evidence:
+    - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). The CLI tests for REQ-PIPE-363 criteria 11 and 12 failed against the code before 446 (13 errors - the resolver had no one-offs root to point at), and pass.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52567,7 +52605,32 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever maintains the pipeline, I want `mothman check` to gate every one-off folder at a cost near today's and to say exactly what it checked, so that hundreds of generated folders stay trustworthy configuration without slowing the gate or reaching CI.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: 'Criterion 2 - each applicable gate run in full over every one-off folder changed since the diff base, and every other folder checked against its recorded digest.'
+      why: 'The recorded digest is REQ-PIPE-440''s. Running a per-asset gate over a one-off folder also needs a way to select a one-off in the gate''s subprocess, which MOTHMAN_ASSET may not carry (REQ-PIPE-446 criterion 9) - an open question for Keith (2026-11-22).'
+      owner: REQ-PIPE-440
+      blocked_by:
+        requirements:
+        - REQ-PIPE-440
+    - criterion: 'Criterion 3''s rows - one per applicable gate per kind, folders gated in full and by digest counted, a digest failure naming its first differing file, and the counts in the run''s one-line result.'
+      why: 'Nothing gates a one-off folder until criterion 2. Built now: the not-applicable line per kind, and silence where there are no one-offs.'
+      owner: REQ-PIPE-440
+      blocked_by:
+        requirements:
+        - REQ-PIPE-440
+    - criterion: 'Criterion 4 - the collections gate accepting a one-off''s collections served by its kind''s shared adapter.'
+      why: 'A kind''s shared adapter is the extraction''s (REQ-PIPE-440); no kind provides one yet.'
+      owner: REQ-PIPE-440
+      blocked_by:
+        requirements:
+        - REQ-PIPE-440
+    - criterion: 'Criterion 6 - a kind''s changed _template/ gated with every gate its kind declares for the template.'
+      why: 'What a template holds and is read for live is REQ-PIPE-440 criterion 13''s, and gating it needs criterion 2''s way of running a gate over a folder that is not an asset.'
+      owner: REQ-PIPE-440
+      blocked_by:
+        requirements:
+        - REQ-PIPE-440
     source: 'Split out of REQ-PIPE-446 by Keith 2026-11-21 (v6 Q6 (b)), carrying v6''s criteria 10-14 and 20 unchanged in substance: Keith round 5 (architect Q2 (b)); delivery-architect v4 findings 6 and 7 and post-sign-off H and K; delivery-cli-ux C5. Drafted by delivery-scoper 2026-11-21, v7. Shared by every kind. v7, PROPOSAL until signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - THE SYSTEM SHALL have every per-asset gate in `mothman check` declare, for each one-off kind, whether it applies, SHALL refuse to run a gate with any (gate, kind) pair undeclared, SHALL decide a one-off's synthetic gates from that declaration and never from _has_synthetic's default for a name it does not find, and SHALL word a gate that does not apply to a kind 'not applicable (<kind>)' with the kind's display word, keeping 'not applicable (no synthetic/ folder)' for an enduring asset.
@@ -52596,6 +52659,22 @@ requirements:
     - 'v7, SPLIT FROM REQ-PIPE-446 (Keith 2026-11-21, v6 Q6 (b): ''split the mothman check criteria (c10-c14, c20) into a requirement of their own BEFORE re-signing''). Moved as written: v6''s 446 c10-c14 are criteria 1-5 here and c20 is criterion 6; the NFRs about subprocess cost, CI''s shell loops and validate-config.yml, and the decisions only about gating, came with them. REJECTED re-signing 446 at 20 criteria.'
     - 'v7, CI AND HOOKS LIVE HERE TOO (Keith named c14 in the split): the test that no workflow or hook loops over, selects or loads a one-off is the other half of ''gated locally, never in CI'', so it sits with the local gating it complements.'
     - v7, DEPENDS ON REQ-PIPE-440 for the recorded digest and the gitignored dbt artefacts criterion 2 reads, and on REQ-PIPE-385 for the synthetic gates' not-applicable rule criterion 1 extends. REQ-PIPE-385 moves here from 446, which no longer touches gates.
+    - 'BUILT 2026-11-22: THE DECLARATIONS ARE THE KIND PLUG-IN''S `gates` MAP (asset_model/one_off_kinds.Kind, REQ-PIPE-446). A per-asset gate - every gate not repository-wide - is refused, FAILED and not run, when a kind that has folders leaves it undeclared; a kind with no folders is not asked, so a kind is declared in full before its first folder can pass.'
+    - 'BUILT 2026-11-22: ''not applicable (<kind>)'' uses the kind''s SINGULAR display word; the enduring assets keep ''not applicable (no synthetic/ folder)'' unchanged. The one line per kind prints under the summary table, only where that kind has folders.'
+    - 'CRITERION 5''S TEST READS SOURCE ON PURPOSE (CLAUDE.md''s test rule 1): every workflow `run:` step and the session-start hook''s script, refused any mention of one-offs/, `mothman one-off`, one_off or --id - an architecture rule with no behaviour to observe from a test.'
+    - 'OPEN, put to Keith 2026-11-22: how a per-asset gate''s SUBPROCESS acts for a one-off. MOTHMAN_ASSET may not (REQ-PIPE-446 criterion 9), and handoff()/adopt() serve a pool, not a `uv run` subprocess. Recommended: a hidden `mothman one-off gate --id <id> <gate>` that selects the one-off and runs the gate in process.'
+    linked_tests:
+    - tests/test_one_off_gates.py
+    implemented_by:
+    - cli/check.py::undeclared
+    - cli/check.py::not_applicable_text
+    - cli/check.py::not_applicable_lines
+    - cli/check.py::per_asset_gates
+    - cli/check.py::one_off_kinds_with_folders
+    - cli/check.py::check_command
+    - asset_model/one_off_kinds.py::Kind
+    evidence:
+    - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_one_off_gates.py is new behaviour (10 tests); its criterion 1 tests cannot pass on the code before it, which has no undeclared().'
     signed_off:
       by: Keith
       date: '2026-11-21'
