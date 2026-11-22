@@ -166,7 +166,7 @@ class TestTheBusiestParsersAskOnce:
         path = tmp_path / "environments.yaml"
         path.write_text(environments.ENVIRONMENTS_PATH.read_text())
         before = environments._load(path)
-        path.write_text(path.read_text().replace(before[0].id, before[0].id + "x", 1))
+        path.write_text(path.read_text().replace(f"id: {before[0].id}\n", f"id: {before[0].id}x\n", 1))
         assert environments._load(path)[0].id == before[0].id + "x"
 
 
