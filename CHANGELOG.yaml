@@ -109,6 +109,25 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-22"
+    summary: >
+      A dataset with no delivery schedule is now checked when its supply
+      arrives, and a dashboard holding one builds.
+    changes:
+      - category: Fixed
+        items:
+          - headline: A supply with no schedule is checked when it arrives
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply for a dataset that has no delivery schedule used to stop
+              the pipeline before any check ran. It is now recorded with no
+              period, never held for you to place, and checked straight away.
+          - headline: A dashboard with an unscheduled dataset builds
+            components: ["Dashboard UI"]
+            description: >
+              The dashboard build stopped on a dataset with no delivery
+              schedule. It now builds, and shows no due date, period or
+              lateness for that dataset.
   - date: "2026-11-21"
     summary: >
       Each data asset now publishes to its own private site, keeps its own

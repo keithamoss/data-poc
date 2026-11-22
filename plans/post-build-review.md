@@ -16821,6 +16821,11 @@ twice. It deliberately did not re-find the `TypeError`.
      dashboard build's agreement.cadence() raises it too. Keith, 2026-11-18:
      scoped separately as a design question - plans/running-thoughts.md #141.
      Not fixed; criterion 5 is recorded unmet.
+     - **Filing half BUILT 2026-11-22 as REQ-PIPE-434** (test-first: filing
+       raised NoCalendarAgreed, and the gate's claim-window read did too); the
+       dashboard build's agreement.cadence() and its slot reads are REQ-DASH-436
+       criterion 1's (built the same day, test-first); the promotion gate's
+       raise is REQ-PIPE-435 criterion 7's, still to build.
 
 474. **[done, 2026-11-18]** **[Testing & dev tooling]** **Old session-start blocks kept exporting a retired DSN and asset name.**
      The session-start hook appends its exports to $CLAUDE_ENV_FILE on every

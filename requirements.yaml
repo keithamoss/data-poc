@@ -52242,7 +52242,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever runs QA on a one-off, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately); plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; unchanged in v6. Buildable at once (Keith, round 5, architect Q1). Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing.
@@ -52261,6 +52261,23 @@ requirements:
     - 'REJECTED holding a no-period supply for a person: there is nothing a person could choose.'
     - 'REJECTED inventing a pseudo-period (the receipt date, or one period per one-off) so the ordinary filing path runs: it would put a period into the arithmetic REQ-PIPE-106 criterion 5 excludes by construction.'
     - 'v6: no criterion changed. The MAINTAINABILITY NFR now says is_sample stays the routing question, because REQ-PIPE-438 v6 splits routing from counted state (delivery-architect finding G).'
+    - 'BUILT 2026-11-22: A BRANCH OF ITS OWN, `no-period` (assignment.NO_PERIOD), recorded on the filing with no slot - not `held-no-open-slot`, which would put it on the holds queue, and not a slot the rule looked for and missed. filing.file_arrivals asks is_sample() first, at the boundary, and never builds slots for it, which is where NoCalendarAgreed escaped (slots.claimable_until). No supersession, period opening, offset groups or hold follow, since each is per period.'
+    - 'BUILT 2026-11-22: ITS FILING CARRIES NO ARRIVAL CLASSIFICATION, never `unfiled` (criterion 4): unfiled means judged and owed a slot it did not get, which is lateness talk for a supply that has no schedule.'
+    - 'BUILT 2026-11-22: CRITERION 3 NEEDED NO NEW MECHANISM. The staging-time run views already read the newest version of each no-calendar table from the sample schema (REQ-PIPE-106), and period_overlay.rebuild_for_arrival builds nothing for a supply with no period and no hold, so those views stand and the run step checks them in the same pass. What stopped it was filing raising first.'
+    - 'BUILT 2026-11-22: THE GATE''S EFFECTIVE INSTANT ASKED A CLAIM WINDOW (orchestrate._claim_window caught ScheduleConfigError only), so a no-calendar arrival would have raised again in the gate stage; it is now left out of the minimum, as a dataset with no version in force already was. Whether the promotion gate then refuses such a supply is REQ-PIPE-435 criterion 7''s, not this requirement''s.'
+    - 'KNOWN LIMIT: criterion 3''s test stands in for the run step and the gate at their entry points (orchestrate.run_one, orchestrate.promote_after) and asserts what the run step is handed - the real tools are not run over a no-calendar supply here. REQ-TEST-437''s fixture runs one end to end.'
+    linked_tests:
+    - tests/test_no_period_filing.py
+    implemented_by:
+    - qa_tools/common/filing.py::file_arrivals
+    - qa_tools/common/filing.py::_filed_to_no_period
+    - qa_tools/common/filing.py::_has_no_calendar
+    - qa_tools/common/filing.py::_judged_for
+    - asset_model/assignment.py::NO_PERIOD
+    - qa_tools/tools/orchestrate.py::_claim_window
+    - cli/supply.py::filings_command
+    evidence:
+    - '2026-11-22, tree 52d356c5 (code as committed in the change flipping this): 34 named test modules (pytest -n 2: tests/test_no_period_filing.py, test_no_calendar_dashboard, test_counted_parity, test_no_calendar, test_sample_data, test_filing, test_file_arrivals_slot_horizon, test_delivery_hold_retired, test_period_opening, test_filing_before_checks, test_schedule_ended_hold, test_cross_collection_reads, test_arrival_lifecycle and 21 more schedule, status and dashboard-build modules) 861 passed in 2m40s; npm test 99 files, 1308 passed. tests/test_no_period_filing.py was SEEN FAILING FIRST: all 6 filing tests failed with NoCalendarAgreed escaping file_arrivals, the criterion 3 test failed with StageFailed at the filing and overlay stage (NoCalendarAgreed), and the claim-window test failed with NoCalendarAgreed out of orchestrate._claim_window; all 10 pass. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work).'
     signed_off:
       by: Keith
       date: '2026-11-21'
