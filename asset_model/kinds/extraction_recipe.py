@@ -147,6 +147,12 @@ def _source(location: str, s3_client=None):
     return _Local(Path(location))
 
 
+def source(location: str, s3_client=None):
+    """Where a package's files are read from - `.names()` and `.read(name)`
+    over a local directory or an S3 prefix - for the load (REQ-PIPE-442)."""
+    return _source(location, s3_client)
+
+
 # ---- reading ----------------------------------------------------------------
 
 def _schema() -> dict:

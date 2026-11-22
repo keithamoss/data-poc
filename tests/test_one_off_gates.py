@@ -280,3 +280,54 @@ class TestTheScheduleGateRefusesAOneOffASchedule:
 
         code, said = one_off_gating.gate_folder("schedule", "cohort-2026-a")
         assert code == 0, said
+
+
+class TestAChangedTemplateIsGated:
+    """Criterion 6: a kind's changed _template/ is gated with every gate its
+    kind declares for it - the extraction's, its default check layer
+    (REQ-QAC-441 criterion 1)."""
+
+    @pytest.fixture
+    def template(self, tmp_path, monkeypatch):
+        import shutil
+
+        root = tmp_path / "one-offs"
+        shutil.copytree(ROOT / "one-offs" / "extraction" / "_template",
+                        root / "extraction" / "_template")
+        before = assets.use_one_offs_root(root)
+        monkeypatch.delenv(assets.ASSET_ENV, raising=False)
+        yield root / "extraction" / "_template"
+        assets.restore(before)
+
+    def _row(self):
+        rows = [r for r in check.template_rows() if "extraction template" in r[0]]
+        assert rows, "the extraction declares a gate for its template"
+        return rows
+
+    def test_the_committed_template_passes(self, template, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: True)
+        assert [(r[0], r[1]) for r in self._row()] == \
+            [("default check layer (extraction template)", 0)]
+
+    def test_a_broken_default_layer_fails(self, template, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: True)
+        path = template / "default-checks.yaml"
+        doc = yaml.safe_load(path.read_text())
+        doc["checks"] = [c for c in doc["checks"] if c["assertion"] != "identifier_not_null"]
+        doc["checks"][0]["tools"] = ["evidently"]
+        path.write_text(yaml.safe_dump(doc))
+        ((_shown, code, *_),) = self._row()
+        assert code == 1
+        problems = one_off_gating.template_pass(one_off_kinds.get("extraction"))
+        said = " ".join(problems["default check layer"])
+        assert "'identifier_not_null' is not defined" in said and "evidently" in said
+
+    def test_an_unchanged_template_is_not_gated(self, template, monkeypatch):
+        from qa_tools.common import one_off_gating
+
+        monkeypatch.setattr(one_off_gating, "changed", lambda path, base=None: False)
+        assert check.template_rows() == []

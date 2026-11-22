@@ -114,3 +114,13 @@ def kind_pass(label: str, kind, *, base: str | None = None) -> dict:
         if problem:
             out["failed"][name] = problem
     return out
+
+
+def template_pass(kind, *, base: str | None = None) -> dict | None:
+    """{gate: [problem]} for every gate the kind declares for its template
+    (REQ-PIPE-448 criterion 6) - or None where the template has not changed
+    since the diff base, or the kind has none."""
+    template = assets.kind_template(kind.name)
+    if not kind.template_gates or not template.is_dir() or not changed(template, base):
+        return None
+    return {name: list(check(template)) for name, check in sorted(kind.template_gates.items())}

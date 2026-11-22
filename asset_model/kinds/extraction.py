@@ -29,6 +29,24 @@ def _generate(package, root):
     return extraction_folder.generate(package, root)
 
 
+def _default_layer_problems(template) -> list[str]:
+    """The template's default check layer reads (REQ-QAC-441 criterion 1):
+    every default assertion defined once, with its words and a tool it takes."""
+    from asset_model.kinds import extraction_checks
+
+    try:
+        extraction_checks.read_template(template)
+    except extraction_checks.TemplateRefused as exc:
+        return exc.problems
+    return []
+
+
+#: WHAT GATES THE TEMPLATE (REQ-PIPE-448 criterion 6): its default check layer.
+#: people.yaml (REQ-PIPE-435) and the destination (REQ-PIPE-443) add theirs.
+TEMPLATE_GATES = {"default check layer": _default_layer_problems}
+
+
 EXTRACTION = one_off_kinds.register(one_off_kinds.Kind(
     name="extraction", singular="extraction", plural="extractions", layer="Recipe check",
-    reader=extraction_recipe.read, generator=_generate, gates=GATES))
+    reader=extraction_recipe.read, generator=_generate, gates=GATES,
+    template_gates=TEMPLATE_GATES))

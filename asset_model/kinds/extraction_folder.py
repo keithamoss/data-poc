@@ -250,7 +250,10 @@ def _check_files(recipe, data_asset: str, calendar: str, introduced: str) -> dic
     the kind's template (REQ-PIPE-440 criterion 13)."""
     from asset_model.kinds import extraction_checks as checks
 
-    tables = checks.declared(yaml.safe_load(data_asset), yaml.safe_load(calendar))
+    from asset_model import config_yaml
+
+    tables = checks.declared(config_yaml.parse(data_asset, name="data-asset.yaml"),
+                             config_yaml.parse(calendar, name="calendar.yaml"))
     layers = checks.recipe_layer(recipe.extraction_id, tables, introduced)
     out = {}
     for coll in dict.fromkeys(t.collection_id for t in recipe.tables):

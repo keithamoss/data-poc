@@ -211,7 +211,7 @@ def package_digest(location: str, files, *, s3_client=None) -> str:
 
     from asset_model.kinds import extraction_recipe
 
-    source = extraction_recipe._source(location, s3_client)
+    source = extraction_recipe.source(location, s3_client)
     h = hashlib.sha256()
     for name in sorted(files):
         h.update(name.encode() + b"\0" + hashlib.sha256(source.read(name)).digest())
@@ -374,7 +374,7 @@ def load(package, *, run_by: str, s3_client=None, say=print) -> dict:
                     if source is None:
                         from asset_model.kinds import extraction_recipe
 
-                        source = extraction_recipe._source(package.location, s3_client)
+                        source = extraction_recipe.source(package.location, s3_client)
                     paths = []
                     for t in mine:
                         local = Path(tmp) / t.file

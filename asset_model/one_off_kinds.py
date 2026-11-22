@@ -42,6 +42,11 @@ class Kind:
     #: {gate label: applies?} for every per-asset gate of `mothman check`
     #: (REQ-PIPE-448 criterion 1) - declared, never defaulted.
     gates: Mapping[str, bool] = field(default_factory=dict)
+    #: {name: check(template folder) -> [problem]} - what `mothman check` runs
+    #: over the kind's template, one-offs/<kind>/_template/, when it changed
+    #: since the diff base (REQ-PIPE-448 criterion 6): every one-off of the
+    #: kind reads it live.
+    template_gates: Mapping[str, Callable] = field(default_factory=dict)
 
 
 _REGISTRY: dict[str, Kind] = {}

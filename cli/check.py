@@ -279,6 +279,27 @@ def one_off_rows(label: str, why: str, can_warn: bool) -> list[tuple]:
     return rows
 
 
+def template_rows(why: str = "a kind's template, which every one-off of the kind reads "
+                                "live") -> list[tuple]:
+    """One row per gate a kind declares for its template, where the template
+    changed since the diff base (REQ-PIPE-448 criterion 6) - nothing where it
+    did not, or the kind declares none."""
+    from asset_model import one_off_kinds
+    from qa_tools.common import one_off_gating
+
+    rows = []
+    for kind in one_off_kinds.registered():
+        started = time.monotonic()
+        got = one_off_gating.template_pass(kind)
+        for name, problems in sorted((got or {}).items()):
+            for problem in problems:
+                console.print(f"[{kind.name}/_template] {name}: {problem}", markup=False,
+                              highlight=False)
+            rows.append((f"{name} ({kind.singular} template)", 1 if problems else 0, why,
+                         False, time.monotonic() - started))
+    return rows
+
+
 def not_applicable_lines() -> list[str]:
     """One line per kind with folders: every gate that does not apply to it -
     never a row each, never shown passed (criterion 3)."""
@@ -664,6 +685,10 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             results.append(row[:5])
             one_off_counts.append(row[5])
 
+    # EACH KIND'S CHANGED TEMPLATE (REQ-PIPE-448 criterion 6), where a
+    # per-asset gate ran.
+    if not docs and any(label not in _REPOSITORY_WIDE for label, *_ in gates):
+        results += template_rows()
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")
     table.add_column("Gate")
