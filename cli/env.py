@@ -320,14 +320,17 @@ def leftover_test_databases(admin_dsn: str, older_than_hours: float,
     them, with nobody connected to it, created more than `older_than_hours`
     ago. A test session recreates its own databases
     when it starts, so a live session's are always younger than any sensible
-    threshold, and a connected one is skipped whatever its age."""
+    threshold, and a connected one is skipped whatever its age. A database
+    another session drops while this lists them has no file to stat, so it
+    reads as no age (`missing_ok`) and is skipped, rather than failing the
+    whole listing (seen in the 2026-11-23 gate, beside a concurrent run)."""
     import psycopg
 
     with psycopg.connect(admin_dsn, autocommit=True) as conn:
         rows = conn.execute(
             "SELECT d.datname, "
             "       (SELECT count(*) FROM pg_stat_activity a WHERE a.datname = d.datname), "
-            "       EXTRACT(EPOCH FROM now() - (pg_stat_file('base/' || d.oid || '/PG_VERSION')).modification) / 3600 "
+            "       EXTRACT(EPOCH FROM now() - (pg_stat_file('base/' || d.oid || '/PG_VERSION', true)).modification) / 3600 "
             "FROM pg_database d WHERE d.datname ~ %s ORDER BY d.datname",
             [_TEST_DATABASE]).fetchall()
     return [name for name, connected, age in rows

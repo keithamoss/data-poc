@@ -17475,3 +17475,28 @@ twice. It deliberately did not re-find the `TypeError`.
        'Expected row count'); the agency card's blurb repeating its name; the
        published line printing the full local path; the gate line's capitals
        and "0 calendar(s)" on a one-off's load.
+
+495. **[done, 2026-11-23]** **[Pipeline & publishing]** **[Testing & CI]** **What the first hand-started full CI run in three weeks found**
+     test.yml run 45156427185 (on 8d1aa280, a cache miss) failed where the
+     local gate of the same tree had passed 9,039 of 9,039. Each cause found,
+     none a product defect except the last, and each fixed on wip/cifix:
+     - **The on-demand runner** (tests/thirty_linked_run.py) still called
+       cli.pipeline._run_stream, gone since #134 step 3, and no longer
+       generated or played scripted decisions; it now follows the
+       bootstrap's own steps. 39 on-demand tests pass.
+     - **Rich cut a long path mid-word** at 80 columns, so two tests failed
+       only for CI's basetemp length (test_rolling_anchor,
+       test_schedule_config_errors): a `wide_console` fixture.
+     - **test_config_pin** depended on the disk's listing order.
+     - **test_cloudflare_publish's** end-to-end test forced the sandbox
+       environment against CI's database marked `ci`.
+     - **The first-view timing budget** failed under four parallel browser
+       workers: Keith 2026-11-23, keep 6 s and run it with no parallel load
+       (the `unloaded` mark; its own -n0 step locally and in CI).
+     - Found by the triage gate the same day: **test_cli_plans** read
+       today's register, which the triage finished (rule 4: rebuilt on a
+       register of its own); and **`mothman env tidy-test-databases`**
+       failed outright when another session dropped a database while it
+       listed them - a real race, fixed with pg_stat_file's missing_ok as
+       the one-off list already was. No failing-first test: the race is
+       inside one statement and could not be made to happen on demand.
