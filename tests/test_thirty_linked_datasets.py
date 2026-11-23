@@ -5,8 +5,10 @@ holding thirty linked datasets between them - one identified by two columns,
 one by three - and a fake linkage product reading all thirty, its referential
 and coverage checks generated from its `linked_datasets`
 (tests/thirty_linked_datasets.py). One period is then taken from generation
-to recorded results through the function `mothman pipeline run` calls for
-collections sharing a calendar (tests/thirty_linked_run.py), against a
+to recorded results through the bootstrap's own steps - each collection
+generated, then all six replayed as one stream through the function `mothman
+pipeline run` also calls for collections sharing a calendar, with the
+scripted decisions played (tests/thirty_linked_run.py) - against a
 scratch database of its own: the thirty arrive, are staged, filed and
 promoted, the product arrives and is checked, and one linked supply is sent
 again and promoted over the first by a scripted person.
