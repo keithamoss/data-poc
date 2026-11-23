@@ -25,6 +25,7 @@ workers a class at a time (REQ-TEST-281).
 from __future__ import annotations
 
 import asset_folders
+import difflib
 import json
 import re
 import os
@@ -3769,6 +3770,81 @@ class TestABuiltRequirementShowsItsOwnHoles:
         assert bad == [], bad
 
 
+#: A register of the dependency view's own (tests/test_cli_plans.py's, two
+#: sprints wider). Sprints 1 and 2 both own REQ-TEST-901, whose one unmet
+#: criterion waits on sprint 4; sprint 2 also owns REQ-TEST-902, whose two
+#: unmet criteria wait on sprints 4 and 3. So sprint 4 holds up TWO distinct
+#: criteria for two sprints - three if the shared one were counted per owner -
+#: and is the worst blocker, though sprint 3 is the first that holds anything
+#: up; sprint 3 holds up one.
+_DEPS_PLAN = """\
+1. **[blocked, 2026-01-01]** **[Pipeline & publishing]** **The first sprint.**
+   Some prose.
+
+   **Owns:** `REQ-TEST-901`
+
+2. **[blocked, 2026-01-01]** **[Pipeline & publishing]** **The second sprint.**
+   Some prose.
+
+   **Owns:** `REQ-TEST-901`, `REQ-TEST-902`
+
+3. **[todo, 2026-01-01]** **[Pipeline & publishing]** **The third sprint.**
+   Some prose.
+
+   **Owns:** `REQ-TEST-903`
+
+4. **[todo, 2026-01-01]** **[Pipeline & publishing]** **The fourth sprint.**
+   Some prose.
+
+   **Owns:** `REQ-TEST-904`
+"""
+_DEPS_REGISTER = {"requirements": [
+    {"id": "REQ-TEST-901", "status": "built",
+     "acceptance_criteria": ["THE SYSTEM SHALL a.", "THE SYSTEM SHALL b."],
+     "unmet_criteria": [{"criterion": "2", "why": "y", "owner": "sprint 4",
+                         "blocked_by": {"sprints": [4]}}]},
+    {"id": "REQ-TEST-902", "status": "built",
+     "acceptance_criteria": ["THE SYSTEM SHALL c.", "THE SYSTEM SHALL d.",
+                             "THE SYSTEM SHALL e."],
+     "unmet_criteria": [{"criterion": "2", "why": "y", "owner": "sprint 4",
+                         "blocked_by": {"sprints": [4]}},
+                        {"criterion": "3", "why": "y", "owner": "sprint 3",
+                         "blocked_by": {"sprints": [3]}}]},
+    {"id": "REQ-TEST-903", "status": "draft", "acceptance_criteria": ["THE SYSTEM SHALL f."]},
+    {"id": "REQ-TEST-904", "status": "draft", "acceptance_criteria": ["THE SYSTEM SHALL g."]},
+]}
+
+
+@pytest.fixture(scope="class")
+def a_dependency_graph(built_dashboard_html, tmp_path_factory) -> dict:
+    """The real page, embedded again by the real embed() with the dependency
+    graph of the register above - the same dependency_data(), only pointed at
+    the test's own plan and requirements files.
+
+    THE REGISTER IS THE TEST'S OWN, NOT TODAY'S: these tests read the real
+    register until the triage of 2026-11-23 finished the last sprints its graph
+    showed (10, 16 and 28), which emptied it and turned all six red. That was
+    work succeeding (CLAUDE.md's test rule 4), so the graph is built here."""
+    import functools
+
+    import yaml
+
+    from dashboard import embed_dashboard_data as edd
+    from qa_tools.common import sprint_state
+
+    work = tmp_path_factory.mktemp("dependency-graph")
+    plan, reqs = work / "plan.md", work / "requirements.yaml"
+    plan.write_text(_DEPS_PLAN)
+    reqs.write_text(yaml.safe_dump(_DEPS_REGISTER))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "dependency_data",
+                   functools.partial(sprint_state.dependency_data, plan, reqs))
+        page = _embed_variant(built_dashboard_html, work / "site")
+    return {"page": page, "plan": plan, "requirements": reqs,
+            "expected": sprint_state.dependency_data(plan, reqs),
+            "deferrals": sprint_state.all_deferrals(plan, reqs)}
+
+
 @pytest.mark.shared_page
 class TestTheDependencyViewInThePlansTab:
     """REQ-DOCS-073 criterion 6, against the real built dashboard.
@@ -3780,70 +3856,91 @@ class TestTheDependencyViewInThePlansTab:
     agrees with itself - this project has already shipped a shared
     rule implemented twice and had one copy render a check with
     fourteen real violations green.
+
+    AGAINST A GRAPH OF THE TEST'S OWN (`a_dependency_graph`), embedded by the
+    real embed() from the real dependency_data(), so it always has a sprint
+    blocked by another, a shared requirement and a worst blocker to show.
     """
 
-    def test_it_matches_what_the_python_computed(self, clean_page, built_dashboard_html):
-        from qa_tools.common.sprint_state import dependency_data
+    def _open_plans(self, page, graph):
+        _goto(page, graph["page"])
+        page.evaluate("() => navigate({tier:'plans'})")
+        page.wait_for_selector("details.plans-deps")
 
-        expected = dependency_data()
-        assert expected["sprints"], "no sprint is waiting on anything - this test is vacuous"
+    def _open_table(self, page, graph):
+        """The table as a reader sees it once they open the view - a collapsed
+        <details> renders its rows as no text at all."""
+        self._open_plans(page, graph)
+        page.locator("details.plans-deps summary").click()
+        assert page.locator("details.plans-deps").evaluate("d => d.open")
+        return page.locator("details.plans-deps tbody tr")
 
-        _goto(clean_page, built_dashboard_html)
+    def test_it_matches_what_the_python_computed(self, clean_page, a_dependency_graph):
+        expected = a_dependency_graph["expected"]
+        assert [s["sprint"] for s in expected["sprints"]] == [1, 2, 3, 4], expected
+
+        _goto(clean_page, a_dependency_graph["page"])
         embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
         assert embedded == expected
 
     def test_the_tab_renders_a_row_per_sprint_in_the_graph(
-            self, clean_page, built_dashboard_html):
-        from qa_tools.common.sprint_state import dependency_data
+            self, clean_page, a_dependency_graph):
+        """One row per sprint, in order, each saying what it waits on: sprint 1
+        on sprint 4, sprint 2 on sprints 4 and 3."""
+        rows = self._open_table(clean_page, a_dependency_graph)
+        sprints = a_dependency_graph["expected"]["sprints"]
+        assert rows.count() == len(sprints) == 4
+        for i, s in enumerate(sprints):
+            cells = rows.nth(i).locator("td").all_inner_texts()
+            assert cells[0].startswith(f"Sprint {s['sprint']}"), cells
+            assert cells[2] == (", ".join(s["waits_on"]) or "—"), cells
+        assert rows.nth(0).locator("td").nth(2).inner_text() == "sprint 4"
+        assert rows.nth(1).locator("td").nth(2).inner_text() == "sprint 4, sprint 3"
 
-        _goto(clean_page, built_dashboard_html)
-        clean_page.evaluate("() => navigate({tier:'plans'})")
-        clean_page.wait_for_selector("details.plans-deps")
-        rows = clean_page.locator("details.plans-deps tbody tr")
-        assert rows.count() == len(dependency_data()["sprints"])
-
-    def test_it_is_collapsed_until_asked_for(self, clean_page, built_dashboard_html):
+    def test_it_is_collapsed_until_asked_for(self, clean_page, a_dependency_graph):
         """The Plans tab's job is the hundred-odd entries below it. A
         ten-row table expanded by default pushes the thing people came
         for off the screen."""
-        _goto(clean_page, built_dashboard_html)
-        clean_page.evaluate("() => navigate({tier:'plans'})")
-        clean_page.wait_for_selector("details.plans-deps")
+        self._open_plans(clean_page, a_dependency_graph)
         assert not clean_page.locator("details.plans-deps").evaluate("d => d.open")
 
     def test_the_summary_names_the_worst_blocker_without_opening(
-            self, clean_page, built_dashboard_html):
+            self, clean_page, a_dependency_graph):
         """The single fact the whole view exists to surface, readable
         without interacting - promotion holds up more than anything
         else, which the sprint list alone could never show."""
-        from qa_tools.common.sprint_state import dependency_data
-
-        worst = max(dependency_data()["sprints"], key=lambda s: s["holds_up"])
-        _goto(clean_page, built_dashboard_html)
-        clean_page.evaluate("() => navigate({tier:'plans'})")
+        worst = max(a_dependency_graph["expected"]["sprints"], key=lambda s: s["holds_up"])
+        assert (worst["sprint"], worst["holds_up"]) == (4, 2), worst
+        self._open_plans(clean_page, a_dependency_graph)
         text = clean_page.locator("details.plans-deps summary").inner_text()
-        assert f"sprint {worst['sprint']}" in text and str(worst["holds_up"]) in text
+        assert "sprint 4 holds up 2 criteria" in text, text
 
     def test_a_shared_requirement_does_not_double_count(
-            self, clean_page, built_dashboard_html):
-        """REQ-PIPE-035 is owned by two sprints. Counting per owner
-        rather than per criterion made promotion read as holding up
-        twenty when it holds up seventeen."""
-        from qa_tools.common.sprint_state import all_deferrals
-
-        _goto(clean_page, built_dashboard_html)
+            self, clean_page, a_dependency_graph):
+        """REQ-TEST-901 is owned by two sprints, as REQ-PIPE-035 once was.
+        Counting per owner rather than per criterion made promotion read as
+        holding up twenty when it held up seventeen; here it would make
+        sprint 4 hold up three where it holds up two."""
+        waiting_on_4 = {(d.requirement, d.index) for d in a_dependency_graph["deferrals"]
+                        if 4 in d.sprints}
+        assert len(waiting_on_4) == 2, waiting_on_4
+        rows = self._open_table(clean_page, a_dependency_graph)
         embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
-        most = max(s["holds_up"] for s in embedded["sprints"])
-        assert most <= len(all_deferrals())
+        four = next(s for s in embedded["sprints"] if s["sprint"] == 4)
+        assert four["holds_up"] == len(waiting_on_4)
+        assert four["holds_up_sprints"] == [1, 2]
+        row = rows.nth(3)
+        assert row.locator("td").nth(3).inner_text() == "2 criteria in sprint 1, sprint 2"
 
-    def test_it_renders_without_console_errors(self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html)
+    def test_it_renders_without_console_errors(self, clean_page, a_dependency_graph):
+        _goto(clean_page, a_dependency_graph["page"])
         errors = []
         clean_page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         clean_page.evaluate("() => navigate({tier:'plans'})")
         clean_page.wait_for_selector("details.plans-deps")
         clean_page.locator("details.plans-deps summary").click()
         clean_page.wait_for_timeout(200)
+        assert clean_page.locator("details.plans-deps").evaluate("d => d.open")
         assert errors == []
 
 
@@ -7492,6 +7589,15 @@ def _agencies_and_plans(page, url) -> dict:
         page.goto("about:blank")
         page.goto(url)
         _wait_rendered(page)
+        # THE TRENDS ARE DRAWN AFTER FIRST PAINT (REQ-DASH-291 criterion 13:
+        # pills and counts first, then the lines), in a task of their own, so
+        # a read straight after the first render can land before them. Under
+        # the gate's parallel load it did, on one of the two opens and not the
+        # other (2026-11-23): the agency cards' "Datasets failing and warning,
+        # each week" lines were in one text and not the other. So wait until
+        # every trend slot on the view sits in a grid the page has marked drawn.
+        page.wait_for_function("""() => [...document.querySelectorAll('#view .datasets-trend-slot')]
+            .every(s => s.closest('[data-trends-drawn]'))""")
         agencies = page.locator("#view").inner_text()
         collections = page.evaluate("() => Object.keys(COLLECTION_DATA)")
         page.locator("#plans-btn").click()
@@ -7570,7 +7676,14 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         assert sorted(u.rsplit("/", 1)[1] for u in served["data_requests"]) == \
             sorted(e["name"] for e in files), "the split form loads each of its files"
         keys = ("agencies", "collections", "plans")
-        assert {k: served[k] for k in keys} == {k: alone[k] for k in keys}
+        # A UNIFIED DIFF OF EACH TEXT THAT DIFFERS: pytest truncates a dict of
+        # two whole pages to its first and last lines, which hid the one line
+        # that differed when this failed in the gate of 2026-11-23.
+        diffs = {k: "\n".join(difflib.unified_diff(
+                     str(alone[k]).splitlines(), str(served[k]).splitlines(),
+                     "alone", "split", lineterm="", n=1))
+                 for k in keys if served[k] != alone[k]}
+        assert not diffs, "\n\n".join(f"{k}:\n{d}" for k, d in diffs.items())
         # THE PLAYER IS BESIDE THE SNAPSHOTS ON THE SITE (Keith, 2026-10-25,
         # #268 (c)), so nothing is filtered here: no console error at all,
         # and the player was actually asked for and found. The fonts travel
