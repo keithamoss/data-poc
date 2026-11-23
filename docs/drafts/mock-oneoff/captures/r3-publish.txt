@@ -1,0 +1,62 @@
+$ uv run mothman one-off publish --id repro-undeclared-only --yes
+
+Environment: Claude Code sandbox (not production) · One-off: repro-undeclared-only (extraction)
+Publishing repro-undeclared-only (extraction) to: /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/mock-repo/data/one-off-pages/repro-undeclared-only.html
+Decision in force: none recorded - the page will say no release decision is recorded.
+Datasets not yet checked: 0.
+Rebuilding check results from the recorded QA history...
+
+17 real check results (17 pass / 0 warn / 0 fail) across 1 runs, from recorded history -> /tmp/mothman-one-off-publish-f5nj1lh4/reports/results_a1_emergency-care.json
+
+50 real check results (50 pass / 0 warn / 0 fail) across 2 runs, from recorded history -> /tmp/mothman-one-off-publish-f5nj1lh4/reports/results_a1_inpatient-care.json
+
+14 real check results (14 pass / 0 warn / 0 fail) across 1 runs, from recorded history -> /tmp/mothman-one-off-publish-f5nj1lh4/reports/results_a2_death-registrations.json
+Reshaping into dashboard JSON...
+Wrote 
+/tmp/mothman-one-off-publish-f5nj1lh4/reports/a1_emergency-care_dashboard.json
+Wrote 
+/tmp/mothman-one-off-publish-f5nj1lh4/reports/a1_inpatient-care_dashboard.json
+Wrote 
+/tmp/mothman-one-off-publish-f5nj1lh4/reports/a2_death-registrations_dashboard.j
+son
+Embedding...
+Re-embedded ONE_OFF = repro-undeclared-only · Repro: an undeclared file is the only problem · QA report (extraction), 0 decision(s)
+Encoded COLLECTION_DATA into 3 data file(s) (3 collection(s): emergency-care, inpatient-care, death-registrations)
+Re-embedded ASSET_TIMEZONES = Australia/Perth from 1970-01-01
+Re-embedded BUILT_AT = 2026-11-22T14:44:26.424209+08:00
+Re-embedded BUILD_PROVENANCE = {'id': 'sandbox', 'label': 'Claude Code sandbox', 'publishes': True, 'production': False}, commit 5d7bab679b5ed44e6701174a5b9ca7c52a56078a
+Re-embedded HIERARCHY = 2 agenc(ies), 3 collection(s), 4 dataset(s)
+Re-embedded PERIOD_SEQUENCES = , ending at 2026-11-22
+note: could not read the supplies awaiting a decision (NoCalendarAgreed: dataset 'deaths' has no delivery calendar because it is a one-off extraction and will never have one (no_calendar: never). It owes no supply and is filed to no period.) - the rest of the queue is unaffected.
+note: could not read closed periods for death-registrations (NoCalendarAgreed: dataset 'deaths' has no delivery calendar because it is a one-off extraction and will never have one (no_calendar: never). It owes no supply and is filed to no period.).
+note: could not read closed periods for emergency-care (NoCalendarAgreed: dataset 'ed-presentations' has no delivery calendar because it is a one-off extraction and will never have one (no_calendar: never). It owes no supply and is filed to no period.).
+note: could not read closed periods for inpatient-care (NoCalendarAgreed: dataset 'hospital-admissions' has no delivery calendar because it is a one-off extraction and will never have one (no_calendar: never). It owes no supply and is filed to no period.).
+Re-embedded OUTSTANDING = 0 item(s) (0 blocking) across 0 agenc(ies)
+Re-embedded SCHEDULE_RUNWAY = 0 authored calendar(s), 0 dataset(s)
+Re-embedded CHANGELOG_FEED = 0 entries
+Re-embedded RELEASE_NOTES = 0 dated entries
+Read REQUIREMENTS = 0 requirements
+Re-embedded TICKET_STATUS = 0 open ticket(s) (no reports/open_tickets.json - local build, embedding empty)
+Re-embedded GITHUB_LINKS = 81 check link(s) at commit 5d7bab679b5e
+Re-embedded ASSIGNMENTS = 0 agency/0 dataset assignment(s)
+Re-embedded LEADERBOARD = 0 real streak row(s) (no reports/ticket_resolutions.json - local build, embedding empty)
+Re-embedded FEEDBACK = 0 card(s)
+Re-embedded SPRINT_DEPENDENCIES = 0 sprint(s) in the graph, 0 deferral(s) worth re-testing
+Re-embedded DEMO_CAST = null (no dashboard/demos/qa_wizard.cast - not recorded yet)
+Wrote /tmp/mothman-one-off-publish-f5nj1lh4/qa-reporting-dashboard.html and 3 data file(s) under /tmp/mothman-one-off-publish-f5nj1lh4/data:
+  qa-reporting-dashboard.html: 0.87 MiB
+  collection-emergency-care.1d66b772a4cc.js: 0.03 MiB
+  collection-inpatient-care.86f5ae3cb3c2.js: 0.08 MiB
+  collection-death-registrations.d94012b469f2.js: 0.03 MiB
+Built sizes: qa-reporting-dashboard.html 0.87 MiB, 
+data/collection-emergency-care.1d66b772a4cc.js 0.03 MiB, 
+data/collection-inpatient-care.86f5ae3cb3c2.js 0.08 MiB, 
+data/collection-death-registrations.d94012b469f2.js 0.03 MiB
+Gate - dashboard structural + real-browser render check...
+dashboard render check OK - embedded data valid, zero console errors, #view populated (built output AND template both verified).
+Published -> /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/mock-repo/data/one-off-pages/repro-undeclared-only.html
+Next: record a decision, or drop it:
+  mothman one-off decide --id repro-undeclared-only
+  mothman one-off drop --id repro-undeclared-only
+
+[exit code 0, 16s]

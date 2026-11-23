@@ -1,0 +1,14 @@
+$ uv run mothman one-off decide --id ed-readmissions-2021-2024 --decision withhold --reason Withheld pending the agencies: one ED presentation has no presentation_id, one admission is dated February 2025 (outside the cohort), the summary carries a 'suppressed' rate, and linkage_keys_DRAFT.csv was sent by mistake and must be destroyed and confirmed. --yes
+
+Environment: Claude Code sandbox (not production) · One-off: ed-readmissions-2021-2024 (extraction)
+QA result of ed-readmissions-2021-2024, dataset by dataset:
+  ED presentations (ed-presentations): Fail
+  Hospital admissions (hospital-admissions): Fail
+  Quarterly readmission summary (readmission-summary): Fail
+  Death registrations (deaths): Pass
+Decision in force: none recorded.
+Recorded: Withheld by Keith Moss, 2:42pm Sunday, 22 November 2026: Withheld pending the agencies: one ED presentation has no presentation_id, one admission is dated February 2025 (outside the cohort), the summary carries a 'suppressed' rate, and linkage_keys_DRAFT.csv was sent by mistake and must be destroyed and confirmed.
+Next: publish it, so its page carries the decision:
+  mothman one-off publish --id ed-readmissions-2021-2024
+
+[exit code 0, 1s]

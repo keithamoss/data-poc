@@ -47827,12 +47827,12 @@ requirements:
     - blocked_by:
         unowned: true
       criterion: 'Criteria 1 and 5, the RESTORED half on GitHub''s runner - an asset''s database restored from its own key, and the ''bootstrap RESTORED from cache key'' line in the Actions log.'
-      owner: 'a third hand-started test.yml with no bootstrap-input change (Keith''s call: about 80 more billable minutes)'
+      owner: 'the next hand-started test.yml whose bootstrap inputs are unchanged since the run before it (Keith 2026-11-24: not a run of its own - it rides on the next real hand-started run)'
       why: 'Both hand-started runs (45156427185, 45220960977) were cache misses for both assets, so only the keying, the saves and the REBUILT line have run on a runner. A third run with no input change would show both assets restored; one asset''s change restoring the other''s cache stays shown by tests/test_ci_bootstrap_cache.py only, unless that third run changes one asset''s inputs alone.'
     - blocked_by:
         unowned: true
       criterion: 'Criterion 7 - the billable minutes of a cache-HIT run after the split, and the 10 percent ceiling on it against the cache-hit run before (about 80 minutes, run 41173122058).'
-      owner: 'a third hand-started test.yml with no bootstrap-input change (Keith''s call: about 80 more billable minutes)'
+      owner: 'the next hand-started test.yml whose bootstrap inputs are unchanged since the run before it (Keith 2026-11-24: not a run of its own - it rides on the next real hand-started run)'
       why: 'The cache-miss figure after the split is recorded (144 and 146 billable minutes, evidence); no cache-hit run after the split exists.'
     open_questions: []
   - id: REQ-PIPE-372

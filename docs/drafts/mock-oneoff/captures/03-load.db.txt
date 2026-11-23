@@ -1,0 +1,78 @@
+## select run_key, agency_id, collection_id, dataset_id, supply_id, scope, run_by, environment, completed_at is not null as completed from qa.run order by run_key
+                  run_key                  |     agency_id     |    collection_id    |     dataset_id      | supply_id |  scope  |               run_by                | environment | completed 
+-------------------------------------------+-------------------+---------------------+---------------------+-----------+---------+-------------------------------------+-------------+-----------
+ death_registrations__20261122144045154037 | civil-registry    | death-registrations | deaths              |           | arrival | fpycnkgvmt@privaterelay.appleid.com | sandbox     | t
+ ed_presentations__20261122144034561921    | hospital-services | emergency-care      | ed-presentations    |           | arrival | fpycnkgvmt@privaterelay.appleid.com | sandbox     | t
+ hospital_admissions__20261122144042242010 | hospital-services | inpatient-care      | hospital-admissions |           | arrival | fpycnkgvmt@privaterelay.appleid.com | sandbox     | t
+ readmission_summary__20261122144042242010 | hospital-services | inpatient-care      | readmission-summary |           | arrival | fpycnkgvmt@privaterelay.appleid.com | sandbox     | t
+(4 rows)
+
+## select only_row, one_off_id, left(package_digest,16)||'…' package_digest, left(recipe_digest,16)||'…' recipe_digest, loaded_commit, deliveries, loaded_at from qa.one_off_load
+ only_row |        one_off_id         |  package_digest   |   recipe_digest   |              loaded_commit               |                                                                        deliveries                                                                        |           loaded_at           
+----------+---------------------------+-------------------+-------------------+------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------
+ t        | ed-readmissions-2021-2024 | 82e00201cb10a66b… | 38166fd51464e520… | 7c0470d8120ecd182bd229ccbcbee5c87d867761 | {"emergency-care": "handfiled-2026-11-22T144034", "inpatient-care": "handfiled-2026-11-22T144042", "death-registrations": "handfiled-2026-11-22T144045"} | 2026-11-22 06:40:32.738997+00
+(1 row)
+
+## select name, collections, filed_by_kind, filing_route, filed_by, received_from from qa.delivery order by name
+            name             |       collections       | filed_by_kind | filing_route |              filed_by               | received_from 
+-----------------------------+-------------------------+---------------+--------------+-------------------------------------+---------------
+ handfiled-2026-11-22T144034 | ["emergency-care"]      | person        | folder       | fpycnkgvmt@privaterelay.appleid.com | our-clock
+ handfiled-2026-11-22T144042 | ["inpatient-care"]      | person        | folder       | fpycnkgvmt@privaterelay.appleid.com | our-clock
+ handfiled-2026-11-22T144045 | ["death-registrations"] | person        | folder       | fpycnkgvmt@privaterelay.appleid.com | our-clock
+(3 rows)
+
+## select delivery, filename, dataset_id from qa.delivery_file order by 1,2
+          delivery           |        filename         |     dataset_id      
+-----------------------------+-------------------------+---------------------
+ handfiled-2026-11-22T144034 | ed_presentations.csv    | ed-presentations
+ handfiled-2026-11-22T144042 | hospital_admissions.csv | hospital-admissions
+ handfiled-2026-11-22T144042 | readmission_summary.csv | readmission-summary
+ handfiled-2026-11-22T144045 | death_registrations.csv | deaths
+(4 rows)
+
+## select dataset_id, supply_id, slot, classification, delivery from qa.filing order by 1
+     dataset_id      |                supply_id                 | slot | classification |          delivery           
+---------------------+------------------------------------------+------+----------------+-----------------------------
+ deaths              | deaths@20261122144045154037              |      |                | handfiled-2026-11-22T144045
+ ed-presentations    | ed-presentations@20261122144034561921    |      |                | handfiled-2026-11-22T144034
+ hospital-admissions | hospital-admissions@20261122144042242010 |      |                | handfiled-2026-11-22T144042
+ readmission-summary | readmission-summary@20261122144042242010 |      |                | handfiled-2026-11-22T144042
+(4 rows)
+
+## select delivery, dataset_id, outcome, row_count, reason from qa.load_outcome order by 1,2
+          delivery           |     dataset_id      | outcome | row_count | reason 
+-----------------------------+---------------------+---------+-----------+--------
+ handfiled-2026-11-22T144034 | ed-presentations    | loaded  |       240 | 
+ handfiled-2026-11-22T144042 | hospital-admissions | loaded  |        96 | 
+ handfiled-2026-11-22T144042 | readmission-summary | loaded  |        16 | 
+ handfiled-2026-11-22T144045 | deaths              | loaded  |        11 | 
+(4 rows)
+
+## select dataset_id, status, count(*) from qa.check_result group by 1,2 order by 1,2
+     dataset_id      | status | count 
+---------------------+--------+-------
+ deaths              | pass   |    21
+ ed-presentations    | fail   |     5
+ ed-presentations    | pass   |    20
+ hospital-admissions | fail   |     3
+ hospital-admissions | pass   |    24
+ readmission-summary | fail   |     3
+ readmission-summary | pass   |    34
+(7 rows)
+
+## select dataset_id, check_id, status from qa.check_result where status in ('fail','error','warn') order by 1,2
+     dataset_id      |                                                           check_id                                                           | status 
+---------------------+------------------------------------------------------------------------------------------------------------------------------+--------
+ ed-presentations    | ed-readmissions-2021-2024.hospital-services.emergency-care.ed-presentations.presentation_id.identifier_not_null_datacontract | fail
+ ed-presentations    | ed-readmissions-2021-2024.hospital-services.emergency-care.ed-presentations.presentation_id.identifier_not_null_dbt          | fail
+ ed-presentations    | ed-readmissions-2021-2024.hospital-services.emergency-care.ed-presentations.presentation_id.identifier_not_null_evidently    | fail
+ ed-presentations    | ed-readmissions-2021-2024.hospital-services.emergency-care.ed-presentations.presentation_id.identifier_not_null_soda         | fail
+ ed-presentations    | ed-readmissions-2021-2024.hospital-services.emergency-care.ed-presentations.undeclared_file                                  | fail
+ hospital-admissions | ed-readmissions-2021-2024.hospital-services.inpatient-care.hospital-admissions.admission_date.cohort_bounds_datacontract     | fail
+ hospital-admissions | ed-readmissions-2021-2024.hospital-services.inpatient-care.hospital-admissions.admission_date.cohort_bounds_dbt              | fail
+ hospital-admissions | ed-readmissions-2021-2024.hospital-services.inpatient-care.hospital-admissions.admission_date.cohort_bounds_soda             | fail
+ readmission-summary | ed-readmissions-2021-2024.hospital-services.inpatient-care.readmission-summary.readmission_rate.declared_type_datacontract   | fail
+ readmission-summary | ed-readmissions-2021-2024.hospital-services.inpatient-care.readmission-summary.readmission_rate.declared_type_dbt            | fail
+ readmission-summary | ed-readmissions-2021-2024.hospital-services.inpatient-care.readmission-summary.readmission_rate.declared_type_soda           | fail
+(11 rows)
+

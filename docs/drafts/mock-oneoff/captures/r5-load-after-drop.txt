@@ -1,0 +1,13 @@
+$ uv run mothman one-off load --id repro-undeclared-only /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/repro-package
+
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ the load was refused, and nothing was loaded:                                │
+│ repro-undeclared-only's page is already published at                         │
+│ /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scrat │
+│ chpad/mock-oneoff/mock-repo/data/one-off-pages/repro-undeclared-only.html,   │
+│ so its QA is recorded for good and it is not loaded again. A re-send is a    │
+│ new one-off, with an id of its own.                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
+
+[exit code 1, 0s]

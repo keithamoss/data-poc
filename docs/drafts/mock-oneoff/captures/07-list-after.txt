@@ -1,0 +1,15 @@
+$ uv run mothman one-off list
+
+ed-readmissions-2021-2024  extraction  loaded    0h  RX-0417 Readmission after an emergency department visit, 2021-2024 (fictional study, Example University)
+  next: mothman one-off publish --id ed-readmissions-2021-2024, or drop it with mothman one-off drop --id ed-readmissions-2021-2024
+repro-undeclared-only      extraction  pushed     -  Repro: an undeclared file is the only problem
+  next: mothman one-off load --id repro-undeclared-only <package>
+One-off databases on the server:
+  supply_daily_c  4d
+  supply_ed-readmissions-2021-2024  0h
+  supply_quarterly_c  4d
+  supply_x-gateh-4ba0aa  0h
+  supply_x-oneoff3-e467cd  1h
+Next: a step with --id <id>, as each line says.
+
+[exit code 0, 0s]

@@ -1,0 +1,15 @@
+$ uv run mothman one-off load --id ed-readmissions-2021-2024 /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/package
+
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ the load was refused, and nothing was loaded:                                │
+│ the one-off's folder (one-offs/extraction/ed-readmissions-2021-2024) has     │
+│ uncommitted changes or untracked files. Commit and push it first:            │
+│   git add one-offs/extraction/ed-readmissions-2021-2024                      │
+│   git commit -m "<why>"                                                      │
+│   git push origin mock/oneoff                                                │
+│ The reason: the published page names the commit it ran from, and only a      │
+│ pushed commit is one anyone else can find.                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
+
+[exit code 1, 1s]

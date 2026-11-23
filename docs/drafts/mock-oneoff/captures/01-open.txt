@@ -1,0 +1,10 @@
+$ uv run mothman one-off open --kind extraction /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/package
+
+Generated one-offs/extraction/ed-readmissions-2021-2024 from /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/package (extraction ed-readmissions-2021-2024, RX-0417 Readmission after an emergency department visit, 2021-2024 (fictional study, Example University)).
+Next: commit and push it, then load it:
+  git add one-offs/extraction/ed-readmissions-2021-2024
+  git commit -m "Open extraction ed-readmissions-2021-2024"
+  git push
+  mothman one-off load --id ed-readmissions-2021-2024 /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/package
+
+[exit code 0, 1s]
