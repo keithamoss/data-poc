@@ -552,16 +552,15 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     own_by_state: dict[str, list[dict]] = _empty_states()
     spanning_by_state: dict[str, list[dict]] = _empty_states()
     reads_by_state: dict[str, list[tuple]] = _empty_states()
-    sample_ids = sample_data.sample_dataset_ids()
+    kinds = sample_data.uncounted()
     for index, record in enumerate(records):
         if record.get("check_id") in declared:
             state = sample_data.state_for_participants(
-                _participants(record.get("check_id"), declared), sample_ids=sample_ids)
+                _participants(record.get("check_id"), declared), kinds=kinds)
             spanning_by_state[state].append(record)
             reads_by_state[state].append(reads[index])
         else:
-            state = sample_data.supply_state(record.get("dataset_id"),
-                                             sample_ids=sample_ids)
+            state = sample_data.supply_state(record.get("dataset_id"), kinds=kinds)
             own_by_state[state].append(record)
         # AND SAID ON THE RECORD ITSELF, for the in-development ones only.
         # The reader drops it again for an agreed record

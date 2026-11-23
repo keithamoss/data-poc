@@ -577,6 +577,10 @@ def _claim_window(collection_id: str, arrival):
             # 6, 378 Q2 (a), SETTLED by Keith): this dataset is left out of the
             # minimum - never a borrowed window.
             continue
+        except schedule.NoCalendarAgreed:
+            # NO CALENDAR, SO NO CLAIM WINDOW (REQ-PIPE-434 criterion 4): left
+            # out of the minimum the same way, rather than escaping the gate.
+            continue
     return min(windows, default=None)
 
 
@@ -612,6 +616,12 @@ def promote_after(collection_id: str, arrival, got: list[dict], run_by: str,
 
     del got
     coll = declared_collections.by_id(collection_id)
+    # NOT PUT TO THE GATE AT ALL where every dataset it carries has no
+    # calendar (REQ-PIPE-435 criterion 7): nothing has a period to promote to.
+    from qa_tools.common import sample_data
+
+    if arrival.files_by_dataset and all(sample_data.is_sample(d) for d in arrival.files_by_dataset):
+        return gate.Applied()
     applied = gate.after_arrival(
         coll.id, arrival, run_by=run_by, entry=entry or gate.PACKAGE,
         effective_at=effective_at_of(coll.id, arrival))

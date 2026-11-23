@@ -67,6 +67,10 @@ from asset_model import asset_time, hierarchy, schedule, slots as slots_mod
 OPEN_UNFILLED = "open-slot-unfilled"
 RESUPPLY = "resupply-of-open-slot"
 HELD = "held-no-open-slot"
+#: FILED TO NO PERIOD, BECAUSE ITS DATASET HAS NO CALENDAR (REQ-PIPE-434):
+#: either `no_calendar` value. Not a hold - there is no period a person could
+#: choose - and not a slot the rule looked for and failed to find.
+NO_PERIOD = "no-period"
 
 
 @dataclass(frozen=True)

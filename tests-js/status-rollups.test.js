@@ -143,7 +143,15 @@ describe("a dataset with no agreed schedule is in no rollup", () => {
     // not count (REQ-PIPE-106 criterion 9), but a group with nothing
     // counted must not claim to be healthy either.
     expect(w.rollup([ds("a", "red", { scheduleNotAgreed: "not-yet-agreed" }),
-                      ds("b", "amber", { scheduleNotAgreed: "never" })])).toBe("notcounted");
+                      ds("b", "amber", { scheduleNotAgreed: "never", derived: true })]))
+      .toBe("notcounted");
+  });
+
+  it("a never dataset is counted, as any dataset with a calendar (REQ-PIPE-438 c3)", () => {
+    const w = load();
+    expect(w.inNoRollup(ds("x", "red", { scheduleNotAgreed: "never" }))).toBe(false);
+    expect(w.rollup([ds("a", "green", { scheduleNotAgreed: "never" }),
+                      ds("b", "red", { scheduleNotAgreed: "never" })])).toBe("red");
   });
 
   it("a Not counted group says why, in words, by reason, and a partly counted one says so", () => {
@@ -152,9 +160,10 @@ describe("a dataset with no agreed schedule is in no rollup", () => {
     // reason, never a list of names.
     const group = [ds("a", "red", { scheduleNotAgreed: "not-yet-agreed" }),
                    ds("b", "amber", { scheduleNotAgreed: "not-yet-agreed" }),
-                   ds("c", "green", { scheduleNotAgreed: "never" })];
+                   ds("c", "green", { scheduleNotAgreed: "never", derived: true })];
     const line = w.notCountedMarker("notcounted", group).replace(/\s+/g, " ");
-    expect(line).toContain("3 datasets not counted: 2 no schedule agreed yet, 1 one-off extraction");
+    // REQ-PIPE-438 criterion 5: derived products are named in this line.
+    expect(line).toContain("3 datasets not counted: 2 no schedule agreed yet, 1 derived product");
     // REQ-DASH-180 criterion 10: a group with only SOME left out says so too,
     // in its own words; one whose every dataset is turned off says nothing,
     // which would only repeat its status.
@@ -189,13 +198,11 @@ describe("it says so in words rather than by colour", () => {
     expect(markup).toContain("No delivery schedule agreed yet");
   });
 
-  it("says something DIFFERENT for a one-off extraction", () => {
+  it("says nothing on a never dataset, and the tooltip has no never wording (REQ-PIPE-438 c6, c7)", () => {
     const w = load();
-    // Criterion 3: presenting a finished decision as an outstanding job
-    // would put a permanent item on somebody's list.
-    const markup = w.unagreedMarker(ds("never"));
-    expect(markup).toContain("One-off extraction");
-    expect(markup).not.toContain("agreed yet");
+    // The one-off page says it once (REQ-DASH-444); a marker on every row is noise.
+    expect(w.unagreedMarker(ds("never"))).toBe("");
+    expect(w.unagreedMarker(ds("not-yet-agreed"))).not.toMatch(/never|one-off/i);
   });
 
   it("says nothing at all for an ordinary dataset", () => {

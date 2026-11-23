@@ -39,7 +39,11 @@ def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch)
     monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [])
     # A run id whose seeded lag is far longer than thirty seconds, so the
     # cap is what keeps it before the next receipt.
-    arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_lag_probe")
+    # It carries its collection's dataset, as a real arrival does: the
+    # orchestrator reads which datasets it carries (REQ-PIPE-435 criterion 7).
+    dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
+    arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_lag_probe",
+                              files_by_dataset={dataset: "x"})
     assert promotion_lag.effective_at(RECEIVED, seed="run_lag_probe") > NEXT, (
         "test precondition - the uncapped lag must reach past the next receipt")
     # IN A REPLAY (REQ-PIPE-382 criterion 3): the replay clock answers with the

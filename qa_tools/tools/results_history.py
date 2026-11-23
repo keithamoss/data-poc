@@ -102,7 +102,11 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
     os.makedirs(os.path.dirname(path), exist_ok=True)
     atomic_file.write_json(path, output)
     n_error, n_nodata = counts["error"], counts["nodata"]
-    print(f"\n{len(results)} real check results ({counts['pass']} pass / {counts['warn']} warn / "
+    # THE TOOLS' RESULTS, SAID SO (the mock run of 2026-11-22): a one-off's
+    # load counts its file and package checks too, and three totals that
+    # differ without saying why read as three wrong ones.
+    print(f"\n{len(results)} check results from the tools, file checks not counted here "
+          f"({counts['pass']} pass / {counts['warn']} warn / "
           f"{counts['fail']} fail{f' / {n_error} error' if n_error else ''}"
           f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(runs)} runs"
           f"{source} -> {path}")

@@ -419,7 +419,7 @@ def output_paths() -> tuple[str, str, str]:
             os.path.join(reports, TICKET_RESOLUTIONS_FILE))
 
 
-def place_page_assets(page_path) -> None:
+def place_page_assets(page_path, vendor: bool = True) -> None:
     """Copy fonts/ and vendor/ beside a page built under `--out-dir`, so it
     renders from there exactly as the real build does - the self-hosted fonts
     and the Demo tab's player (REQ-TEST-281 criterion 5). A COPY rather than a
@@ -432,7 +432,27 @@ def place_page_assets(page_path) -> None:
     if source == dest:
         return
     for name in PAGE_ASSET_DIRS:
+        if name == "vendor" and not vendor:
+            continue
         shutil.copytree(os.path.join(source, name), os.path.join(dest, name), dirs_exist_ok=True)
+
+
+#: The vendor/ references in the template's head - the Demo tab's player -
+#: which a one-off's page is built without (REQ-DASH-444 criterion 11).
+_VENDOR_RE = re.compile(r'<!-- Vendored, not CDN-loaded.*?-->\n?|<link[^>]*href="vendor/[^"]*"[^>]*>\n?|<script[^>]*src="vendor/[^"]*"[^>]*></script>\n?', re.DOTALL)
+
+
+def one_off_page_html(html: str, identity: dict) -> str:
+    """A one-off's page: its identity in a <meta> after the charset, which a
+    later publish, load or drop reads back (REQ-PIPE-443), and no reference to
+    anything under vendor/."""
+    from qa_tools.common import one_off_publish
+
+    html = _VENDOR_RE.sub("", html)
+    marker = '<meta charset="utf-8">\n'
+    if marker not in html:
+        raise RuntimeError("the template has no charset <meta> to place the one-off's identity after")
+    return html.replace(marker, marker + one_off_publish.meta_tag(identity) + "\n", 1)
 
 
 def generated_up_to_provenance() -> dict:
@@ -458,6 +478,18 @@ def embed() -> None:
     page_path, open_tickets_json, ticket_resolutions_json = output_paths()
     with open(TEMPLATE_HTML) as f:
         html = f.read()
+
+    # A ONE-OFF'S PAGE (REQ-DASH-444): what it knows about itself, None for an
+    # enduring asset's. Its development tools are left out of it (criterion
+    # 9), and so is every reference to vendor/ (criterion 11).
+    from dashboard import one_off_page
+
+    one_off = one_off_page.record()
+    html = _replace_const(html, "ONE_OFF", json.dumps(one_off, separators=(",", ":")))
+    if one_off is not None:
+        html = one_off_page_html(html, one_off_page.identity(one_off))
+        print(f"Re-embedded ONE_OFF = {one_off['siteName']} ({one_off['kind']['singular']}), "
+              f"{len(one_off['decisions'])} decision(s)")
 
     # COLLECTION_DATA - REQ-DASH-244. Read before anything else, so a missing
     # collection refuses the build before any other work is done.
@@ -801,18 +833,19 @@ def embed() -> None:
           f"calendar(s), "
           f"{sum(len(c['datasets']) for c in schedule_runway['calendars'])} dataset(s)")
 
-    changelog_feed = _build_changelog_feed()
+    changelog_feed = _build_changelog_feed() if one_off is None else []
     html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))
     print(f"Re-embedded CHANGELOG_FEED = {len(changelog_feed)} entries")
 
-    release_notes = parse_changelog(CHANGELOG_YAML)
+    release_notes = parse_changelog(CHANGELOG_YAML) if one_off is None \
+        else {"intro": [], "entries": []}
     html = _replace_const(html, "RELEASE_NOTES", json.dumps(release_notes, separators=(",", ":")))
     print(f"Re-embedded RELEASE_NOTES = {len(release_notes['entries'])} dated entries")
 
     # REQUIREMENTS and PLANS (below) go into ONE data file of their own,
     # which the page loads only when a reader opens the Requirements panel
     # or the Plans tab (REQ-DASH-291 criterion 7).
-    requirements = parse_requirements(REQUIREMENTS_YAML)
+    requirements = parse_requirements(REQUIREMENTS_YAML) if one_off is None else []
     print(f"Read REQUIREMENTS = {len(requirements)} requirements")
 
     if os.path.exists(open_tickets_json):
@@ -826,7 +859,12 @@ def embed() -> None:
           + ("" if os.path.exists(open_tickets_json) else " (no reports/open_tickets.json - local build, embedding empty)"))
 
     sha = current_commit_sha()
-    github_links, outside = github_links_or_none(sha=sha)
+    # A ONE-OFF NEVER USES GITHUB (REQ-PIPE-446 criterion 14; the mock run of
+    # 2026-11-22 found 'View on GitHub' on a one-off's page), so its page
+    # links to no repository path at all.
+    github_links, outside = github_links_or_none(sha=sha) if one_off is None else (
+        json.loads(json.dumps(_NO_GITHUB_LINKS)),
+        "GITHUB_LINKS left out: a one-off never uses GitHub.")
     html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
     print(outside or f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
 
@@ -857,29 +895,30 @@ def embed() -> None:
     print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
           + ("" if os.path.exists(ticket_resolutions_json) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
 
-    plans = parse_plans(PLANS_DIR)
-    print(f"Read PLANS = {len(plans['items'])} items, "
-          f"{len(plans['threads'])} threads")
-    files += data_files.encode(data_files.REQUIREMENTS_PLANS_KEY,
-                               {"requirements": requirements, "plans": plans},
-                               kind=data_files.REQUIREMENTS_PLANS_KEY)
+    if one_off is None:
+        plans = parse_plans(PLANS_DIR)
+        print(f"Read PLANS = {len(plans['items'])} items, "
+              f"{len(plans['threads'])} threads")
+        files += data_files.encode(data_files.REQUIREMENTS_PLANS_KEY,
+                                   {"requirements": requirements, "plans": plans},
+                                   kind=data_files.REQUIREMENTS_PLANS_KEY)
 
     # REQ-DASH-220. The Feedback tab's cards, through the same parser the
     # validate-feedback gate uses; a card error refuses the build.
-    feedback = feedback_data(PLANS_DIR, REQUIREMENTS_YAML)
+    feedback = feedback_data(PLANS_DIR, REQUIREMENTS_YAML) if one_off is None else {"cards": []}
     html = _replace_const(html, "FEEDBACK", json.dumps(feedback, separators=(",", ":")))
     print(f"Re-embedded FEEDBACK = {len(feedback['cards'])} card(s)")
 
     # REQ-DOCS-073. Computed by the same function `mothman plans
     # dependencies` renders, never re-derived in the page's own JS -
     # see the template's own const comment for why that matters here.
-    deps = dependency_data()
+    deps = dependency_data() if one_off is None else {"sprints": [], "stale": []}
     html = _replace_const(html, "SPRINT_DEPENDENCIES",
                            json.dumps(deps, separators=(",", ":")))
     print(f"Re-embedded SPRINT_DEPENDENCIES = {len(deps['sprints'])} sprint(s) "
           f"in the graph, {len(deps['stale'])} deferral(s) worth re-testing")
 
-    if os.path.exists(DEMO_CAST_PATH):
+    if one_off is None and os.path.exists(DEMO_CAST_PATH):
         with open(DEMO_CAST_PATH) as f:
             demo_cast_text = f.read()
         html = _replace_const(html, "DEMO_CAST", json.dumps(demo_cast_text))
@@ -912,7 +951,7 @@ def embed() -> None:
         f.write(html)
     data_files.prune(data_dir, [f.entry["name"] for f in files])
     if build_output.out_dir():
-        place_page_assets(page_path)
+        place_page_assets(page_path, vendor=one_off is None)
 
     # EVERY FILE'S SIZE, EVERY BUILD (REQ-DASH-293 criterion 4, REQ-PIPE-255
     # criterion 26), so growth is seen while developing rather than first met

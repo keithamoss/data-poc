@@ -79,7 +79,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from asset_model import statuses, hierarchy
+from asset_model import schedule, statuses, hierarchy
 from qa_tools.common import delivery_log, display_time, in_flight_log
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -446,6 +446,17 @@ def _from_contested_tables(blockers, conn=None) -> list[Item]:
     return items
 
 
+def _never_owe(dataset_ids) -> bool:
+    """Whether every one of these datasets declares `no_calendar: never` (a
+    one-off's) - so that a NoCalendarAgreed reading them says nothing worth a
+    note: nothing is ever owed, by design."""
+    try:
+        return bool(dataset_ids) and all(schedule.no_calendar(d) == schedule.NEVER
+                                         for d in dataset_ids)
+    except Exception:  # noqa: BLE001 - only the note depends on it; it stays said
+        return False
+
+
 def _from_unfilled_periods(conn=None) -> list[Item]:
     """REQ-PIPE-132 criteria 10 and 11: every closed, unfilled period
     nobody has marked, grouped into consecutive runs per dataset - one
@@ -458,6 +469,15 @@ def _from_unfilled_periods(conn=None) -> list[Item]:
         for collection_id in collections:
             try:
                 gaps = filing_queue.closed_gaps(db, collection_id)
+            except schedule.NoCalendarAgreed as exc:
+                # NEVER TO HAVE ONE (a one-off's) has no periods to close, so
+                # there is nothing to say - the mock run of 2026-11-22 said it
+                # once per collection on every publish.
+                if not _never_owe([e.dataset_id for e in hierarchy.all_datasets()
+                                   if e.collection_id == collection_id]):
+                    print(f"note: could not read closed periods for {collection_id} "
+                          f"({type(exc).__name__}: {exc}).")
+                continue
             except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
                 print(f"note: could not read closed periods for {collection_id} "
                       f"({type(exc).__name__}: {exc}).")
@@ -635,6 +655,11 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
                 if found_worse else {}
             received = {(r[0], r[1]): r[2] for r in db.execute(
                 "SELECT dataset_id, supply_id, received_at FROM qa.supply_receipt").fetchall()}
+    except schedule.NoCalendarAgreed as exc:
+        if not _never_owe([e.dataset_id for e in hierarchy.all_datasets()]):
+            print(f"note: could not read the supplies awaiting a decision "
+                  f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")
+        return []
     except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
         print(f"note: could not read the supplies awaiting a decision "
               f"({type(exc).__name__}: {exc}) - the rest of the queue is unaffected.")

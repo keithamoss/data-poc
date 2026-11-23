@@ -202,7 +202,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 52
+SCHEMA_VERSION = 53
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -236,6 +236,17 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".history_anchor (
     only_row     boolean PRIMARY KEY DEFAULT true CHECK (only_row),
     anchor       date NOT NULL,
     recorded_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- EVERY SLOT-TICKET COMMENT THE PROCESSING PASS HAS HANDED TO THE GITHUB
+-- FILING ROUTE (REQ-GHUB-433 criteria 4 and 5, v53): its GitHub id, once,
+-- so a comment GitHub lists again - re-run after a failure, edited later -
+-- never raises a decision twice. created_at is the comment's own GitHub
+-- creation instant: the newest of them anchors the next pass's listing.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".ticket_comment_handled (
+    comment_id  bigint PRIMARY KEY,
+    created_at  timestamptz NOT NULL,
+    handled_at  timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS "{SCHEMA}".run (

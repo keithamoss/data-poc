@@ -307,6 +307,9 @@ class PassReport:
     failures: list[tuple[str, str]] = field(default_factory=list)
     owed: list = field(default_factory=list)
     tickets: list[str] = field(default_factory=list)
+    #: The ticket-comment stage (REQ-GHUB-433 criterion 14): comments read,
+    #: decisions raised, refusals posted. None where it did not run.
+    comments: object = None
     red: bool = False
     #: (datasets, supplies) this pass held because a schedule ended
     #: (REQ-PIPE-154 criterion 6), and what it re-filed once dates covered
@@ -343,7 +346,10 @@ class PassReport:
                     or self.refiled_cleared or self.refused or self.parked_moved
                     or self.left_behind_failure or self.left_behind_locked
                     or self.left_for_budget or self.failures or self.owed
-                    or self.left_waiting)
+                    or self.left_waiting
+                    # A PASS THAT READ COMMENTS IS NOT IDLE (REQ-GHUB-433
+                    # criterion 14), whatever they raised.
+                    or (self.comments is not None and self.comments.read))
 
     @property
     def exit_status(self) -> int:
@@ -602,6 +608,22 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         run_owed_work(report, run_by=run_by, deadline=deadline)
     except Exception as exc:  # noqa: BLE001 - it stays owed for the next pass
         failed("owed work", exc)
+    # COMMANDS POSTED ON SLOT TICKETS (REQ-GHUB-433 criterion 1), as a stage
+    # BEFORE reconciliation, so a decision a comment raises is reconciled in
+    # this same pass. Read outbound, by the pass that already calls GitHub.
+    try:
+        from qa_tools.common import ticket_comments
+
+        service = ticket_reconciler.service_from_env()
+        if service is None:
+            report.tickets.append("No ticketing is configured for this environment, so no "
+                                  "ticket comment was read.")
+        else:
+            report.comments = ticket_comments.read_and_handle(service)
+            if report.comments.failure:
+                report.failures.append(report.comments.failure)
+    except Exception as exc:  # noqa: BLE001 - handled ids are kept; the next pass reads the rest
+        failed("ticket comments", exc)
     # TICKETS LAST (criterion 12), and one line where none are configured.
     try:
         service = ticket_reconciler.service_from_env()

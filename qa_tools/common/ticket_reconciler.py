@@ -160,7 +160,25 @@ def body_for(state: slot_state.SlotState, also: tuple[str, ...] = ()) -> str:
         # this one holds back, named here rather than given a ticket of its
         # own - datasets and periods only.
         lines += ["", "Also held back by this:", *also]
+    lines += ["", commands_line()]
     return "\n".join(lines)
+
+
+def commands_line() -> str:
+    """WHEN A COMMAND POSTED HERE IS ACTED ON (REQ-GHUB-433 criterion 12,
+    SETTLED by Keith 2026-11-21): at the next processing pass, and how often
+    passes run as this environment's configuration declares it - never a
+    figure written into code, and nothing about frequency where none is
+    declared. No last-pass time: it would change every pass and rewrite every
+    ticket (REQ-PIPE-083 writes only on a change)."""
+    from qa_tools.common import environments
+
+    said = "A command posted on this ticket is acted on at the next processing pass"
+    env = environments.current_or_none()
+    minutes = env.processing_interval_minutes if env is not None else None
+    if minutes:
+        return f"{said}; passes run {environments.interval_words(minutes)}."
+    return f"{said}."
 
 
 def _own_comment(state: slot_state.SlotState, also: tuple[str, ...] = ()) -> str:
@@ -331,6 +349,11 @@ def service_from_env():
     # the data asset's, from contract/data-asset.yaml.
     env = environments.current_or_none()
     if env is None or not env.ticketing:
+        return None
+    # NO TICKETING FOR A ONE-OFF, EVER (REQ-PIPE-446 criterion 14), whatever
+    # the environment says.
+    chosen = _assets.selected_or_none()
+    if chosen is not None and chosen.is_one_off:
         return None
     slug = environments.ticket_repository() or ""
     if "/" not in slug:

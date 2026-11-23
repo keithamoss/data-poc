@@ -15388,6 +15388,7 @@ requirements:
     - tests/test_validate_people.py
     - tests/test_offer_after_hand_filed_run.py
     evidence:
+    - '2026-11-22: criterion 1''s entry point exists - REQ-GHUB-433''s stage of `mothman pipeline process` reads new slot-ticket comments and hands each to filing_from_github.handle_counted; its unmet entry (owner REQ-GHUB-433) is closed citing that requirement.'
     - '2026-09-29. The TUI adapter, 32 tests. The ones that matter are the three properties only this surface can break: it confirms before it writes (declining appends nothing, and it asks even for a promote), it never shows a cached answer (an unreachable log raises rather than falling back, the standing view prints no periods, the queue offers nothing and the command exits 1), and it calls no GitHub - asserted by parsing this module''s own imports rather than grepping its source, which its prose about GitHub would otherwise fail.
 
       '
@@ -15403,17 +15404,6 @@ requirements:
     - '2026-09-29. dashboard/demos/qa_wizard.cast re-recorded against the real TUI in a real pty - 217 events, 58.1s, and zero occurrences of "Promote" where there were three.
 
       '
-    unmet_criteria:
-    - criterion: 'Criterion 1, in the part of it that is an ENTRY POINT rather than a capability - a GitHub comment actually reaching filing_from_github.handle().
-
-        '
-      why: 'The adapter is built and tested; nothing in production calls it. ticket-sync.yml is disabled (REQ-PIPE-089) because a workflow cannot reach the database, and its replacement inverts the integration''s direction.
-
-        '
-      owner: REQ-GHUB-433
-      blocked_by:
-        requirements:
-        - REQ-GHUB-433
   - id: REQ-PIPE-083
     title: >
       Every slot has a ticket that is reconciled to its current state,
@@ -19658,7 +19648,7 @@ requirements:
     source: 'Keith, plans/running-thoughts.md #45 (2026-09-26) - yes, the load-time file checks reach the dashboard, as their own scope, never folded into the data checks'' status. REFRESHED by delivery-scoper 2026-10-04 to fit REQ-PIPE-115''s dataset-level red (signed that day) and REQ-DASH-070''s outstanding items, with the failed-load case moved out to REQ-DASH-148. Reshaped the same day when Keith chose that any failing file check refuses the whole file, so the red and the queue item became REQ-DASH-148''s.'
     acceptance_criteria:
     - THE SYSTEM SHALL show a dataset's file-check results, on its dataset page, in a section of their own labelled as being about the file as delivered, distinct from its data checks.
-    - THE SYSTEM SHALL NOT fold a file check's verdict into any data check's status, count or trend.
+    - 'THE SYSTEM SHALL NOT fold a file check''s verdict into any data check''s status, count or trend. (AMENDED 2026-11-22, Keith, via REQ-DASH-436: except a one-off''s two package checks, ''declared table arrived'' and ''undeclared file'', which count in its dataset''s status.)'
     - THE SYSTEM SHALL word a file-check failure as a statement about the file that arrived, naming the file, and SHALL NOT word it as a count of records violating a rule.
     - THE SYSTEM SHALL let a reader open each file check, with its authored prose and its history over time, on the same terms as any other check.
     - WHERE every file check passed for the supply on show, THE SYSTEM SHALL show that section as one line saying so, and SHALL NOT render each passing check by default.
@@ -19697,6 +19687,7 @@ requirements:
     - THE FILE ON SHOW IS THE NEWEST LOAD ATTEMPT OF A FILE RECEIVED ON OR BEFORE
       THE DATE ON SHOW, by the file's own receipt (qa.delivery_file), never by
       when a pass ran - the same rule every in-place-on judgement uses.
+    - 'AMENDED by Keith 2026-11-22, via REQ-DASH-436 criterion 2 (option (a)): criterion 2''s one exception is a one-off''s two package checks - facts about its package, not a file''s bytes - which count in its dataset''s status so that a declared table that never arrived reads Fail rather than No data. Every other file check, every enduring asset''s among them, still never folds into a status; the build marks the exception countsInStatus and both status implementations read only that mark.'
   - id: REQ-PIPE-098
     title: A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born
     date_written: '2026-09-26'
@@ -22177,21 +22168,32 @@ requirements:
         THE SYSTEM SHALL report such a dataset's own checks with their
         REAL verdicts - red, amber or green as the checks actually
         found - because developing a check means seeing whether it
-        passes.
+        passes. AMENDED 2026-11-22 (Keith, via REQ-PIPE-438 criterion 1): "such a
+        dataset" is one declaring `no_calendar: not-yet-agreed`; a `never`
+        dataset's verdicts are real quality history (REQ-PIPE-438).
       - >
         THE SYSTEM SHALL label such a dataset as one whose schedule is
         not agreed, alongside those verdicts and IN WORDS rather than
         by colour alone, following the pattern the `nodata` and
-        `inactive` pills already set.
+        `inactive` pills already set. AMENDED 2026-11-22 (Keith, via
+        REQ-PIPE-438): for a dataset declaring `no_calendar:
+        not-yet-agreed` only; a `never` or derived dataset follows
+        REQ-PIPE-438 criteria 5 to 7.
       - >
         THE SYSTEM SHALL exclude such a dataset's verdicts from every
         collection-level and asset-level rollup, so that a dataset
-        nobody has agreed cannot turn an agreed one's status.
+        nobody has agreed cannot turn an agreed one's status. AMENDED
+        2026-11-22 by REQ-PIPE-438 criterion 1: for a dataset declaring
+        `no_calendar: not-yet-agreed` only; a `never` dataset rolls up, and
+        a derived one is left out by REQ-PIPE-438 criterion 3.
       - >
         THE SYSTEM SHALL keep the record of that QA distinguishable
         from the QA history of agreed supplies, so that check
         development never counts toward a dataset's real quality
-        history.
+        history. AMENDED 2026-11-22 (Keith, via REQ-PIPE-438 criterion 1): for a
+        dataset declaring `no_calendar: not-yet-agreed` only; a `never`
+        dataset's results are recorded agreed unless it is declared
+        `derived` (REQ-PIPE-438 criterion 2).
       - >
         THE SYSTEM SHALL place a dataset without a calendar in the same
         agency, collection and dataset hierarchy as every other dataset,
@@ -22216,6 +22218,9 @@ requirements:
         and report it against the dataset without a calendar, and SHALL
         NOT let it contribute to the status of any dataset that has a
         calendar, nor to any collection-level or asset-level rollup.
+        AMENDED 2026-11-22 (Keith, via REQ-PIPE-438): where a participant
+        declares `no_calendar: not-yet-agreed`; a check spanning `never` or
+        derived datasets follows REQ-PIPE-438 criterion 4.
       - >
         WHEN a dataset gains a calendar, THE SYSTEM SHALL graduate it -
         from that point it owes supplies, is filed to periods, and is
@@ -22303,6 +22308,17 @@ requirements:
         behaviour - verified by sample_dataset_ids() returning an empty set
         against the real asset.
     decisions:
+      - >
+        AMENDED 2026-11-22 (Keith, via REQ-PIPE-438): criteria 7, 8, 9, 10
+        and 15 apply to a dataset declaring `no_calendar: not-yet-agreed`
+        only. A one-off's QA is the deliverable (Keith 2026-11-21, Q4.1
+        (a)), so a `never` dataset's results are agreed quality history and
+        roll up; a dataset declared `derived` is recorded in development
+        and left out, and a cross-table check over a derived and a counted
+        dataset is agreed and counts on the counted side. What stays for
+        `never`: criteria 4 and 5 (the no-period schema) and the hierarchy
+        criteria 11 to 15 as amended. The mechanism is sample_data's split
+        of routing (is_sample) from counted state (supply_state).
       - >
         BUILT IN TWO HALVES ON 2026-09-28, and this records which half is
         which because the code alone does not say. The CONFIGURATION AND
@@ -28374,6 +28390,7 @@ requirements:
         wiring inside _amber_setting_errors has no test of its own - the two pieces
         are tested separately.'
       - 'PENDING AMENDMENT, NOT YET APPLIED (Keith, 2026-10-07): criterion 7''s guard dates a version by the commit''s author date (%aI), which anyone can backdate. It moves to the committer instant floored at the base commit, and to comparing normalised changelog entries with the changelog append-only (REQ-PIPE-112), in the change that builds REQ-PIPE-111 and REQ-PIPE-112 - not before, so until then this requirement describes the code as it runs. Recorded in plans/post-build-review.md #134.'
+      - 'NOTE 2026-11-22 (Keith, via REQ-PIPE-448): criterion 9''s required setting is asked of an enduring asset only; a one-off under one-offs/ states none, since a no-period supply is never promoted.'
     open_questions: []
 
 
@@ -28468,6 +28485,7 @@ requirements:
         entry.'
       - "CRITERION 8 THROUGH THE GATE PRODUCTION USES (Keith, 2026-10-25, answer 2a; post-build-review #274 D3): a replacement a later period stands on is 'promotion-withheld' whichever path judges it. The package gate (gate.after_arrival, from the per-arrival lifecycle) calls promotion.judge with record=False, which skipped _record_withheld, and gate._record_holdback then wrote 'promotion-refused'; promotion.Judged.withheld now carries the case and the gate writes 'promotion-withheld' with its application fields. Pinned through the real lifecycle by tests/test_replacement_setting.py::TestStoodOnThroughTheGate, seen to record 'promotion-refused' on the tree before the fix."
       - "CHILD PROTECTION HAS A GREEN ERA OF ITS OWN (Keith, 2026-10-25, answer 4a; REQ-GEN-273 criterion 4): a collection-level 'green' version from 2017-04-17 (2017-Q2's claim window) and 'never' from 2017-10-18 (2017-Q4's), so TS-81 (S1 green) and TS-82 (S1 red) can show a green resupply replacing a promoted one inside a package; before it the asset's 'never' applies, after it the collection's. ADDED, back-dated, which the frozen-past guard allows only on a synthetic asset (validate_schedule: a new version before the day it is added is refused unless both states say synthetic) - and changes no version already in force. REJECTED widening the asset-level era, which would have reached every collection."
+      - 'NOTE 2026-11-22 (Keith, via REQ-PIPE-448): criterion 1''s required setting is asked of an enduring asset only; a one-off under one-offs/ states none, since a no-period supply is never promoted.'
     open_questions: []
 
 
@@ -46796,6 +46814,7 @@ requirements:
     - REQ-PIPE-369
     - REQ-GEN-370
     linked_tests:
+    - tests/test_one_offs.py::TestTheListing
     - tests/test_assets.py::TestTheRealLayout
     - tests/test_assets.py::TestTheFixture
     - tests/test_assets.py::TestARepositoryPathForAFolderOutsideIt
@@ -46807,6 +46826,8 @@ requirements:
     - tests/test_collections_registry.py::TestTheLiteralGate::test_the_shared_collections_trees_are_no_longer_exempt
     - tests/test_github_links.py::test_the_build_leaves_the_links_out_for_a_folder_outside_the_repository
     implemented_by:
+    - asset_model/assets.py::one_offs
+    - asset_model/one_off_kinds.py::registered
     - cli/dashboard.py::validate_layout_command
     - asset_model/assets.py::_Assets::names
     - asset_model/assets.py::selected
@@ -46821,6 +46842,7 @@ requirements:
     - assets/environments.yaml
     - .github/CODEOWNERS
     evidence:
+    - '2026-11-22, built with REQ-PIPE-446 (tree 68a8cf7a): criterion 5 as amended - one-off folders found from one-offs/<kind>/ itself for every kind, and kind plug-ins discovered from asset_model/kinds/, with no list of assets, kinds or one-offs in code - in tests/test_one_offs.py''s TestTheListing. The unmet entry owned by REQ-PIPE-446 is closed.'
     - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: assets/ holds environments.yaml and the two asset folders only, each with data-asset.yaml, calendar.yaml, presentation.yaml, people.yaml, file-checks.yaml, dbt/, collections/ and synthetic/ (c1, c2); quarterly holds child-protection-family-support and department-of-health, daily registry-services (c3); assets._Assets.names lists the folder, and no asset name is held in product code (c5); the resolver answers state paths at call time (c6), the constants it replaced are gone from product code (grep); CODEOWNERS names /assets/*/ (c9); qa_tools/collections/ and generator/collections/ hold __init__.py and base.py only and dbt_shared/ macros/ and tests/generic/ only (c10).'
     - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate among them) - `layout OK - only environments.yaml and asset folders at the top of assets/, and no collection''s file in the shared code tree.`'
     - '2026-11-15, split T1 (branch wip/split-t1, merged 9dce1e9b), from its decisions: tests/test_two_asset_gates.py 26 passed, its refusals seen failing first (c4, c10); the move map deleted in c8531b7b (c2). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run. The earlier criteria''s proof is the move commit de009e91 and its follow-ons recorded in decisions.'
@@ -46854,13 +46876,6 @@ requirements:
     - 'STATUS PASS 2026-11-15 (split T0): every live criterion met at HEAD 8df9ddb5, flipped to built.'
     - 'THE SPLIT INCLUDES TEST DATASETS OFF THE BASELINE''S CADENCE (Keith, 2026-10-31, #131 (b)): an annual dataset on the quarterly asset (REQ-QAC-348) and a weekly one on the daily (REQ-QAC-350), so the period control is designed against slower-than-baseline participation from the start. REJECTED (a), splitting with today''s datasets only.'
     open_questions: []
-    unmet_criteria:
-    - criterion: Criteria 5 as amended 2026-11-21 for one-offs.
-      why: Amended by Keith's re-sign of the one-offs batch (deferred-rescope-v7, 2026-11-21); not yet built.
-      owner: REQ-PIPE-446
-      blocked_by:
-        requirements:
-        - REQ-PIPE-446
   - id: REQ-PIPE-363
     title: A command is told which asset it acts for by MOTHMAN_ASSET, with no default; only that asset's commands exist, the terminal names the asset, and check and --help work with none set
     date_written: '2026-10-31'
@@ -46875,7 +46890,7 @@ requirements:
     - 'THE SYSTEM SHALL take the asset a command acts for from MOTHMAN_ASSET, naming an asset folder under assets/ by its bare name, beside MOTHMAN_ENVIRONMENT and MOTHMAN_SUPPLY_DSN (SETTLED by Keith 2026-11-01, on REQ-PIPE-091''s precedent), and SHALL NOT take a one-off from it: a one-off is named only by `mothman one-off`''s `--id` or chosen in its TUI, and MOTHMAN_ASSET set beside either is refused (REQ-PIPE-446 criterion 3). AMENDED 2026-11-21 by REQ-PIPE-446 (v7, Keith''s v6 Q2 (b)).'
     - WHEN mothman starts, THE SYSTEM SHALL build the command groups of the selected asset's collections only, and SHALL build none and read no asset configuration WHILE MOTHMAN_ASSET is unset or names no asset folder.
     - IF a command names a collection the selected asset does not hold - `mothman bdm ...` under the quarterly asset, for example - THEN THE SYSTEM SHALL answer as for any unknown command, 'No such command', followed by one line naming the selected asset - 'Commands for asset 'quarterly':' (wording SETTLED by Keith 2026-11-01) - and the selected asset's own collection commands beneath it, reading nothing of any other asset.
-    - 'IF a command that is not one of the tool commands of criterion 5 is given WHILE MOTHMAN_ASSET is unset or names no asset folder - a one-off''s id included (REQ-PIPE-446 criterion 9) - THEN THE SYSTEM SHALL answer not ''No such command'' but that MOTHMAN_ASSET is not set, or names no asset folder, naming the variable, listing the folder names found under assets/, then - WHERE one-off folders exist - saying ''For one of <n> <kinds>, use mothman one-off.'', and saying there is deliberately no default, in the form environments.current() uses for MOTHMAN_ENVIRONMENT - reading nothing but those folder names; <n> <kinds> is each kind that has folders, counted in its plural display word, joined with ''or'' (e.g. ''37 extractions or 2 audits''), and WHERE no one-off folder exists the sentence is left out. AMENDED 2026-11-21 by REQ-PIPE-446 (one-off sentence: wording SETTLED by Keith 2026-11-21, v6 Q2 (b)).'
+    - 'IF a command that is not one of the tool commands of criterion 5 is given WHILE MOTHMAN_ASSET is unset or names no asset folder - a one-off''s id included (REQ-PIPE-446 criterion 9) - THEN THE SYSTEM SHALL answer not ''No such command'' but that MOTHMAN_ASSET is not set, or names no asset folder, naming the variable, listing the folder names found under assets/, then - WHERE one-off folders exist - saying ''For one of <n> <kinds>, use mothman one-off.'', and saying there is deliberately no default, in the form environments.current() uses for MOTHMAN_ENVIRONMENT - reading nothing but those folder names; <n> <kinds> is each kind that has folders, counted in its plural display word, joined with ''or'' (e.g. ''37 extractions or 2 audits''), a kind with exactly one folder counted in its singular display word (''For one of 1 extraction, use mothman one-off.''), and WHERE no one-off folder exists the sentence is left out. AMENDED 2026-11-21 by REQ-PIPE-446 (one-off sentence: wording SETTLED by Keith 2026-11-21, v6 Q2 (b)); AMENDED 2026-11-22 (Keith): the singular for exactly one folder.'
     - 'WHILE MOTHMAN_ASSET is unset, THE SYSTEM SHALL run `mothman check`, `mothman --help`, every `mothman one-off` command (REQ-PIPE-442 criterion 1) and every command that reads no asset configuration and opens no connection, and `mothman --help` SHALL say, as one line inside its Collections panel (REQ-TEST-252 criterion 2''s two-panel layout kept), ''Set MOTHMAN_ASSET to one of: <the asset folder names found>.'' followed - WHERE one-off folders exist - by criterion 4''s sentence ''For one of <n> <kinds>, use mothman one-off.'' (wording SETTLED by Keith 2026-11-01; the one-off sentence AMENDED 2026-11-21, Keith''s yes to delivery-cli-ux D3 and his v6 Q2 (b)).'
     - IF a command that reads asset configuration or opens a connection runs WHILE MOTHMAN_ASSET is unset or names no asset folder - a one-off's id included (REQ-PIPE-446 criterion 9) - THEN THE SYSTEM SHALL refuse before reading any asset configuration or opening any connection, naming the variable and every asset folder found, followed - WHERE one-off folders exist - by criterion 4's sentence 'For one of <n> <kinds>, use mothman one-off.', and SHALL NOT fall back to a default, a last-used value or the only asset present - except every `mothman one-off` command (REQ-PIPE-442 criterion 1), which runs with MOTHMAN_ASSET unset, is refused with it set, and selects its one-off by `--id` or in its TUI. AMENDED 2026-11-21 by REQ-PIPE-446 and REQ-PIPE-442 (v7, Keith's v6 Q2 (b)).
     - WHEN `mothman` is run bare, to open the wizard, WHILE MOTHMAN_ASSET is unset or names no asset folder, THE SYSTEM SHALL refuse before the banner with criterion 6's message, as REQ-TEST-114 criterion 8 refuses for the environment, and SHALL NOT fail on an empty collection list.
@@ -46897,8 +46912,11 @@ requirements:
     - REQ-TEST-114
     - REQ-TEST-252
     linked_tests:
+    - tests/test_one_offs.py
     - tests/test_cli_asset_selection.py
     implemented_by:
+    - asset_model/assets.py::kinds_sentence
+    - cli/one_off.py::refuse_an_asset_beside
     - cli/app.py::_MothmanGroup::resolve_command
     - cli/app.py::cli
     - asset_model/assets.py::_refusal
@@ -46909,6 +46927,7 @@ requirements:
     - cli/env.py::list_command
     - tests/conftest.py::module_selects_its_asset
     evidence:
+    - '2026-11-22, built with REQ-PIPE-446 (tree 68a8cf7a): criteria 1, 4, 5, 6, 11 and 12 as amended for one-offs - the one-off sentence in --help, criterion 4''s and 6''s refusals and left out where there are none, MOTHMAN_ASSET naming a one-off refused in criterion 12''s approved words and selecting nothing, and every `mothman one-off` command running unset and refused set - in tests/test_one_offs.py''s TestTheOneOffSentence, TestMothmanAssetNamingAOneOff and TestTheOneOffGroup, each in a real non-TTY subprocess. They failed against the code before 446 (13 errors: no one-offs root to point the resolver at) and pass; with test_cli_asset_selection in the 41-module run, 1286 passed, 1 failed (a marker guard, fixed; see REQ-PIPE-446). The unmet entry owned by REQ-PIPE-446 is closed.'
     - '2026-11-15 (Perth), split T0 status pass at HEAD 8df9ddb5, read against the code: cli/app.py builds collection groups only for assets.selected_or_none() and none with no asset (c2); _MothmanGroup answers an unknown command with "Commands for asset ''<asset>'':" (c3); the Collections panel says ''Set MOTHMAN_ASSET to one of: ...'' with no asset (c5); assets._refusal names the variable, the folders found and that there is deliberately no default (c4, c6); environment_statement adds '' · Asset: <asset>'' and env current/list name it (c8); tests/conftest.py refuses a test module with no asset mark (c9). tests/test_cli_asset_selection.py holds a test for each case c10 lists.'
     - '2026-11-15, HEAD 8df9ddb5: `mothman check --no-pytest` with MOTHMAN_ASSET unset, exit 0, every asset-reading gate passing once per asset (layout, collections, providers, imports and the lifecycle gate among them), run with MOTHMAN_ASSET unset (c5, PORTABILITY). No pytest was run by this pass (it would create test databases); the tests named are the T1 builder''s runs recorded in decisions, re-read here, not re-run; the suite last passed whole in the main session''s full chunked suite on ac3a1376 (before the T1 merge 9dce1e9b): 7730 tests, 1 failure, the premise gate reading agents'' worktrees, since fixed (post-build-review #329). ''Seen failing first'' is the build''s record, not re-checked here.'
     decisions:
@@ -46932,14 +46951,8 @@ requirements:
     - EVERY `mothman one-off` COMMAND RUNS WITH NO ASSET SELECTED (REQ-PIPE-442 criterion 1), and v7 adds that it is refused with one set (Keith, CLI Q1 and Q2, v6 Q2 (b)).
     - 'v7, THE CRITERION 2 AMENDMENT IS WITHDRAWN: see withdrawn_from_v6. The architect''s A concern (groups built at import) is met by the criterion as built, because a one-off never sits in MOTHMAN_ASSET.'
     - A KIND WITH NO FOLDERS IS LEFT OUT, AND --help MATCHES (Keith 2026-11-21, yes to both delivery-cli-ux D3 edge cases); under v6 Q2 (b) 'left out' means the whole one-off sentence goes when there are none. REJECTED the architect's L 'leave criterion 5 deliberately'.
+    - 'AMENDED 2026-11-22 (Keith): criterion 4''s one-off sentence counts a kind with exactly one folder in its SINGULAR display word - ''For one of 1 extraction, use mothman one-off.'' - everything else as approved 2026-11-21. Tested in tests/test_one_offs.py::TestTheOneOffSentence::test_one_folder_is_counted_in_the_singular, seen failing first against the plural-only code.'
     open_questions: []
-    unmet_criteria:
-    - criterion: Criteria 1, 4, 5, 6, 11, 12 as amended 2026-11-21 for one-offs.
-      why: Amended by Keith's re-sign of the one-offs batch (deferred-rescope-v7, 2026-11-21); not yet built.
-      owner: REQ-PIPE-446
-      blocked_by:
-        requirements:
-        - REQ-PIPE-446
   - id: REQ-PIPE-364
     title: mothman check runs every configuration gate once per asset folder, needing no asset and no database, keeps identifiers unique within each asset, and compares nothing across assets
     date_written: '2026-10-31'
@@ -49632,17 +49645,6 @@ requirements:
     story: As whoever would stand up a new asset - including a one-off project extraction - I want its delivery calendar to be configuration read by the same code as every other asset's, so that a new asset needs no calendar code of its own.
     moscow: should
     status: built
-    unmet_criteria:
-    - criterion: 'Criterion 5 - a fixture asset whose only collection is a project extraction, its datasets `no_calendar: never`, run through `mothman pipeline run` and `mothman dashboard rebuild`.
-
-        '
-      why: 'Building the test found the shape has never run end to end: filing and the promotion gate raise NoCalendarAgreed and a no-period supply is held unchecked. Keith, 2026-11-18: scope it separately (plans/running-thoughts.md #141) - what filing, the run''s view and promotion mean with no period is a design question.
-
-        '
-      owner: REQ-TEST-437
-      blocked_by:
-        requirements:
-        - REQ-TEST-437
     source: Keith, the split overview's decision 1b (SPLIT D1b, 2026-11-03, Perth). Drafted by delivery-scoper 2026-11-03 (v4); v5 2026-11-14 with Q2; v6 2026-11-14, the compare NFR removed (QD) and the fixture shared with REQ-PIPE-385 (architect). A PROPOSAL, not signed until Keith signs v6. Signed by Keith 2026-11-14 as v6 (docs/drafts/separation-v6.yaml), after the v5 reviews and v6's own questions.
     acceptance_criteria:
     - THE SYSTEM SHALL read every asset's calendar.yaml through one loader in asset_model/, with the baseline's dates and versions per asset (SPLIT D1b, SETTLED by Keith 2026-11-03). AMENDED 2026-11-15 by REQ-PIPE-345.
@@ -49659,6 +49661,12 @@ requirements:
       - REQ-PIPE-345
       - REQ-PIPE-342
       reason: 'Overlaps: a calendar''s name in shared code is REQ-PIPE-345 criterion 6''s (built in T2: scenario_injection._lands_in asks Calendar.kind), and an asset''s name in code is REQ-PIPE-342 criterion 5''s (''SHALL NOT hold a list of assets, or name an asset, anywhere in code'').'
+    - by: Keith
+      criterion: 5
+      date: '2026-11-21'
+      reason: 'Replaced by REQ-TEST-437 (signed by Keith 2026-11-21), whose criterion 7 retires it when built - built 2026-11-22: a real recipe package run end to end through `mothman one-off --id`, each table recorded with no slot and no period.'
+      replaced_by:
+      - REQ-TEST-437
     non_functional_requirements:
     - 'SCALABILITY: a third or fourth asset shape (the project extraction, CLAUDE.md''s scale note) adds configuration, not code.'
     - 'COST: criterion 5''s test shares REQ-PIPE-385 criterion 14''s fixture asset (copied dbt packages, no network) and the test database, not a bootstrap; a real four-tool run takes tens of seconds, so it is not marked critical.'
@@ -52193,7 +52201,7 @@ requirements:
     date_written: '2026-11-21'
     story: As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, delivery-architect triage of REQ-GHUB-082 criterion 1, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H''s drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21; SETTLED as polling by Keith the same day (Q2.1 (a)); v5 signed by Keith 2026-11-21; v6 folds in the post-sign-off reviews (architect C, dashboard UX 433 c12, CLI UX C6) and Keith''s answers. v7 folds in the REQ-PIPE-446 renumbering and v6 Q2 (one decision''s references only). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL, as a stage before ticket reconciliation, read the comments on the asset's ticket repository that it has not yet handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by its creation time.
@@ -52240,9 +52248,33 @@ requirements:
     - 'v6, HOW OFTEN COMES FROM CONFIGURATION (delivery-dashboard-ux post-sign-off, 433 c12): an interval written into the ticket code would go false the day a deployment''s scheduler changes.'
     - 'v6, CRITERION 14 AND THE NAMED CAUSE IN CRITERION 8 (delivery-cli-ux C6): a pass that read three comments and raised nothing must not read as idle, and a failed stage must say what failed.'
     - 'v6, ONE-OFFS NEVER USE GITHUB (Keith 2026-11-21): that rule is REQ-PIPE-446''s (criterion 14); this stage cannot reach a one-off, because no command outside `mothman one-off` can select one (REQ-PIPE-446 criteria 3 and 9, v7).'
+    - 'BUILT 2026-11-22, THE INTERVAL''S HOME (the second open question, a build decision): `processing_interval_minutes:` on an environment in assets/environments.yaml, whole minutes, refused if not a positive whole number; worded ''every 15 minutes'' / ''every hour'' / ''every 2 hours''. Minutes because the authored duration form (`14d`, `4h`) has no unit for a scheduler''s interval. No environment declares one yet, so every ticket says only ''acted on at the next processing pass'' (Keith 2026-11-22: nothing about frequency where none is declared).'
+    - 'BUILT 2026-11-22: qa.ticket_comment_handled (schema v53, additive) holds each handled comment''s GitHub id and creation instant; the newest creation instant is the listing''s `since` anchor. A comment is recorded once its handling returns - raised, refused or ignored alike - so a refusal is never posted twice.'
+    - 'BUILT 2026-11-22: the two listings are `gh api --paginate` over repos/<repo>/issues/comments?since= and repos/<repo>/issues?labels=slot-ticket&state=all, read as a stream of page arrays; the service''s own login is one `gh api user`. Same `gh` boundary and credential as reconciliation (ticket_github), so no new network path.'
+    - 'BUILT 2026-11-22: COUNTING NEEDED THE ROUTE TO SAY WHAT HAPPENED. filing_from_github.handle_counted returns raised / refused / ignored beside the outcome; handle() keeps its signature and returns the outcome alone. A comment with no command is read and counted, never refused.'
+    - 'BUILT 2026-11-22: A COMMENT ON ANOTHER ASSET''S SLOT, OR ON A TICKET OF NO SLOT, IS NOT RECORDED AS HANDLED in this asset''s database - the asset owning it handles it in its own - and is not counted as read.'
+    - 'BUILT 2026-11-22: THE STAGE STOPS AT THE FIRST COMMENT WHOSE HANDLING FAILS, naming it, rather than skipping past it: oldest first, last wins (Thread H) means a later comment must not be applied before an earlier one on the same slot.'
+    - 'TESTED WITH GITHUB STOOD IN FOR (Keith 2026-11-22): the real API is never called from a test and no real GitHub write happens - a stand-in service for the stage, and ticket_github._gh replaced by a recorder for the listings. filing_decisions.apply is recorded rather than run where a decision is raised; refusals and ignored comments go through the real route.'
+    - 'DELETED .github/workflows/ticket-sync.yml (criterion 13). CLAUDE.md still describes it as disabled; CLAUDE.md is Keith''s to edit.'
     open_questions:
     - Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. A deployment decision; it does not change what is built.
-    - Where the environment declares its processing interval for criterion 12 (assets/environments.yaml is the likely home), and what the ticket says where an environment declares none. A build decision; it does not change the settled wording.
+    linked_tests:
+    - tests/test_ticket_comments.py
+    - tests/test_processing_pass.py::TestKeithsAnswersToTheSprint14Critic
+    implemented_by:
+    - qa_tools/common/ticket_comments.py::read_and_handle
+    - qa_tools/common/ticket_comments.py::anchor
+    - qa_tools/common/ticket_comments.py::handled_ids
+    - qa_tools/common/ticket_github.py::GitHubTickets
+    - qa_tools/common/filing_from_github.py::handle_counted
+    - qa_tools/common/processing_pass.py::run_pass
+    - qa_tools/common/processing_pass.py::PassReport
+    - cli/pipeline.py::_say_pass
+    - qa_tools/common/ticket_reconciler.py::commands_line
+    - qa_tools/common/environments.py::interval_words
+    - qa_tools/common/qa_store.py::DDL
+    evidence:
+    - '2026-11-22, tree 452d3590: 23 named test modules (pytest -n 2: tests/test_ticket_comments.py, test_processing_pass, test_ticket_reconciler, test_ticket_github, test_filing_from_github, test_environments, test_stated_environment, test_schema_version_refusal, test_qa_store, test_publish, test_lambda_handlers, test_run_summary_line, test_ticket_sync, test_filing_decisions, test_cli_check and 8 more) 678 passed in 3m21s. tests/test_ticket_comments.py is new behaviour rather than a defect fix, so not seen failing first; it was checked to be able to fail by disabling the handled-id record and the own-author filter, which turned 5 of its 18 tests red. npm test was not run (no page change). The full suite, the needs_deployment half and the browser tests were NOT run. No test calls the real GitHub API.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52251,7 +52283,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever runs QA on a one-off, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately); plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; unchanged in v6. Buildable at once (Keith, round 5, architect Q1). Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing.
@@ -52270,6 +52302,27 @@ requirements:
     - 'REJECTED holding a no-period supply for a person: there is nothing a person could choose.'
     - 'REJECTED inventing a pseudo-period (the receipt date, or one period per one-off) so the ordinary filing path runs: it would put a period into the arithmetic REQ-PIPE-106 criterion 5 excludes by construction.'
     - 'v6: no criterion changed. The MAINTAINABILITY NFR now says is_sample stays the routing question, because REQ-PIPE-438 v6 splits routing from counted state (delivery-architect finding G).'
+    - 'BUILT 2026-11-22: A BRANCH OF ITS OWN, `no-period` (assignment.NO_PERIOD), recorded on the filing with no slot - not `held-no-open-slot`, which would put it on the holds queue, and not a slot the rule looked for and missed. filing.file_arrivals asks is_sample() first, at the boundary, and never builds slots for it, which is where NoCalendarAgreed escaped (slots.claimable_until). No supersession, period opening, offset groups or hold follow, since each is per period.'
+    - 'BUILT 2026-11-22: ITS FILING CARRIES NO ARRIVAL CLASSIFICATION, never `unfiled` (criterion 4): unfiled means judged and owed a slot it did not get, which is lateness talk for a supply that has no schedule.'
+    - 'BUILT 2026-11-22: CRITERION 3 NEEDED NO NEW MECHANISM. The staging-time run views already read the newest version of each no-calendar table from the sample schema (REQ-PIPE-106), and period_overlay.rebuild_for_arrival builds nothing for a supply with no period and no hold, so those views stand and the run step checks them in the same pass. What stopped it was filing raising first.'
+    - 'BUILT 2026-11-22: THE GATE''S EFFECTIVE INSTANT ASKED A CLAIM WINDOW (orchestrate._claim_window caught ScheduleConfigError only), so a no-calendar arrival would have raised again in the gate stage; it is now left out of the minimum, as a dataset with no version in force already was. Whether the promotion gate then refuses such a supply is REQ-PIPE-435 criterion 7''s, not this requirement''s.'
+    - 'KNOWN LIMIT: criterion 3''s test stands in for the run step and the gate at their entry points (orchestrate.run_one, orchestrate.promote_after) and asserts what the run step is handed - the real tools are not run over a no-calendar supply here. REQ-TEST-437''s fixture runs one end to end.'
+    linked_tests:
+    - tests/test_no_period_filing.py
+    - tests/test_not_yet_agreed_beside_calendared.py
+    implemented_by:
+    - qa_tools/common/filing.py::file_arrivals
+    - qa_tools/common/filing.py::_filed_to_no_period
+    - qa_tools/common/filing.py::_has_no_calendar
+    - qa_tools/common/filing.py::_judged_for
+    - asset_model/assignment.py::NO_PERIOD
+    - qa_tools/tools/orchestrate.py::_claim_window
+    - cli/supply.py::filings_command
+    - qa_tools/common/inheritance.py::offset_group
+    - qa_tools/common/list_setting_members.py::_round_date
+    evidence:
+    - '2026-11-22, tree 52d356c5 (code as committed in the change flipping this): 34 named test modules (pytest -n 2: tests/test_no_period_filing.py, test_no_calendar_dashboard, test_counted_parity, test_no_calendar, test_sample_data, test_filing, test_file_arrivals_slot_horizon, test_delivery_hold_retired, test_period_opening, test_filing_before_checks, test_schedule_ended_hold, test_cross_collection_reads, test_arrival_lifecycle and 21 more schedule, status and dashboard-build modules) 861 passed in 2m40s; npm test 99 files, 1308 passed. tests/test_no_period_filing.py was SEEN FAILING FIRST: all 6 filing tests failed with NoCalendarAgreed escaping file_arrivals, the criterion 3 test failed with StageFailed at the filing and overlay stage (NoCalendarAgreed), and the claim-window test failed with NoCalendarAgreed out of orchestrate._claim_window; all 10 pass. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work).'
+    - '2026-11-22, criterion 1 widened to a no-calendar dataset beside a calendared one in the same collection: inheritance.offset_group and list_setting_members._round_date raised NoCalendarAgreed out of the calendared supply''s filing and its period overlay; both now read it as no period. Found failing first by tests/test_not_yet_agreed_beside_calendared.py (REQ-TEST-437 criterion 5); code tree a329b566.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52278,7 +52331,7 @@ requirements:
     date_written: '2026-11-21'
     story: As the person accountable for handing a one-off's data to a project, I want to record whether it is released or withheld, and why, so that there is a named, dated account of who let the data go - or stopped it.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, 2026-11-21, Q4.2 (b) and round 2 Q4 (a); plans/running-thoughts.md #141 (the promotion gate raises); the delivery-architect''s v4 review (a new qa table, not decision_log). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-cli-ux G1, G5 and C2 and Keith''s answers (copy nothing; never GitHub; --id). Shared by every one-off kind. v7 folds in Keith''s answer to v6 Q4 (as drafted; the PROVISIONAL mark cleared). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN every dataset of a one-off has a recorded outcome for its checks - a could-not-load or could-not-check result counting as one - THE SYSTEM SHALL offer, in the `mothman one-off` TUI and as `mothman one-off decide --id <id>`, one decision for the whole one-off - release or withhold.
@@ -52309,6 +52362,34 @@ requirements:
     - 'v6, CRITERION 10 IS apply_decision''s FLOW (delivery-cli-ux C2): one order for every recorded decision in mothman, so a person who has filed a supply already knows this one; the QA summary is shown because the decision is about it.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q4 (a)): a could-not-load or could-not-check result COUNTS AS AN OUTCOME, so such a one-off can be decided; the confirmation names those datasets (criterion 10), withholding is the expected answer, and releasing one is a person''s recorded call with a reason. REJECTED (b) offering no decision until every dataset has a real verdict, which leaves a one-off with one unloadable table undecidable. v7 clears v6''s PROVISIONAL mark.'
     - 'v6, CRITERION 11 (delivery-cli-ux G1): a decision recorded after the last publish is otherwise invisible on the page and lost at drop.'
+    - 'BUILT 2026-11-22: THE TABLE is qa.one_off_decision (qa_tools/common/one_off_decision.py) - one_off_id, decision, reason, actor email and name, decided_at - created with the one-off''s database by the load and on first use, append-only by a statement trigger refusing UPDATE, DELETE and TRUNCATE for every role, as qa.filing is. It carries no dataset column (criterion 5). The publisher reads it through qa_store.ensure_publisher_role''s SELECT on the qa schema, whose write revokes cover it (criterion 3). Outside qa_store''s own DDL deliberately, as qa.one_off_load is: no enduring asset''s database has it, so no schema version moves.'
+    - 'BUILT 2026-11-22: `mothman one-off decide --id <id> [--decision release|withhold] [--reason ...] [--yes]` in apply_decision''s order (criterion 10, delivery-cli-ux C2): the actor from git identity against the kind''s people.yaml read at that moment; the refusal where a dataset has no recorded outcome (criterion 1 - a completed run, whatever its result, so a could-not-load or could-not-check dataset counts, Keith v6 Q4 (a)); the decision and the reason, each asked where no flag gave it, a blank reason refused; then the QA summary dataset by dataset, the datasets that could not be checked named, and the decision in force; one confirmation, skipped by --yes and refused with no terminal. It ends with the publish command. The TUI offers it as ''Record its release decision''.'
+    - 'BUILT 2026-11-22: PEOPLE ARE THE KIND''S, LIVE (criterion 4): qa_tools/common/people.people_yaml() is the kind template''s people.yaml for a selected one-off, so a person added there may decide at once. The people gate asks a one-off''s people for no `github:` and no asset manager - a one-off never uses GitHub (REQ-PIPE-446 criterion 14) and files nothing a manager must confirm. one-offs/extraction/_template/people.yaml ships with Keith''s entry as assets/daily/people.yaml carries it, less its GitHub username, and one placeholder.'
+    - 'BUILT 2026-11-22: NO-PERIOD SUPPLIES ARE NEVER GATED (criterion 7): orchestrate.promote_after does not call the gate for an arrival whose every dataset has no calendar, and gate.after_arrival, asked about one, refuses it with promotion.NO_PERIOD - ''this dataset has no calendar, so its supply has no period and is never put to the promotion gate'' - where it used to give the rule''s ''no slot could be confidently claimed''. Seen failing first: the load said ''not promoted - ... no slot ...''.'
+    - 'BUILT 2026-11-22: NEVER GITHUB (criterion 8): the decision touches no ticket code; held by a test with the GitHub boundary (ticket_github._gh) set to fail.'
+    - 'SETTLED by Keith 2026-11-22: building it next, after REQ-PIPE-442, is why the load''s next step already names decide.'
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_off_gates.py
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - qa_tools/common/one_off_decision.py::record
+    - qa_tools/common/one_off_decision.py::ensure_table
+    - qa_tools/common/one_off_decision.py::history
+    - qa_tools/common/one_off_decision.py::standing
+    - qa_tools/common/one_off_decision.py::qa_summary
+    - qa_tools/common/one_off_decision.py::refusal
+    - cli/one_off.py::decide_command
+    - qa_tools/common/people.py::people_yaml
+    - qa_tools/common/validate_people.py::problems
+    - qa_tools/common/gate.py::after_arrival
+    - qa_tools/tools/orchestrate.py::promote_after
+    - cli/one_off.py::decide_command
+    - qa_tools/common/people.py::_where_people_are
+    evidence:
+    - '2026-11-22, code tree 3d8528e0 (later commits touch requirements.yaml only): tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs and test_counted_parity, pytest -n 4, 193 passed in 43s; npx vitest run 1312 passed in 99 files; ruff clean. On the tree before its last fix (the package checks read with no template present), 36 modules - those six with test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, the run_* and datacontract modules, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_validate_soda, test_validate_imports, test_hand_filing, test_no_calendar_dashboard, test_two_asset_gates, test_cli_package_gate, test_package_gate, test_people, test_validate_people, test_promotion, test_promotion_gate, test_promotion_after_run, test_promotion_step, test_cli_filing_tui and test_status_parity - 1037 passed and 1 failed, the failure that fix answered (tests/test_one_off_gates.py''s collections gate over a root with no template). The full suite was not run.'
+    - 'tests/test_one_off_load.py TestTheReleaseDecision (8 tests) over the module''s real load: a withhold then a release appended with actor, instant and reason, the latest standing and both kept, the summary and the decision in force shown before ''Recorded'', nothing of the data moved; a blank reason, no terminal without --yes, an unknown person and a placeholder refused with nothing recorded; a person added to the template deciding at once; --dataset no such option and no dataset column; UPDATE and DELETE refused by the trigger, and a publisher role granted SELECT and neither UPDATE nor DELETE; and the outcome refusal. TestNoPeriodIsNeverGated (2, the first seen failing). tests/test_one_off_gates.py TestAOneOffsPeopleNeedNoGitHub (written with its fix, the failure first seen in a scratch run of the people gate over a generated folder: ''has no github:'' and ''no real person holds the manager role'').'
+    - '2026-11-22, criterion 11 met by REQ-PIPE-443: a decision recorded while a page is published says the page still shows the earlier state and names the publish command, read from the published page itself - tests/test_one_off_end_to_end.py TestPublishing::test_a_decision_after_publishing_says_the_page_is_behind.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52317,7 +52398,7 @@ requirements:
     date_written: '2026-11-21'
     story: As a reader of a one-off's dashboard, I want each dataset's checks and supplies shown without any schedule language or controls, so that I see what was checked rather than a page that failed to build, calls everything missing or offers buttons that do nothing.
     moscow: must
-    status: not_started
+    status: built
     source: 'Keith, plans/running-thoughts.md #141 (2026-11-18); sprint 29 point 8; delivery-dashboard-ux''s v4 review findings 6 and 10. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off A, C and D. Buildable at once (Keith, round 5). Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - WHEN the dashboard is built for an asset or one-off holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() (build_dashboard_data.py) or any other cadence read.
@@ -52341,6 +52422,39 @@ requirements:
     - 'v6, A DECLARED TABLE THAT NEVER ARRIVED IS FAIL (delivery-dashboard-ux post-sign-off A): v5''s criterion 2 forbade ''anything marked missing'', while REQ-QAC-441 criterion 3 makes that table a failing result; read literally the page would have shown grey No data for the one failure that matters most. REJECTED showing it as No data, which reads as nothing owed.'
     - 'v6, ''NOT YET CHECKED'' IS A DATASET STATUS OF ITS OWN (delivery-dashboard-ux C): v5 borrowed the `.pill.notchecked` style, whose words are the check-level ''Not checked'' (REQ-DASH-299 criterion 17). REJECTED reusing `notchecked`, which would make two different facts read alike.'
     - 'v6, REMOVED TOOLS'' ROUTES (delivery-dashboard-ux D): REQ-DASH-444 removes the tools from the header, but #/plans, #/demo, #/scenarios, #/feedback, ?panel= and cmp= still resolve from a pasted link; criterion 6 now covers them with the same notice as a stray date.'
+    - 'BUILT 2026-11-22: THE BUILD''S CADENCE READS SKIP A NO-CALENDAR DATASET at each reader - build_one_table''s cadence (None), owed_nothing.sla_timeline and for_dataset (empty), closed_slots.for_dataset and late_slots (no slots) - asking the declaration, rather than catching NoCalendarAgreed further up, which would drop the whole page. Found one reader at a time by the test, each seen raising first.'
+    - 'BUILT 2026-11-22: ''NOT YET CHECKED'' IS `notyetchecked`, a DATASET-level unordered status: in status-cases.json''s vocabulary (by_level.dataset, labels, unordered) and both STATUS_WORDS, after notchecked and before notcounted in the quiet order, drawn as .pill.notchecked is. The dataset carries notYetChecked; both rollups leave it out and the not-counted line gives the reason ''not yet checked''.'
+    - 'BUILT 2026-11-22: notYetChecked IS SET ONLY ON A ONE-OFF''S PAGE (an Asset stating a kind, REQ-PIPE-446 criterion 12), so no enduring asset''s page changes; no page carries it until 446 lands.'
+    - 'SETTLED by Keith 2026-11-22: criteria 5 and 6 wait for REQ-PIPE-446 rather than being built now against an embedded flag.'
+    - 'SETTLED by Keith 2026-11-22 (option (a)): CRITERION 2''S FAIL HALF - A ONE-OFF''S PACKAGE CHECKS COUNT. For a one-off only, its two package checks, ''declared table arrived'' and ''undeclared file'', count in its dataset''s status, so a declared table that never arrived reads Fail; REQ-DASH-097 criterion 2 is AMENDED to say so. REJECTED (b) recording every check of a missing table as could-not-run, and (c) treating it as a failed load under REQ-DASH-148.'
+    - 'BUILT 2026-11-22: ONE MARK, TWO READERS (the parity rule): pipeline/file_check_panel.for_dataset marks those two checks countsInStatus - only a one-off names them (asset_model/file_check_definitions.ONE_OFF_NAMES) - and qa_tools/common/dataset_status.package_statuses and the template''s ownVerdict() both add a marked check''s status to the dataset''s own verdict. status-cases.json counted_cases.package_checks holds both suites to the same rows, an unmarked failing file check among them. The page and the build read the package checks live from the kind''s template through file_check_definitions (Kind.file_checks), with no check workspace in use.'
+    linked_tests:
+    - tests/test_no_calendar_dashboard.py
+    - tests/test_counted_parity.py
+    - tests-js/counted-parity.test.js
+    - tests/test_status_parity.py
+    - tests-js/status-parity.test.js
+    - tests/test_one_off_load.py
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - pipeline/build_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::_one_off_page
+    - pipeline/owed_nothing.py::sla_timeline
+    - pipeline/owed_nothing.py::for_dataset
+    - pipeline/closed_slots.py::for_dataset
+    - pipeline/closed_slots.py::late_slots
+    - qa_tools/common/dataset_status.py::rollup_datasets
+    - asset_model/statuses.py::STATUS_WORDS
+    - dashboard/qa-reporting-dashboard.template.html
+    - status-cases.json
+    - qa_tools/common/dataset_status.py::package_statuses
+    - pipeline/file_check_panel.py::for_dataset
+    - asset_model/file_check_definitions.py::merged
+    - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+    - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work). tests/test_no_calendar_dashboard.py was SEEN FAILING FIRST: all 4 build tests raised NoCalendarAgreed - from agreement.cadence, then owed_nothing.for_dataset, then closed_slots - and all 6 pass.'
+    - '2026-11-22, code tree e8820d4c: tests/test_counted_parity.py 36 passed and tests-js/counted-parity.test.js 23 passed, the four new package_checks rows in status-cases.json failing in both before dataset_status.package_statuses and the template''s ownVerdict existed; tests/test_one_off_load.py 41 passed, its TestADeclaredTableThatNeverArrivedReadsFail having read the missing table''s dataset Inactive before; tests/test_extraction_recipe.py 16 passed, its TestEveryTableNamesAnIdentifier seen failing first.'
+    - '2026-11-22, criteria 3, 5 and 6 met: real verdicts for `never` datasets on a rendered page (REQ-TEST-437''s journey), no in-the-warehouse date, period control, trends, sparklines, run comparison or supply history, and every removed tool''s route, `?panel=`, `cmp=`, in-the-warehouse date and period opening the nearest view with a notice - tests/test_one_off_end_to_end.py TestTheControlsAOneOffHasNot, TestAddressesAOneOffCannotAnswer and TestEachDatasetOnThePage. Criterion 2 FOUND FAILING FIRST on the rendered page: the absent table read No data there (it had no run), though dataset_status.py read Fail; the page now takes a no-run dataset''s status from its counted package checks.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52349,7 +52463,7 @@ requirements:
     date_written: '2026-11-21'
     story: As a reader of a one-off's dashboard, I want its tables' verdicts to count and roll up, so that the page answers whether the data is fit to release rather than reading 'Not counted' throughout.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, 2026-11-21, Q4.1 (a), Q4.7 (a), round 5 architect Q3 (a); delivery-architect v4 finding 5; delivery-dashboard-ux v4 findings 7 to 9. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off B and G and delivery-dashboard-ux B, C and the display-words point. Amends REQ-PIPE-106 (built). Buildable at once (Keith, round 5). The rollup half is shared by every one-off kind. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - 'THE SYSTEM SHALL amend REQ-PIPE-106 criteria 7, 9 and 10 in the same change so that each applies to a dataset declaring `no_calendar: not-yet-agreed` only.'
@@ -52380,6 +52494,45 @@ requirements:
     - 'v6, HOW CRITERION 4 WORKS (delivery-architect G): record the result agreed, share it with every participant as share_cross_table_results already does, and count it only where the participant is counted. All participants derived means nothing counted it, so in development. This is the mechanism under Keith''s round 5 answer, not a new rule.'
     - 'v6, THE MARKER IS FOR NOT-YET-AGREED ONLY (delivery-dashboard-ux B): v5''s criterion 6 removed the marker from `never` rows while criterion 7 rewrote its tooltip for them, leaving a tooltip with nothing to hang on. REJECTED keeping a `never` sentence in the tooltip.'
     - 'v6, THE KIND''S DISPLAY WORD (delivery-dashboard-ux smaller points): ''<kind>'' in criterion 5 is the plug-in''s display word (''extraction''), never the folder name.'
+    - 'BUILT 2026-11-22: THE COUNTED SET IS ONE VALUE, sample_data.Uncounted (not-yet-agreed ids, derived ids), built by uncounted() and passed by the writer as a hoist, as sample_ids was - so supply_state and state_for_participants read one definition. is_sample stays the routing question and is unchanged; qa_results_writer''s NO-SUPPLY read still asks the routing set.'
+    - 'BUILT 2026-11-22: THE DERIVED-SIDE EXCLUSION IS A CARD FLAG, notCountedHere. A shared result is one object on every participant''s page (REQ-QAC-037 forbids a copy), so it cannot carry a per-page state; build_one_table marks the derived page''s cross-table card when any of its results is agreed, and both status implementations (dataset_status.dataset_status and the template''s new columnStatus()) skip it. On a derived page an agreed result can only be a shared counted one, since the derived product''s own results are in development.'
+    - 'BUILT 2026-11-22: ROUTING AN IN-DEVELOPMENT RESULT generalises 106''s rule: it is never shared to a participant whose own results are agreed (sample_data.supply_state), replacing ''a participant with a calendar''.'
+    - 'BUILT 2026-11-22: `derived` WITHOUT `no_calendar` FAILS THE GATE too, wherever it is declared: criterion 2 puts it beside no_calendar, and a dataset with a calendar is never a derived product. The asset-level omission message no longer suggests `never` (Keith 2026-11-22: ''your reworded gate advice stands'').'
+    - 'PARITY (the CORRECTNESS NFR): status-cases.json counted_cases is read by tests/test_counted_parity.py and tests-js/counted-parity.test.js - recorded state, cross-table recording and sharing, the derived-side exclusion, both rollups, the marker and ''Not yet checked'' - neither suite owning it. tests/test_no_calendar.py''s existing node comparison of the two rollup implementations stays.'
+    - 'SETTLED by Keith 2026-11-22: REQ-PIPE-106 criteria 8 and 15 are amended as 7, 9 and 10 are - they apply to `not-yet-agreed` only, and `never` and derived datasets follow this requirement.'
+    - 'BUILT 2026-11-22 WITH REQ-PIPE-442: CRITERION 9. The schedule gate (validate_schedule._dataset_errors) fails a one-off''s dataset declaring `not-yet-agreed`, a calendar, or no `no_calendar:` at all, naming it - every one-off dataset is `never` - and a one-off''s load runs that gate over its folder and refuses on it. Seen failing first for `not-yet-agreed`, which passed the gate before.'
+    linked_tests:
+    - tests/test_counted_parity.py
+    - tests-js/counted-parity.test.js
+    - tests/test_no_calendar.py
+    - tests/test_agreement.py
+    - tests-js/status-rollups.test.js
+    - tests/test_one_off_gates.py
+    - tests/test_one_off_load.py
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - asset_model/schedule.py::is_derived
+    - asset_model/agreement.py::DatasetAgreement
+    - qa_tools/common/schemas.py::DatasetAgreementConfig
+    - qa_tools/common/sample_data.py::Uncounted
+    - qa_tools/common/sample_data.py::uncounted
+    - qa_tools/common/sample_data.py::supply_state
+    - qa_tools/common/sample_data.py::state_for_participants
+    - qa_tools/common/qa_results_writer.py::write_qa_result
+    - pipeline/build_dashboard_data.py::share_cross_table_results
+    - pipeline/build_dashboard_data.py::build_one_table
+    - qa_tools/common/dataset_status.py::in_no_rollup
+    - qa_tools/common/dataset_status.py::dataset_status
+    - qa_tools/common/validate_schedule.py::_dataset_errors
+    - qa_tools/common/validate_schedule.py::_enduring_asset
+    - dashboard/qa-reporting-dashboard.template.html
+    - status-cases.json
+    - qa_tools/common/validate_schedule.py::_dataset_errors
+    - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+    - '2026-11-22, tree 52d356c5 (the code of this change; later commits touch only requirements.yaml, CHANGELOG.yaml and plans): 34 named test modules, pytest -n 2, 861 passed in 2m40s - among them tests/test_counted_parity.py, test_no_calendar_dashboard, test_no_calendar, test_sample_data, test_status_parity, test_status_words_shown, test_validate_schedule, test_schedule_config_errors, test_agreement, test_embed_dashboard_data, test_dashboard_for_every_collection, test_owed_nothing and test_not_supplied; npm test 99 files, 1308 passed, tests-js/counted-parity.test.js 19 and status-rollups.test.js 25 among them. The full suite, the needs_deployment half and the browser tests were NOT run (a full gate was running beside this work).'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 9: tests/test_one_off_gates.py TestTheScheduleGateRefusesAOneOffASchedule and tests/test_one_off_load.py TestTheLoadGatesItsFolder.'
+    - '2026-11-22, criterion 5 met by REQ-DASH-444: ''Derived product, not counted in the extraction''s status'' beside the derived dataset in the kind''s display word, and ''derived product'' in the not-counted line, on a rendered page - tests/test_one_off_end_to_end.py TestEachDatasetOnThePage. FOUND FAILING FIRST: the page''s dataset never carried `derived`, so neither showed and the rollup counted it; fixed in the template''s rollupFacts().'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52388,7 +52541,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever maintains the pipeline, I want one-offs of any kind found and selected like assets while staying out of everything that serves the enduring assets, so that hundreds of them never reach a command, a CI run or GitHub that was built for the enduring assets.
     moscow: must
-    status: not_started
+    status: built
     source: Keith 2026-11-21, round 3 (one-offs apart from the enduring assets), round 4 (one-offs/<kind>/<id>/, the extraction the first kind) and round 5 (architect Q2 (b)); delivery-architect v4 findings 6, 7 and 9 and its reuse list. Checked against asset_model/assets.py, cli/check.py's _GATES and _asset_passes, qa_tools/common/diff_base.py and REQ-PIPE-342/363. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A, H, J, K, L and M, delivery-cli-ux G4, G7 and C5, and Keith's answers (--id; never GitHub; every kind declares a project; copy nothing). Shared by every kind. v7 folds in Keith's answers to the v6 questions (Q2, MOTHMAN_ASSET for enduring assets only; Q6, the `mothman check` criteria split out as REQ-PIPE-448). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL list one-offs from one-offs/<kind>/ for every kind folder under one-offs/ - directories only, '_' and '.' names skipped - and SHALL NOT hold a list of one-offs anywhere in code; IF a one-off folder's name does not meet NAME_PATTERN, THEN `mothman check` SHALL fail, naming it, and THE SYSTEM SHALL NOT select any other folder in its place.
@@ -52433,6 +52586,48 @@ requirements:
     - 'v7, NO ONE-OFF IN MOTHMAN_ASSET, EVEN INTERNALLY (delivery-scoper, checked against asset_model/assets.py): assets.select() writes the selected name into os.environ so a spawned process inherits it. Doing that for a one-off would hand the child a MOTHMAN_ASSET that criterion 9 refuses, so criterion 7 carries a one-off through handoff()/adopt() instead.'
     - 'v7, CRITERION 8 NO LONGER SAYS ''WHILE A ONE-OFF IS SELECTED'' (following v6 Q2 (b)): with MOTHMAN_ASSET unset whenever a one-off is worked, REQ-PIPE-363 criterion 2 as built already builds no collection group, so its v6 amendment is withdrawn (amendments-v7) and this criterion just states the rule.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q6 (b)): SPLIT BEFORE RE-SIGNING. v6''s criteria 10-14 and 20 - every per-(gate, kind) declaration, the changed-folder and digest passes, check''s output, the collections gate, the CI/hook test and the template gate - with the NFRs and decisions only about them, are REQ-PIPE-448. REJECTED (a) re-signing one 20-criterion requirement. Criteria 15-19 are renumbered 10-14.'
+    - 'BUILT 2026-11-22 AGAINST A TEST KIND (''audit'' / ''audits'', tests/one_off_support.py), not the extraction, whose recipe reader and generated folder are REQ-PIPE-439''s and REQ-PIPE-440''s (Keith 2026-11-22: do not invent the extraction''s files).'
+    - 'BUILT 2026-11-22: THE KIND PLUG-IN REGISTRY is asset_model/one_off_kinds.py - a Kind (folder name, singular, plural, check layer''s name, reader, generator, check layers, and its (gate -> applies) declarations for REQ-PIPE-448) that each kind''s module under asset_model/kinds/ registers itself; the package is discovered, so no list of kinds is held in code (REQ-PIPE-342 criterion 5). None is registered today.'
+    - 'BUILT 2026-11-22: THE ONE-OFFS ROOT LIVES ON THE LAYOUT (_Assets.one_offs, criterion 11), with a stat stamp for the root and one per kind folder (the SCALABILITY NFR). use_one_offs_root() points it elsewhere; use_root() keeps it. handoff() gains a sixth element, whether the selection is a one-off, and adopt() selects it by select_one_off() - never through MOTHMAN_ASSET (criterion 7).'
+    - 'BUILT 2026-11-22: THE SELECTED ONE-OFF IS A PROCESS GLOBAL set only by assets.select_one_off() (--id or the TUI). selected() refuses it with MOTHMAN_ASSET set at all. The clash check (criterion 4) runs in selected() for an asset only where one-offs exist, since selected() is asked millions of times in one generation.'
+    - 'BUILT 2026-11-22: A BAD ONE-OFF NAME IS LEFT OUT OF THE LISTING rather than raising as a bad asset name does: a raise there would break every enduring asset''s selection over one badly named one-off. The folders gate names it, and it can never be selected (criterion 1).'
+    - 'BUILT 2026-11-22: THE FOLDERS GATE (qa_tools/common/validate_folders.py, repository-wide) owns criteria 1, 2, 4, 5 and 13''s `mothman check` failures; it reads folder names and each data-asset.yaml''s data_asset_id and project only. `project:` is an optional key of the asset schema, required of a one-off by the gate.'
+    - 'BUILT 2026-11-22: NEVER GITHUB (criterion 14) is enforced at every `gh` boundary - ticket_github, ticket_sync, leaderboard and ci_usage refuse with NeverGitHub when a one-off is selected - and service_from_env() returns no ticket service for one, whatever the environment says.'
+    - 'BUILT 2026-11-22: `mothman one-off` REFUSES MOTHMAN_ASSET SET AT ALL, before reading anything, in its own words naming the variable and its value; REQ-PIPE-363 criterion 12''s approved words are for MOTHMAN_ASSET naming a one-off''s id outside the group.'
+    - 'A KIND WITH FOLDERS BUT NO PLUG-IN IS LEFT OUT OF ''For one of <n> <kinds>'' - it has no display word, and the folders gate fails its folder (criterion 2).'
+    - 'APPROVED by Keith 2026-11-22: criterion 3''s refusal words, as built in cli/one_off.py::refuse_an_asset_beside - ''MOTHMAN_ASSET is ''<value>'', and `mothman one-off` runs with it unset: MOTHMAN_ASSET is for the enduring assets only, and a one-off is named by --id or chosen in `mothman one-off`. Unset it and run this again.'''
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D5): a one-off''s page carried ''View on GitHub'' links to github.com/<repo>/tree/<commit>/one-offs/..., though a one-off never uses GitHub (criterion 14). The embed now leaves GITHUB_LINKS empty for a one-off, saying ''GITHUB_LINKS left out: a one-off never uses GitHub.'''
+    linked_tests:
+    - tests/test_one_offs.py
+    - tests/one_off_support.py
+    - tests/test_one_off_load.py
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - asset_model/assets.py::select_one_off
+    - asset_model/assets.py::selected
+    - asset_model/assets.py::one_offs
+    - asset_model/assets.py::use_one_offs_root
+    - asset_model/assets.py::handoff
+    - asset_model/assets.py::adopt
+    - asset_model/assets.py::id_clashes
+    - asset_model/assets.py::kinds_sentence
+    - asset_model/assets.py::refuse_github
+    - asset_model/assets.py::Asset
+    - asset_model/one_off_kinds.py::Kind
+    - asset_model/one_off_kinds.py::register
+    - qa_tools/common/validate_folders.py::problems
+    - cli/one_off.py::one_off_group
+    - cli/one_off.py::list_command
+    - cli/one_off.py::choose
+    - qa_tools/common/ticket_reconciler.py::service_from_env
+    - qa_tools/common/ticket_github.py::_gh
+    - qa_tools/common/ci_usage.py::_run_gh
+    - cli/one_off.py::publish_command
+    evidence:
+    - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). The CLI tests for REQ-PIPE-363 criteria 11 and 12 failed against the code before 446 (13 errors - the resolver had no one-offs root to point at), and pass.'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Load, list and drop through `mothman one-off --id`: tests/test_one_off_load.py.'
+    - '2026-11-22, criterion 8''s publish step met by REQ-PIPE-443: `mothman one-off publish --id`, and in the TUI - tests/test_one_off_end_to_end.py.'
+    - '2026-11-22, the mock run''s D5, test-first: tests/test_one_off_page_agrees.py TestNoNoise::test_no_github_links FAILED FIRST on the missing line (its fixture''s folder is outside the repository, which left the links out by another road), and passes after.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52441,7 +52636,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever maintains the pipeline, I want `mothman check` to gate every one-off folder at a cost near today's and to say exactly what it checked, so that hundreds of generated folders stay trustworthy configuration without slowing the gate or reaching CI.
     moscow: must
-    status: not_started
+    status: built
     source: 'Split out of REQ-PIPE-446 by Keith 2026-11-21 (v6 Q6 (b)), carrying v6''s criteria 10-14 and 20 unchanged in substance: Keith round 5 (architect Q2 (b)); delivery-architect v4 findings 6 and 7 and post-sign-off H and K; delivery-cli-ux C5. Drafted by delivery-scoper 2026-11-21, v7. Shared by every kind. v7, PROPOSAL until signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - THE SYSTEM SHALL have every per-asset gate in `mothman check` declare, for each one-off kind, whether it applies, SHALL refuse to run a gate with any (gate, kind) pair undeclared, SHALL decide a one-off's synthetic gates from that declaration and never from _has_synthetic's default for a name it does not find, and SHALL word a gate that does not apply to a kind 'not applicable (<kind>)' with the kind's display word, keeping 'not applicable (no synthetic/ folder)' for an enduring asset.
@@ -52470,6 +52665,44 @@ requirements:
     - 'v7, SPLIT FROM REQ-PIPE-446 (Keith 2026-11-21, v6 Q6 (b): ''split the mothman check criteria (c10-c14, c20) into a requirement of their own BEFORE re-signing''). Moved as written: v6''s 446 c10-c14 are criteria 1-5 here and c20 is criterion 6; the NFRs about subprocess cost, CI''s shell loops and validate-config.yml, and the decisions only about gating, came with them. REJECTED re-signing 446 at 20 criteria.'
     - 'v7, CI AND HOOKS LIVE HERE TOO (Keith named c14 in the split): the test that no workflow or hook loops over, selects or loads a one-off is the other half of ''gated locally, never in CI'', so it sits with the local gating it complements.'
     - v7, DEPENDS ON REQ-PIPE-440 for the recorded digest and the gitignored dbt artefacts criterion 2 reads, and on REQ-PIPE-385 for the synthetic gates' not-applicable rule criterion 1 extends. REQ-PIPE-385 moves here from 446, which no longer touches gates.
+    - 'BUILT 2026-11-22: THE DECLARATIONS ARE THE KIND PLUG-IN''S `gates` MAP (asset_model/one_off_kinds.Kind, REQ-PIPE-446). A per-asset gate - every gate not repository-wide - is refused, FAILED and not run, when a kind that has folders leaves it undeclared; a kind with no folders is not asked, so a kind is declared in full before its first folder can pass.'
+    - 'BUILT 2026-11-22: ''not applicable (<kind>)'' uses the kind''s SINGULAR display word; the enduring assets keep ''not applicable (no synthetic/ folder)'' unchanged. The one line per kind prints under the summary table, only where that kind has folders.'
+    - 'CRITERION 5''S TEST READS SOURCE ON PURPOSE (CLAUDE.md''s test rule 1): every workflow `run:` step and the session-start hook''s script, refused any mention of one-offs/, `mothman one-off`, one_off or --id - an architecture rule with no behaviour to observe from a test.'
+    - 'SETTLED by Keith 2026-11-22: A PER-ASSET GATE ACTS FOR A ONE-OFF THROUGH A HIDDEN `mothman one-off gate --id <id> <gate>`, which selects the one-off and runs that gate in process. REJECTED a second environment variable naming the one-off for the gate''s subprocess: it would be a second way of naming a one-off beside --id, the thing REQ-PIPE-446 criterion 9 and Keith''s v6 Q2 (b) rule out.'
+    - 'BUILT 2026-11-22 (criteria 2 and 3): qa_tools/common/one_off_gating.py. A folder changed since the diff base, committed or not, untracked files included, is gated in full through `mothman one-off gate --id <id> <gate>` - a subprocess per (folder, gate), carrying a one-offs root pointed elsewhere by a hidden --root, never MOTHMAN_ASSET - and digest-checked too; every other folder is digest-checked in process. The gitignored dbt artefacts (target/, logs/, dbt_packages, package-lock.yml) are left out of the digest. One row per (gate, kind) follows the gate''s own row - ''<gate> (<kinds>: <n> in full, <m> by digest; failed: <ids>)'' - each failure printed with its folder and first differing file, and the one-line result counts folder-gates in full and by digest.'
+    - 'BUILT 2026-11-22: `mothman one-off gate` runs the gate''s own argv in process - a module run as __main__, or a mothman command invoked - with the one-off selected; it lives in cli/, since qa_tools may not import cli (the import gate).'
+    - 'SETTLED by Keith 2026-11-22: THE SCHEDULE GATE DOES NOT ASK amber_setting OR replacement_setting OF A ONE-OFF - a no-period supply is never promoted (REQ-PIPE-435 criterion 7) - so neither the schema''s ''required'' nor either setting''s own frozen-past checks run for an Asset stating a kind; an enduring asset must still state both. REJECTED fixed values written into every one-off folder. Tested in tests/test_extraction_folder.py, the whole schedule gate seen failing first for a generated folder and passing after.'
+    - 'BUILT 2026-11-22 WITH REQ-QAC-441: CRITERION 4. qa_tools/collections.adapter_module() serves a one-off''s collection from its kind''s shared adapter, qa_tools/kind_adapters/<kind>.py''s adapter_for(collection) - outside qa_tools/collections/, which the layout gate keeps to the registry and its base (REQ-PIPE-342 criterion 10). The collections gate counts every collection of a one-off as served where the selected asset is one, and still fails an enduring asset''s collection without a module. Its dbt-layout check now compares by where a file is, so a folder outside the repository is gated as one inside it (a defect, seen failing first).'
+    - 'BUILT 2026-11-22: CRITERION 6. A kind declares its template''s gates as named checks (Kind.template_gates); `mothman check` runs them, where the template changed since the diff base, after the per-asset gates - one row each, ''<gate> (<kind> template)'', nothing where it did not change. The extraction''s one is its default check layer (extraction_checks.read_template). people.yaml (REQ-PIPE-435) and the destination (REQ-PIPE-443) add theirs when built.'
+    linked_tests:
+    - tests/test_one_off_gates.py
+    - tests/test_cli_check.py
+    implemented_by:
+    - qa_tools/common/one_off_gating.py::kind_pass
+    - qa_tools/common/one_off_gating.py::digest_problem
+    - qa_tools/common/one_off_gating.py::changed
+    - qa_tools/common/one_off_gating.py::gate_folder
+    - cli/one_off.py::gate_command
+    - cli/one_off.py::run_in_process
+    - cli/check.py::one_off_rows
+    - cli/check.py::result_line
+    - cli/check.py::undeclared
+    - cli/check.py::not_applicable_text
+    - cli/check.py::not_applicable_lines
+    - cli/check.py::per_asset_gates
+    - cli/check.py::one_off_kinds_with_folders
+    - cli/check.py::check_command
+    - asset_model/one_off_kinds.py::Kind
+    - qa_tools/common/one_off_gating.py::template_pass
+    - cli/check.py::template_rows
+    - qa_tools/common/validate_collections.py::config_problems
+    - qa_tools/kind_adapters/extraction.py::adapter_for
+    - qa_tools/common/one_off_gating.py::template_pass
+    evidence:
+    - '2026-11-22, tree e76f814f: criteria 2 and 3 built; tests/test_one_off_gates.py 17 tests (7 new: a changed folder gated in full through the hidden command, the row''s counts in full and by digest, an unchanged folder by digest alone, a digest failure naming the folder and file, an untracked file counted and dbt artefacts not, no row for a gate that does not apply, the result line''s counts) in the 50-module run, 1451 passed in 2m03s.'
+    - '2026-11-22, tree 68a8cf7a: 41 named test modules (pytest -n 4: tests/test_one_offs.py, test_one_off_gates, test_assets, test_cli_asset_selection, test_cli_check, test_terminal_names_environment, test_ticket_comments, test_ticket_reconciler, test_ticket_github, test_ticket_sync, test_leaderboard, test_ci_usage, test_validate_imports, test_two_asset_gates, test_processing_pass, test_publish and 25 more) 1286 passed, 1 failed: tests/test_publish.py''s reports-marker guard, which matched test_one_offs'' naming of reports/<id>. Fixed by the marker comment (c328aa4e); test_publish and test_one_offs then 82 passed. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_one_off_gates.py is new behaviour (10 tests); its criterion 1 tests cannot pass on the code before it, which has no undeclared().'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 4: tests/test_one_off_gates.py TestTheCollectionsGateAcceptsTheSharedAdapter (seen failing first on the missing adapter and the dbt layout); criterion 6: TestAChangedTemplateIsGated. `MOTHMAN_ASSET=daily mothman check --no-pytest` on the same code: every gate passed but patterns (daily), which refuses supply_daily''s qa schema at version 52 against this checkout''s 53 - the deployment database, not touched here - and, before the shared adapter moved to qa_tools/kind_adapters/, layout, which then passed.'
+    - '2026-11-22, criterion 6 widened by REQ-PIPE-443: every kind''s template is also gated for its publishing destination - tests/test_one_off_gates.py TestAChangedTemplateIsGated (a missing file, an empty destination and an s3:// with no bucket each fail it).'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52478,10 +52711,10 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a one-off, I want it worked in a database of its own that I remove, with everything it left on disk, when I am done, so that one one-off's rows never sit beside another's and never outlast the work.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29 points 7 and 9 (Keith, 2026-09-27); Keith 2026-11-21 Q4.3 (a), Q4.6 (a), round 2 Q1 (a) and Q5 (b), round 5 architect Q4 (a); delivery-architect v4 findings 2 and 9 and its reuse list. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-cli-ux G1-G3, G6, C1, C7, C8, D1 and D2, delivery-architect A2, F, L and the two contradictions, and Keith's answers (the TUI; --id; drop by typed id only; load gates its folder; no 259 hold). Shared by every kind. v7 folds in Keith's answers to v6 Q1 (load records its commit), Q2 (MOTHMAN_ASSET refused beside --id), Q3 and Q5 (as drafted). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
-    - 'THE SYSTEM SHALL run every `mothman one-off` command with MOTHMAN_ASSET unset, and refuse one with it set (REQ-PIPE-446 criterion 3), as an exemption from REQ-PIPE-363 criteria 6 and 7 - bare `mothman one-off`, open and list selecting nothing, and load, decide, publish and drop selecting the one-off their `--id` names (REQ-PIPE-446 criterion 3): open reads the package, the kind''s template and the folder names under assets/ and one-offs/, and connects to nothing; list reads the one-offs root and git, and connects to the configured local server only through an administrative connection that lists its databases and claims no asset for the process.'
+    - 'THE SYSTEM SHALL run every `mothman one-off` command with MOTHMAN_ASSET unset, and refuse one with it set (REQ-PIPE-446 criterion 3), as an exemption from REQ-PIPE-363 criteria 6 and 7 - bare `mothman one-off`, open and list selecting nothing, and load, decide, publish and drop selecting the one-off their `--id` names (REQ-PIPE-446 criterion 3): open reads the package, the kind''s template and the folder names under assets/ and one-offs/, and connects to nothing; list reads the one-offs root, git and its kind''s publishing destination, and connects to the configured local server only through an administrative connection that lists its databases, reads the mark each one-off''s database carries, and claims no asset for the process. AMENDED 2026-11-22 (Keith, on the mock run''s D3).'
     - WHEN a person runs bare `mothman one-off`, THE SYSTEM SHALL open a menu of its own, needing no asset set, that lists the one-offs as criterion 10 does and lets the person choose one to work on or open a new package; once one is chosen, THE SYSTEM SHALL act on that one-off for every step for the rest of the session, and SHALL need a new session to work on another.
     - WHEN a person loads a one-off from the TUI or `mothman one-off load --id <id>`, THE SYSTEM SHALL select it (REQ-PIPE-446 criterion 3), run every gate its kind declares over its folder and refuse on a failure, naming the gate and the folder, and only then create supply_<id> on the configured local server, mark that database's identity as the one-off's (db_identity.mark), record in it the package's digest and the commit of this repository the load ran at (REQ-DASH-444 criterion 8), and stage, check and record the package there through the same pipeline as any arrival, filing one delivery per collection.
     - WHERE a package holds a file its recipe does not declare, THE SYSTEM SHALL record it as a failing default-layer result (REQ-QAC-441 criterion 3), naming the file, and SHALL NOT file it.
@@ -52490,12 +52723,13 @@ requirements:
     - THE SYSTEM SHALL accept nothing but the typed id as the drop's confirmation - no flag stands in for it and `--yes` never skips it - and IF no terminal is attached, THEN THE SYSTEM SHALL refuse the drop in NeedsATerminal's words.
     - WHEN the id is typed, THE SYSTEM SHALL remove every item the confirmation listed, saying 'Deleted <item>' as each goes, and SHALL leave the one-off's committed configuration in place; IF any item cannot be removed, THEN THE SYSTEM SHALL name each one it could not remove and SHALL let the same drop be run again to finish.
     - THE SYSTEM SHALL NOT drop a one-off automatically - not on publishing, not on a schedule, and not as a side effect of anything else.
-    - THE SYSTEM SHALL list, in the TUI and `mothman one-off list`, every one-off with its stage - opened, committed, pushed, or loaded - how long since its database was created where it has one, and the command for its next step, and every one-off database still on the server with its age; WHERE there are no one-offs, THE SYSTEM SHALL say so and name `mothman one-off open`.
+    - THE SYSTEM SHALL list, in the TUI and `mothman one-off list`, every one-off with its stage - opened, committed, pushed, loaded, decided or published - how long since its database was created where it has one, and the command for its next step, never a step that would be refused, and every one-off database still on the server with its age; WHERE there are no one-offs, THE SYSTEM SHALL say so and name `mothman one-off open`. AMENDED 2026-11-22 (Keith, on the mock run's D3).
     - THE SYSTEM SHALL NOT run any part of a one-off in CI.
     - WHEN any `mothman one-off` command finishes, THE SYSTEM SHALL end its output with the command for the next step - after open, the git commands to commit and push the folder and then `mothman one-off load --id <id>`; after load, decide or publish; after publish, decide or drop.
     - 'THE SYSTEM SHALL name the selected one-off, in words, wherever REQ-PIPE-363 criterion 8 names the asset - ''Environment: Sandbox (not production) · One-off: <id> (extraction)'', the kind in its display word - in the TUI''s toolbar and the line at the first connection.'
     - THE SYSTEM SHALL list `mothman one-off` as a Tier 1 command in `mothman --help`'s Tools panel.
     - THE SYSTEM SHALL use the words 'one-off' only for a one-off, and SHALL reword cli/app.py's 'one-off command' (a single command run outside the wizard) to say that instead.
+    - WHEN a one-off's load is run again after an earlier load stopped inside a run's checks - the run opened, its staging recorded, not completed - THE SYSTEM SHALL retry that run on a fresh attempt, as a recurring asset's retry of a failed run does, rebuilding its run views over what its arrival already staged and neither staging it nor recording its file checks again. ADDED 2026-11-22 (Keith, 'Retry opens a new try').
     non_functional_requirements:
     - 'SECURITY: creating a database needs CREATEDB on the local server; the role that holds it is the operator''s, never a CI or service identity.'
     - 'PRIVACY: a one-off''s rows sit on a shared local server between load and drop, and copies of its files and its failing-row keys sit under data/<id>/ and reports/<id>/ until the drop removes them (criterion 8). A real deployment''s one-off folders would need a private repository (REQ-PIPE-446''s PRIVACY NFR).'
@@ -52530,8 +52764,61 @@ requirements:
     - 'SETTLED by Keith 2026-11-21 (v6 Q5 (a)): LIST SHOWS THE CHEAP STAGES ONLY - opened, committed, pushed, loaded, age and next step (criterion 10). REJECTED (b) opening every one-off''s database and reading the destination per row.'
     - 'v7, LOAD RECORDS ITS COMMIT (Keith 2026-11-21, v6 Q1 (a)): criterion 3 stores the commit the load ran at beside the package digest, so the page can say ''checked at'' as well as ''built at'' (REQ-DASH-444 criterion 8).'
     - 'v7, MOTHMAN_ASSET SET BESIDE A ONE-OFF COMMAND IS REFUSED (Keith 2026-11-21, v6 Q2 (b)): criterion 1 now says so, pointing at REQ-PIPE-446 criterion 3.'
-    open_questions:
-    - 'Where load finds the package: given again as an argument, or recorded at open. A build decision - the recipe digest check (REQ-PIPE-440 criterion 8) refuses a wrong package either way.'
+    - 'BUILT 2026-11-22 (the open question): LOAD IS GIVEN THE PACKAGE AGAIN, `mothman one-off load --id <id> <package>`. Recording it at open would put one machine''s path - or an S3 prefix and its credentials'' reach - into committed configuration; the recipe digest (REQ-PIPE-440 criterion 8) and the package''s own digest (criterion 5) refuse a wrong one either way, and a package whose recipe names another id is refused.'
+    - 'BUILT 2026-11-22: THE LOAD (qa_tools/common/one_off_load.load) after the CLI has asked REQ-PIPE-440''s refusals and run every gate the kind declares in process (cli/one_off.run_in_process, as `mothman one-off gate` does): supply_<id> is created on MOTHMAN_PG''s server through one administrative connection, marked (db_identity.mark) and given qa.one_off_load - the package''s digest, the recipe''s, the commit the load ran at, and each collection''s delivery once filed. Then the check workspace (REQ-QAC-441), one hand-filed delivery per collection holding its declared files only (route `folder`, originally received `not-known`), each arrival staged and run through orchestrate.run_arrivals, and the package''s own facts recorded (qa_tools/common/one_off_package.py).'
+    - 'BUILT 2026-11-22: THE PACKAGE''S DIGEST is sha256 over every file''s name and content - not the recipe''s alone, so a re-send with the same recipe and other data is a different package and refused (criterion 5). RESUME reads the recorded deliveries rather than filing again, and skips every run already completed, a missing table''s included.'
+    - 'KNOWN LIMIT 2026-11-22: a package where NO declared table arrived has no receipt to name its missing tables'' runs by, so the load''s own instant is used; a resumed load of such a package would record them again under a new instant.'
+    - 'BUILT 2026-11-22: LIST IS THE STAGE BOARD (qa_tools/common/one_off_lifecycle.rows): `loaded` where supply_<id> is on the server, else `pushed`, `committed` or `opened` from git; the age from the database''s own PG_VERSION file, as `mothman env tidy-test-databases` reads it; and every supply_<name> that is no enduring asset''s is listed as a one-off database, with or without its folder. Through one administrative connection, claiming no asset; where no server is configured or reachable, the stages git can see are still shown and it says so.'
+    - 'BUILT 2026-11-22: THE DROP (cli/one_off.drop_command) lists only what is there - the database with its tables and rows, data/<id>/ (filed files, check workspace, dbt scratch), reports/<id>/ and any dbt artefact in the folder, each with its count - asks for the typed id through click''s prompt after common.require_tty, refuses with no terminal in NeedsATerminal, says ''Deleted <item>'' as each goes, and on a failure names what remains and the command that finishes it. one_off_lifecycle.remove is called by the drop command only (criterion 9, held by a source-reading test).'
+    - 'BUILT 2026-11-22: THE ENVIRONMENT LINE names a selected one-off as ''One-off: <id> (<kind''s display word>)'' in cli/common.environment_statement, which the TUI''s toolbar and the line at the first connection both read (criterion 13). cli/app.py''s ''one-off command'' docstring now says a single command run outside the wizard (criterion 15).'
+    - 'SETTLED by Keith 2026-11-22: the load''s next step naming decide and publish, before either is built, is fine - they are built next (REQ-PIPE-435, REQ-PIPE-443).'
+    - 'SETTLED by Keith 2026-11-22 (''Retry opens a new try''), CRITERION 16: a load that died INSIDE a run''s checks is resumed by a fresh attempt at that run. Found building REQ-TEST-437 (plans/qa-pipeline.md #89, deleted in the same change): the run was left with a run_seq and no completed_at, the next load re-staged it, and staging''s writes, which come before an attempt opens, were refused with NoOpenAttempt (REQ-PIPE-279 criterion 8) - so the load could never finish. REJECTED treating such a run as a could-not-check outcome.'
+    - 'BUILT 2026-11-22: one_off_load._opened() tells a run already opened (its run_seq drawn) from one never begun; the first is not re-staged - stage.rebuild_run_views() rebuilds its view schema, which the failed attempt gave back - and the orchestrator opens a fresh attempt at it, drawing a later run_seq, exactly as the processing pass retries a failed recurring run without staging it again.'
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D4), `list` LISTS ONLY ONE-OFF DATABASES: it took every supply_<name> that was no enduring asset''s exact name for a one-off''s, so supply_daily_c - an enduring asset''s database on a suffixed DSN - was listed as one, with drop advice beside it. A one-off load now marks its database on the server (COMMENT ON DATABASE, ''mothman one-off: <id>'', one_off_load.SERVER_MARK), and list reads the mark through the same single administrative connection (shobj_description), so criterion 1''s ''only through an administrative connection that lists its databases'' still holds. REJECTED opening each candidate database to look for qa.one_off_load: that is a connection to every database, which criterion 1 rules out. A one-off database loaded before this carries no mark and is not listed (regenerate, never migrate). The same read now uses pg_stat_file(..., missing_ok): a database another session dropped mid-read failed the list (found running the suite in parallel).'
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D5), THE LOAD''S COUNT IS THE DATABASE''S: it said ''81 tool result(s), 10 failing'' while the database held 110 results and 11 failing - the four tools'' results alone, so the undeclared file''s failure was not in it. It now reads every result its runs recorded (one_off_load.recorded_counts) and says what the total holds: ''N check result(s) recorded (T from the four tools, F file and package checks), K failing''. The publish''s per-collection line counts the tools'' results only, legitimately, and now says so (''check results from the tools, file checks not counted here'').'
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D5), NOISE: a one-off''s load printed ''carries <dataset>, which nothing is currently owed from'' for every delivery, again at each collection (fifteen lines for three deliveries), and its publish four ''could not read closed periods ... NoCalendarAgreed (no_calendar: never)'' notes. A `never` dataset owes nothing by design, so neither says anything: arrivals leaves never datasets out of the note, and outstanding says nothing where every dataset it read is never.'
+    - 'AMENDED BY KEITH 2026-11-22 (the worked mock run, post-build-review #494 D3), criteria 1 and 10: list showed no decided or published stage, and after a published one-off was dropped it recommended a load that REQ-PIPE-443 criterion 7 refuses. Keith approved the wording proposed after the run: six stages, the next step never one that would be refused, and list reading the kind''s publishing destination and each one-off database''s mark. BUILT the same day: decide and publish re-mark the database''s comment (''mothman one-off: <id>; decided'' / ''; published'', one_off_load.remark); list reads the stage from the mark through its one administrative connection, and where the database is gone reads the destination, so a published, dropped one-off reads published with ''none - its page is published at <address>'' as its next step. A decision after a publish re-marks it decided, whose next step is to publish again. A database marked before this carries no stage and reads loaded (regenerate, never migrate).'
+    open_questions: []
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_offs.py
+    - tests/test_one_off_gates.py
+    - tests/test_one_off_end_to_end.py
+    - tests/test_one_off_resume.py
+    - tests/test_one_off_page_agrees.py
+    implemented_by:
+    - cli/one_off.py::one_off_group
+    - cli/one_off.py::_tui
+    - cli/one_off.py::load_command
+    - cli/one_off.py::list_command
+    - cli/one_off.py::drop_command
+    - cli/one_off.py::open_command
+    - qa_tools/common/one_off_load.py::load
+    - qa_tools/common/one_off_load.py::ensure_database
+    - qa_tools/common/one_off_load.py::package_digest
+    - qa_tools/common/one_off_load.py::recorded_load
+    - qa_tools/common/one_off_lifecycle.py::rows
+    - qa_tools/common/one_off_lifecycle.py::stray_databases
+    - qa_tools/common/one_off_lifecycle.py::database_ages
+    - qa_tools/common/one_off_lifecycle.py::inventory
+    - qa_tools/common/one_off_lifecycle.py::remove
+    - cli/common.py::environment_statement
+    - asset_model/kinds/extraction_recipe.py::read
+    - cli/one_off.py::publish_command
+    - qa_tools/common/one_off_load.py::_opened
+    - qa_tools/tools/stage.py::rebuild_run_views
+    - qa_tools/common/one_off_load.py::recorded_counts
+    - qa_tools/common/one_off_load.py::mark_on_server
+    - qa_tools/common/one_off_load.py::remark
+    - qa_tools/common/one_off_lifecycle.py::rows
+    evidence:
+    - '2026-11-22, code tree ca76f6a0 (the commits after it touch only requirements.yaml and CHANGELOG.yaml): 31 named test modules, pytest -n 4 (tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs, test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, test_evidently_reads_its_entry, test_run_evidently_cp, test_run_evidently_bdm, test_run_datacontract_cp, test_run_datacontract_bdm, test_datacontract_common, test_datacontract_worker, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_run_soda_cp, test_run_dbt_cp, test_validate_soda, test_reads_columns, test_validate_imports, test_adapter_imports, test_hand_filing, test_counted_parity, test_no_calendar_dashboard, test_two_asset_gates) 804 passed in 65s; ruff clean. The full suite, the needs_deployment half and the browser tests were NOT run (no page change); npm test ran in `mothman check --no-pytest`.'
+    - 'tests/test_one_off_load.py drives every criterion through `mothman one-off` (Click''s runner, the real one-offs root pointed at a temporary repository with a bare remote, the database a throwaway supply_<id>): the database marked as the one-off''s with the package digest and HEAD recorded, one delivery per collection holding only declared files, the same package resumed with no new run, another refused as a re-send, a folder failing the schedule gate refused naming the gate and the folder with no database made; list as the stage board (opened, pushed, loaded with age and the database), claiming no asset, and ''No one-offs'' naming open; the TUI choosing a one-off then steps acting on it, and opening a new package; the drop refused with no terminal, nothing removed on a wrong id, each item listed with its counts, a failed item named and the same drop finishing it, the folder kept; the environment line; one-off in --help''s Tools panel. Criterion 11 is REQ-PIPE-448 criterion 5''s test (no workflow or hook names `mothman one-off`).'
+    - '2026-11-22, criteria 2, 6 and 12 met by REQ-PIPE-443: publish in the TUI''s step menu (TestTheTuiOffersPublish), the drop''s two publishing warnings in its confirmation (TestPublishing), and publish ending with decide or drop as its next step (test_next_steps) - tests/test_one_off_end_to_end.py.'
+    - '2026-11-22, code tree a329b566 (later commits touch requirements.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_resume, test_not_yet_agreed_beside_calendared, test_one_off_load, test_one_off_gates, test_inheritance, test_inheritance_refusal_items, test_list_settings, test_offset_group_inheritance, test_period_overlay, test_no_period_filing, test_no_calendar, test_no_calendar_dashboard and test_counted_parity - 365 passed and 1 failed (the home view''s undeclared-file line, whose key was then fixed in asset_model/kinds/extraction.py); tests/test_one_off_end_to_end.py again after that fix, -n0, 67 passed; npx vitest run 1312 passed; ruff clean. The full suite was not run.'
+    - 'Criterion 16, test-first: tests/test_one_off_resume.py kills Evidently inside the first load''s people run, then loads again - FAILED FIRST with NoOpenAttempt (and once past that, UnreadableOwnTable, the run''s views gone); now the second load finishes, no run is left uncompleted, and the dead run''s run_seq is later than the one it died on.'
+    - '2026-11-22, the mock run''s D4 and D5, test-first: tests/test_one_off_page_agrees.py FAILED FIRST on a plain supply_x-<hex>-plain database listed under ''One-off databases on the server'', on ''currently owed'' in the load''s output, on NoCalendarAgreed in the publish''s, and on the load''s failing count against the database''s; all pass after.'
+    - '2026-11-22, criteria 1 and 10 as amended, test-first: tests/test_one_off_page_agrees.py TestTheListFollowsTheStages FAILED FIRST on ''loaded'' after decide and after publish, and on ''pushed'' with a load offered after the published one-off was dropped (a load the test confirms is refused); all four pass after.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52540,7 +52827,7 @@ requirements:
     date_written: '2026-11-21'
     story: As a project team member or auditor, I want each one-off's QA page in one known place, permanently, so that what was checked and decided can be found years later.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29 point 8 and its durable-record paragraph (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q3 (b); delivery-architect v4 finding 10. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off D and D2 and the 442-on-443 contradiction, delivery-cli-ux G1 and C3, and Keith's answers (copy nothing; --id). Shared by every kind. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - WHEN a person publishes a one-off from the TUI or `mothman one-off publish --id <id>`, THE SYSTEM SHALL build its dashboard by the rebuild, reshape, embed and render-gate steps of any asset's build, and write it as one page named by the id to the destination named in the kind's template (one-offs/<kind>/_template/), read at the moment of publishing - a filesystem path or an S3 prefix - with the page's fonts/ beside it, whether or not a decision has been recorded.
@@ -52574,6 +52861,38 @@ requirements:
     - 'v6, THE DESTINATION''S GUARDS LIVE HERE (the architect''s second contradiction): the already-published load refusal and both drop warnings read the destination, so they moved from REQ-PIPE-442 to this requirement, which now depends on 442 instead of the reverse.'
     - 'v6, THE STALE-PAGE WARNING (delivery-cli-ux G1): a decision recorded after the last publish would be lost at drop with nothing said; criterion 9 says so and offers to publish first.'
     - 'v6, PUBLISH CONFIRMS (delivery-cli-ux C3): it writes outside the repository to a place other people read, so the address, the decision and the unchecked count are shown first.'
+    - 'BUILT 2026-11-22, THE PUBLISHED PAGE IS ITS OWN RECORD: the page carries in a <meta name="mothman-one-off"> the one-off, its package digest, its publish instant and its newest decision. That is what refuses another package''s overwrite (c5), refuses the load of a published one-off (c7, when the database may be gone), and what the drop''s warnings (c8, c9) and REQ-PIPE-435 c11''s note compare the recorded decisions with. REJECTED a qa.one_off_publish table in the one-off''s database: it is dropped with the database, and c7 must still refuse after a drop.'
+    - 'BUILT 2026-11-22, THE DESTINATION FILE: one-offs/<kind>/_template/publishing.yaml, one field, `destination:` - a folder (relative read from the repository root) or s3://bucket/prefix - shared by every kind, read by asset_model/one_off_publishing.py and gated for every kind''s template beside the kind''s own template gates (REQ-PIPE-448 c6). SETTLED by Keith 2026-11-22 for the PoC (''local folder for now''): the extraction template''s value is data/one-off-pages (gitignored); it is set to a real shared folder or bucket when a deployment exists.'
+    - 'BUILT 2026-11-22, ONE PAGE: the four steps build into a scratch directory with data/ files beside the page, then the data is inlined into one page by dashboard/data_files.inline (the snapshot''s own inliner) and that page is render-gated again before it is written - so the destination holds <id>.html and fonts/ only. The four steps are the CLI''s (cli/dashboard.py) handed to qa_tools/common/one_off_publish.build_page, since qa_tools may not import cli (the imports gate).'
+    - 'BUILT 2026-11-22, THE STALE PAGE: ''older than its latest recorded decision'' is read as any recorded decision decided after the newest one the page carries; accepting the offer to publish runs the publish with --yes, since the person has just said yes to it, then asks for the typed id.'
+    linked_tests:
+    - tests/test_one_off_end_to_end.py
+    - tests/test_one_off_gates.py::TestAChangedTemplateIsGated
+    implemented_by:
+    - cli/one_off.py::publish_command
+    - cli/one_off.py::_build_steps
+    - cli/one_off.py::_drop_warnings
+    - cli/one_off.py::drop_command
+    - cli/one_off.py::load_command
+    - cli/one_off.py::_tui
+    - qa_tools/common/one_off_publish.py::plan
+    - qa_tools/common/one_off_publish.py::publish
+    - qa_tools/common/one_off_publish.py::build_page
+    - qa_tools/common/one_off_publish.py::write_page
+    - qa_tools/common/one_off_publish.py::read_page
+    - qa_tools/common/one_off_publish.py::published
+    - qa_tools/common/one_off_publish.py::load_refusal
+    - qa_tools/common/one_off_publish.py::drop_warnings
+    - qa_tools/common/one_off_publish.py::identity_of
+    - asset_model/one_off_publishing.py::read
+    - asset_model/one_off_publishing.py::problems
+    - qa_tools/common/one_off_gating.py::template_pass
+    - dashboard/embed_dashboard_data.py::one_off_page_html
+    - dashboard/one_off_page.py::identity
+    - one-offs/extraction/_template/publishing.yaml
+    evidence:
+    - '2026-11-22, code tree d759e134 (later commits touch requirements.yaml, CHANGELOG.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_load, test_one_off_gates, test_one_offs, test_extraction_folder, test_extraction_recipe, test_cli_check, test_people, test_place_held_supply, test_check_dashboard_renders, test_dashboard_data_files, test_embed_dashboard_data, test_no_calendar_dashboard, test_snapshot_dashboard, test_counted_parity, test_status_parity, test_no_calendar, test_validate_imports, test_no_period_filing and test_file_check_panel - 750 passed in 117s; npx vitest run 1312 passed in 99 files; ruff clean; validate-imports clean. The full suite and tests/test_dashboard_e2e.py were not run.'
+    - 'tests/test_one_off_end_to_end.py over one real journey of the committed fixture package (a temporary repository and bare remote, a throwaway supply_<id>, a temporary destination): c1 one page named by the id with fonts/ beside it and its data inlined, published undecided, released and withheld; c2 and c10 published in the suite''s `test` environment, which publishes nothing, with dashboard/hosting''s upload, wrangler and the snapshot step watched and never called, and dashboard/snapshots/ untouched; c3 the address, `Decision in force: none recorded` and `Datasets not yet checked: 0.` shown, no terminal without --yes refused, the address printed; c4 the second publish replacing its own page; c5 a page at the address carrying another package digest refused and left byte-identical; c6 the destination holding only the page and fonts/; c7 a load of the published one-off refused; c8 the unpublished drop warning that no record will remain, then dropping on the typed id; c9 a withhold after the last publish warned at the drop, the offer accepted, the page published before the database went. TestAnS3Destination: an S3 prefix written and read back through boto3''s own put_object/get_object calls on an in-memory stand-in client (no S3 reachable here).'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52582,7 +52901,7 @@ requirements:
     date_written: '2026-11-21'
     story: As someone reading a one-off's page, possibly a downloaded copy long after the work, I want it to say plainly whether the data was released or withheld, by whom and why - or that nobody has decided - and how current the copy is, so that a green QA result is never read as a release.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29, 'the durable record is a static file' (2026-09-27); Keith 2026-11-21 Q4.2 (b) and round 5 UX Q1 (a), Q2 (a), Q3 (a); delivery-dashboard-ux v4 findings 1 to 5, 9, 11 and 14. Drafted by delivery-scoper 2026-11-21 (split from v4's REQ-DASH-444; the recipe display is REQ-DASH-447); v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off E and its smaller points, delivery-architect D, and Keith's answers (every kind declares a project; copy nothing). Shared by every kind. v7 folds in Keith's answer to v6 Q1 (both commits, labelled 'checked at' and 'built at'). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL give a one-off's page the site name '<id> · <project> · QA report', SHALL head its masthead with it and use it as the suffix of every view's title, and SHALL say once, in the masthead, which kind of one-off it is in the kind's display word, never its folder name.
@@ -52620,6 +52939,32 @@ requirements:
     - 'SETTLED by Keith 2026-11-21 (v6 Q1 (a)): TWO COMMITS, ''checked at'' and ''built at''. The checks run at load and the page is built at publish, and the kind''s template - read live by both - can change between them, so the build commit alone may not be the version that checked the data. REJECTED (b) the build commit only. v7 clears v6''s PROVISIONAL mark and fixes the two labels.'
     - 'v6, ONE VOCABULARY FOR LAYERS (delivery-dashboard-ux smaller points): v5''s criterion 10 said ''the default layer and the kind''s own'' while REQ-DASH-447 said ''from the recipe''; two fixed names now serve both.'
     - 'v6, NO vendor/ (delivery-architect D): see REQ-PIPE-443''s decision; this is where the page is built without it.'
+    - 'BUILT 2026-11-22, ONE CONST: the page knows it is a one-off from ONE_OFF (dashboard/one_off_page.py::record) - id, project, site name, the kind''s display words, every decision newest first, the publication, ''built at'' (snapshot_dashboard._git_short_sha of this repository) and ''checked at'' (qa.one_off_load.loaded_commit, short) - null on every enduring asset''s page, so nothing on those pages changes.'
+    - 'BUILT 2026-11-22, THE DECISION LINE IS A BLOCK AT THE TOP OF #view, added in render()''s done() for every view, a cold-loaded deep link and a not-found page included, so no renderer can forget it. Its words come from ONE_OFF_DECISION_WORDS and the Python display_time instant words, never decisionWords() or causeNoun(); no pill, no status colour.'
+    - 'BUILT 2026-11-22, ''QA result'' is a label beside every ROLLUP status - agency, collection and dataset pills and the dataset table''s column heading. A check''s own pill is left alone: it is that check''s result, not the QA result.'
+    - 'BUILT 2026-11-22, THE CONTROLS GO BY CSS, not removal: other code reaches each button by id, so .one-off-page hides them; an address naming a removed tool or a removed parameter is repaired before anything reads it (REQ-DASH-436 c6).'
+    - 'BUILT 2026-11-22, LAYERS: the kind plug-in''s layer_of(check key) says ''default'' or ''kind''; for an extraction a recipe assertion is ''kind'' and every other check - the default layer''s and the shared file checks, which every extraction gets alike - ''default''. The build marks each check; the page words it.'
+    - 'SETTLED by Keith 2026-11-22 (''first dataset + home''), THE UNDECLARED FILE''S HOME: its failing result stays on, and counts in, the first counted dataset, as REQ-QAC-441 places it, and the home view names the file once with that dataset (oneOffUndeclaredHtml). REJECTED inventing a package-level status.'
+    - 'BUILT 2026-11-22, Keith''s ask on the mock run (the worked mock run of 2026-11-22, post-build-review #494), WORDING APPROVED BY KEITH 2026-11-22: on a one-off''s page the recurring assets'' drawers - Time travel, both Cadence-aware viewing panels, the Leaderboard - and the Feedback link are absent (hidden and marked hidden, their elements kept because later code reaches them by id); no cross-table section, on a dataset or a collection, since recipe format version 1 declares no relationship; and a one-off''s own words for its footer, home and agency lines, its verdict line (''The results below are the supply received <instant>.'', never ''not in place in the warehouse''), and its receipt (''Received'', with no ''Unknown'' punctuality and no ''waiting 2m''). A failing derived product gets one line on the home view: ''The derived product <name> fails <n> check(s); derived products don''t count in this status.'' - without a pill, since it counts in no status.'
+    linked_tests:
+    - tests/test_one_off_end_to_end.py
+    - tests/test_one_off_page_agrees.py
+    implemented_by:
+    - dashboard/one_off_page.py::record
+    - dashboard/embed_dashboard_data.py::embed
+    - dashboard/embed_dashboard_data.py::one_off_page_html
+    - dashboard/embed_dashboard_data.py::place_page_assets
+    - pipeline/build_dashboard_data.py::_label_layers
+    - asset_model/one_off_kinds.py::Kind
+    - asset_model/kinds/extraction.py::_layer_of
+    - dashboard/qa-reporting-dashboard.template.html
+    - asset_model/kinds/extraction.py::_declaration
+    evidence:
+    - '2026-11-22, code tree d759e134 (later commits touch requirements.yaml, CHANGELOG.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_load, test_one_off_gates, test_one_offs, test_extraction_folder, test_extraction_recipe, test_cli_check, test_people, test_place_held_supply, test_check_dashboard_renders, test_dashboard_data_files, test_embed_dashboard_data, test_no_calendar_dashboard, test_snapshot_dashboard, test_counted_parity, test_status_parity, test_no_calendar, test_validate_imports, test_no_period_filing and test_file_check_panel - 750 passed in 117s; npx vitest run 1312 passed in 99 files; ruff clean; validate-imports clean. The full suite and tests/test_dashboard_e2e.py were not run.'
+    - 'tests/test_one_off_end_to_end.py, in a real browser over the journey''s three published pages, every view cold-loaded (home, agency, three datasets and the absent one): c1 the title ending '' · <id> · The fixture study · QA report'', the masthead heading the site name and saying ''One-off extraction''; c2 ''Released by Tess Ter, <instant>: <reason>'' with no pill, above the first ''QA result''; c3 the undecided line exactly; c4 ''QA result'' on the cards and the table heading; c5 the withhold reason in full; c6 both decisions on the home view, ''Current'' and ''Replaced by the decision of <instant>''; c8 the address, ''built at'', ''checked at'' and the later-publish sentence; c9 none of the eleven controls visible; c10 only ''Default check'' and ''Recipe check''; c11 no ''vendor/'' in any page and no failed request; zero console errors.'
+    - '2026-11-22, code tree a329b566 (later commits touch requirements.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_resume, test_not_yet_agreed_beside_calendared, test_one_off_load, test_one_off_gates, test_inheritance, test_inheritance_refusal_items, test_list_settings, test_offset_group_inheritance, test_period_overlay, test_no_period_filing, test_no_calendar, test_no_calendar_dashboard and test_counted_parity - 365 passed and 1 failed (the home view''s undeclared-file line, whose key was then fixed in asset_model/kinds/extraction.py); tests/test_one_off_end_to_end.py again after that fix, -n0, 67 passed; npx vitest run 1312 passed; ruff clean. The full suite was not run.'
+    - 'The undeclared file named once on the home view - extra.csv, with the People dataset that carries its failure - and nowhere on a dataset''s own view: tests/test_one_off_end_to_end.py TestTheHomeView::test_the_undeclared_file_is_named_once (failed first, on a wrong key).'
+    - '2026-11-22: tests/test_one_off_page_agrees.py''s TestTheRecurringAssetsPartsAreAbsent (absent on the one-off''s built page, present on the raw template), TestAOneOffsWords and TestAFailingDerivedProductOnTheHomeView, in a real browser.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52628,7 +52973,7 @@ requirements:
     date_written: '2026-11-21'
     story: As someone reading an extraction's page long after its working data is gone, I want it to say what the extraction claimed to contain, so that the declaration survives the database and can be compared with what the checks found.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29, 'the durable record is a static file' (2026-09-27); delivery-dashboard-ux v4 findings 12 and 14. Drafted by delivery-scoper 2026-11-21, split from v4's REQ-DASH-444; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off smaller points (447 c1 to c3) and delivery-architect M. The extraction kind's own. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL show on an extraction's home view its recipe format version, its recipe digest and its filter text, and SHALL NOT repeat the id and project the masthead already carries (REQ-DASH-444 criterion 1).
@@ -52646,6 +52991,17 @@ requirements:
     - 'v6, THE DIGEST IN, THE REPEATS OUT (delivery-dashboard-ux post-sign-off, 447 c1): the recipe digest is what ties a found page to one package; the id and project are already in the masthead on every view.'
     - 'v6, ONE SET OF WORDS (delivery-dashboard-ux smaller points, 447 c2 and c3): ''derived product'' in 438''s words and ''Recipe check'' as 444 names the layer, so the same thing never reads two ways.'
     - 'v6, THE FOLDER NOW CARRIES WHAT THIS READS (delivery-architect M): v5''s criterion 4 read column types, identifier marks, cohort bounds and expected rows from a folder that did not declare them; REQ-PIPE-440 criterion 2 now generates them.'
+    - 'BUILT 2026-11-22, THE KIND''S DECLARATION: the extraction plug-in''s declaration(folder) reads data-asset.yaml''s recipe block and each dataset''s columns, cohort and expected rows, and calendar.yaml''s derived, into ONE_OFF.declaration - with, for each declaration, the check keys derived from it (extraction_checks.ASSERTION_TOOLS), which the page looks up in that column''s checks. Never the recipe file.'
+    - 'BUILT 2026-11-22, ''beside the declaration'': each declared column''s row, each cohort bound and the expected row count carry their recipe checks as buttons - name, tool, ''Recipe check'' and its pill - opening the check''s panel.'
+    linked_tests:
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - asset_model/kinds/extraction.py::_declaration
+    - dashboard/one_off_page.py::record
+    - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+    - '2026-11-22, code tree d759e134 (later commits touch requirements.yaml, CHANGELOG.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_load, test_one_off_gates, test_one_offs, test_extraction_folder, test_extraction_recipe, test_cli_check, test_people, test_place_held_supply, test_check_dashboard_renders, test_dashboard_data_files, test_embed_dashboard_data, test_no_calendar_dashboard, test_snapshot_dashboard, test_counted_parity, test_status_parity, test_no_calendar, test_validate_imports, test_no_period_filing and test_file_check_panel - 750 passed in 117s; npx vitest run 1312 passed in 99 files; ruff clean; validate-imports clean. The full suite and tests/test_dashboard_e2e.py were not run.'
+    - 'tests/test_one_off_end_to_end.py, in a real browser: c1 the home view''s format version, digest (equal to the folder''s) and filter, and neither the id nor the project in that section; c2 People''s placement, ''No'', its cohort bound, 3 expected rows, person_id ''string'' ''Primary identifier'' and first_seen ''date'', and the derived summary''s ''Derived product, not counted in the extraction''s status'' and ''The recipe gave no expected row count''; c3 first_seen''s and the cohort''s checks labelled ''Recipe check''; c4 the withheld page published after the package''s recipe.json was moved away.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52654,12 +53010,12 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want the extraction to declare itself in a recipe beside its files, so that what it claims to contain is stated before anything checks it.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29 points 1-3 (Keith, 2026-09-27); Keith 2026-11-21 Q4.4 (b) and round 2 Q6 (b); delivery-architect v4 finding 4. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; unchanged in v6. The extraction kind's own. v7 folds in REQ-PIPE-446's renumbering (one decision's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL read an extraction as a package - a directory on local disk or an S3 prefix - holding one recipe file and the data files it names.
     - THE SYSTEM SHALL read the recipe as JSON against a schema committed in this repository, carrying a recipe format version.
-    - THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file and that file's format, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement.
+    - THE SYSTEM SHALL require the recipe to declare an extraction id, the project it is for, each table with its file and that file's format, its columns (name, type and whether it is a primary identifier) and whether it is a derived product, the cohort bounds as structured values (column, lower and upper bound) per table, the filter as descriptive text, and each table's agency, collection and dataset placement, and at least one primary identifier per table (AMENDED 2026-11-22, Keith).
     - THE SYSTEM SHALL accept, for each table, an optional expected row count.
     - THE SYSTEM SHALL accept CSV as the only file format in recipe format version 1, and IF a recipe names any other format, THEN THE SYSTEM SHALL refuse it, naming the table.
     - IF the recipe is missing, does not parse, or fails the schema, THEN THE SYSTEM SHALL refuse the package before anything is generated or loaded, naming each problem.
@@ -52680,6 +53036,23 @@ requirements:
     - 'COHORT BOUNDS ARE STRUCTURED, THE FILTER IS PROSE: only a structured bound can become a check; filter text is shown, never parsed.'
     - 'v6: no change. The project the recipe already requires is what REQ-PIPE-446 criterion 13 (every kind declares a project) is met from for the extraction kind.'
     - 'v7: no change but that reference, which follows REQ-PIPE-446''s renumbering (v6''s criterion 18 is now 13).'
+    - 'BUILT 2026-11-22: THE RECIPE SCHEMA is asset_model/kinds/extraction-recipe.schema.json (JSON Schema 2020-12, read with jsonschema), recipe_format_version 1 a const; the reader is asset_model/kinds/extraction_recipe.py, the extraction kind plug-in''s `reader`. Placement is {id, name} for the agency and the collection and {id, name, table} for the dataset; column types are the ODCS logical types (string, integer, number, date, timestamp, boolean); cohort bounds are {column, lower, upper}.'
+    - 'BUILT 2026-11-22: A DECLARED FILE MISSING FROM THE PACKAGE IS NOT A REFUSAL: REQ-QAC-441 criterion 3 records it as a failing default-layer result, and REQ-TEST-437''s fixture has one.'
+    - 'BUILT 2026-11-22: S3 THROUGH A CLIENT THE CALLER HANDS IN (the PORTABILITY NFR): `mothman one-off open` makes it with boto3 and the environment''s credentials; the reader creates none. A file name that is absolute, holds a backslash or any ''..'' part is refused (the SECURITY NFR).'
+    - 'SETTLED by Keith 2026-11-22: THE RECIPE FORMAT IS SET DOWNSTREAM, NOT BY US (''The recipe format is fixed downstream, we''ll probably create some sort of translator to work out what checks to apply as a base.''). Format version 1 is a STAND-IN, kept so the one-off path can be built and tested end to end, and is NEVER EXTENDED; the real format will arrive from downstream and a translator - not yet scoped (plans/running-thoughts.md) - will map it to base checks. REJECTED adding a `relationships` field to version 1 for REQ-QAC-441 criterion 6.'
+    - 'AMENDED by Keith 2026-11-22: EVERY TABLE DECLARES A PRIMARY IDENTIFIER, or the recipe is refused naming the table (extraction_recipe.read). A failing row is only ever recorded by its identifiers (REQ-QAC-441 criterion 9), so a table with none could name no failing row and lost its Soda failed-rows checks.'
+    linked_tests:
+    - tests/test_extraction_recipe.py
+    - tests/extraction_support.py
+    implemented_by:
+    - asset_model/kinds/extraction_recipe.py::read
+    - asset_model/kinds/extraction_recipe.py::Recipe
+    - asset_model/kinds/extraction_recipe.py::RecipeRefused
+    - asset_model/kinds/extraction_recipe.py::recipe_digest
+    - asset_model/kinds/extraction.py::EXTRACTION
+    evidence:
+    - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_recipe.py is new behaviour (17 tests): a local and an S3 package, CSV only, every refusal, the id rules and no connection opened.'
+    - '2026-11-22, code tree e8820d4c: tests/test_counted_parity.py 36 passed and tests-js/counted-parity.test.js 23 passed, the four new package_checks rows in status-cases.json failing in both before dataset_status.package_statuses and the template''s ownVerdict existed; tests/test_one_off_load.py 41 passed, its TestADeclaredTableThatNeverArrivedReadsFail having read the missing table''s dataset Inactive before; tests/test_extraction_recipe.py 16 passed, its TestEveryTableNamesAnIdentifier seen failing first.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52688,7 +53061,7 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want its configuration generated from its recipe into a committed folder of its own, apart from the enduring assets, so that each extraction's checks and declaration are reviewable configuration and nothing is typed by hand.
     moscow: must
-    status: not_started
+    status: built
     source: plans/supply-model.md sprint 29 points 2, 4 and 5 and the rejected list (Keith, 2026-09-27); Keith 2026-11-21 round 2 Q2 (b), round 3 Q1 (a) and addition, round 4 (one-offs/<kind>/<id>/); delivery-architect v4 findings 1, 3 and 5. Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-architect post-sign-off A2, B, F, H, I and M, delivery-cli-ux C4, and Keith's answers (copy nothing; pushed before load; dbt_utils a local copy; no 259 hold). The extraction kind's own. v7 folds in Keith's answer to v6 Q1 (the template half of criterion 9 settled) and the REQ-PIPE-448 split (criterion 5's reference). v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - WHEN a person runs `mothman one-off open --kind extraction` on a package, or opens one from the `mothman one-off` TUI, THE SYSTEM SHALL generate one-offs/extraction/<id>/ from its recipe alone, SHALL NOT read any hierarchy or check authored by hand for that extraction, and SHALL NOT copy any file from the kind's template (one-offs/extraction/_template/) into it.
@@ -52739,6 +53112,45 @@ requirements:
     - 'v6, UNTRACKED FILES COUNT (delivery-architect H): a file added by hand to a generated folder and never committed is refused at load, as an edited one is.'
     - 'v6, NO 259 HOLD (Keith 2026-11-21, architect Q-A2: ''Happy for it to go while the repo is public, this is a poc with fake data.''): REVERSES round 5''s ''blocked on going private''. REQ-DOCS-259 leaves the dependencies; the PRIVACY NFR says a real deployment''s folders would need a private repository. REJECTED the architect''s (a) a guard criterion on `one-off open` into the repository''s own root.'
     - 'SETTLED by Keith 2026-11-21 (v6 Q1 (a)): LOAD REFUSES AN UNCOMMITTED OR UNPUSHED TEMPLATE as it refuses such a folder (criterion 9), because the default checks, people.yaml and the destination are read live from it and the page''s ''checked at'' commit must hold the version that ran. v7 clears v6''s PROVISIONAL mark.'
+    - 'BUILT 2026-11-22: THE GENERATOR is asset_model/kinds/extraction_folder.py (configuration only, so asset_model''s side of the import gate), the extraction plug-in''s `generator`; `mothman one-off open` reads the package with the plug-in''s reader and generates into the one-offs root. Tests always generate into a root pointed elsewhere; no real one-offs/extraction/<id>/ folder is committed (Keith 2026-11-22).'
+    - 'BUILT 2026-11-22: GENERATED SHORTS - each agency `a<n>`, each collection `c<n>` with run prefix `c<n>_run_`, in recipe order: a one-off builds no command group (REQ-PIPE-446 criterion 8), so a short only has to be unique and the right shape. A contract per collection at <agency>/<collection>-contract.yaml, its schema from the recipe''s columns with no quality rules (those are REQ-QAC-441''s layers).'
+    - 'BUILT 2026-11-22: THE DIGEST is generated.sha256.json at the folder''s top - the recipe''s digest and every generated file''s sha256 - which the collections gate accepts beside the asset-wide files for a one-off; REQ-PIPE-448''s digest pass reads it.'
+    - 'BUILT 2026-11-22: THE LOCAL dbt_utils IS NAMED BY AN ENVIRONMENT VARIABLE in the generated packages.yml (`local: {{ env_var(''MOTHMAN_ONE_OFF_DBT_UTILS'') }}`), so the committed, digested folder names no machine''s path; the load sets it from the environment''s `one_off_dbt_utils` (assets/environments.yaml). `mothman one-off setup-dbt-utils` copies an enduring asset''s installed dbt_utils where `mothman env dbt-deps` has put it - no fetch - else runs one dbt deps over the assets'' own packages.yml and lock; it records the revision installed, and the load refuses another revision than the assets lock. A one-off''s dbt/package-lock.yml is gitignored with target/, logs/ and dbt_packages, since dbt deps writes one naming the local path.'
+    - 'BUILT 2026-11-22: THE LOAD''S REFUSALS ARE qa_tools/common/one_off_load.refusals() - the recipe digest (criterion 8), the folder and the template committed and on the tracked remote branch, with `git add`, `git commit` and `git push <remote> <branch>` filled in and the reason (criterion 9), and the dbt_utils copy (criterion 12) - for REQ-PIPE-442''s load to ask first.'
+    - 'SETTLED by Keith 2026-11-22: what the generated data-asset.yaml must state that a recipe does not - the zone its instants are read in and the PostgreSQL major - is inherited from the enduring assets, and generation is refused where they disagree.'
+    - 'SETTLED by Keith 2026-11-22: NEITHER amber_setting NOR replacement_setting IS GENERATED: the schedule gate does not ask either of a one-off, since a no-period supply is never promoted (REQ-PIPE-448''s decision). REJECTED fixed values written into every folder.'
+    - 'BUILT 2026-11-22 WITH REQ-QAC-441: CRITERION 4''S RECIPE CHECK LAYER is generated into the folder by extraction_folder.files_for from asset_model/kinds/extraction_checks.py - each collection''s contract with its quality rules, its Soda, Evidently and dbt schema files, and their empty -retired siblings (REQ-QAC-241) - under the digest. A one-table collection''s contract carries its dataset''s id and name (REQ-QAC-039), a defect the first two-collection recipe found.'
+    - 'BUILT 2026-11-22 WITH REQ-PIPE-442: CRITERION 1''S TUI ROUTE is the `mothman one-off` menu''s ''Open a new package'', which asks the kind and the package and runs open.'
+    - 'BUILT 2026-11-22: THE LOAD READS THE PACKAGE WITHOUT CRITERION 6''s FOLDER CLASH (extraction_recipe.read(opening=False)): the folder that clash would name is the load''s own.'
+    linked_tests:
+    - tests/test_extraction_folder.py
+    - tests/extraction_support.py
+    - tests/test_one_off_load.py
+    - tests/test_one_off_end_to_end.py
+    implemented_by:
+    - asset_model/kinds/extraction_folder.py::generate
+    - asset_model/kinds/extraction_folder.py::files_for
+    - asset_model/kinds/extraction_folder.py::recorded
+    - asset_model/assets.py::kind_template
+    - qa_tools/common/one_off_load.py::refusals
+    - qa_tools/common/one_off_load.py::git_refusal
+    - qa_tools/common/one_off_load.py::digest_refusal
+    - qa_tools/common/one_off_load.py::dbt_utils_refusal
+    - qa_tools/common/one_off_load.py::setup_dbt_utils
+    - qa_tools/common/environments.py::Environment
+    - qa_tools/common/schemas.py::DatasetConfig
+    - qa_tools/common/schemas.py::RecipeRecord
+    - qa_tools/common/validate_collections.py::check_file_problems
+    - cli/one_off.py::open_command
+    - cli/one_off.py::setup_dbt_utils_command
+    - asset_model/kinds/extraction_checks.py::recipe_layer
+    - qa_tools/common/one_off_checks.py::materialise
+    - cli/one_off.py::_tui
+    - asset_model/one_off_publishing.py::read
+    evidence:
+    - '2026-11-22, tree e76f814f: 50 named test modules (pytest -n 4: tests/test_extraction_recipe.py, test_extraction_folder, test_one_offs, test_one_off_gates, test_assets, test_cli_check, test_cli_asset_selection, test_ticket_*, test_collections_registry, test_validate_schedule, test_agreement, test_publish, test_filing and 36 more) 1451 passed in 2m03s. The full suite, the needs_deployment half, the browser tests and npm test were NOT run (no page change). tests/test_extraction_folder.py is new behaviour (24 tests): the generated files and nothing else, read back by the real hierarchy, calendar loader, schedule gate and folders gate with the one-off selected; the digest; each refusal; and the load''s refusals against a temporary repository and bare remote.'
+    - '2026-11-22, code tree ca76f6a0, with REQ-QAC-441 and REQ-PIPE-442: the same 31 named test modules (pytest -n 4) 804 passed in 65s - see REQ-QAC-441''s evidence for the list. Criterion 4: TestTheRecipeLayer reads the recipe layer''s check ids out of the generated folder and the real tools'' verdicts on them; criterion 13: TestTheDefaultLayerIsReadLive; criterion 1''s TUI: TestTheTui.'
+    - '2026-11-22, criterion 13''s last live reader met by REQ-PIPE-443: the destination read from one-offs/extraction/_template/publishing.yaml at each publish, load and drop, never copied into the folder - tests/test_one_off_end_to_end.py (the journey''s template names its own destination) and tests/test_one_off_gates.py''s destination gate.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52747,7 +53159,13 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever QAs a project extraction, I want a standard floor of checks on every extraction plus checks derived from what its recipe declares, so that every extract is held to the same baseline and to its own promises.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criterion 6 - a cross-table relationship the recipe declares, checked as a cross-table check.
+      why: 'Recipe format version 1 is a stand-in that is never extended (Keith 2026-11-22, REQ-PIPE-439''s decisions): it declares no relationship, so there is nothing to check. The real format is set downstream and arrives through a translator (plans/running-thoughts.md #145).'
+      owner: a translator from the downstream recipe format (Keith 2026-11-22), not yet scoped
+      blocked_by:
+        unowned: true
     source: plans/supply-model.md sprint 29 point 6 and its tool-agnostic note (Keith, 2026-09-27); Keith 2026-11-21 Q4.5 (b), round 2 Q6 (b), Q7 (a), Q8 (a). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in Keith's 'copy nothing' and delivery-architect A2. The extraction kind's own. Unchanged in v7. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).
     acceptance_criteria:
     - THE SYSTEM SHALL apply a default check layer to every extraction, defined once in the kind's template (one-offs/extraction/_template/) and read from it at each load (REQ-PIPE-440 criterion 13), and SHALL NOT copy it into any extraction's folder.
@@ -52776,6 +53194,61 @@ requirements:
     - 'NOT IN SCOPE, by Keith''s call 2026-09-27: lineage, and plans/wider.md #9''s reconciliation and aggregation checks, which stay parked there.'
     - 'v6, THE DEFAULT LAYER IS READ LIVE (Keith 2026-11-21, ''copy nothing''): REVERSES v5''s criterion 1, ''copied into each generated folder''. REJECTED keeping a copy per folder.'
     - 'v6, AN UNDECLARED FILE IS NOT FILED (delivery-architect A2): recording it as failing without filing it is what lets QA carry on past it, as round 2 Q7 (a) requires, given that hand_filing refuses a file with no arrival pattern.'
+    - 'SETTLED by Keith 2026-11-22: ALL FOUR TOOLS EVALUATE A ONE-OFF, as for an enduring asset - dbt-core, Soda Core, datacontract-cli and Evidently, each taking the assertions it fits. REJECTED datacontract-cli only.'
+    - 'SETTLED by Keith 2026-11-22: RECIPE FORMAT VERSION 1 IS A STAND-IN, never extended; the real format comes from downstream through a translator (plans/running-thoughts.md #145), so criterion 6 waits on that, unowned.'
+    - 'BUILT 2026-11-22: WHICH TOOL EVALUATES WHICH ASSERTION is one table, asset_model/kinds/extraction_checks.py''s ASSERTION_TOOLS. Table arrived and undeclared file: the load. Columns arrived: Soda''s schema check - datacontract-cli''s own field-present checks are dropped by its runner as duplicates, and a missing column makes a dbt test or SQL rule error rather than fail. Identifier not null: all four (Evidently by MissingValueCount). Declared type: dbt (dbt_utils.expression_is_true), Soda (failed rows) and datacontract-cli (SQL), each through PostgreSQL''s pg_input_is_valid over the value as text, because the loader infers types from the file and a column holding one bad date arrives as text; a string column has no type check. Cohort bounds: dbt_utils.accepted_range, Soda failed rows, datacontract-cli SQL. Expected rows, exactly: Soda row_count, datacontract-cli rowCount and Evidently RowCount - not dbt, which has no generic test counting a model exactly without a second model to compare against.'
+    - 'BUILT 2026-11-22: THE DEFAULT LAYER''S DEFINITION is one-offs/extraction/_template/default-checks.yaml - each assertion''s name, words, category, introduced date and, optionally, a narrower set of tools; how an assertion becomes each tool''s configuration is code (extraction_checks.default_layer). The kind''s template gate (REQ-PIPE-448 criterion 6) refuses an undefined assertion, missing words, or a tool the assertion cannot take.'
+    - 'BUILT 2026-11-22: THE CHECK WORKSPACE. What the tools must read as files is materialised into data/<id>/qa/config/ - the committed folder''s files with the default layer merged into each collection''s contract, Soda, Evidently and dbt files - rebuilt at every load and removed by the drop (REQ-PIPE-442 criterion 6). assets.use_workspace points the selected one-off''s configuration folder and dbt project there for the load, and assets.handoff carries it to a tool''s worker process. dbt runs there, so the committed folder never gets a target/, logs/ or dbt_packages, and the workspace''s packages.yml names the deployment''s local dbt_utils by path. REJECTED each tool reading the two layers from two places: dbt refuses one model''s properties declared in two files, and datacontract-cli takes one contract per run.'
+    - 'BUILT 2026-11-22: TABLE ARRIVED AND UNDECLARED FILE ARE THE ONE-OFF''S OWN FILE CHECKS (asset_model/file_check_definitions.py ONE_OFF_NAMES), written into the workspace''s file-checks.yaml from the template''s words, and refused in any enduring asset''s file. `table_arrived` passes as each declared file is screened, and the load records it failing, in a run of its own named as the table''s arrival would have been, for a declared table that never came. `undeclared` (format `package`, so no file''s screening asks it) is asked of the package once, by the load. Their words, check ids and definition fingerprints so come from where every file check''s do.'
+    - 'answered by Keith 2026-11-22 - it stays until REQ-DASH-444 settles the one-off page: THE PACKAGE''S ONE UNDECLARED-FILE RESULT IS RECORDED AGAINST ITS FIRST COUNTED DATASET (qa_tools/common/one_off_package.home_of) - a file that belongs to no table has no dataset of its own, and the first counted one keeps the failure in the one-off''s own status rather than in a derived product''s, which no rollup counts. The alternatives were every dataset (one stray file would fail them all) or a one-off-level scope the page does not yet have (REQ-DASH-444).'
+    - 'BUILT 2026-11-22: EVIDENTLY''S ASSERTION METHODS, `missing` and `row_count` (asset_model/drift.py ASSERTION_METHODS), run the real evidently Report over the run''s own view and need no reference supply, so they never read as having none. A file of only those is accepted; a file declaring checks with neither psi nor an assertion is still refused.'
+    - 'BUILT 2026-11-22: FAILING-ROW KEYS ARE THE DECLARED PRIMARY IDENTIFIERS (criterion 9): the kind''s shared adapter (qa_tools/kind_adapters/extraction.py) gives each table''s identifiers as its sample key, and a generated failed-rows query selects those columns only. datacontract-cli''s SQL rules record no keys - the existing gap for custom SQL rules (qa_tools/tools/run_datacontract.py).'
+    - 'SUPERSEDED 2026-11-22: the known limit of a table declaring no primary identifier is gone - Keith required one on every recipe table (REQ-PIPE-439 criterion 3, amended), so every table has a key to sample.'
+    - 'THE WORDS (docs/check-authoring-rules.md): the recipe layer''s are extraction_checks.RECIPE_WORDS, the default layer''s the template''s. No figure, no tool, not the check''s own column, `supply` for a delivery - held by tests/test_one_off_load.py''s TestEveryGeneratedCheckCarriesItsWords over both layers as the lifecycle parser reads them. The standard itself was not changed.'
+    - 'DEFECTS FOUND BUILDING IT, each fixed test-first: a one-table collection''s generated contract carried the collection''s id and name where REQ-QAC-039 wants its dataset''s, failing the hierarchy gate the load runs (tests/test_extraction_folder.py TestAOneTableCollectionsContract, seen failing); the collections gate failed a one-off''s collections for want of an adapter module and compared a dbt folder outside the repository by its spelling (tests/test_one_off_gates.py TestTheCollectionsGateAcceptsTheSharedAdapter, seen failing); and datacontract_common appended to a `servers` list a generated contract does not carry (found by the first real run, KeyError ''servers'').'
+    - 'REJECTED by Keith 2026-11-22: a dbt generic test for the exact row count - Soda, datacontract-cli and Evidently already check it.'
+    - 'SETTLED by Keith 2026-11-22 (REQ-DASH-436 criterion 2, option (a)): the two package checks count in their dataset''s status on a one-off''s page - REQ-DASH-097 criterion 2 amended for them alone.'
+    - 'SETTLED by Keith 2026-11-22 (''first dataset + home''): a file the recipe does not declare is recorded failing against the one-off''s FIRST COUNTED dataset, and counts in its status - a file belonging to no table has no dataset of its own, and a derived product''s status counts in no rollup. The one-off''s page also names the file once on its home view (REQ-DASH-444). Clears the PROVISIONAL mark of 2026-11-22. REJECTED a package-level status of its own.'
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D1), THE UNDECLARED FILE''S FAILURE NOW REACHES EVERY LAYER: with it the only problem, its home dataset read Fail while the collection and agency above it read Pass, the load said ''0 failing'' and the dataset page named no failing check. Causes: the page''s rollup() and dataset_status.rollup_datasets rolled each dataset up from its columns alone, never its package checks (ownVerdict/package_statuses), and fileAttemptInPlaceOn() dropped the package check''s history point (load_attempt null). Now both rollups read the dataset''s own verdict, package checks and all; a declared table that never arrived (packageOnly) counts in its collection''s rollup, which it was also left out of; and a one-off''s dataset page shows its counted package checks with a verdict (''About the supply as a whole'') at the top of its file section, the file section itself holding the file''s own checks only. REJECTED showing the package check inside ''About the file as delivered'': its words (''This file was refused ... none of its data was loaded'') are about a file, and an undeclared file belongs to none.'
+    - 'FIXED 2026-11-22 (the worked mock run of 2026-11-22, post-build-review #494 D2), THE DEFAULT LAYER''S WORDS ON THE PAGE: a default-layer check showed its tool''s raw name (dbt:not_null) with no description, because the publish built from the committed folder, which by design never holds the default layer (REQ-PIPE-440 criterion 13). The publish now materialises the same check workspace the load does (one_off_checks.materialise, from the folder and the kind''s template read live) and builds from it. Evidently''s checks stay named by their method (''Null rate'', ''Row count'') on both layers - its own naming, left for Keith.'
+    linked_tests:
+    - tests/test_one_off_load.py
+    - tests/test_one_off_gates.py
+    - tests/test_extraction_folder.py
+    - tests/test_one_off_page_agrees.py
+    implemented_by:
+    - asset_model/kinds/extraction_checks.py::declared
+    - asset_model/kinds/extraction_checks.py::read_template
+    - asset_model/kinds/extraction_checks.py::default_layer
+    - asset_model/kinds/extraction_checks.py::recipe_layer
+    - asset_model/kinds/extraction_checks.py::contract_doc
+    - asset_model/kinds/extraction_checks.py::soda_doc
+    - asset_model/kinds/extraction_checks.py::evidently_doc
+    - asset_model/kinds/extraction_checks.py::dbt_schema_doc
+    - asset_model/kinds/extraction_folder.py::files_for
+    - asset_model/kinds/extraction.py::_default_layer_problems
+    - asset_model/file_check_definitions.py::definitions
+    - asset_model/drift.py::collection_checks
+    - asset_model/assets.py::use_workspace
+    - asset_model/assets.py::committed_folder
+    - qa_tools/common/one_off_checks.py::materialise
+    - qa_tools/common/one_off_checks.py::package_checks
+    - qa_tools/common/one_off_package.py::findings
+    - qa_tools/common/one_off_package.py::record_missing
+    - qa_tools/common/one_off_package.py::record_undeclared
+    - qa_tools/common/file_checks.py::evaluate
+    - qa_tools/common/datacontract_common.py::run_against_warehouse
+    - qa_tools/tools/run_evidently.py::evaluate
+    - qa_tools/kind_adapters/__init__.py::adapter_module
+    - qa_tools/kind_adapters/extraction.py::adapter_for
+    - qa_tools/collections/__init__.py::adapter_module
+    - qa_tools/common/dataset_status.py::rollup_datasets
+    - qa_tools/common/one_off_publish.py::publish
+    evidence:
+    - '2026-11-22, code tree ca76f6a0 (the commits after it touch only requirements.yaml and CHANGELOG.yaml): 31 named test modules, pytest -n 4 (tests/test_one_off_load.py, test_one_off_gates, test_extraction_folder, test_extraction_recipe, test_one_offs, test_cli_check, test_file_checks, test_shared_file_checks, test_collections_registry, test_validate_schedule, test_assets, test_evidently_reads_its_entry, test_run_evidently_cp, test_run_evidently_bdm, test_run_datacontract_cp, test_run_datacontract_bdm, test_datacontract_common, test_datacontract_worker, test_no_calendar, test_cli_asset_selection, test_file_check_panel, test_run_soda_cp, test_run_dbt_cp, test_validate_soda, test_reads_columns, test_validate_imports, test_adapter_imports, test_hand_filing, test_counted_parity, test_no_calendar_dashboard, test_two_asset_gates) 804 passed in 65s; ruff clean. The full suite, the needs_deployment half and the browser tests were NOT run (no page change); npm test ran in `mothman check --no-pytest`.'
+    - 'tests/test_one_off_load.py is new behaviour (40 tests over ONE REAL LOAD): a two-collection package in a temporary repository with a bare remote, opened, committed, pushed and loaded by `mothman one-off load`, the four real tools running over the generated checks into a throwaway supply_<id> on the test server, named for the session''s MOTHMAN_TEST_DB_TAG and dropped at the end. An empty identifier fails in all four tools; a value that is no number fails its declared type in dbt, Soda and datacontract-cli; a date outside the cohort fails its bound in the same three; an exact row count passes at three rows and fails at eight of ten in Soda, datacontract-cli and Evidently; the declared table that never arrived fails table_arrived in a completed run of its own, the undeclared file fails naming it and is never filed, and QA carries on; the shared file checks screen every arrived file; failing keys are identifiers only, at most five. The folder holds the recipe layer only; the workspace holds both; a template edit reaches the next materialisation. Re-run on tree 9c90d34e, after the module''s fixture began setting up its own local dbt_utils copy with the real setup step rather than relying on this checkout''s data/one-off-packages/ (moved aside for the run): 40 passed in 29s.'
+    - 'Run first by hand before the tests, 2026-11-22 (a scratch script over the same entry points): every tool''s results for a generated extraction printed - e.g. cohort_bounds_dbt fail [None], declared_type_soda fail [''v2''], expected_rows_evidently pass 3 - and the database''s qa.check_result read back, table_arrived_file fail ''visits.csv is declared by the recipe and is not in the supply'', undeclared_file fail naming extra.csv.'
+    - '2026-11-22, the mock run''s D1 and D2, test-first: tests/test_one_off_page_agrees.py runs a package whose only problems are package facts (an undeclared file on a clean home dataset, a declared table absent, a failing derived product) open -> load -> list -> publish, and reads the built page in a real browser. FAILED FIRST: the page''s statuses ({cohort-study: green, health-agency: green, visit-study: nodata}), the Python mirror (cohort-study green), the agency and collection pills, no failing check named on the home dataset, the load''s ''3 failing'' against the database''s count, and a default-layer check named dbt:not_null. All 18 pass after the fix.'
     signed_off:
       by: Keith
       date: '2026-11-21'
@@ -52784,7 +53257,13 @@ requirements:
     date_written: '2026-11-21'
     story: As whoever maintains the pipeline, I want one test that takes a real recipe package from opening to a published page, so that the one-off shape cannot quietly stop working again.
     moscow: must
-    status: not_started
+    status: built
+    unmet_criteria:
+    - criterion: Criteria 1 and 2's cross-table relationship between the derived table and a counted one, and the cross-table result counted on the counted table only.
+      why: 'Recipe format version 1 declares no relationship (REQ-QAC-441 criterion 6, unmet; Keith 2026-11-22: v1 is a stand-in, never extended), so the committed fixture cannot carry one. Built now: the derived table out of the rollup and labelled a derived product, on a rendered page.'
+      owner: a translator from the downstream recipe format (Keith 2026-11-22), not yet scoped
+      blocked_by:
+        unowned: true
     source: 'REQ-PIPE-379 criterion 5 (signed 2026-11-14), deferred by Keith 2026-11-18 to #141; Keith 2026-11-21 Q4.4 (b). Drafted by delivery-scoper 2026-11-21; v5 signed by Keith 2026-11-21; v6 folds in delivery-dashboard-ux post-sign-off A and the v6 changes to REQ-PIPE-440, 442, 443 and 446. v7 folds in Keith''s answers to v6 Q1-Q3 and the REQ-PIPE-448 split. v7, PROPOSAL until re-signed. Signed by Keith 2026-11-21 (deferred-rescope-v5), re-signed the same day as v7 after the architect, dashboard UX and CLI UX reviews (sign-off pack https://claude.ai/artifact/EjfbTEommCBbHaPP2jZRQE, version 2).'
     acceptance_criteria:
     - THE SYSTEM SHALL have a test that opens a committed synthetic fixture package - a recipe and at least three CSV files, one a derived product, one table with an expected row count, one table the recipe declares that is absent from the package, one file the recipe does not declare, and a cross-table relationship between the derived table and a counted one - through `mothman one-off --id` steps into a temporary one-offs root, commits and pushes it to a temporary local remote, loads it into a test database, publishes it undecided, records a release decision and publishes it again, to a temporary destination.
@@ -52822,6 +53301,23 @@ requirements:
     - 'v6, NO GITHUB (Keith 2026-11-21: ''One offs should never use GitHub.''): criterion 4 asserts REQ-PIPE-446 criterion 14 on the real path.'
     - 'v6, NO 259 HOLD (Keith 2026-11-21, architect Q-A2): v5''s PORTABILITY NFR said the fixture ''is not held for REQ-DOCS-259''; nothing is held now, so the sentence is gone.'
     - v7, THE TEST FOLLOWS KEITH'S v6 ANSWERS (Q1 both commits and the template refusal; Q2 MOTHMAN_ASSET refused beside --id and when it names a one-off; Q3 the reload after an unpublished drop) and depends on the new REQ-PIPE-448.
+    - 'BUILT 2026-11-22, THE FIXTURE IS tests/fixtures/extraction_package/: recipe.json and four CSVs - people.csv counted with an expected three rows, an empty identifier and a date outside the cohort; summary.csv derived; labs.csv counted, clean, two expected; extra.csv undeclared; visits.csv declared and absent. The journey copies it and rewrites extraction_id to a MOTHMAN_TEST_DB_TAG id, so two sessions never share supply_<id>; never under one-offs/extraction/<id>/.'
+    - 'BUILT 2026-11-22, ONE JOURNEY PER MODULE: open, the refusals, a stop between collections and its resume, an unpublished drop and a reload, publish undecided, release, publish, withhold, a drop that publishes first - each step''s output and each page kept, every test reading them. ''A load stopped partway'' is stopped before the second collection''s checks; a stop INSIDE a run''s checks, found not resumed while building this (NoOpenAttempt, REQ-PIPE-279 c8), is REQ-PIPE-442 criterion 16 (Keith 2026-11-22), tested by tests/test_one_off_resume.py.'
+    - 'BUILT 2026-11-22, NO GITHUB IS WATCHED, not assumed: assets.refuse_github and every subprocess (through a subclass of subprocess.Popen, which Evidently''s inheritance check needs to stay a class) are recorded for the whole journey and must be empty.'
+    - 'BUILT 2026-11-22, criterion 7: REQ-PIPE-379 criterion 5 retired, replaced_by this requirement, and its unmet entry removed.'
+    - 'BUILT 2026-11-22 (Keith: ''Build it''), CRITERION 5: tests/test_not_yet_agreed_beside_calendared.py - a test-only recurring asset under a temporary assets/ root, its configuration made by the extraction kind''s own generator and then made enduring (no recipe or project, an adapter of its own, people on a calendar of one authored date and notes `no_calendar: not-yet-agreed`), one delivery of both files filed, staged, checked by all four tools and recorded through the real filing and orchestrator functions in a throwaway database, the page built from the recorded history and asked in a real browser. In process rather than through `mothman pipeline run` in a copied tree (tests/real_asset.py''s way): the same functions, without a copy of the repository. It found two NoCalendarAgreed escapes on the way - inheritance.offset_group and list_setting_members._round_date, each now answering None for a dataset with no calendar (REQ-PIPE-434 criterion 1).'
+    linked_tests:
+    - tests/test_one_off_end_to_end.py
+    - tests/test_not_yet_agreed_beside_calendared.py
+    - tests/test_one_off_resume.py
+    implemented_by:
+    - tests/test_one_off_end_to_end.py::journey
+    - tests/fixtures/extraction_package/recipe.json
+    evidence:
+    - '2026-11-22, code tree d759e134 (later commits touch requirements.yaml, CHANGELOG.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_load, test_one_off_gates, test_one_offs, test_extraction_folder, test_extraction_recipe, test_cli_check, test_people, test_place_held_supply, test_check_dashboard_renders, test_dashboard_data_files, test_embed_dashboard_data, test_no_calendar_dashboard, test_snapshot_dashboard, test_counted_parity, test_status_parity, test_no_calendar, test_validate_imports, test_no_period_filing and test_file_check_panel - 750 passed in 117s; npx vitest run 1312 passed in 99 files; ruff clean; validate-imports clean. The full suite and tests/test_dashboard_e2e.py were not run.'
+    - 'c1 to c4 and c6 in tests/test_one_off_end_to_end.py: c3''s refusals each asserted from the real command''s output (uncommitted folder, unpushed commit, uncommitted template, MOTHMAN_ASSET set, MOTHMAN_ASSET naming the one-off refused as not an asset, an id under assets/, another package), the stopped load resumed, the reload after the unpublished drop, the drop refused with no terminal, nothing removed on a wrong id, and the database, data/<id>/, reports/<id>/ and the dbt target gone with the configuration kept; c2 each table filed with no slot and branch NO_PERIOD, the row counts passing, the undeclared file failing and not filed, visits Fail on the rendered page and never No data (FAILED FIRST: it read No data, and the derived dataset carried no label and no not-counted line - the template defects fixed in this build), the derived one labelled, both pages'' lines above the QA result with their commits, no vendor/ and no console error; c4 no GitHub boundary or gh process reached; c6 the fixture''s calendar-less datasets and recorded results asserted first.'
+    - '2026-11-22, code tree a329b566 (later commits touch requirements.yaml and plans/ only): pytest -n 4 over tests/test_one_off_end_to_end.py, test_one_off_resume, test_not_yet_agreed_beside_calendared, test_one_off_load, test_one_off_gates, test_inheritance, test_inheritance_refusal_items, test_list_settings, test_offset_group_inheritance, test_period_overlay, test_no_period_filing, test_no_calendar, test_no_calendar_dashboard and test_counted_parity - 365 passed and 1 failed (the home view''s undeclared-file line, whose key was then fixed in asset_model/kinds/extraction.py); tests/test_one_off_end_to_end.py again after that fix, -n0, 67 passed; npx vitest run 1312 passed; ruff clean. The full suite was not run.'
+    - 'Criterion 5 and 6: tests/test_not_yet_agreed_beside_calendared.py, 5 passed - recorded results asserted for both datasets first; notes red and people not red on the page; the collection and the agency each reading people''s own status; each dataset''s page status the one dataset_status.py gives it; notes carrying ''No delivery schedule agreed yet'' and the not-counted line. It CAN FAIL: with the template''s rollupFacts emptied, 2 of the 5 fail (the rollup reads red, and no not-counted line). It failed first on the two NoCalendarAgreed escapes in filing and the overlay.'
     signed_off:
       by: Keith
       date: '2026-11-21'

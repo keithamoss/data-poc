@@ -408,10 +408,10 @@ Rough layout:
   `.github/workflows/validate-config.yml` - every gate that reads only
   committed configuration, and nothing that needs the results. The build
   itself moves to the environment that can read them (REQ-PIPE-092), and
-  `.github/workflows/ticket-sync.yml` is DISABLED for the same reason
-  with its old trigger kept in a comment: its replacement inverts the
-  integration's direction, which is `plans/running-thoughts.md` #53 and
-  not scoped yet.
+  `.github/workflows/ticket-sync.yml` is GONE for the same reason
+  (REQ-GHUB-433, 2026-11-22): the processing pass now reads ticket
+  comments itself, outbound, in the environment that can reach the
+  database.
 
   **WHAT STILL BREAKS THE RULE, so nobody has to re-derive the list.**
   `data/<asset>/deliveries/` and `data/<asset>/receipts/` are the supplier's own files and

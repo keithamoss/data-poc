@@ -317,6 +317,8 @@ def _schema_errors(raw: dict, src: Source, model=None, file_name: str | None = N
                     "nowhere here precisely because a dropped one is invisible.",
                     field=field, layer="schema"))
             elif err["type"] == "missing":
+                if loc in (["amber_setting"], ["replacement_setting"]) and not _enduring_asset():
+                    continue  # not asked of a one-off (Keith 2026-11-22)
                 out.append(ConfigError(
                     file_name, scope,
                     f"{where} is required and is not there.",
@@ -603,6 +605,13 @@ def _version_date_errors(scope: str, index: int, version: dict, src: Source) -> 
 
 # ---- datasets -------------------------------------------------------
 
+def _enduring_asset() -> bool:
+    """Whether the folder being gated is an enduring asset under assets/ -
+    every selectable folder today. A one-off's Asset will state its kind
+    (REQ-PIPE-446 criterion 12), and one stating a kind is not enduring."""
+    return getattr(assets.selected(), "kind", None) is None
+
+
 def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
     out: list[ConfigError] = []
 
@@ -612,6 +621,48 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
         scope = f"dataset {dataset_id!r}"
         named = dataset.get("calendar")
         declared_none = dataset.get(schedule.NO_CALENDAR_KEY)
+        derived = dataset.get(schedule.DERIVED_KEY)
+
+        # `never` AND `derived` LIVE ONLY UNDER one-offs/ (REQ-PIPE-438
+        # criterion 8, Keith 2026-11-21 Q4.7 (a)): this gate refuses them on an
+        # enduring asset, naming the dataset; the calendar loader reads what it
+        # is given, so every other reader of a bad folder still works.
+        if _enduring_asset():
+            if declared_none == schedule.NEVER:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {schedule.NEVER}` on "
+                    f"{src.asset_label}, an enduring asset.",
+                    f"`{schedule.NEVER}` is for a one-off, which lives under one-offs/, never "
+                    f"under assets/. Give this dataset the asset's baseline, or declare "
+                    f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` while its schedule "
+                    f"is still being agreed."))
+            if derived is not None:
+                out.append(ConfigError(
+                    src.name, scope,
+                    f"declares `{schedule.DERIVED_KEY}:` on {src.asset_label}, an enduring asset.",
+                    f"`{schedule.DERIVED_KEY}: true` marks a one-off's derived product, which "
+                    f"lives under one-offs/, never under assets/. Remove it."))
+        else:
+            # A ONE-OFF HAS SUPPLIES AND NO CADENCE (REQ-PIPE-438 criterion 9):
+            # every dataset `never`, so `not-yet-agreed` or a calendar fails.
+            if declared_none == schedule.NOT_YET_AGREED or named is not None or (
+                    declared_none is None):
+                found = (f"`{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}`"
+                         if declared_none == schedule.NOT_YET_AGREED else
+                         f"the calendar {named!r}" if named is not None else "no `no_calendar:`")
+                out.append(ConfigError(
+                    src.name, scope, f"declares {found} on {src.asset_label}, a one-off.",
+                    f"A one-off has supplies and no schedule: every one of its datasets "
+                    f"declares `{schedule.NO_CALENDAR_KEY}: {schedule.NEVER}`, and nothing "
+                    f"else."))
+        if derived is not None and declared_none is None:
+            out.append(ConfigError(
+                src.name, scope,
+                f"declares `{schedule.DERIVED_KEY}:` with no `{schedule.NO_CALENDAR_KEY}:` beside it.",
+                f"`{schedule.DERIVED_KEY}: true` sits beside a dataset's `{schedule.NO_CALENDAR_KEY}:` "
+                f"declaration (REQ-PIPE-438); a dataset with a calendar is never a derived "
+                f"product."))
 
         # A DATASET MAY SAY IT HAS NO CALENDAR, DELIBERATELY (REQ-PIPE-106
         # criterion 2) - and only deliberately. This branch is what lets
@@ -647,9 +698,8 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
                 f"no-calendar declaration for it ({src.asset_label}).",
                 f"In {src.calendar_name}, declare the asset's baseline under `calendars:`, or "
                 f"declare `{schedule.NO_CALENDAR_KEY}: {schedule.NOT_YET_AGREED}` for this "
-                f"dataset if no schedule has been agreed for it yet (or `{schedule.NEVER}` "
-                f"for a one-off extraction). Without either there is nothing to judge this "
-                f"dataset's supplies against."))
+                f"dataset if no schedule has been agreed for it yet. Without either there is "
+                f"nothing to judge this dataset's supplies against."))
             continue
 
         months = dataset.get("delivery_months")
@@ -1243,6 +1293,8 @@ def _merged_view(raw: dict, cal_raw: dict) -> dict:
         # (REQ-PIPE-345): _baseline_errors refuses both by name.
         dataset.pop("calendar", None)
         dataset.pop("dates", None)
+        if entry.get(schedule.DERIVED_KEY) is not None:
+            dataset[schedule.DERIVED_KEY] = entry[schedule.DERIVED_KEY]
         if entry.get(schedule.NO_CALENDAR_KEY) is not None:
             dataset[schedule.NO_CALENDAR_KEY] = entry[schedule.NO_CALENDAR_KEY]
         elif base:
@@ -2442,8 +2494,11 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)
     errors += _eras_errors(raw, src)
-    errors += _amber_setting_errors(raw, src)
-    errors += _replacement_setting_errors(raw, src)
+    # NOT ASKED OF A ONE-OFF (Keith 2026-11-22): a no-period supply is never
+    # promoted (REQ-PIPE-435 criterion 7), so neither setting means anything.
+    if _enduring_asset():
+        errors += _amber_setting_errors(raw, src)
+        errors += _replacement_setting_errors(raw, src)
     errors += _list_setting_errors(raw, src)
     if src.is_the_selected_assets and not errors:
         errors += _overlap_errors(src)

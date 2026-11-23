@@ -312,8 +312,8 @@ allowlist, the one shared implementation, the GitHub adapter and the
 TUI adapter. Its thirty-four criteria are met bar two, both recorded in
 its own `unmet_criteria` with owners: the GitHub route has no PRODUCTION
 CALLER (nothing reads ticket comments, because `ticket-sync.yml` is
-disabled and its replacement is `plans/running-thoughts.md` #53, not
-scoped), and RE-FILE is offered on both routes while its effect belongs
+disabled; REQ-GHUB-433 replaced it with a stage of the processing pass,
+built 2026-11-22), and RE-FILE is offered on both routes while its effect belongs
 to `REQ-PIPE-079`'s unbuilt wiring - both routes refuse it by name
 rather than half-doing it. The design reasoning that used to be written
 out here has moved into that requirement's own `decisions:`, which is
@@ -1879,7 +1879,7 @@ comparisons against the expected-supply sequence.
    (the verdict follows the filing). Both signed 2026-09-23 and BUILT
    2026-09-25.
 
-11. **[blocked, 2026-11-21]** **[Pipeline & publishing]** **Promotion and
+11. **[done, 2026-11-22]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
     landing in a filled slot never (Thread B). Plus the **off-cycle
     arrival gate** - a supply arriving in a period its dataset does not
@@ -1938,7 +1938,7 @@ comparisons against the expected-supply sequence.
     "promotion and rejection" reads like a complete set of outcomes and
     is not.
 
-12. **[blocked, 2026-11-21]** **[Pipeline & publishing]** **The decision
+12. **[done, 2026-11-22]** **[Pipeline & publishing]** **The decision
     log, and the GitHub Issues write path.** Append-only; who, when,
     what, which, why; automated decisions recorded the same way with the
     rule as actor; demotion stickiness; **re-filing** (confirmed in
@@ -1946,7 +1946,7 @@ comparisons against the expected-supply sequence.
     identity** (Thread G).
 
     **Owns:** `REQ-PIPE-074`, `REQ-PIPE-076`, `REQ-PIPE-078`,
-    `REQ-GHUB-082`, `REQ-QAC-108`
+    `REQ-GHUB-082`, `REQ-QAC-108`, `REQ-GHUB-433`
 
     *Scope grew 2026-09-28 (Keith's own placement)*: `REQ-QAC-108` -
     the drift and volume reference - lands here rather than in sprint
@@ -2413,15 +2413,23 @@ exist.
     inheriting it would let an unchecked supply become a period's answer by
     default.
 
-29. **[todo, 2026-09-27]** **[Pipeline & publishing]** **The
-    project-extraction asset shape.** QA of one-off data extractions for
+29. **[in-progress, 2026-11-22]** **[Pipeline & publishing]** **One-offs,
+    the extraction the first kind.** QA of one-off data extractions for
     individual projects - the third asset shape `CLAUDE.md` has named
     since 2026-09-21 ("supplies but no cadence at all") and nobody had
     scoped. Scoped with Keith 2026-09-27 over five rounds of questions,
     at his own ask, and then explicitly deprioritised: "write it all up
     as its own sprint and we'll tackle it later."
 
-    **Owns:** nothing yet - the five requirements below are not drafted.
+    **Owns:** `REQ-PIPE-434`, `REQ-PIPE-435`, `REQ-DASH-436`, `REQ-TEST-437`,
+    `REQ-PIPE-438`, `REQ-PIPE-439`, `REQ-PIPE-440`, `REQ-PIPE-446`,
+    `REQ-PIPE-448`, `REQ-QAC-441`, `REQ-PIPE-442`, `REQ-PIPE-443`,
+    `REQ-DASH-444`, `REQ-DASH-447` - drafted 2026-11-21, with the no-period
+    lifecycle beneath them.
+
+    **Build order** (delivery-architect, post-sign-off review, 2026-11-21):
+    434, 438, 436, 433 (any time), 446, 439, 440, 448 (split out of 446 in v7,
+    built once 440's digest exists), 441, 442, 435, 444, 447, 443, 437.
 
     **THE MODEL, as his answers produce it.** Nine points, each his own
     decision rather than an inference:

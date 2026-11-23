@@ -594,10 +594,31 @@ class LinkedDataset(_Strict):
     id_columns: list[NonEmptyStr] = Field(min_length=1)
 
 
+class DeclaredColumn(_Strict):
+    """A one-off's declared column, generated from its recipe (REQ-PIPE-440
+    criterion 2): its type and whether it is a primary identifier."""
+    name: NonEmptyStr
+    type: Literal["string", "integer", "number", "date", "timestamp", "boolean"]
+    primary_identifier: bool
+
+
+class CohortBound(_Strict):
+    """A one-off's structured cohort bound on one column (REQ-PIPE-439)."""
+    column: NonEmptyStr
+    lower: str | int | float | None = None
+    upper: str | int | float | None = None
+
+
 class DatasetConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
     table: NonEmptyStr
+    #: WHAT A ONE-OFF'S RECIPE DECLARES, generated into its folder (REQ-PIPE-440
+    #: criterion 2), so the page reads it from the folder rather than the
+    #: recipe (REQ-DASH-447). An enduring asset declares none of them.
+    columns: list[DeclaredColumn] | None = None
+    cohort: list[CohortBound] | None = None
+    expected_rows: int | None = Field(default=None, ge=0)
     #: The delivery agreement - participation, not_expected and the
     #: no-calendar declaration - lives in assets/<asset>/calendar.yaml since
     #: REQ-PIPE-110, and none of it is accepted here: a key stated in two
@@ -669,6 +690,12 @@ class Hosting(_Strict):
     access_domain: NonEmptyStr
 
 
+class RecipeRecord(_Strict):
+    format_version: int
+    digest: NonEmptyStr
+    filter: str
+
+
 class DataAsset(_Strict):
     data_asset_id: NonEmptyStr
     timezone: TimezoneConfig
@@ -682,6 +709,12 @@ class DataAsset(_Strict):
     #: only an environment with ticketing on needs it, and that refuses
     #: without one (environments.for_connection).
     ticket_repository: NonEmptyStr | None = None
+    #: The project a one-off is for (REQ-PIPE-446 criterion 13): required of
+    #: every one-off by the folders gate, never asked of an enduring asset.
+    project: NonEmptyStr | None = None
+    #: A one-off extraction's recipe record (REQ-PIPE-440 criterion 2): its
+    #: format version, its digest and its filter text.
+    recipe: "RecipeRecord | None" = None
     #: The PostgreSQL major this asset targets (REQ-PIPE-146). Optional
     #: HERE so this model's own tests can build a minimal asset; its
     #: presence and shape are gated by postgres_version.declaration_errors,
@@ -779,6 +812,8 @@ class DatasetAgreementConfig(_Strict):
     gate refuses either by name."""
     id: NonEmptyStr
     no_calendar: NonEmptyStr | None = None
+    #: A derived product beside its `no_calendar` (REQ-PIPE-438 criterion 2).
+    derived: bool | None = None
     participation: Participation | None = None
     not_expected: list[NotExpectedPeriod] | None = None
     #: Declared corrections to this dataset's frozen items (REQ-PIPE-111).

@@ -39,6 +39,14 @@ reports/*/
 assets/*/dbt/target/
 assets/*/dbt/logs/
 assets/*/dbt/dbt_packages
+# Each one-off's dbt artefacts (REQ-PIPE-440 criterion 11): never read as
+# uncommitted configuration by load's committed-and-pushed refusal.
+one-offs/*/*/dbt/target/
+one-offs/*/*/dbt/logs/
+one-offs/*/*/dbt/dbt_packages
+# dbt deps writes a lock beside packages.yml; for a one-off it names the
+# deployment's local dbt_utils copy, so it is a fact of one machine.
+one-offs/*/*/dbt/package-lock.yml
 .dbt/
 qa_tools/dbt_profiles/.user.yml
 dashboard/snapshots/*/*.html

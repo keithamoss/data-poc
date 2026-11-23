@@ -227,8 +227,13 @@ def recognise(d: delivery.Delivery) -> Recognition:
     # answer, which does not exist yet. What is checkable now is a
     # dataset with no slots AT ALL, which is the same event at a
     # coarser grain.
+    # A DATASET THAT WILL NEVER OWE ANYTHING (`no_calendar: never` - a
+    # one-off's) is not "a supplier sending something extra": nothing is owed
+    # by design, so the note says nothing (the mock run of 2026-11-22: fifteen
+    # of them on one three-delivery load).
     unexpected = tuple(sorted(
-        ds for ds in found.by_dataset if not slots.is_owed_supplies(ds)))
+        ds for ds in found.by_dataset
+        if not slots.is_owed_supplies(ds) and not _never_owes(ds)))
     if unexpected:
         print(f"note: delivery {d.name!r} carries {', '.join(unexpected)}, which "
                f"nothing is currently owed from - processed as usual.")
@@ -532,3 +537,14 @@ def adopt_tree(snapshot: TreeSnapshot | None) -> None:
     handed, or none. Its digest is checked by the process that took it."""
     global _tree
     _tree = snapshot
+
+
+def _never_owes(dataset_id: str) -> bool:
+    """Whether a dataset declares it will never have a calendar
+    (`no_calendar: never`, a one-off's)."""
+    from asset_model import schedule
+
+    try:
+        return schedule.no_calendar(dataset_id) == schedule.NEVER
+    except Exception:  # noqa: BLE001 - only the note depends on it; it stays said
+        return False

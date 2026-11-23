@@ -88,6 +88,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     ("layout", ["uv", "run", "mothman", "dashboard", "validate-layout"],
      "only asset folders at the top of assets/, and no collection's file in shared code",
      False),
+    # REQ-PIPE-446 criteria 1, 2, 4, 5 and 13: folder names, kind plug-ins, one
+    # id namespace, data_asset_id against the folder, and a project per
+    # one-off. Repository-wide: it reads folder names and data_asset_id.
+    ("folders", ["uv", "run", "python3", "-m", "qa_tools.common.validate_folders"],
+     "every asset and one-off folder is named for its data_asset_id, and one id is one folder",
+     False),
     # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
     # would draw the same rows. REQ-GEN-370 criterion 5: and no provider
     # imports another provider, an adapter or anything under assets/.
@@ -205,7 +211,7 @@ _DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 #: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
 #: criterion 9).
 _REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "imports", "dbt packages",
-                              "layout", "npm test", "pytest"})
+                              "layout", "folders", "npm test", "pytest"})
 
 
 #: Gates about synthetic configuration (REQ-PIPE-385 criterion 8): run only for
@@ -216,6 +222,93 @@ _SYNTHETIC_GATES = ("providers", "scenarios", "scenario map")
 #: The result a gate that does not apply records in place of an exit code.
 NOT_APPLICABLE = -1
 NOT_APPLICABLE_TEXT = "not applicable (no synthetic/ folder)"
+
+
+# ---- one-offs (REQ-PIPE-448) ----------------------------------------------
+
+def one_off_kinds_with_folders() -> list:
+    """The kind plug-ins whose kind has one-off folders - those are the kinds
+    whose (gate, kind) declarations a run of `mothman check` asks. With no
+    one-offs, none, and check says nothing about one-offs (criterion 3)."""
+    from asset_model import assets, one_off_kinds
+
+    held = sorted({kind for kind, _name in assets.one_offs()})
+    return [k for k in (one_off_kinds.get(n) for n in held) if k is not None]
+
+
+def per_asset_gates() -> list[str]:
+    """Every gate run once per asset - the ones a kind declares for."""
+    return [label for label, _argv, _why, _w in _GATES if label not in _REPOSITORY_WIDE]
+
+
+def undeclared(label: str) -> list[str]:
+    """The kinds with folders that do not declare whether `label` applies to
+    them (REQ-PIPE-448 criterion 1): no default - 'applies' would fail every
+    calendar or scenario gate, 'does not apply' would leave a new gate unrun."""
+    if label in _REPOSITORY_WIDE:
+        return []
+    return [k.name for k in one_off_kinds_with_folders() if label not in k.gates]
+
+
+def not_applicable_text(kind) -> str:
+    """'not applicable (<kind>)', in the kind's display word - never 'no
+    synthetic/ folder', which is not why a gate skips a one-off."""
+    return f"not applicable ({kind.singular})"
+
+
+def one_off_rows(label: str, why: str, can_warn: bool) -> list[tuple]:
+    """One row per kind with folders for an applicable gate (REQ-PIPE-448
+    criteria 2 and 3): how many folders were gated in full and how many by
+    digest, and the name of each that failed. Nothing where the gate does not
+    apply to a kind, and nothing at all where there are no one-offs."""
+    from qa_tools.common import one_off_gating
+
+    rows = []
+    for kind in one_off_kinds_with_folders():
+        if kind.gates.get(label) is not True:
+            continue
+        started = time.monotonic()
+        got = one_off_gating.kind_pass(label, kind)
+        for name, problem in sorted(got["failed"].items()):
+            console.print(f"[{name}] {label}: {problem}", markup=False, highlight=False)
+        shown = (f"{label} ({kind.plural}: {got['full']} in full, {got['digest']} by digest"
+                 + (f"; failed: {', '.join(sorted(got['failed']))}" if got["failed"] else "")
+                 + ")")
+        rows.append((shown, 1 if got["failed"] else 0, why, can_warn,
+                     time.monotonic() - started, got))
+    return rows
+
+
+def template_rows(why: str = "a kind's template, which every one-off of the kind reads "
+                                "live") -> list[tuple]:
+    """One row per gate a kind declares for its template, where the template
+    changed since the diff base (REQ-PIPE-448 criterion 6) - nothing where it
+    did not, or the kind declares none."""
+    from asset_model import one_off_kinds
+    from qa_tools.common import one_off_gating
+
+    rows = []
+    for kind in one_off_kinds.registered():
+        started = time.monotonic()
+        got = one_off_gating.template_pass(kind)
+        for name, problems in sorted((got or {}).items()):
+            for problem in problems:
+                console.print(f"[{kind.name}/_template] {name}: {problem}", markup=False,
+                              highlight=False)
+            rows.append((f"{name} ({kind.singular} template)", 1 if problems else 0, why,
+                         False, time.monotonic() - started))
+    return rows
+
+
+def not_applicable_lines() -> list[str]:
+    """One line per kind with folders: every gate that does not apply to it -
+    never a row each, never shown passed (criterion 3)."""
+    out = []
+    for kind in one_off_kinds_with_folders():
+        skipped = [g for g in per_asset_gates() if kind.gates.get(g) is False]
+        if skipped:
+            out.append(f"{not_applicable_text(kind)}: {', '.join(skipped)}")
+    return out
 
 
 def _has_synthetic(extra: dict) -> bool:
@@ -472,7 +565,7 @@ def _fail_under() -> float | None:
 
 def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed: float,
                 failed_gates: list[str], not_run: list[str] = (),
-                not_applicable: list[str] = ()) -> str:
+                not_applicable: list[str] = (), one_offs: list[dict] = ()) -> str:
     """REQ-TEST-375 criterion 10: the full gate's result, on one line, fit to
     paste into a commit message. It never claims more than ran: a missing
     report says so, and a tree that changed mid-run is not a claim about
@@ -488,6 +581,11 @@ def result_line(*, tree: str, tree_after: str, counts, coverage, floor, elapsed:
         f"not run (no toolchain): {', '.join(not_run)}" if not_run else ""])) \
         or (f"every gate that applies passed ({NOT_APPLICABLE_TEXT}: {', '.join(not_applicable)})"
             if not_applicable else "every gate passed")
+    # FOLDERS GATED IN FULL AND BY DIGEST (REQ-PIPE-448 criterion 3), so a green
+    # line cannot claim more than ran; nothing where there are no one-offs.
+    if one_offs:
+        gates += (f"; one-offs: {sum(c['full'] for c in one_offs)} folder-gate(s) in full, "
+                  f"{sum(c['digest'] for c in one_offs)} by digest")
     where = (tree if tree == tree_after
              else f"TREE CHANGED DURING THE RUN ({tree} -> {tree_after}), so this is no claim")
     return f"Full gate (mothman check): {gates}; {tests}; {cov}; {minutes}m{seconds:02d}s; {where}"
@@ -535,6 +633,11 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             label, argv, why, can_warn = gate
             if label in _SYNTHETIC_GATES and not _asset_passes(label):
                 return label, NOT_APPLICABLE, why, can_warn, 0.0, f"{label}: {NOT_APPLICABLE_TEXT}."
+            missing = undeclared(label)     # REQ-PIPE-448 criterion 1
+            if missing:
+                return (f"{label} (undeclared for {', '.join(missing)})", 2, why, can_warn, 0.0,
+                        f"{label}: not run - one-off kind(s) {', '.join(missing)} do not "
+                        f"declare whether it applies to them.")
             started = time.monotonic()
             code, output, failed = _run_captured(label, argv, can_warn)
             return _shown(label, failed), code, why, can_warn, time.monotonic() - started, output
@@ -552,6 +655,7 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     import tempfile
 
     reports = Path(tempfile.mkdtemp(prefix="mothman-check-"))
+    one_off_counts: list[dict] = []
     for label, argv, why, can_warn in (() if docs else gates):
         if no_pytest and label == "pytest":
             continue
@@ -562,10 +666,29 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             continue
         if label == "pytest":
             argv = _pytest_argv(argv, reports)
+        # A (GATE, KIND) PAIR UNDECLARED IS REFUSED (REQ-PIPE-448 criterion 1),
+        # before the gate runs.
+        missing = undeclared(label)
+        if missing:
+            console.rule(f"[bold]{label}", style="dim")
+            console.print(f"{label}: not run - one-off kind(s) {', '.join(missing)} do not "
+                          f"declare whether it applies to them (asset_model/kinds/).",
+                          style="red")
+            results.append((f"{label} (undeclared for {', '.join(missing)})", 2, why,
+                            can_warn, 0.0))
+            continue
         started = time.monotonic()
         code, failed = _run(label, argv, can_warn)
         results.append((_shown(label, failed), code, why, can_warn, time.monotonic() - started))
+        # AND OVER EVERY ONE-OFF FOLDER IT APPLIES TO (REQ-PIPE-448 criterion 2).
+        for row in one_off_rows(label, why, can_warn):
+            results.append(row[:5])
+            one_off_counts.append(row[5])
 
+    # EACH KIND'S CHANGED TEMPLATE (REQ-PIPE-448 criterion 6), where a
+    # per-asset gate ran.
+    if not docs and any(label not in _REPOSITORY_WIDE for label, *_ in gates):
+        results += template_rows()
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")
     table.add_column("Gate")
@@ -585,6 +708,10 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             outcome = f"[red]FAILED ({code})[/red]"
         table.add_row(label, outcome, f"{took:.1f}s", why)
     console.print(table)
+    # THE GATES THAT DO NOT APPLY TO A KIND, ON ONE LINE EACH (REQ-PIPE-448
+    # criterion 3) - and nothing at all where there are no one-offs.
+    for line in ([] if docs else not_applicable_lines()):
+        console.print(line, style="dim")
 
     def _warned(code: int, can_warn: bool) -> bool:
         return can_warn and code == WARNING_EXIT
@@ -599,7 +726,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
                            counts=_pytest_counts(reports / "junit.xml"),
                            coverage=_coverage_percent(reports / "coverage.json"),
                            floor=_fail_under(), elapsed=time.monotonic() - gate_started,
-                           failed_gates=failed, not_run=skipped, not_applicable=not_applicable)
+                           failed_gates=failed, not_run=skipped, not_applicable=not_applicable,
+                           one_offs=one_off_counts)
         console.print("Paste into the commit message:", style="bold")
         console.out(line, highlight=False)
     shutil.rmtree(reports, ignore_errors=True)

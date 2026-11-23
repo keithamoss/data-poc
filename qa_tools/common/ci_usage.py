@@ -34,6 +34,9 @@ DAYS_IN_MONTH = 30
 
 
 def _run_gh(args: list[str]) -> str:
+    from asset_model import assets as _assets_guard
+
+    _assets_guard.refuse_github(f"`gh {' '.join(args[:2])}`")   # REQ-PIPE-446 c14
     result = subprocess.run(["gh", *args], capture_output=True, text=True, check=True)
     return result.stdout
 

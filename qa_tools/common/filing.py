@@ -47,7 +47,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from asset_model import asset_time as _clock
-from qa_tools.common import qa_store, supply_db
+from qa_tools.common import qa_store, sample_data, supply_db
 from qa_tools.common import verdict as verdict_mod
 from asset_model.assignment import Assignment
 
@@ -160,6 +160,11 @@ def _judged_for(dataset_id: str, slot_name: str | None,
     be the blast-radius rule broken for a presentational field.
     """
     if received_at is None:
+        return verdict_mod.Judged(None, None, None)
+    if not slot_name and _has_no_calendar(dataset_id):
+        # NO PERIOD, SO NOTHING TO BE PUNCTUAL AGAINST (REQ-PIPE-434
+        # criterion 4): never `unfiled`, which reads as a supply that should
+        # have had one.
         return verdict_mod.Judged(None, None, None)
     if not slot_name:
         return verdict_mod.judge(dataset_id, None, received_at)
@@ -430,6 +435,18 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
 
     for arrival in found_arrivals:
         for dataset_id in sorted(arrival.files_by_dataset):
+            # A DATASET WITH NO CALENDAR IS FILED TO NO PERIOD (REQ-PIPE-434
+            # criteria 1 and 2), asked of the declaration once, here at the
+            # boundary: no slot is looked for - which is what let
+            # NoCalendarAgreed escape filing - and nothing is held, because
+            # there is no period a person could place it in. Both no_calendar
+            # values are filed alike; what the record COUNTS for is
+            # sample_data.supply_state's (REQ-PIPE-438).
+            if _has_no_calendar(dataset_id):
+                decided = _filed_to_no_period(arrival, dataset_id)
+                if decided is not None:
+                    written.append(decided)
+                continue
             # TWO FILES FOR ONE DATASET ARE FILED LIKE ANY SUPPLY
             # (REQ-PIPE-105 criterion 6, amended 2026-10-02). They were a
             # delivery-level HOLD - nothing filed, a work item asking which
@@ -526,6 +543,40 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
             _make_due_groups(dataset_id, arrival.received_at)
             written.append(decided)
     return written
+
+
+def _has_no_calendar(dataset_id: str) -> bool:
+    """sample_data.is_sample(), the one routing question (REQ-PIPE-434's
+    MAINTAINABILITY NFR) - False for an id the hierarchy does not define,
+    which the slot lookup after it reports as it always has."""
+    from asset_model import hierarchy
+
+    try:
+        return sample_data.is_sample(dataset_id)
+    except hierarchy.UnknownDatasetError:
+        return False
+
+
+def _filed_to_no_period(arrival, dataset_id: str) -> Assignment | None:
+    """Record a no-calendar dataset's supply with no slot and no period
+    (REQ-PIPE-434). Returns the assignment where this call wrote it.
+
+    NOTHING PERIOD-SHAPED FOLLOWS: no supersession (that is per period), no
+    period opening, no offset groups, no hold. Its checks run in the same
+    pass as any arrival's, against the sample schema's newest version of
+    each no-calendar table (REQ-PIPE-106), because the period overlay builds
+    nothing for a supply with no period and leaves the staging-time views."""
+    from asset_model import assignment as assign_mod
+
+    supply_id = _supply_id_for(arrival, dataset_id)
+    if filing_for(dataset_id, supply_id) is not None:
+        return None
+    decided = Assignment(dataset_id=dataset_id, supply_id=supply_id, slot=None,
+                         branch=assign_mod.NO_PERIOD, considered=(),
+                         received_at=arrival.received_at)
+    with _connect("mothman:filing-record") as conn:
+        wrote = record(decided, arrival.delivery_name, conn=conn)
+    return decided if wrote else None
 
 
 def _make_due_groups(dataset_id: str, at) -> None:

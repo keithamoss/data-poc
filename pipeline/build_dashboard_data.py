@@ -55,6 +55,7 @@ from qa_tools.common import (
     drift_reference,
     qa_store,
     root_cause,
+    sample_data,
     schedule_ended,
     supply_db,
     supply_status,
@@ -377,6 +378,20 @@ def _schedule_not_agreed(dataset_id: str) -> str | None:
     return schedule.no_calendar(dataset_id)
 
 
+def _one_off_page() -> bool:
+    """Whether this page is built for a folder under one-offs/ - which states
+    its kind (REQ-PIPE-446 criterion 12); no enduring asset does."""
+    return getattr(assets.selected(), "kind", None) is not None
+
+
+def _derived(dataset_id: str) -> bool:
+    """Whether calendar.yaml declares this dataset a derived product
+    (REQ-PIPE-438 criterion 2) - configuration, so safe here."""
+    from asset_model import schedule
+
+    return schedule.is_derived(dataset_id)
+
+
 def _agreement_refusal(dataset_id: str) -> dict | None:
     """This dataset's REQ-PIPE-173 refusal as the page renders it, or None."""
     from qa_tools.common import agreement_drift
@@ -399,7 +414,13 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
     HELD FROM (criterion 14, K2 = A): a result that read no supply of a table
     - ABSENT or NO-SUPPLY - is not about that table, so it stays on the page
     of the dataset it is declared on and goes nowhere else.
+
+    AN AGREED RESULT GOES TO EVERY PARTICIPANT, a derived product included
+    (REQ-PIPE-438 criterion 4); build_one_table leaves it out of the derived
+    product's own status. An in-development one goes only to the participants
+    whose own results are in development - never to a counted one.
     """
+    kinds = sample_data.uncounted()
     for r in results:
         for other, read in sorted((r.get("reads") or {}).items()):
             if read.get("state") not in _SHOWN_ELSEWHERE and not _contested_read(read):
@@ -411,8 +432,8 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
             # it, but don't let it affect the agreed data set"). It is still
             # run, recorded and reported on the calendar-less participant's
             # page, which is where somebody developing the check is looking.
-            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and \
-                    not _schedule_not_agreed(hierarchy.dataset_for_table(other).dataset_id):
+            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and sample_data.supply_state(
+                    hierarchy.dataset_for_table(other).dataset_id, kinds=kinds) == qa_store.AGREED:
                 continue
             by_table[other].append(r)
 
@@ -488,6 +509,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     """
 
     table, dataset_id = dataset.table, dataset.dataset_id
+    derived_here = _derived(dataset_id)
     view = {} if warehouse_cache is None else warehouse_cache
     slot_timelines = view.setdefault("timelines", {})
 
@@ -567,6 +589,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "status_by_run": {}, "reference": {}, "not_evaluated": {}, "at": {}, "reads": {},
             "unreadable": {}, "due_at": {}, "distribution": {}, "band": {}, "member_set": {},
         })
+        # AN AGREED RESULT ON THIS PAGE (REQ-PIPE-438 criterion 4): on a derived
+        # product's page that can only be a cross-table result counted on its
+        # counted participants' side, so it is left out of this one's status.
+        if r.get("supply_state") != qa_store.IN_DEVELOPMENT:
+            slot["agreed"] = True
         # A RECORDED BINNED DISTRIBUTION (REQ-DASH-337 criterion 14) and the
         # BAND IN THE DIRECTION THE RESULT RECORDS (criterion 13), where the
         # result carries them - any check's, never named here.
@@ -782,6 +809,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 "between": (_between(slot["check_id"],
                                      {t for got in slot["reads"].values() for t in (got or ())})
                             if col == CROSS_TABLE_PSEUDO_COLUMN else None),
+                # COUNTED ON THE OTHER SIDE, NOT HERE (REQ-PIPE-438 criterion 4):
+                # an agreed cross-table result shared onto a derived product's
+                # page is left out of that page's own status, in both status
+                # implementations (the template's and dataset_status.py's).
+                **({"notCountedHere": True}
+                   if derived_here and col == CROSS_TABLE_PSEUDO_COLUMN and slot.get("agreed")
+                   else {}),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 # THE REPLACED RUNS' ENTRIES, apart from the history so nothing
@@ -893,7 +927,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         })
 
     # From the dataset's participation in contract/calendar.yaml (REQ-PIPE-110).
-    cadence = agreement.cadence(dataset_id)
+    # NONE FOR A DATASET WITH NO CALENDAR (REQ-DASH-436 criteria 1 and 2): no
+    # cadence to read, so no due date or lateness to show - never a raise.
+    cadence = None if sample_data.is_sample(dataset_id) else agreement.cadence(dataset_id)
 
     # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2): the arrival verdict
     # is recorded against the filing, keyed on the run's own `received_at`.
@@ -1028,6 +1064,15 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
         # (REQ-PIPE-106). None in the ordinary case, so the page renders
         # nothing extra - a marker on every tile is noise at 30 datasets.
         "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
+        # A DERIVED PRODUCT (REQ-PIPE-438 criteria 3 and 5): in no rollup,
+        # and said so in words. Absent in the ordinary case.
+        **({"derived": True} if derived_here else {}),
+        # ARRIVED, NO CHECK OUTCOME YET, ON A ONE-OFF'S PAGE (REQ-DASH-436
+        # criterion 4): its own status, 'Not yet checked', out of the rollup.
+        # A one-off's Asset states its kind (REQ-PIPE-446 criterion 12); an
+        # enduring asset's page is unchanged.
+        **({"notYetChecked": True}
+           if _one_off_page() and last_arrival and not results else {}),
         "lastArrival": last_arrival,
         # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081 criteria
         # 1, 2, 3 and 6): the ANSWERS, from the decision log, never the rule.
@@ -1222,11 +1267,32 @@ def build_datasets(collection_id: str) -> list[dict]:
     all_runs = sorted([*manifest, *readers_runs.values()],
                       key=lambda m: facts[m["run_id"]]["rank"])
     superseded = superseded_runs(facts, manifest)
-    return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
-                            dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
-                            warehouse_cache=cache, superseded=superseded,
-                            not_in_agreement=payload.get("not_in_agreement") or {})
-            for d in coll.datasets]
+    built = [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.dataset_id, facts),
+                             dataset_stats, lifecycle_by_id, facts=facts, all_runs=all_runs,
+                             warehouse_cache=cache, superseded=superseded,
+                             not_in_agreement=payload.get("not_in_agreement") or {})
+             for d in coll.datasets]
+    if _one_off_page():
+        _label_layers(built)
+    return built
+
+
+def _label_layers(datasets: list[dict]) -> None:
+    """Each check of a one-off's page, marked with its layer - 'default' or
+    'kind' - through its kind's plug-in (REQ-DASH-444 criterion 10). The page
+    words them; nothing here names a kind."""
+    from asset_model import one_off_kinds
+
+    kind = one_off_kinds.get(assets.selected().kind)
+    if kind is None or kind.layer_of is None:
+        return
+    for ds in datasets:
+        checks = [ck for col in ds.get("columns") or [] for ck in col.get("checks") or []]
+        checks += list((ds.get("fileChecks") or {}).get("checks") or [])
+        for ck in checks:
+            layer = kind.layer_of(ck.get("key") or "")
+            if layer:
+                ck["layer"] = layer
 
 
 def build(collection_id: str) -> dict:

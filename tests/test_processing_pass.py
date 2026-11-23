@@ -595,6 +595,21 @@ class TestARefusalAfterTheSupplyMovedIsStillRecorded:
         assert len(_refusals(conn, ds)) == 2
 
 
+class _NoComments:
+    """A ticket service with nothing posted on any slot ticket - the comment
+    stage (REQ-GHUB-433) reads it before reconciliation, which these tests
+    stand in for. Never the real GitHub."""
+
+    def issue_comments_since(self, since):
+        return []
+
+    def slot_tickets(self):
+        return {}
+
+    def own_login(self):
+        return "mothman-bot"
+
+
 class TestKeithsAnswersToTheSprint14Critic:
     """post-build-review #120, Keith 2026-10-06: Q1 a ticket that could not
     be reconciled is a failed stage (exit 2); Q3 a locked arrival holds
@@ -607,7 +622,7 @@ class TestKeithsAnswersToTheSprint14Critic:
     def test_a_ticket_that_could_not_be_reconciled_exits_2(self, world, monkeypatch):
         from qa_tools.common import ticket_reconciler
 
-        world.tickets = object()
+        world.tickets = _NoComments()
         monkeypatch.setattr(ticket_reconciler, "after_runs",
                             lambda c: ticket_reconciler.Outcome(failed={"slot-1": "403"}))
         monkeypatch.setattr(ticket_reconciler, "report", lambda outcome: None)
@@ -618,7 +633,7 @@ class TestKeithsAnswersToTheSprint14Critic:
     def test_reconciled_tickets_change_nothing(self, world, monkeypatch):
         from qa_tools.common import ticket_reconciler
 
-        world.tickets = object()
+        world.tickets = _NoComments()
         monkeypatch.setattr(ticket_reconciler, "after_runs",
                             lambda c: ticket_reconciler.Outcome())
         monkeypatch.setattr(ticket_reconciler, "report", lambda outcome: None)

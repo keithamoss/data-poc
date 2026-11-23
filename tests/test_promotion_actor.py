@@ -41,7 +41,12 @@ def captured(monkeypatch):  # noqa: D401
     return seen
 
 
-ARRIVAL = SimpleNamespace(received_at=None, run_id="run_001")
+def _arrival(collection_id):
+    """It carries its collection's calendared dataset, as a real arrival does:
+    the orchestrator reads which datasets it carries (REQ-PIPE-435 c7)."""
+    dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
+    return SimpleNamespace(received_at=None, run_id="run_001",
+                           files_by_dataset={dataset: "x"})
 
 
 @pytest.mark.parametrize("collection_id", asset_params.per_asset(
@@ -53,7 +58,7 @@ def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeyp
 
     monkeypatch.setattr(asset_time, "when_effective",
                         lambda *a, **k: SimpleNamespace(isoformat=lambda: "2026-10-04T00:00:00+08:00"))
-    orchestrate.promote_after(collection_id, ARRIVAL, [], "someone@example.org")
+    orchestrate.promote_after(collection_id, _arrival(collection_id), [], "someone@example.org")
 
     # THE OPERATOR IS NEVER HANDED TO THE GATE AS AN ACTOR - only as who ran
     # the pipeline; the gate's own records name the rule.

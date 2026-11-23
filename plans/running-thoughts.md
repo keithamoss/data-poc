@@ -794,55 +794,6 @@ e2e.py`/`test_check_dashboard_renders.py` (22 passed), ruff clean, plus
 a manual real-browser walkthrough confirming all 3 link types resolve
 to the exact right file/line/folder with zero console errors.
 
-53. **[todo, 2026-09-27]** **[Pipeline & publishing]** Something in the AWS build has to poll GitHub for QA-ticket comments, because GitHub Actions no longer builds the dashboard.
-
-    Keith's own observation, 2026-09-27, while REQ-PIPE-092 was being
-    drafted: "now that GitHub Pages isn't doing any building of the
-    dashboard, we'll need a lambda in the AWS infra to poll GitHub
-    looking for comments - flag that as part of running thoughts for
-    the AWS build."
-
-    **The dependency being broken, stated plainly.** An accept/reject
-    decision is a real `/accept` or `/reject` comment on a dataset's own
-    QA ticket (REQ-QAC-017, built). `acceptance_sync.py` splits into a
-    real `gh` boundary - `fetch_all_ticket_comments()` - and pure
-    matching functions over already-fetched data. The `gh` call is made
-    by `deploy-pages.yml`, because that workflow already had a GitHub
-    token and was already building the dashboard, so fetching comments
-    there cost nothing extra.
-
-    REQ-PIPE-092 moves the build inside the environment and stops
-    GitHub Actions building anything. The environment has a database and
-    no GitHub token; the workflow has a token and no database. So the
-    one place that used to have both has stopped existing, and nothing
-    currently fetches those comments at all.
-
-    **Not urgent for the PoC, and worth saying why so it does not get
-    scoped as a crisis.** `embed_dashboard_data.py` already degrades:
-    with no `reports/qa_comments.json` it embeds an empty
-    `AMBER_DECISIONS` and the badges simply do not render. A local
-    build has always behaved that way. What breaks is the PUBLISHED
-    dashboard losing its decision badges, which matters as soon as
-    anybody relies on them.
-
-    **Three shapes, none of them decided here.** A Lambda on a schedule
-    that polls and writes into the metadata schema, which is Keith's own
-    suggestion and the one that fits the AWS MVP. A GitHub webhook
-    into something in the environment, which needs an inbound endpoint
-    the environment may not want. Or the environment polls GitHub
-    itself during a publish, which needs a token where we have just
-    finished removing credentials from one side and would be adding one
-    to the other.
-
-    **It bears on the unification question below** (see the decision-log
-    entry filed alongside this one): if an accept/reject is an entry in
-    the one decision log, then whatever polls GitHub is a WRITER to that
-    log rather than a producer of a side file the dashboard build reads.
-    That changes which of the three shapes is natural - a Lambda writing
-    to the database is very different from a Lambda writing a JSON file
-    into a build.
-
-
 54. **[done, 2026-09-27]** **[Pipeline & publishing]** An amber accept/reject and a filing decision are both decisions, and there are two logs.
 
     **OUTCOME, so nobody reads the analysis below as live: an amber
@@ -5609,7 +5560,7 @@ could never have computed it), and it belongs with batch 5's check work.
      or would it have cleared by itself minutes later? The early-arrival red
      in #95 (a table held until its partner's file arrives) is the case that
      prompted it. Automated notification on red is not scoped. It relates to
-     the ticketing work (#53) and to REQ-GHUB tickets.
+     the ticketing work (REQ-GHUB-433) and to REQ-GHUB tickets.
 
 114. **[todo, 2026-10-20]** **[Pipeline & publishing]** **"Zip" is a
      stand-in for "a package of files".** Keith, 2026-10-20: "zip is just a
@@ -6163,18 +6114,12 @@ could never have computed it), and it belongs with batch 5's check work.
      configuration injected at deploy time. This is configuration
      architecture, not code architecture (REQ-PIPE-240 to 248).
 
-141. **[todo, 2026-11-18]** **[Pipeline & publishing]** **[QA pipeline]** **A project extraction's supplies have never run end to end - scope how a no-period supply is filed, checked and gated.**
-     Found building REQ-PIPE-379 criterion 5's test: an asset whose one
-     dataset declares `no_calendar: never`, put through `mothman pipeline
-     run`. Filing raised NoCalendarAgreed (it is not a ValueError, so
-     file_arrivals' handlers missed it); past that, the supply is held as
-     "waiting for a person to place it", so no tool checks it; and the
-     promotion gate raises NoCalendarAgreed again. The dashboard build's
-     agreement.cadence() raises it too. **Keith, 2026-11-18: scope it
-     separately** - what filing, the run's view and promotion mean when a
-     supply has no period is a design question, not a fix. REQ-PIPE-379
-     criterion 5 stays unmet pointing here; REQ-PIPE-385's no-synthetic-folder
-     test runs on an asset with a calendar instead. Not scoped yet.
+141. **[done, 2026-11-22]** **[Pipeline & publishing]** **[QA pipeline]** **A project extraction's supplies have never run end to end - scope how a no-period supply is filed, checked and gated.**
+     Scoped and built as plans/supply-model.md sprint 29's requirements
+     (REQ-PIPE-434 to REQ-DASH-447); REQ-PIPE-379 criterion 5, which pointed
+     here, was retired 2026-11-22 for REQ-TEST-437, which runs a real recipe
+     package end to end. What is still open lives in those requirements'
+     unmet criteria.
 
 142. **[todo, 2026-11-18]** **[Testing & dev tooling]** **The session-start hook drops every leftover test database - including those of a test run still going.**
      Seen 2026-11-18 evening: a context compaction re-ran the SessionStart
@@ -6210,3 +6155,14 @@ could never have computed it), and it belongs with batch 5's check work.
      template, the database, data/<id>/, reports/<id>/), and the published
      page undecided and then decided. Probably an artifact. After the
      build, not before - the folder's shape is still moving in v6.
+
+145. **[todo, 2026-11-22]** **[Pipeline & publishing]** **[QA checks & contract]** **A translator from the downstream recipe format to an extraction's base checks.**
+     Keith, 2026-11-22: "The recipe format is fixed downstream, we'll probably
+     create some sort of translator to work out what checks to apply as a
+     base." So REQ-PIPE-439's recipe format version 1 is a stand-in, kept so
+     the one-off path can be built and tested end to end and never extended;
+     the real recipes come from downstream, and a translator maps them to the
+     checks an extraction gets. REQ-QAC-441 criterion 6 (a cross-table
+     relationship the recipe declares) waits on it. Not scoped: the downstream
+     format, where the translator runs, and whether it replaces version 1 or
+     sits in front of it.

@@ -326,6 +326,9 @@ AMBER_WAITING_REASON = ("this supply is warning and its warn setting is hold, so
 #: and rewording this module's refusal made it answer False in silence.
 CONTESTED = "contested"
 NO_SLOT = "no-slot"
+#: A dataset with no calendar: its supply has no period, so it is never put to
+#: the gate (REQ-PIPE-435 criterion 7).
+NO_PERIOD = "no-period"
 DECIDED_BY_A_PERSON = "decided-by-a-person"
 NO_ACTIVE_CHECKS = "no-active-checks"
 #: Its status is red - the rule's own failure.

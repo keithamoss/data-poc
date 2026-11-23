@@ -474,8 +474,10 @@ class TestARefusedHandOffIsSaidAsItself:
         real = config_pin.ConfigSnapshot.take()
         forged = config_pin.ConfigSnapshot(real.asset, {**real.texts, "/x.yaml": ""},
                                            digest=real.digest)
-        name, layout, _pin, tree, anchor = assets.handoff()
-        monkeypatch.setattr(assets, "handoff", lambda: (name, layout, forged, tree, anchor))
+        # Every field the hand-off carries, with only the pin forged (a
+        # one-off's flag joined them with REQ-PIPE-440).
+        name, layout, _pin, *rest = assets.handoff()
+        monkeypatch.setattr(assets, "handoff", lambda: (name, layout, forged, *rest))
         with boot.stream_pool(1) as pool:
             with pytest.raises(config_pin.PinMismatch, match="hand-off"):
                 pool.submit(boot._reporting, os.getpid).result()

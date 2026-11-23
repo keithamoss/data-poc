@@ -29,6 +29,7 @@ more value that could answer for a file as it used to read.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from asset_model import hierarchy, schedule
@@ -42,10 +43,12 @@ SCHEMA = supply_db.SAMPLE_SCHEMA
 def is_sample(dataset_id: str) -> bool:
     """Whether this dataset has declared that it has no calendar.
 
-    True for BOTH kinds - `not-yet-agreed` and `never` - because
-    everything this module does is the same for both. Which kind it is
-    matters to a person reading the dashboard (criterion 3) and not to
-    where the data goes or how the record is keyed.
+    True for BOTH kinds - `not-yet-agreed` and `never` - because this is
+    the ROUTING question (REQ-PIPE-438's MAINTAINABILITY NFR): neither has a
+    period, so both are filed to none (REQ-PIPE-434) and staged into the
+    no-period schema. Whether the RECORD counts as quality history is a
+    different question, supply_state()'s, and no caller asks one for the
+    other.
     """
     return schedule.no_calendar(dataset_id) is not None
 
@@ -62,46 +65,87 @@ def sample_dataset_ids() -> frozenset[str]:
                      if schedule.no_calendar(d.dataset_id) is not None)
 
 
-def supply_state(dataset_id: str | None, *,
-                 sample_ids: frozenset[str] | None = None) -> str:
+@dataclass(frozen=True)
+class Uncounted:
+    """Which datasets' results are NOT agreed quality history (REQ-PIPE-438):
+    those declaring `no_calendar: not-yet-agreed`, and those declared
+    `derived: true`. A `never` dataset that is not derived is counted.
+
+    THE COUNTED QUESTION, kept apart from is_sample()'s ROUTING question
+    (REQ-PIPE-438's MAINTAINABILITY NFR): both no_calendar values route to
+    the no-period schema, and only these two kinds are recorded in
+    development. A hoist, not a second source: built from the declarations
+    by uncounted(), and passed by a caller deciding thousands of records in
+    one loop rather than rebuilt per record."""
+
+    not_yet_agreed: frozenset[str]
+    derived: frozenset[str]
+
+    def __contains__(self, dataset_id: str) -> bool:
+        return dataset_id in self.not_yet_agreed or dataset_id in self.derived
+
+
+def uncounted() -> Uncounted:
+    """Every dataset in the asset whose results are recorded in development."""
+    nya, derived = set(), set()
+    for d in hierarchy.all_datasets():
+        kind = schedule.no_calendar(d.dataset_id)
+        if kind == schedule.NOT_YET_AGREED:
+            nya.add(d.dataset_id)
+        if kind is not None and schedule.is_derived(d.dataset_id):
+            derived.add(d.dataset_id)
+    return Uncounted(frozenset(nya), frozenset(derived))
+
+
+def supply_state(dataset_id: str | None, *, kinds: Uncounted | None = None) -> str:
     """Which `supply_state` a result about this dataset is recorded under.
+
+    IN DEVELOPMENT FOR `not-yet-agreed` AND FOR A DERIVED PRODUCT, AGREED
+    OTHERWISE (REQ-PIPE-438 criterion 2) - a `never` dataset's results are
+    real quality history, because a one-off's QA is the deliverable (Keith,
+    2026-11-21, Q4.1 (a)).
 
     A dataset id this asset does not define is AGREED rather than an
     error, and the direction is deliberate: the risk this whole mechanism
-    guards against is sample data counting as real, and an id that is not
-    a configured calendar-less dataset is not sample data. A genuinely
-    unknown dataset is a hierarchy error, reported by the hierarchy gate
-    where it means something, not inferred here from a QA write.
+    guards against is check development counting as real, and an id that is
+    not a configured dataset is not that. A genuinely unknown dataset is a
+    hierarchy error, reported by the hierarchy gate where it means
+    something, not inferred here from a QA write.
 
-    `sample_ids` IS A HOIST, NOT A SECOND SOURCE OF TRUTH. A caller
-    deciding this for thousands of records in one loop passes
-    sample_dataset_ids() once rather than having it rebuilt per record -
-    measured at ~1.6M frozenset constructions across one bootstrap
-    otherwise. It is the same set either way, which is the point: the
-    alternative was the caller inlining the membership test, and then the
-    rule lives in two places.
+    `kinds` IS A HOIST, NOT A SECOND SOURCE OF TRUTH: see Uncounted.
     """
     if not dataset_id:
         return qa_store.AGREED
-    ids = sample_dataset_ids() if sample_ids is None else sample_ids
-    return qa_store.IN_DEVELOPMENT if dataset_id in ids else qa_store.AGREED
+    found = uncounted() if kinds is None else kinds
+    return qa_store.IN_DEVELOPMENT if dataset_id in found else qa_store.AGREED
 
 
 def state_for_participants(dataset_ids: Iterable[str], *,
-                           sample_ids: frozenset[str] | None = None) -> str:
+                           kinds: Uncounted | None = None) -> str:
     """The state a check spanning these datasets is recorded under.
 
-    IN-DEVELOPMENT IF ANY PARTICIPANT HAS NO CALENDAR (criterion 15), not
-    only if all of them do. A mixed cross-table check - a new dataset
-    joining an existing collection, which is arguably the strongest reason
-    to develop checks early - is allowed (criterion 14) and must not be
-    able to move the agreed dataset's verdict. Recording the whole result
-    as in-development is what makes that true by construction: the agreed
-    dataset's own page reads AGREED results, and this is not one.
+    IN DEVELOPMENT IF ANY PARTICIPANT IS `not-yet-agreed` (REQ-PIPE-106
+    criterion 15), not only if all of them are. A mixed cross-table check - a
+    new dataset joining an existing collection, which is arguably the
+    strongest reason to develop checks early - is allowed (criterion 14) and
+    must not be able to move the agreed dataset's verdict. Recording the whole
+    result as in-development is what makes that true by construction: the
+    agreed dataset's own page reads AGREED results, and this is not one.
+
+    A DERIVED PRODUCT DOES NOT MAKE IT IN DEVELOPMENT (REQ-PIPE-438 criterion
+    4, Keith 2026-11-21, round 5 Q3 (a)): a check over a derived and a counted
+    table is recorded AGREED and counts on the counted side; it is shared
+    with the derived product too and left out of that one's status by the
+    dashboard build. Only where EVERY participant is derived did nothing
+    count it, so it is in development.
     """
-    ids = sample_dataset_ids() if sample_ids is None else sample_ids
-    return (qa_store.IN_DEVELOPMENT if any(d in ids for d in dataset_ids)
-            else qa_store.AGREED)
+    found = uncounted() if kinds is None else kinds
+    ids = list(dataset_ids)
+    if any(d in found.not_yet_agreed for d in ids):
+        return qa_store.IN_DEVELOPMENT
+    if ids and all(d in found.derived for d in ids):
+        return qa_store.IN_DEVELOPMENT
+    return qa_store.AGREED
 
 
 def is_sample_table(table: str) -> bool:

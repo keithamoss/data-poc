@@ -29,7 +29,7 @@ import yaml
 from asset_model import schedule
 from qa_tools.common.validate_schedule import _merged_view, _walk_datasets
 
-_MOVED = ("calendar", schedule.NO_CALENDAR_KEY, "delivery_months", "dates",
+_MOVED = ("calendar", schedule.NO_CALENDAR_KEY, schedule.DERIVED_KEY, "delivery_months", "dates",
           "not_expected", "owes_from")
 
 #: The author a test-written changelog entry carries.
@@ -84,6 +84,9 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
             cal.setdefault("datasets", []).append(entry)
         entry.pop("calendar", None)
         entry.pop(schedule.NO_CALENDAR_KEY, None)
+        entry.pop(schedule.DERIVED_KEY, None)
+        if moved.get(schedule.DERIVED_KEY) is not None:
+            entry[schedule.DERIVED_KEY] = moved[schedule.DERIVED_KEY]
         if moved.get(schedule.NO_CALENDAR_KEY) is not None:
             entry[schedule.NO_CALENDAR_KEY] = moved[schedule.NO_CALENDAR_KEY]
             if moved.get("delivery_months") is None:

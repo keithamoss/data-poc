@@ -33,6 +33,16 @@ def adapter_module(collection: Collection | str):
     if not ID_PATTERN.fullmatch(c.id):
         raise UnknownCollectionError(
             f"collection id {c.id!r} is not a hierarchy id, so it cannot name an adapter")
+    # A ONE-OFF'S COLLECTIONS ARE SERVED BY ITS KIND'S ONE SHARED ADAPTER
+    # (REQ-PIPE-448 criterion 4): a one-off folder holds no adapter module.
+    kind = assets.selected().kind
+    if kind is not None:
+        from qa_tools import kind_adapters as kinds
+
+        try:
+            return kinds.adapter_module(kind, c)
+        except kinds.NoSharedAdapter as exc:
+            raise NoAdapterError(f"collection {c.id!r} has no adapter - {exc}") from None
     try:
         return assets.load("adapter", c.module_name)
     except assets.NoModule:

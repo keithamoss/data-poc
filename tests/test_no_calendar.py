@@ -215,9 +215,33 @@ class TestTheConfigGateAcceptsItAndStaysStrict:
             path, validate_schedule.Source.default().contract_dir))
 
     def test_a_deliberate_declaration_passes_the_gate(self, tmp_path, monkeypatch):
-        found = self._errors([AGREED, SAMPLE, PROJECT], tmp_path, monkeypatch)
+        found = self._errors([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert [e for e in found if "cp-referrals" in (e.scope or "")] == []
-        assert [e for e in found if "one-off-extract" in (e.scope or "")] == []
+
+    def test_an_enduring_asset_refuses_never_naming_the_dataset(self, tmp_path, monkeypatch):
+        """REQ-PIPE-438 criterion 8 (Keith 2026-11-21, Q4.7 (a)): `never` lives
+        only under one-offs/, so an asset under assets/ fails the gate."""
+        found = self._errors([AGREED, SAMPLE, PROJECT], tmp_path, monkeypatch)
+        named = [e for e in found if "one-off-extract" in (e.scope or "")]
+        assert named and "one-offs/" in named[0].fix
+        assert [e for e in found if "cp-referrals" in (e.scope or "")] == []
+
+    def test_an_enduring_asset_refuses_derived_naming_the_dataset(self, tmp_path, monkeypatch):
+        found = self._errors([AGREED, {**SAMPLE, "derived": True}], tmp_path, monkeypatch)
+        named = [e for e in found if "cp-referrals" in (e.scope or "")]
+        assert named and any(schedule.DERIVED_KEY in e.problem for e in named)
+
+    def test_derived_with_no_no_calendar_beside_it_fails(self, tmp_path, monkeypatch):
+        found = self._errors([{**AGREED, "derived": True}], tmp_path, monkeypatch)
+        assert any("birth-registrations" in (e.scope or "")
+                   and schedule.NO_CALENDAR_KEY in e.problem for e in found)
+
+    def test_the_loader_does_not_refuse_what_the_gate_does(self, tmp_path, monkeypatch):
+        """Criterion 8's second half: every other reader of a bad folder - the
+        dashboard build included - still reads it."""
+        _asset_with([AGREED, {**PROJECT, "derived": True}], tmp_path, monkeypatch)
+        assert schedule.no_calendar("one-off-extract") == schedule.NEVER
+        assert schedule.is_derived("one-off-extract") is True
 
     def test_a_bare_omission_on_an_asset_with_no_baseline_fails_the_gate(
             self, tmp_path, monkeypatch):
@@ -232,9 +256,11 @@ class TestTheConfigGateAcceptsItAndStaysStrict:
             self, tmp_path, monkeypatch):
         """REQ-PIPE-345 criterion 1: none is accepted only where every
         dataset declares no calendar - the project-extraction shape."""
-        found = self._errors([SAMPLE, PROJECT], tmp_path, monkeypatch, baseline=False)
+        found = self._errors([SAMPLE, dict(SAMPLE, id="cp-other", table="cp_other",
+                                           arrival_pattern=r"cp_other\.csv")],
+                             tmp_path, monkeypatch, baseline=False)
         assert [e for e in found if "cp-referrals" in (e.scope or "")
-                or "one-off-extract" in (e.scope or "")] == []
+                or "cp-other" in (e.scope or "")] == []
 
     def test_the_omission_message_names_the_declaration_as_the_way_out(
             self, tmp_path, monkeypatch):
@@ -350,8 +376,19 @@ class TestItIsInNoRollup:
 
         assert ds.rollup_datasets([
             self._ds("a", "red", scheduleNotAgreed="not-yet-agreed"),
-            self._ds("b", "amber", scheduleNotAgreed="never"),
+            self._ds("b", "amber", scheduleNotAgreed="never", derived=True),
         ]) == "notcounted"
+
+    def test_a_never_dataset_is_counted(self):
+        """REQ-PIPE-438 criterion 3: a one-off's QA is the deliverable, so a
+        `never` dataset's verdict rolls up like any other's."""
+        from qa_tools.common import dataset_status as ds
+
+        assert ds.in_no_rollup(self._ds("x", "red", scheduleNotAgreed="never")) is False
+        assert ds.rollup_datasets([
+            self._ds("a", "green", scheduleNotAgreed="never"),
+            self._ds("b", "red", scheduleNotAgreed="never"),
+        ]) == "red"
 
     def test_a_turned_off_dataset_owing_nothing_is_left_out(self):
         """REQ-DASH-180 criteria 7, 8 and 9, in the Python mirror."""

@@ -205,6 +205,13 @@ def config_problems(package: Path | None = None) -> list[str]:
     problems += import_problems
     wanted = {c.module_name: c for c in declared}
     loaded = {}
+    # A ONE-OFF'S COLLECTIONS ARE SERVED BY ITS KIND'S ONE SHARED ADAPTER
+    # (REQ-PIPE-448 criterion 4), resolved through the registry: the folder
+    # holds no adapter module, and every collection counts as having one when
+    # the kind's module serves it.
+    one_off = assets.selected().is_one_off and package == assets.selected().adapters
+    if one_off:
+        modules = set(wanted)
     for c in declared:
         if c.module_name not in modules:
             problems.append(f"collection {c.id!r} has no adapter ({shown(c.module_name)})")
@@ -307,6 +314,8 @@ def config_problems(package: Path | None = None) -> list[str]:
 #: collection's (REQ-QAC-241 criterion 2 as amended by A21).
 ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "file-checks.yaml",
               "presentation.yaml")
+#: A one-off's record of its generated files' digests (REQ-PIPE-440).
+ONE_OFF_DIGEST = "generated.sha256.json"
 #: The asset folder's own parts, each with a gate of its own - its dbt project
 #: (the dbt-folder gate), its QA adapters (the adapters gate) and its
 #: synthetic-only configuration (below) - so never an agency's folder.
@@ -366,6 +375,10 @@ def check_file_problems(root: Path | None = None) -> list[str]:
             continue
         rel = path.relative_to(root).as_posix()
         if path.parent == contract:
+            # A ONE-OFF'S GENERATED-FILE DIGEST (REQ-PIPE-440 criterion 5) sits at
+            # the top of its folder beside the asset-wide files.
+            if path.name == ONE_OFF_DIGEST and assets.selected().is_one_off:
+                continue
             if path.name not in ASSET_WIDE:
                 problems.append(f"{rel} is at the top of the asset's folder, where only the "
                                 f"asset-wide files belong ({', '.join(ASSET_WIDE)})")
@@ -439,7 +452,12 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
             if not path.is_file() or path.suffix not in (".sql", ".yml", ".yaml"):
                 continue
             rel = path.relative_to(root).as_posix()
-            home = next((f for f in folders if rel.startswith(f)), None)
+            # BY WHERE EACH IS, not by how it is spelled: a folder outside the
+            # repository (a test's copy, a one-off generated elsewhere) names
+            # its collection folders absolute and its files relative to root.
+            here = (root / rel).as_posix()
+            home = next((f for f in folders if rel.startswith(f)
+                         or here.startswith((root / f).as_posix() + "/")), None)
             if home is None:
                 problems.append(f"{rel} sits outside every collection's dbt folder "
                                 f"({project}/models/<collection-id>/, "

@@ -32,6 +32,8 @@ def for_dataset(dataset_id: str, until: date, agreement=None) -> list[dict]:
     the empty-dataset notice say instead (criterion 3).
     """
     agr = schedule.agreement_to_read(agreement)
+    if schedule.no_calendar(dataset_id, agr) is not None:
+        return []           # NO CALENDAR, NO PERIODS (REQ-DASH-436 criterion 2)
     begins = schedule.owes_from(dataset_id, agr)
     skipped = schedule.not_expected_periods(dataset_id, agr)
     out: list[dict] = []
@@ -85,6 +87,9 @@ def sla_timeline(dataset_id: str, agreement=None) -> dict:
     calendar has, for the tile's muted second line.
     """
     agr = schedule.agreement_to_read(agreement)
+    if schedule.no_calendar(dataset_id, agr) is not None:
+        # NO CALENDAR, NO DELIVERY TIME (REQ-DASH-436 criteria 1 and 2).
+        return {"owesFrom": None, "versions": []}
     base = agreement_mod.cadence(dataset_id, agr)
     begins = schedule.owes_from(dataset_id, agr)
     versions = []

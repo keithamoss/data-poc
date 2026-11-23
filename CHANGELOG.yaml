@@ -111,9 +111,175 @@ intro: >
 releases:
   - date: "2026-11-22"
     summary: >
+      A dataset with no delivery schedule is now checked when its supply
+      arrives, and a dashboard holding one builds. Filing commands posted on
+      a slot's ticket are acted on again. An extraction can now be loaded,
+      checked by all four tools and dropped.
       Small fixes for keyboard, screen-reader and phone use, and plainer
       names in the queue.
     changes:
+      - category: New
+        items:
+          - headline: A home for one-offs, beside the data assets
+            components: ["Pipeline & publishing"]
+            description: >
+              One-off pieces of QA work now have their own folders, under
+              `one-offs/`, kept apart from the enduring data assets. You browse
+              and choose one with `mothman one-off`, with MOTHMAN_ASSET unset,
+              and `mothman check` refuses a badly named or clashing folder. A
+              one-off never touches GitHub.
+          - headline: An extraction's folder is generated from its recipe
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off open --kind extraction <package>` reads an
+              extraction's recipe, from a local folder or S3, refuses it with
+              every problem named if it is not valid, and generates the
+              extraction's own folder from it - its datasets, contracts and dbt
+              project - with a digest of every file. `mothman check` now gates
+              a changed one-off folder in full and checks the rest against
+              their digests.
+          - headline: Commands on a slot's ticket are acted on at the next pass
+            components: ["GitHub workflow & people"]
+            description: >
+              A filing command you post on a slot's GitHub ticket is now read
+              by the next `mothman pipeline process` and acted on once, as if
+              you had made it in the terminal. The ticket says so, and the
+              pass reports how many comments it read, how many decisions they
+              raised and how many it refused.
+          - headline: An extraction is checked by all four tools
+            components: ["QA checks & contract"]
+            description: >
+              Every extraction now gets a default set of checks - each declared
+              table and column arrived, no identifier empty, no file the recipe
+              does not declare - read from the kind's template each time, plus
+              checks from its own recipe: each column's type, the cohort's
+              bounds and an exact row count. dbt, Soda, datacontract-cli and
+              Evidently each evaluate the ones they fit.
+          - headline: Load an extraction into a database of its own, and drop it
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off load --id <id> <package>` gates the folder,
+              creates its own database and checks the package, resuming if it
+              stopped and refusing a different package. `mothman one-off list`
+              shows each one-off's stage and next step, and `mothman one-off
+              drop --id <id>` removes its database and files once you type its
+              id. Bare `mothman one-off` offers the same steps as a menu.
+          - headline: Record whether an extraction is released or withheld
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off decide --id <id>` records one release or
+              withhold decision for the whole one-off, with your reason, after
+              showing you each dataset's QA result and the decision in force.
+              Every decision is kept and the latest stands. Who may decide is
+              read from the kind's template. Nothing about the data is moved.
+          - headline: A table that never arrived reads Fail
+            components: ["Dashboard UI"]
+            description: >
+              On a one-off's page, a declared table that never arrived, or a
+              file nobody declared, now counts in the dataset's status, so the
+              dataset reads Fail rather than No data. A recipe whose table
+              names no primary identifier is now refused.
+          - headline: Publish an extraction's QA page
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off publish --id <id>` builds the extraction's page
+              and writes it, with its fonts, to the folder or S3 prefix the
+              kind's template names, after showing you the address, the
+              decision in force and anything not yet checked. Publishing again
+              replaces its own page and never another one-off's, and a drop
+              warns you first when no page, or only an out-of-date one,
+              records its results.
+          - headline: An extraction's page says what was decided
+            components: ["Dashboard UI"]
+            description: >
+              A one-off's page is named for its id and project, says on every
+              view whether the data was released or withheld, by whom and why -
+              or that no decision is recorded - and when, where and from which
+              commits it was built and checked. Each table's view shows what
+              the recipe declared beside the checks made from it, and the
+              development tools, dates and trends are gone from it.
+          - headline: A one-off's page speaks for one supply
+            components: ["Dashboard UI"]
+            description: >
+              A one-off's page no longer carries the data assets' time travel,
+              cadence-aware viewing, leaderboard or feedback, nor a cross-table
+              section its recipe cannot fill, and says when each table was
+              received rather than what is in place in a warehouse. A derived
+              product that fails is named on the home view, with a note that it
+              does not count in the status.
+      - category: Fixed
+        items:
+          - headline: A one-off load that stopped mid-check finishes when run again
+            components: ["Pipeline & publishing"]
+            description: >
+              If a one-off's load stopped part way through a table's checks,
+              loading it again used to fail every time. It now checks that
+              table again on a fresh try and finishes the load.
+          - headline: An unscheduled dataset beside a scheduled one no longer stops filing
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection holding a dataset with no schedule agreed yet beside
+              a scheduled one stopped the scheduled supply's filing. Both are
+              now filed and checked, and the page leaves the unscheduled one
+              out of the collection's status.
+          - headline: Datasets left out of a status are left out on the page too
+            components: ["Dashboard UI"]
+            description: >
+              The page counted a dataset with no schedule agreed yet, a derived
+              product or a dataset not yet checked in its collection's status,
+              though the build had marked each one out. They are now left out
+              on the page as well, and a table that never arrived shows its
+              failing check rather than No data on its own view.
+          - headline: A supply with no schedule is checked when it arrives
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply for a dataset that has no delivery schedule used to stop
+              the pipeline before any check ran. It is now recorded with no
+              period, never held for you to place, and checked straight away.
+          - headline: A dashboard with an unscheduled dataset builds
+            components: ["Dashboard UI"]
+            description: >
+              The dashboard build stopped on a dataset with no delivery
+              schedule. It now builds, and shows no due date, period or
+              lateness for that dataset.
+          - headline: A file nobody declared fails the collection and agency too
+            components: ["Dashboard UI"]
+            description: >
+              When the only problem in an extraction was a file its recipe does
+              not declare, the dataset carrying that failure read Fail while
+              its collection and agency read Pass, and its own page named no
+              failing check. Every level now reads Fail, and the dataset's
+              page shows the failing check at the top of its file section.
+          - headline: The load's count of failures includes the package's own
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off load` counted only the four tools' results, so
+              it said "0 failing" when an undeclared file had failed. It now
+              counts every result it recorded, says how many are file and
+              package checks, and gives the same number of failures as the
+              page.
+          - headline: An extraction's own checks keep their names on its page
+            components: ["Dashboard UI"]
+            description: >
+              The checks every extraction gets showed on its page under the
+              tool's own name, such as dbt:not_null, with nothing about what
+              they check. They now carry their names and descriptions, as the
+              recipe's own checks already did.
+          - headline: The one-off list shows only one-offs' databases
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman one-off list` listed any database whose name started
+              supply_ as a one-off's, including a data asset's own. It now lists
+              only the databases a one-off load created, and says when a
+              one-off has been decided or published. A published one-off is no
+              longer offered a load that would be refused.
+          - headline: Quieter one-off loads and publishes, and no GitHub links
+            components: ["Pipeline & publishing"]
+            description: >
+              A one-off's load no longer repeats a note that nothing is owed
+              for each delivery, its publish no longer notes that it could not
+              read periods a one-off never has, and its page no longer links to
+              GitHub.
       - category: Improved
         items:
           - headline: The dashboard works better from a keyboard and on a phone

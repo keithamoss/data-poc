@@ -35,7 +35,7 @@ from qa_tools.common import file_checks, load_log, sample_data, supply_db, suppl
 from asset_model import asset_time
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
-__all__ = ["build_all", "stage_arrival", "stage_table", "stager"]
+__all__ = ["build_all", "rebuild_run_views", "stage_arrival", "stage_table", "stager"]
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
@@ -279,6 +279,23 @@ def stage_arrival(collection_id: str, arrival, dsn: str | None = None) -> list[s
                 staged.append(physical)
     print(f"{arrival.run_id}: staged {len(staged)} table(s)")
     return staged
+
+
+def rebuild_run_views(collection_id: str, arrival, dsn: str | None = None):
+    """The run's view schema again, over what its arrival already staged - for
+    a retry of a run whose attempt died and gave its schemas back (REQ-PIPE-442
+    criterion 16). Stages nothing and records no file check: those were
+    recorded when the arrival was first staged."""
+    conn = supply_db.connect(dsn=dsn)
+    try:
+        supply_db.ensure_schemas(conn)
+        res = _build_run_views(conn, collection_id, arrival.run_id,
+                               supply_db.arrival_segment(arrival.received_at),
+                               trial.scope_for(arrival.run_id))
+        supply_db.record_resolution(conn, res)
+        return res
+    finally:
+        conn.close()
 
 
 def stager(collection_id: str):
