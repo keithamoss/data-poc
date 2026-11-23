@@ -6166,3 +6166,14 @@ could never have computed it), and it belongs with batch 5's check work.
      relationship the recipe declares) waits on it. Not scoped: the downstream
      format, where the translator runs, and whether it replaces version 1 or
      sits in front of it.
+
+146. **[todo, 2026-11-24]** **[Testing & dev tooling]** **The Playwright MCP server times out after a container restart**
+     Seen 2026-11-23/24: after a container restart the `playwright` MCP
+     server (.mcp.json, `npx -y @playwright/mcp@0.0.82`) failed with
+     CONNECT_TIMEOUT (30 s) because npx had to download the package first;
+     run by hand afterwards, the same command started in 3 s from the
+     cache. Only `/mcp` reconnect or a fresh session brings it back, and
+     the visual and UX critics depend on it. Fix candidates: warm the
+     package in the session-start hook (`npx -y @playwright/mcp@0.0.82
+     --help`), or install it as a pinned dev dependency so nothing is
+     fetched at connect time. Not scoped with Keith yet.
