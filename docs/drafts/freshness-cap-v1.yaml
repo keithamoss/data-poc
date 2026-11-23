@@ -1,0 +1,106 @@
+# PROPOSAL v1 - TS-22 "Freshness caps the headline" (plans/supply-model.md,
+# Test scenario register, TS-22; delivery sprint 20 "Freshness axis and
+# banners"). Drafted by delivery-scoper 2026-11-24 (Perth) at Keith's ask.
+# NOT SIGNED. Status is `not_started` with signed_off null, because the
+# register's own vocabulary (qa_tools/common/vocab.py REQUIREMENT_STATUSES)
+# has no `proposed` value - the proposal status lives in `source:`.
+#
+# Id REQ-DASH-449 was free in requirements.yaml, docs/ and plans/ on
+# 2026-11-24 (the register's highest id is 448); whoever applies this
+# re-checks.
+#
+# PROVISIONAL criteria hang on the four questions handed back with this
+# draft (FC1-FC4); each says which one.
+#
+# WHAT IS ALREADY BUILT, so this draft does not duplicate it:
+#   - The OVERDUE-AND-OPEN STATE IS ALREADY DERIVED AND EMBEDDED. The build
+#     writes `lateSlots` per dataset (pipeline/closed_slots.py late_slots():
+#     period, lateAt, filedAt, closesAt, for every calendar that has slots),
+#     and the page's lateOpenInPlaceOn() already answers "past its late
+#     instant, no file yet, not yet closed" for the date on show, including
+#     the build-day rule (compare instants with BUILT_AT on the build's own
+#     day). Today it drives only the muted 'Late, still open: <period> - no
+#     file yet' note in the collection table (REQ-DASH-133, Keith 2026-10-05).
+#   - What the cap is NOT yet: in that window the dataset is flagged
+#     staleInPlaceOn, its column pills go grey 'No data', and inRollup()
+#     leaves it OUT of the collection's worst-of - so a quarter whose supply
+#     is overdue reads grey for roughly ten weeks (Child Protection: late at
+#     17:00 on the round day, closing when the next round's 14-day claim
+#     window opens) and its collection reads Pass from its siblings, or 'No
+#     data' if every dataset is in the same state. REQ-DASH-204's own
+#     decisions record "an overdue slot not yet closed" as a cause with no
+#     notice of its own.
+#   - Closed and unfilled is red 'no supply' (REQ-DASH-133 c1, c4). Not yet
+#     due reads from the supply in place (REQ-DASH-326 c5). Owed nothing,
+#     turned off, no calendar and exhausted schedule each have their own
+#     reading (REQ-DASH-182, REQ-DASH-180, REQ-PIPE-106, REQ-PIPE-053).
+#   - Sprint 20's OTHER three parts are built elsewhere: the
+#     exhausted-schedule banner (REQ-PIPE-053 c8, c16-c21), arrival into a
+#     filled slot (REQ-PIPE-131 / REQ-PIPE-118, held for a person), and the
+#     blocked-check pointer (superseded by REQ-QAC-037 c7's folding, with
+#     REQ-DASH-204's banners). So this requirement is sprint 20's whole
+#     unbuilt remainder.
+requirements:
+  - id: REQ-DASH-449
+    title: "A dataset whose owed supply is overdue and not yet in reads Fail, marked overdue, however its last supply's checks read - judged at the date on show, never today"
+    date_written: "2026-11-24"
+    story: "As a data team leader looking at Child Protection in November, I want a dataset whose quarterly supply is overdue to read Fail, saying it is overdue and which period, even though every check on August's supply passed, so that a page reading Pass always means the data is both good and current, and I never conclude a collection is healthy when its newest data is a quarter old."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-11-24, asking for TS-22 (plans/supply-model.md Test scenario register, 'Freshness caps the headline') to be given an owning requirement - it has none, and delivery sprint 20 owns nothing. Decision on the reading: Keith, 2026-09-22 (TS-22). Drafted by delivery-scoper 2026-11-24 (freshness-cap v1). A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHILE, at the instant the in-place-on view resolves for the date on show, a dataset owes a period whose slot is past its late instant, has no file filed to it and has not closed, THE SYSTEM SHALL show that dataset's status as Fail with a qualifying chip reading 'Overdue', whatever the recorded verdicts of the supply in place. PROVISIONAL on FC1 (late instant against due instant) and FC2 (the chip's word)."
+      - "THE SYSTEM SHALL take a dataset's headline status as the worse of its quality verdict and its freshness under criterion 1, so that all-passing or warning checks on a dataset with an overdue unfilled period never read Pass or Warn."
+      - "THE SYSTEM SHALL count a dataset read Fail under criterion 1 in the worst-of rollup at collection and agency as a Fail, and SHALL NOT leave it out of the rollup as a dataset with nothing on show is left out."
+      - "WHILE the owed period's late instant has not passed at the instant on show, THE SYSTEM SHALL show the dataset's status from the supply in place, as REQ-DASH-326 criterion 5 requires, and SHALL NOT show it as overdue, stale or 'No data'."
+      - "THE SYSTEM SHALL judge criterion 1 against the instant the in-place-on view resolves for the date on show - the end of that day on the asset's clock - and SHALL NOT judge it against the reader's clock or the build's date, so that a historical view of a date before the period fell due reads from the supply then in place."
+      - "WHEN the date on show is the build's own day on the asset's clock, THE SYSTEM SHALL compare the late instant with BUILT_AT, as lateOpenInPlaceOn() already does, so that a dataset not yet late at the moment of the build does not read Fail for the rest of that day."
+      - "THE SYSTEM SHALL apply criteria 1 to 6 to a dataset on a cadence-rule calendar on the same terms as one on an authored date list, keyed to its own slot's late instant, and SHALL NOT key it to the start of the period's day - so that a daily dataset does not read Fail on a morning before its file is due."
+      - "WHEN a slot read Fail under criterion 1 closes still unfilled, THE SYSTEM SHALL show REQ-DASH-133's red 'no supply' reading for that period in place of this one, and SHALL NOT show both readings for one period."
+      - "WHERE a file has been filed to the overdue slot - promoted, awaiting a decision, held, could not be loaded or contested - THE SYSTEM SHALL show what the requirement owning that state shows, and SHALL NOT show the 'Overdue' chip for that period."
+      - "THE SYSTEM SHALL NOT read a dataset Fail under criterion 1 for a period it owes nothing in (REQ-DASH-182), while it is turned off owing nothing (REQ-DASH-180), where it has no calendar at all - a one-off extraction included (REQ-PIPE-106) - or while its schedule is exhausted (REQ-PIPE-053, which keeps its own status)."
+      - "THE SYSTEM SHALL name, at the top of a dataset page read Fail under criterion 1, the overdue period, the instant it was due, the period of the supply in place, and that the checks shown below are that earlier supply's - for example 'Overdue: 2026-Q2 was due Monday, 2 November 2026, 9:00am, and no file has arrived. The checks below are 2026-Q1's supply.' - with the period and instant in the page's own formats (fmtPeriodName, fmtInstant)."
+      - "THE SYSTEM SHALL show, in the column and check panels of a dataset read Fail under criterion 1, the recorded verdicts and history of the supply in place, each labelled as that supply's period, and SHALL NOT show them as 'No data'. PROVISIONAL on FC3."
+      - "WHERE an agency or collection holds datasets read Fail under criterion 1, THE SYSTEM SHALL show on its card one count of them ('2 overdue'), beside and distinct from REQ-DASH-133's 'no supply' count, and SHALL NOT render one element per dataset. PROVISIONAL on FC4."
+      - "THE SYSTEM SHALL NOT convey the overdue state by colour alone - the status word Fail and the chip's word are both text."
+      - "THE SYSTEM SHALL return the same capped status from qa_tools/common/dataset_status.py and from the page for the same embedded inputs, as REQ-QAC-047 criterion 1 requires of every status, so the dataset the page reads Fail is the dataset the Python rollup reads Fail."
+      - "THE SYSTEM SHALL compute criterion 1 only by comparing instants the build already embeds from configuration and recorded filings (lateSlots' late, filed and closing instants), and SHALL NOT read supply rows, nor derive a due, late or closing instant in the page (REQ-DASH-326 criterion 8)."
+      - "WHEN the test suite runs, THE SYSTEM SHALL prove in a real browser against the built dashboard, on dates taken from the built data rather than fixed, for a Child Protection dataset whose supply was received after its late instant: that it reads its supply-in-place status on the day before the round day; that it reads Fail with the 'Overdue' chip, and its collection and agency read Fail, on a date after the late instant and before the file arrived; that it reads the supply-in-place status again on the day the late file was received (end-of-day inclusion); and that it reads the supply-in-place status on a date in the previous period."
+      - "WHEN the test suite runs, THE SYSTEM SHALL prove in unit tests, seen failing first, the build-day rule against BUILT_AT, a daily dataset before its late instant, a period owed nothing, a dataset with no calendar, an exhausted schedule, the hand-over to 'no supply' at closing, a file filed but awaiting a decision, and Python and JS agreement on each."
+    non_functional_requirements:
+      - "BUILD RULE: computed from configuration and recorded filings only - a build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27). No supply rows, no new database read: lateSlots is already embedded."
+      - "SCALE: at ~30 collections on the quarterly asset a supplier a day late makes many datasets overdue at once. The signal therefore aggregates (a count per agency and collection, criterion 13) and never becomes a per-dataset banner on the executive view; the per-dataset sentence lives on the dataset's own page."
+      - "SCOPE OF FAILURE: per dataset, never per collection or run - one overdue dataset reads Fail and rolls up; its siblings keep their own verdicts at their own level."
+      - "NO SHAPE THAT ASSUMES A CADENCE: a dataset with no calendar (a one-off extraction, REQ-PIPE-106, REQ-PIPE-435) has no slot and therefore can never read overdue; nothing here may give it a default cadence to be late against."
+      - "PERFORMANCE: one comparison per embedded late slot per dataset per date on show, the same work lateOpenInPlaceOn() already does for the note; no new embed size worth measuring. Re-rendering on an in-place-on change stays within today's budget."
+      - "RELIABILITY / FAILURE DIRECTION: IF a dataset on a calendar has no embedded late-slot data, the page SHALL NOT treat that as 'never late'; the build already embeds lateSlots for every dataset with slots, and a builder must confirm an empty list means 'never late while open' and not 'could not be computed' (late_slots() returns [] on a configuration error - see open question 3)."
+      - "PARITY: one more state both status implementations must agree on (REQ-QAC-047). A Python mirror that silently disagrees is the item-74 false green this project has already shipped once."
+      - "AUDITABILITY / AS-AT REPRODUCIBILITY: the reading on any date is a pure function of embedded instants and the date on show, so an in-place-on view reproduces what a reader would have seen at the end of that day (REQ-DASH-133 criterion 9's standard)."
+      - "COMPATIBILITY: no new asset, font or network call; the page still opens from file:// on a government network."
+      - "ACCESSIBILITY: status and chip carry their meaning in text (criterion 14). The muted-token contrast Keith declined to raise (post-build-review Q3, 2026-09-25) is not reopened; this state is Fail, not a quiet state, so it uses Fail's tokens."
+    dependencies:
+      - REQ-DASH-133
+      - REQ-DASH-326
+      - REQ-QAC-047
+      - REQ-PIPE-053
+      - REQ-DASH-182
+      - REQ-DASH-180
+      - REQ-PIPE-106
+    decisions:
+      - "FAIL WITH A QUALIFIER, NOT A NEW STATUS (Keith, 2026-09-22, TS-22): the tables read Fail, with a qualifier chip, the same status-plus-chip vocabulary as a check that could not run (plans/supply-model.md Thread I). Status says how bad, the chip says why. A new status value would need its own place in both STATUS_ORDERs and its own rollup rule; Fail wins every worst-of by construction."
+      - "THE HEADLINE IS WORST OF (QUALITY, FRESHNESS) (plans/supply-model.md TS-22 and Thread I's worked example): freshness is its own axis that caps the headline, replacing today's behaviour where staleness collapses a dataset to 'No data' and drops it out of the rollup (Concept inventory, 'Staleness' row). REJECTED: the exclude-from-worst-of-plus-an-evaluated-count design first drafted in Thread I, superseded 2026-09-21 by red-with-a-chip."
+      - "JUDGED AT THE DATE ON SHOW, NEVER TODAY (TS-22, 'the subtle part'): implemented against today, every historical view goes falsely stale and trains people to ignore the indicator. TS-22's 15 September assertion is the one that catches it (criterion 17's previous-period date)."
+      - "'AS AT <DATE>' IS END OF DAY, ON THE ASSET'S CLOCK (Keith, 2026-09-22, TS-22): the as-of picker is date-granular and due instants are instant-granular, so 'as at 2 November' against a supply due 09:00 that day means the due moment has passed; a supply arriving 14:00 that day is included in that view. End of day in UTC would be eight hours out (TS-31's hazard)."
+      - "TS-22's THREE ASSERTIONS, keyed to the due date (Keith, 2026-09-22): the day before - green, nothing is late; two days after - red with the qualifier; a historical date a quarter earlier - green. Keith first said '1st of November, or even the 3rd', then corrected himself: the boundary is the due date either way. Criterion 17 takes the dates from the built data rather than fixing them, because Child Protection's rounds moved under files_go_to_period 1 (REQ-PIPE-321, REQ-GEN-325) and the scenario's 'Q4 due 2 November' no longer names the period that round fills."
+      - "THE BOUNDARY WITH 'NO SUPPLY' IS THE SLOT'S CLOSING (REQ-DASH-133 criterion 1, built): overdue-but-open and closed-unfilled are shown distinctly. This requirement fills the open half, which REQ-DASH-204's decisions record as a cause with no notice of its own, and hands over at closing rather than overlapping."
+      - "OWED-BUT-ABSENT IS FAIL; NOTHING-WAS-OWED IS NOT (Thread I, 'the boundary it must not cross'): a period before the dataset existed, a period it owes nothing in, a turned-off dataset owing nothing and a dataset with no calendar are not late, so none of them can be capped (criterion 10)."
+      - "A FILE ENDS LATENESS, NOT A PROMOTION (pipeline/closed_slots.py late_slots(), REQ-DASH-133, Keith 2026-10-05): the question is whether the supplier has sent it. A filed supply awaiting a decision, held or failed to load is shown by the requirement owning that state (criterion 9). Kept consistent with REQ-DASH-326 criterion 5, which shows a filed supply at once and lets its verdict colour the status."
+      - "BUILT ON THE EXISTING EMBED, NOT A NEW ONE (scoper, 2026-11-24, verified against the code): lateSlots and lateOpenInPlaceOn() already compute the overdue-open window for both calendar kinds, with the build-day BUILT_AT rule (REQ-DASH-133 decision, Keith 2026-10-05, post-build-review #110 M2). Today they drive only a muted note. REJECTED: reusing owedPeriodStart()/staleInPlaceOn, which on a cadence-rule calendar compares against the period's start date and would read every daily dataset Fail each morning before its file is due."
+      - "WE DO NOT BUILD STALENESS TOLERANCE FOR CONSUMERS (Keith, plans/supply-model.md Thread E): this system reports what is where and how fresh against the supplier agreement; whether a downstream consumer accepts older data is theirs. So there is no per-dataset or per-consumer 'stale after N days' setting - the agreement's due instant and grace are the only tolerance."
+      - "NO SYNTHETIC EXCEPTION (scoper, 2026-11-24, consistent with CLAUDE.md's 'a pipeline only safe because the data is synthetic' rule): a history generated at the fixed test anchor (2026-09-25, REQ-GEN-405) viewed on today's default date has quarterly datasets whose November round is overdue; under this requirement they read Fail, where daily datasets already read red 'no supply' past the anchor by REQ-DASH-133. REQ-DASH-407's footer already says a period after the anchor has no supply. Flagged to Keith rather than settled (open question 2)."
+      - "THE SUPPLY IN PLACE STAYS DRILLABLE (plans/qa-pipeline.md Phase 5g, 2026-09-17): staleness never discards the run's real history; only the rolled-up pills change. Criterion 12 keeps that, and goes one step further by showing the checks' own verdicts labelled with their period instead of grey 'No data' - provisional on FC3."
+    open_questions:
+      - "FC1-FC4 (handed back for Keith with this draft): which instant starts it - the due instant TS-22 names, or the late instant (due plus grace) the 'Late, still open' note and on-time classification already use; the chip's word; what the column and check panels show; and whether agency and collection cards count overdue datasets."
+      - "The synthetic default view: at the fixed test anchor, today's default in-place-on date shows the whole quarterly asset Fail (overdue November round). Accept it as the honest reading, with REQ-DASH-407's footer explaining it, or does that need something - for example the as-of panel's synthetic line saying so?"
+      - "late_slots() returns an empty list on a configuration error (ValueError, KeyError, FileNotFoundError, NoCalendarAgreed), the same as 'never late'. A builder must check whether a dataset on a calendar can reach the page with [] for that reason; if it can, the failure direction is a quiet Pass and wants a loud build refusal instead."
+      - "Under the global period control (REQ-DASH-355/356) a chosen period holding nothing past its due instant reads 'Due' or 'Not supplied' in its composition row. Should the cap apply there too, or is the period view already saying enough? Proposed default if unanswered: the same Fail with the 'Overdue' chip, for consistency with the date view."

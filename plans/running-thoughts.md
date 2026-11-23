@@ -6031,3 +6031,48 @@ could never have computed it), and it belongs with batch 5's check work.
      package in the session-start hook (`npx -y @playwright/mcp@0.0.82
      --help`), or install it as a pinned dev dependency so nothing is
      fetched at connect time. Not scoped with Keith yet.
+
+147. **[todo, 2026-11-24]** **[Dashboard UI]** **The freshness cap (REQ-DASH-449, drafted, unsigned): a reminder of what it is, because Keith asked for one.**
+     Keith, 2026-11-24 ~07:50 Perth: "when I come back to this, I need a
+     reminder on what the hell this freshness cap thing is about."
+
+     **The problem in one example.** Child Protection's August supply
+     arrived, every check passed. It is now November, Q4's supply is
+     overdue and nothing has arrived. Every check still passes, because
+     they ran against August's data and nothing has re-run, so the page
+     says Pass. A reader takes Pass to mean "good AND current", and CP is
+     a quarter out of date.
+
+     **What the page does today.** Once a supply is overdue but its slot
+     has not closed, the dataset goes grey "No data" and drops out of the
+     collection's rollup, so the collection reads Pass from its siblings.
+     For a quarterly round that window is about ten weeks. (After the slot
+     closes it reads red "no supply" - REQ-DASH-133 - which is fine.)
+
+     **The proposal.** The headline is the worse of quality and freshness:
+     an overdue dataset reads **Fail with a chip saying it is overdue**,
+     from its late instant until its slot closes, then hands over to "no
+     supply". Never for a period owed nothing, a dataset turned off, an
+     exhausted schedule, or a one-off (no cadence, never overdue). It is
+     built on data the page already has (`lateSlots`).
+
+     **Where it came from.** Scenario TS-22 in plans/supply-model.md's
+     register, and Keith's own answer of 2026-09-22 ("Fail, with a 'no
+     data' qualifier"). Its sprint (supply-model sprint 20, "Freshness
+     axis and banners") never got a requirement; everything else in that
+     sprint was built elsewhere. It surfaced on 2026-11-24 because
+     REQ-DASH-139 c3's citation pass found TS-22 was the one scenario no
+     requirement owns, and Keith chose to send it to delivery-scoper.
+
+     **Where it stands.** Draft at docs/drafts/freshness-cap-v1.yaml, one
+     requirement, 18 criteria. Four questions for Keith before it can be
+     reviewed: FC1 which instant turns it Fail (late instant, recommended,
+     or due instant); FC2 the chip's word ("Overdue", recommended, or "No
+     data", which collides with the grey pill); FC3 what the column panels
+     under it show (the earlier supply's real verdicts, recommended); FC4 a
+     separate "N overdue" count on cards (recommended). Plus a knock-on to
+     accept: viewed at today's date, the synthetic history (anchored
+     2026-09-25) would show the whole quarterly asset Fail, because its
+     November round is overdue. Then delivery-architect and
+     delivery-dashboard-ux, then sign-off. Not urgent - not in the Class A
+     queue.
