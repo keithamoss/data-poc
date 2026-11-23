@@ -652,6 +652,20 @@ jobs:
                 --cov-append --cov-report= --cov-fail-under=0
           done
 
+      # THE TESTS MARKED `unloaded`, ALONE, AFTER THE REST (Keith, 2026-11-23).
+      # They hold a wall-clock budget - the dashboard's 6 s for the agency
+      # trends read 7.7 to 7.9 s beside four workers' browsers on this runner,
+      # about 4.5 s alone - so every parallel session deselects them
+      # (tests/conftest.py UNLOADED), the fast half's included, and this one
+      # process runs every one of them with nothing beside it. No --only-asset:
+      # each test finds its own asset's database on MOTHMAN_PG's server, as
+      # the local gate's run does. tests/test_publish.py checks it is here.
+      - name: Run the tests that need no parallel load, alone
+        run: |
+          uv run pytest -m unloaded -n0 -rs \
+            --cov=asset_model --cov=bootstrap --cov=scenarios --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov=assets \
+            --cov-append --cov-report= --cov-fail-under=0
+
       - name: Keep this half's coverage for the combine
         uses: actions/upload-artifact@v4
         with:

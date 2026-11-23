@@ -270,7 +270,8 @@ class TestTheResetDeletesTheGeneratedFiles:
         assert synthetic_reset.confirmation_phrase() == (
             f"delete all QA history and generated files for {synthetic_reset.asset_id()}")
 
-    def test_the_command_lists_and_deletes_every_generated_file(self, private_supply_dsn):
+    def test_the_command_lists_and_deletes_every_generated_file(self, private_supply_dsn,
+                                                                 wide_console):
         from cli.env import env_group
 
         root = self._generated()

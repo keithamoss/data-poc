@@ -690,8 +690,68 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
         where it would be meaningless."""
         text = self.FULL.read_text()
         assert "coverage combine" in text
-        assert text.count("--cov-fail-under=0") == 2, (
+        measured = [s["run"] for job in self._load(self.FULL)["jobs"].values()
+                    for s in job.get("steps", []) if "--cov=" in s.get("run", "")]
+        assert len(measured) == 3, "the fast half, the deployment half, and its unloaded step"
+        assert all("--cov-fail-under=0" in run for run in measured), (
             "each half must defer the threshold to the combine")
+
+    def _pytest_runs(self, job: str) -> list[str]:
+        return [s["run"] for s in self._load(self.FULL)["jobs"][job]["steps"]
+                if "uv run pytest" in s.get("run", "")]
+
+    def test_the_unloaded_tests_run_alone_after_the_deployment_half(self):
+        """Keith, 2026-11-23: a test timed against a wall-clock budget runs
+        with no parallel load. Every parallel session deselects the
+        `unloaded` mark, so EACH ONE IS RUN BY EXACTLY ONE STEP only if the
+        parallel steps stay parallel and one -n0 step selects the mark - in
+        the deployment job, where a deployment test can run, after its
+        parallel run. And never in the fast half or the push job, where it
+        would run a second time or skip."""
+        fast, = self._pytest_runs("test")
+        parallel, alone = self._pytest_runs("test-deployment")
+        assert "-m needs_deployment" in parallel and "-n0" not in parallel
+        assert "-m unloaded -n0" in alone and "--only-asset" not in alone
+        assert "unloaded" not in fast and "-n0" not in fast
+        assert "unloaded" not in self._critical_step()
+
+    def test_an_unloaded_test_is_deselected_only_under_parallel_load(self):
+        """The other half of 'exactly one step', through conftest's own hook
+        function: kept in a -n0 session (or under a single worker), dropped
+        from every worker of a parallel one - deselected, never skipped."""
+        from types import SimpleNamespace
+
+        from tests.conftest import UNLOADED, _deselect_unloaded_under_parallel_load
+
+        class _Item:
+            def __init__(self, marked):
+                self.marked = marked
+
+            def get_closest_marker(self, name):
+                return object() if (self.marked and name == UNLOADED) else None
+
+        def run(workerinput):
+            deselected = []
+            config = SimpleNamespace(hook=SimpleNamespace(
+                pytest_deselected=lambda items: deselected.extend(items)))
+            if workerinput is not None:
+                config.workerinput = workerinput
+            items = [_Item(True), _Item(False)]
+            _deselect_unloaded_under_parallel_load(config, items)
+            return [i.marked for i in items], [i.marked for i in deselected]
+
+        assert run(None) == ([True, False], [])
+        assert run({"workercount": 1}) == ([True, False], [])
+        assert run({"workercount": 4}) == ([False], [True])
+
+    def test_the_mark_is_carried_by_the_budget_it_exists_for(self):
+        """A step selecting a mark nothing carries proves nothing (and pytest
+        exits 5 on it); a mark registered under another name selects nothing.
+        Reads source: where a mark sits is the rule here, and collecting the
+        browser module to observe it would need a deployment."""
+        assert "unloaded:" in (ROOT / "pyproject.toml").read_text()
+        source = (ROOT / "tests" / "test_dashboard_e2e.py").read_text()
+        assert "@pytest.mark.unloaded\nclass TestTheDataFilesLoadFromDisk:" in source
 
 
 @pytest.mark.critical

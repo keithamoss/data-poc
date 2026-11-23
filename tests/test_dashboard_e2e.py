@@ -7223,9 +7223,16 @@ def _wait_rendered(page):
     page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
 
 
+@pytest.mark.unloaded
 class TestTheDataFilesLoadFromDisk:
     """REQ-DASH-291 criteria 6 to 9, 15 and 18, in a real browser over
-    file:// - the supported local path, and the one fetch() could not use."""
+    file:// - the supported local path, and the one fetch() could not use.
+
+    RUN WITH NO PARALLEL LOAD (Keith, 2026-11-23): the first-view budget below
+    is wall-clock, and four workers' browsers beside it read 7.7 to 7.9 s for
+    the trends on CI where alone it reads about 4.5. The 6 s budget is kept;
+    the class is deselected from a parallel session and run by a `-n0` step
+    after the rest (tests/conftest.py UNLOADED)."""
 
     def test_every_collection_renders_from_its_own_file(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html)

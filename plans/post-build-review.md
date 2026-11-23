@@ -14529,7 +14529,13 @@ twice. It deliberately did not re-find the `TypeError`.
        quarterly trends against 6 - a known load-sensitive guard (morning
        report 12), and the quarterly data has grown with geocoding. Run
        ALONE on the same tree it passed: 4.6, 4.4 and 4.7 seconds. Not
-       loosened.
+       loosened. **DECIDED by Keith 2026-11-23** (after test.yml run
+       45156427185 read 7.7 to 7.9 seconds beside four workers): keep the
+       6-second budget and run the class without parallel load. It carries
+       the `unloaded` mark, every parallel session deselects it, and it runs
+       alone after the rest - `mothman check`'s "pytest (no parallel load)"
+       gate and a `-n0` step in test.yml's deployment job. Recorded on
+       REQ-DASH-291's decisions.
      - **The push-gate run on 5ff97f93 found two more, both test-side**:
        `test_correction_trial`'s "the view edits no configuration" snapshotted
        every file under `assets/quarterly/`, which now includes the dbt

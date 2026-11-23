@@ -86,7 +86,22 @@ def test_the_python_suite_goes_last(record):
     still ahead of you."""
     calls, _ = record
     _runner.invoke(check_cli.check_command, [])
+    assert calls[-2][:3] == ["uv", "run", "pytest"] and "unloaded" not in calls[-2]
     assert calls[-1][:3] == ["uv", "run", "pytest"]
+
+
+def test_the_unloaded_tests_run_alone_after_the_suite(record):
+    """Keith, 2026-11-23: a test timed against a wall-clock budget runs with
+    no parallel load. The parallel run deselects the `unloaded` mark
+    (tests/conftest.py), so this gate is the one place they run locally -
+    in one process (-n0), last."""
+    calls, _ = record
+    result = _runner.invoke(check_cli.check_command, [])
+    assert result.exit_code == 0, result.output
+    *_, suite, alone = calls
+    assert alone[:6] == ["uv", "run", "pytest", "-m", "unloaded", "-n0"]
+    assert any(a.startswith("--junitxml=") and a.endswith("junit-unloaded.xml") for a in alone)
+    assert "-n0" not in suite and "-m" not in suite, "the suite itself stays parallel and whole"
 
 
 def test_no_pytest_skips_only_the_python_suite(record):
@@ -95,7 +110,7 @@ def test_no_pytest_skips_only_the_python_suite(record):
     assert result.exit_code == 0, result.output
     assert not any(c[:3] == ["uv", "run", "pytest"] for c in calls)
     assert ["npm", "test", "--silent"] in calls
-    assert len(calls) == len(check_cli._GATES) - 1
+    assert len(calls) == len(check_cli._GATES) - 2, "both pytest gates, and only them"
 
 
 def test_the_cheap_gate_checks_the_plans_index(record):
@@ -336,7 +351,8 @@ class TestTheFullGateIsTheWholeSuitesRecord:
         calls, _ = record
         result = _runner.invoke(check_cli.check_command, [])
         assert result.exit_code == 0, result.output
-        pytest_argv = calls[-1]
+        [pytest_argv] = [c for c in calls
+                         if c[:3] == ["uv", "run", "pytest"] and "unloaded" not in c]
         for package in check_cli.COVERAGE_PACKAGES:
             assert f"--cov={package}" in pytest_argv
         # The floor is pyproject's, so nothing may override it to zero here.
@@ -360,6 +376,15 @@ class TestTheFullGateIsTheWholeSuitesRecord:
                          'skipped="2"/></testsuites>')
         assert check_cli._pytest_counts(junit) == (6, 2, 2)
         assert check_cli._pytest_counts(tmp_path / "absent.xml") is None
+
+    def test_the_unloaded_gates_report_is_counted_too(self, tmp_path):
+        junit, alone = tmp_path / "junit.xml", tmp_path / "junit-unloaded.xml"
+        junit.write_text('<testsuites><testsuite tests="10" failures="1" errors="1" '
+                         'skipped="2"/></testsuites>')
+        assert check_cli._pytest_counts(junit, alone) == (6, 2, 2), "absent: the suite's alone"
+        alone.write_text('<testsuites><testsuite tests="3" failures="1"/></testsuites>')
+        assert check_cli._pytest_counts(junit, alone) == (8, 3, 2)
+        assert check_cli._pytest_counts(tmp_path / "absent.xml", alone) is None
 
     def test_the_line_names_counts_coverage_time_and_tree(self):
         line = check_cli.result_line(tree="HEAD abc1234 (clean)", tree_after="HEAD abc1234 (clean)",

@@ -56,6 +56,9 @@ ROOT = Path(__file__).resolve().parent.parent
 WARNING_EXIT = 78
 WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
 
+#: The second pytest gate: the `unloaded` tests, alone, after the suite.
+UNLOADED_GATE = "pytest (no parallel load)"
+
 # (label, argv, why-it-is-here, can-warn). Node's suite is in here
 # alongside the Python ones rather than left to a separate habit - see
 # this module's own docstring.
@@ -190,6 +193,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "the dashboard template's own inline JS", False),
     ("pytest", ["uv", "run", "pytest"],
      "the Python suite", False),
+    # AFTER THE REST, ALONE (Keith, 2026-11-23): the tests marked `unloaded`
+    # hold a wall-clock budget, so the parallel run above deselects them
+    # (tests/conftest.py UNLOADED) and this runs them in one process with
+    # nothing beside it. No coverage here: the floor is the run above's.
+    (UNLOADED_GATE, ["uv", "run", "pytest", "-m", "unloaded", "-n0"],
+     "the tests timed against a budget, with no parallel load", False),
 )
 
 
@@ -211,7 +220,8 @@ _DOCS_FILE_PATTERN = re.compile(r"SCENARIOS-[a-z0-9-]+\.md")
 #: MOTHMAN_ASSET says. pytest selects each test's asset itself (REQ-PIPE-363
 #: criterion 9).
 _REPOSITORY_WIDE = frozenset({"ruff", "yamllint", "agents", "imports", "dbt packages",
-                              "layout", "folders", "npm test", "pytest"})
+                              "layout", "folders", "npm test", "pytest",
+                              UNLOADED_GATE})
 
 
 #: Gates about synthetic configuration (REQ-PIPE-385 criterion 8): run only for
@@ -531,20 +541,26 @@ def _read_tree_state() -> str:
     return f"tree {tree[:10]} (HEAD {head} + {len(changed)} uncommitted paths)"
 
 
-def _pytest_counts(junit: Path) -> tuple[int, int, int] | None:
-    """(passed, failed, skipped) from pytest's JUnit report; errors count as
-    failed. None when pytest wrote no report."""
+def _pytest_counts(junit: Path, *more: Path) -> tuple[int, int, int] | None:
+    """(passed, failed, skipped) from pytest's JUnit report, summed with any
+    further reports that exist (the unloaded gate's); errors count as
+    failed. None when pytest wrote no first report."""
     import xml.etree.ElementTree as ET
 
-    try:
-        root = ET.parse(junit).getroot()
-    except (OSError, ET.ParseError):
-        return None
-    suites = [root] if root.tag == "testsuite" else list(root)
-    total = sum(int(s.get("tests", 0)) for s in suites)
-    failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
-    skipped = sum(int(s.get("skipped", 0)) for s in suites)
-    return total - failed - skipped, failed, skipped
+    counts = [0, 0, 0]
+    for n, path in enumerate((junit, *more)):
+        try:
+            root = ET.parse(path).getroot()
+        except (OSError, ET.ParseError):
+            if n == 0:
+                return None
+            continue
+        suites = [root] if root.tag == "testsuite" else list(root)
+        total = sum(int(s.get("tests", 0)) for s in suites)
+        failed = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+        skipped = sum(int(s.get("skipped", 0)) for s in suites)
+        counts = [counts[0] + total - failed - skipped, counts[1] + failed, counts[2] + skipped]
+    return tuple(counts)
 
 
 def _coverage_percent(report: Path) -> float | None:
@@ -657,7 +673,7 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     reports = Path(tempfile.mkdtemp(prefix="mothman-check-"))
     one_off_counts: list[dict] = []
     for label, argv, why, can_warn in (() if docs else gates):
-        if no_pytest and label == "pytest":
+        if no_pytest and label in ("pytest", UNLOADED_GATE):
             continue
         if label in _SYNTHETIC_GATES and not _asset_passes(label):
             console.rule(f"[bold]{label}", style="dim")
@@ -666,6 +682,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
             continue
         if label == "pytest":
             argv = _pytest_argv(argv, reports)
+        elif label == UNLOADED_GATE:
+            argv = [*argv, f"--junitxml={reports / 'junit-unloaded.xml'}"]
         # A (GATE, KIND) PAIR UNDECLARED IS REFUSED (REQ-PIPE-448 criterion 1),
         # before the gate runs.
         missing = undeclared(label)
@@ -723,7 +741,8 @@ def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     warned = [label for label, code, _, can_warn, _t in results if _warned(code, can_warn)]
     if full:
         line = result_line(tree=tree, tree_after=_tree_state(),
-                           counts=_pytest_counts(reports / "junit.xml"),
+                           counts=_pytest_counts(reports / "junit.xml",
+                                                 reports / "junit-unloaded.xml"),
                            coverage=_coverage_percent(reports / "coverage.json"),
                            floor=_fail_under(), elapsed=time.monotonic() - gate_started,
                            failed_gates=failed, not_run=skipped, not_applicable=not_applicable,

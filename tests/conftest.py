@@ -1514,6 +1514,34 @@ NEEDS_DEPLOYMENT = "needs_deployment"
 #: say, which bootstraps a copy of the tree.
 ON_DEMAND = "on_demand"
 
+#: Tests whose wall-clock budget means nothing under parallel load (Keith,
+#: 2026-11-23: keep the dashboard's 6 s trends budget, and run it with no
+#: parallel load, on its own after the rest). DESELECTED from any session
+#: with more than one xdist worker, and run by a `-n0` step of their own:
+#: `mothman check`'s "pytest (no parallel load)" gate and test.yml's
+#: deployment job. tests/test_publish.py checks both steps exist, after the
+#: parallel run, so a test carrying it is never run nowhere.
+UNLOADED = "unloaded"
+
+
+def _under_parallel_load(config) -> bool:
+    """True in an xdist worker of a session with more than one worker. The
+    controller collects nothing, so the workers are where this is decided."""
+    workerinput = getattr(config, "workerinput", None)
+    return bool(workerinput) and int(workerinput.get("workercount", 1)) > 1
+
+
+def _deselect_unloaded_under_parallel_load(config, items) -> None:
+    """DESELECTED, NOT SKIPPED, like on_demand: a skip in a CI half means a
+    test in the wrong half, and these are in a step of their own by design."""
+    if not _under_parallel_load(config):
+        return
+    dropped = [i for i in items if i.get_closest_marker(UNLOADED) is not None]
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = [i for i in items if i.get_closest_marker(UNLOADED) is None]
+
+
 def pytest_addoption(parser):
     parser.addoption("--run-on-demand", action="store_true", default=False,
                      help="also run tests marked on_demand (slow; deselected otherwise)")
@@ -1593,6 +1621,7 @@ def pytest_collection_modifyitems(config, items):
         if dropped:
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept
+    _deselect_unloaded_under_parallel_load(config, items)
     _mark_deployment(items)
     _refuse_a_critical_test_ci_cannot_run(items)
     _refuse_a_module_naming_no_asset(items)
@@ -1972,3 +2001,21 @@ def invented_check_ids(monkeypatch):
             return dict.get(self, key) or attempt_support.ANY_CHECK.get(key, default)
 
     monkeypatch.setattr(tables_read, "definition_fingerprints", lambda: _RealOrAny(real()))
+
+
+@pytest.fixture
+def wide_console(monkeypatch):
+    """A console wide enough that rich never folds a path in the output.
+
+    Under CliRunner there is no terminal, so rich lays out at 80 columns (76
+    inside a panel) and cuts a long path into pieces mid-word. Where the cut
+    lands depends on the length of pytest's basetemp, so a test asserting on
+    a path in the output passes on one machine and fails on another (CI's
+    `/tmp/pytest-of-runner/pytest-0` folded `calendar.yaml` into `cale
+    ndar.yaml`). Rich reads COLUMNS again on every call, so this reaches the
+    module-level consoles too.
+
+    Deliberately not autouse: a suite-wide width would also change what the
+    tests asserting on an 80-column layout see, and the subprocesses that
+    inherit this environment."""
+    monkeypatch.setenv("COLUMNS", "400")
