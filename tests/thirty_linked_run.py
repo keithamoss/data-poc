@@ -1,6 +1,6 @@
 """Run inside a copy built by tests/thirty_linked_datasets.py (REQ-TEST-339):
 generate the six fake collections, then replay them as ONE receipt-ordered
-stream through cli.pipeline._run_stream - the function `mothman pipeline run`
+stream through orchestrate.run_stream - the function `mothman pipeline run`
 calls for collections sharing a calendar - against the database
 MOTHMAN_SUPPLY_DSN names.
 
@@ -23,8 +23,6 @@ sys.path.insert(0, str(Path.cwd()))
 
 
 def main(out: str) -> None:
-    from cli import pipeline
-    from asset_model import collections
     from qa_tools.tools import orchestrate
 
     import thirty_linked_datasets as fixture
@@ -44,7 +42,7 @@ def main(out: str) -> None:
     ids = [c["id"] for c in fixture.sources()] + [fixture.PRODUCT["collection"]]
     start = time.perf_counter()
     try:
-        pipeline._run_stream([collections.by_id(i) for i in ids], sequential=False)
+        orchestrate.run_stream(ids, sequential=False)
     finally:
         evidence = {"runs": timings, "stream_seconds": round(time.perf_counter() - start, 1)}
         Path(out).write_text(json.dumps(evidence))
