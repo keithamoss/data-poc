@@ -735,6 +735,34 @@ class TestWhatTheRuleDid:
         assert "It was promoted by the rule - " in text and "passing, because the " \
             "cp-notifications received with it was held back" in text, text
 
+    def test_the_kept_reports_recheck_line_fits_80_columns(self, sc, monkeypatch):
+        """REQ-DASH-277 criterion 5 (built 2026-11-23): the kept report's
+        re-check sentence ran 225 to 373 characters on one line and was left
+        to the terminal to wrap. Laid out at COLUMNS=80 it is lines of at
+        most 80, its continuation indented, every word of it still there."""
+        import re as _re
+
+        from cli import lifecycle_report
+
+        monkeypatch.setenv("COLUMNS", "80")
+        established(sc)
+        sc.rules.append(own_red("N2"))
+        v2 = sc.deliver("2024-08-05T10:00:00+08:00",
+                        {"cp_clients": "C2", "cp_notifications": "N2"})
+        sc.process()
+        assert sc.holder("cp-clients", Q3) == v2["C2"]
+        said: list[str] = []
+        lifecycle_report.report([_arrival(sc, "C2")], say=said.append)
+        lines = [line for chunk in said for line in chunk.splitlines()]
+        over = [line for line in lines if len(line) > 80]
+        assert over == [], over
+        flat = _re.sub(r"\s+", " ", " ".join(lines))
+        assert ("re-checked against the cp-notifications in place in the warehouse "
+                "(received 10:00am Thursday, 25 July 2024), passing, because the "
+                "cp-notifications received with it was held back") in flat, flat
+        cont = [line for line in lines if line.startswith("    ")]
+        assert cont, f"the sentence was not laid out over indented lines: {lines}"
+
     def test_crashed_sibling_wording(self, sc):
         """Notifications v2's run stops at the checks stage: Clients v2,
         checked, waits for its package - said, with the command on a line of

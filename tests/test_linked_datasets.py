@@ -201,3 +201,24 @@ class TestTheQueriesThemselvesAgreeWithTheMapping:
 #: The data asset this module's tests act for, unless a test says otherwise
 #: (C11, Keith 2026-11-02: every test module names its asset).
 pytestmark = pytest.mark.asset("quarterly")
+
+
+def test_the_contract_carries_one_id_column_more_than_any_linked_dataset():
+    """REQ-QAC-330 criterion 3 as amended 2026-11-23 (Keith): N is ONE MORE
+    than the largest number of identifier columns a linked dataset declares,
+    so a surplus identifier has a column to arrive in and be checked
+    (REQ-GEN-335 (c)); id_1 required, the rest not, every one text."""
+    import re
+
+    from asset_model import hierarchy
+
+    linked = hierarchy.dataset("linkage-keys").linked
+    assert linked, "precondition: linkage-keys links something"
+    most = max(len(ids) for _ds, _code, ids in linked)
+    contract = next((REAL / assets.folder_rel()).glob("*/linkage-products-contract.yaml"))
+    doc = yaml.safe_load(contract.read_text())
+    table = next(s for s in doc["schema"] if s["name"] == "linkage_keys")
+    ids = [p for p in table["properties"] if re.fullmatch(r"id_\d+", p["name"])]
+    assert [p["name"] for p in ids] == [f"id_{i}" for i in range(1, most + 2)]
+    assert [bool(p.get("required")) for p in ids] == [True] + [False] * most
+    assert {p["logicalType"] for p in ids} == {"string"}

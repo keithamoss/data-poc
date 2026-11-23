@@ -8806,7 +8806,8 @@ class TestHeldBackWithItsDelivery:
 
     def test_s6_each_failed_re_check_is_its_own_root(self, clean_page, cp_pages):
         """S6, ROOT NAMING A (functional critic on 7093c20; Keith Q1 = A,
-        PROVISIONAL, as the tickets' root_cause.root_of reads it): the Client
+        confirmed 2026-11-23 - criteria 2, 3 and 9 reworded to it - as the
+        tickets' root_cause.root_of reads it): the Client
         Register's re-check failed, so its notice names the Notifications
         received with it - never a chain to the Investigations; the
         Notifications' names the Investigations; nothing lists either under

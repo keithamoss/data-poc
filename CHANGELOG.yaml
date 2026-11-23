@@ -109,6 +109,41 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-11-23"
+    summary: >
+      Archived snapshots keep their own typeface wherever they are opened,
+      raising a collection's period setting on a frozen version gives one
+      list of steps, and the kept report fits a standard terminal.
+    changes:
+      - category: Improved
+        items:
+          - headline: Snapshots keep their typeface
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              An archived snapshot now carries its fonts inside it, so a copy
+              opened on its own, years from now, looks as the dashboard did.
+              Only the Demo tab's player stays behind.
+          - headline: One refusal, one list of steps
+            components: ["Pipeline & publishing"]
+            description: >
+              When you raise a collection's files_go_to_period on a version
+              that has already governed filings, the schedule check now gives
+              one numbered list: the periods to declare not owed, then the
+              correction to paste.
+          - headline: The kept report fits 80 columns
+            components: ["Pipeline & publishing"]
+            description: >
+              When the rule promotes a supply after re-checking it against the
+              warehouse, the kept report now lays that out over indented lines
+              within 80 columns, so it reads the same piped as on screen.
+      - category: Fixed
+        items:
+          - headline: Pasted corrections parse again
+            components: ["Pipeline & publishing"]
+            description: >
+              A correction the schedule check printed for a whole-number value
+              ended in a stray "..." line, which stopped the YAML at that
+              point when you pasted it. It no longer does.
   - date: "2026-11-22"
     summary: >
       A dataset with no delivery schedule is now checked when its supply

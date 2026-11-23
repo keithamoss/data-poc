@@ -420,3 +420,41 @@ daily       419s  within budget                  load 1.17 -> 1.35
 The first attempt at this run was lost to a container restart (the disk had filled with
 test scratch folders), and the daily half of the second to a background task's own time
 limit; each was reset and rerun from empty, so the figures are whole runs.
+
+-> **2026-11-22, the full chunked gate on 7daa6ad1, with `--durations=0` on every
+chunk (REQ-TEST-402 criteria 9 and 10's after profile, Keith 2026-11-23).** Both
+halves, the deployment half against this sandbox's own databases: 20 module chunks
+of 4 workers each, then the browser module on its own, one after another, with
+coverage on (95%). **9039 passed, 0 failed, 0 skipped.** Wall 10:41:08-12:37:38
+UTC, **1h56m30s** (pytest's own figures sum to 6932s); summed test time 227.7 min
+over 438 modules, read from each chunk's junit file, so a module's time includes
+its fixtures' setup. The two longest chunks besides the browser module (22m21s)
+were chunk 03 (16m15s: test_cli_package_gate, test_real_deployment) and chunk 16
+(16m21s: test_package_gate). The slowest modules:
+
+```
+7daa6ad1 chunked gate, 2026-11-22: 9039 tests, summed test time 227.7 min (wall 1h56m30s, 20 chunks + browser chunk)
+    62.2 min  27.3%   463 tests  tests/test_dashboard_e2e.py
+    16.2 min   7.1%    46 tests  tests/test_package_gate.py
+    16.1 min   7.1%    50 tests  tests/test_cli_package_gate.py
+     9.6 min   4.2%    66 tests  tests/test_door_flag_parity.py
+     7.6 min   3.3%    39 tests  tests/test_cloudflare_publish.py
+     5.2 min   2.3%    18 tests  tests/test_real_deployment.py
+     4.3 min   1.9%    13 tests  tests/test_root_cause_shouts.py
+     4.1 min   1.8%     2 tests  tests/test_one_asset_beside_another.py
+     4.0 min   1.8%    12 tests  tests/test_settlement_rechecks_readers.py
+     3.2 min   1.4%    24 tests  tests/test_last_planted_scenarios.py
+     3.0 min   1.3%     7 tests  tests/test_rechecks.py
+     2.8 min   1.3%    34 tests  tests/test_replay_inputs.py
+     2.6 min   1.1%     7 tests  tests/test_queue_beneath.py
+     2.4 min   1.0%    14 tests  tests/test_strict_cross_table.py
+     2.3 min   1.0%    51 tests  tests/test_geocoding_faults.py
+```
+
+Against the suite's 30-minute target on this 4-core sandbox: **NOT MET**. The
+browser module alone took 22m23s of wall (22m21s by pytest), the other twenty
+chunks 1h34m07s.
+Its time is still over a quarter of the whole; the six modules driven through the
+real lifecycle over tests/gate_support.py (package gate, its CLI, root-cause shouts,
+settlement re-checks, queue beneath, re-checks) are another fifth, and door-flag
+parity 4%.

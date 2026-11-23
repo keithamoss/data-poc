@@ -1564,9 +1564,13 @@ Rough layout:
   in both cases still exists after the fix (a default-argument fallback;
   pandas'/DuckDB's own null-sentinel behaviour), so a regression test
   still has real, ongoing signal.
-- The repo is public (Keith's own call, synthetic data only) - GitHub
-  Pages hosting depends on that; see `plans/dashboard.md` #2 for the
-  parked note about what happens if/when it goes private again.
+- The repo is public for now (Keith's own call, synthetic data only),
+  but nothing publishes to GitHub Pages any more: each asset's dashboard
+  is published to its own Cloudflare Pages project (REQ-PIPE-255,
+  REQ-PIPE-354), and keithamoss.github.io/data-poc still shows a frozen
+  pre-split publish of 2026-10-22 until the repository is made private
+  and the gh-pages branch deleted (REQ-DOCS-259, which rewrites this
+  bullet when it lands).
 - When a design decision has real forks (not just implementation
   detail), scope it with Keith via a couple of rounds of clarifying
   questions before building - this has been the working pattern all
