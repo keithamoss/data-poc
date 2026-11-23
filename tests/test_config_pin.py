@@ -97,9 +97,14 @@ class TestAPinHoldsTheConfigurationStill:
         assert _client_name() == DATASET_NAME[1]
 
     def test_a_file_reached_by_another_spelling_is_the_same_entry(self, folder):
-        """Keyed on the resolved path: a linked file read through the link."""
-        linked = next(p for p in folder.iterdir() if p.is_symlink() and p.is_dir())
-        file = next(p for p in linked.rglob("*.yaml"))
+        """Keyed on the resolved path: a linked file read through the link.
+
+        The linked directory is chosen by name and must hold YAML: some
+        (collections/, dbt/) hold none, and taking whichever the filesystem
+        happened to list first failed on CI's."""
+        file = min(p for d in folder.iterdir() if d.is_symlink() and d.is_dir()
+                   for p in d.rglob("*.yaml"))
+        assert file.parent.resolve() != file.parent, "reached through a link"
         with config_pin.ConfigSnapshot.take() as snapshot:
             assert config_yaml.read(file) == snapshot.texts[os.path.realpath(file)]
             assert config_yaml.read(file.resolve()) == config_yaml.read(file)

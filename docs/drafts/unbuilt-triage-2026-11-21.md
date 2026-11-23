@@ -78,6 +78,34 @@ should also flip sprints 9 and 10 from `blocked`.
 - Needs another platform: PIPE-129 NFR7 (event-trigger guard on e.g. RDS);
   PIPE-343 c4/c7 (a Docker host for the dev container).
 
+### Outcome, 2026-11-23
+
+Keith answered all nine of the earlier calls on 2026-11-23, and PIPE-233 c3 and
+DASH-277 c5, left over from Class B, were settled the same day:
+
+- PIPE-098 c4: amended - a period opens at the first filing or by time once its
+  due instant has passed (REQ-PIPE-323); the open-a-period command is withdrawn. Met.
+- GEN-232 c4: amended (option B) - the history starts at the oldest quarter a
+  planted scenario claims, 2013-Q1; the count recorded (54 owed quarters to 2026-Q3). Met.
+- DASH-275: Q1 = A confirmed - a failed re-check is its own root, on the page as in
+  the tickets; criteria 2, 3 and 9 reworded, the open question closed. Met.
+- DASH-292 c9: built - an archived snapshot carries its six fonts inline and keeps its
+  typeface opened alone; the demo player is left out, and the criterion amended to
+  allow only its failure. Met.
+- PIPE-322 c2: built as signed - a rise on a frozen version is one numbered refusal,
+  the correction to paste as its step 2. Met.
+- QAC-330 c3: amended - the contract carries one id column more than any linked
+  dataset declares. Met.
+- PIPE-336 c7: amended to the refusal Keith chose on 2026-10-30. Met.
+- TEST-402: c1 amended; c9 and c10 recorded from the full chunked gate of 7daa6ad1
+  (9039 passed, 1h56m30s). c10 met; c9 met but for the generation count, which that
+  gate did not take. The 30-minute target is not met.
+- DOCS-358 c3: CLAUDE.md's hosting bullet replaced with Keith's approved wording. Met.
+- PIPE-233 c3: amended - each bootstrap stream's time, naming its collections, in
+  docs/suite-timings.md. Met.
+- DASH-277 c5: built - the kept report lays its lines out within 80 columns and caps
+  the re-checked checks at eight. Met.
+
 ## Class C - sent to delivery-scoper the same day
 
 PIPE-065 c8 (is a 'landed on accepted' warning still wanted beside the queue and

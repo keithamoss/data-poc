@@ -204,7 +204,9 @@ def rechecked_promotion_words(conn, dataset_id: str, supply: str) -> str | None:
     against_ds = against.split("@", 1)[0]
     got = filing.received_at_of(against_ds, against, conn=conn)
     on = display_time.format_instant(got) if got else against
-    names = ", ".join(dict.fromkeys(checks))
+    # UP TO EIGHT CHECKS, then 'and <n> more', as every other list of names
+    # in these lines (REQ-DASH-277 criterion 5; named()).
+    names = named(checks)
     mine_at = filing.received_at_of(dataset_id, supply, conn=conn)
     theirs_at = filing.received_at_of(by_ds, by_supply, conn=conn)
     if mine_at and theirs_at and gate._same_instant(mine_at, theirs_at):
@@ -225,8 +227,28 @@ def report(found, *, say=None) -> list[Outcome]:
         outcomes = [outcome_of(conn, a) for a in found]
     say("What the lifecycle decided:")
     for line, who in _grouped(outcomes):
-        say(f"  {who}: {line}" if who else f"  {line}")
+        say(laid_out(f"{who}: {line}" if who else line))
     return outcomes
+
+
+#: The kept report's width (REQ-DASH-277 criterion 5): every line within it.
+WIDTH = 80
+
+
+def laid_out(text: str, width: int = WIDTH) -> str:
+    """One kept-report line laid out within `width` columns by the report
+    itself, not left to the terminal (REQ-DASH-277 criterion 5, built
+    2026-11-23): two spaces in, continuation lines four, broken only between
+    words - so it reads the same piped as on a terminal. A line already
+    holding a line break keeps it, each part laid out."""
+    import textwrap
+
+    out = []
+    for i, part in enumerate(text.split("\n")):
+        out += textwrap.wrap(part, width=width, initial_indent="  " if i == 0 else "    ",
+                             subsequent_indent="    ", break_long_words=False,
+                             break_on_hyphens=False) or [""]
+    return "\n".join(out)
 
 
 #: How a supply held back by another is labelled beneath its root

@@ -339,7 +339,7 @@ class TestARefusalAtTheCommandLine:
     stopped on one says what was recorded before the stop and that it will
     stop the same way on every pass until the configuration is fixed."""
 
-    def test_the_real_command_refuses(self, tmp_path, monkeypatch):
+    def test_the_real_command_refuses(self, tmp_path, monkeypatch, wide_console):
         from click.testing import CliRunner
 
         from cli.app import cli

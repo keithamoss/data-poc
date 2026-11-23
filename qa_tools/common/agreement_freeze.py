@@ -545,8 +545,11 @@ def _value_text(value) -> str:
     # ONE LINE, however long: wrapped at YAML's default eighty columns, a
     # long reason broke the pasted entry's indentation (REQ-PIPE-181's
     # migration, 2026-10-11).
+    # NO DOCUMENT-END MARKER: a bare scalar dumps as '1\n...', and that '...'
+    # inside a pasted correction ended the YAML document there (found building
+    # REQ-PIPE-322 criterion 2, 2026-11-23).
     return yaml.safe_dump(_plain(value), default_flow_style=True, sort_keys=False,
-                          width=10**6).strip()
+                          width=10**6).strip().removesuffix("\n...").strip()
 
 
 def _quoted(value: str) -> str:

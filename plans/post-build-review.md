@@ -14529,7 +14529,13 @@ twice. It deliberately did not re-find the `TypeError`.
        quarterly trends against 6 - a known load-sensitive guard (morning
        report 12), and the quarterly data has grown with geocoding. Run
        ALONE on the same tree it passed: 4.6, 4.4 and 4.7 seconds. Not
-       loosened.
+       loosened. **DECIDED by Keith 2026-11-23** (after test.yml run
+       45156427185 read 7.7 to 7.9 seconds beside four workers): keep the
+       6-second budget and run the class without parallel load. It carries
+       the `unloaded` mark, every parallel session deselects it, and it runs
+       alone after the rest - `mothman check`'s "pytest (no parallel load)"
+       gate and a `-n0` step in test.yml's deployment job. Recorded on
+       REQ-DASH-291's decisions.
      - **The push-gate run on 5ff97f93 found two more, both test-side**:
        `test_correction_trial`'s "the view edits no configuration" snapshotted
        every file under `assets/quarterly/`, which now includes the dbt
@@ -17469,3 +17475,28 @@ twice. It deliberately did not re-find the `TypeError`.
        'Expected row count'); the agency card's blurb repeating its name; the
        published line printing the full local path; the gate line's capitals
        and "0 calendar(s)" on a one-off's load.
+
+495. **[done, 2026-11-23]** **[Pipeline & publishing]** **[Testing & dev tooling]** **What the first hand-started full CI run in three weeks found**
+     test.yml run 45156427185 (on 8d1aa280, a cache miss) failed where the
+     local gate of the same tree had passed 9,039 of 9,039. Each cause found,
+     none a product defect except the last, and each fixed on wip/cifix:
+     - **The on-demand runner** (tests/thirty_linked_run.py) still called
+       cli.pipeline._run_stream, gone since #134 step 3, and no longer
+       generated or played scripted decisions; it now follows the
+       bootstrap's own steps. 39 on-demand tests pass.
+     - **Rich cut a long path mid-word** at 80 columns, so two tests failed
+       only for CI's basetemp length (test_rolling_anchor,
+       test_schedule_config_errors): a `wide_console` fixture.
+     - **test_config_pin** depended on the disk's listing order.
+     - **test_cloudflare_publish's** end-to-end test forced the sandbox
+       environment against CI's database marked `ci`.
+     - **The first-view timing budget** failed under four parallel browser
+       workers: Keith 2026-11-23, keep 6 s and run it with no parallel load
+       (the `unloaded` mark; its own -n0 step locally and in CI).
+     - Found by the triage gate the same day: **test_cli_plans** read
+       today's register, which the triage finished (rule 4: rebuilt on a
+       register of its own); and **`mothman env tidy-test-databases`**
+       failed outright when another session dropped a database while it
+       listed them - a real race, fixed with pg_stat_file's missing_ok as
+       the one-off list already was. No failing-first test: the race is
+       inside one statement and could not be made to happen on demand.

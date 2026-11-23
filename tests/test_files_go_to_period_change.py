@@ -108,6 +108,86 @@ class TestARiseIsRefusedUntilTheSkippedPeriodIsDeclared:
         assert _offset(validate(src)) == []
 
 
+@pytest.fixture
+def frozen_rise(tmp_path, monkeypatch):
+    """A rise from 0 to 1 from the 1 August 2026 round, added on a REAL
+    (non-synthetic) asset after that round has governed filings - so the
+    version is frozen and the freeze gate refuses it too (REQ-PIPE-111
+    criterion 15). The push base is this same contract without the new
+    version, read through the gate's own `_content_at`."""
+    import functools
+
+    from qa_tools.common import agreement_freeze, validate_schedule as vs
+
+    contract = tmp_path / "contract"
+    shutil.copytree(REAL, contract)
+    cal_path, asset_path = contract / "calendar.yaml", contract / "data-asset.yaml"
+    doc = yaml.safe_load(cal_path.read_text())
+    _cp(doc)["files_go_to_period"] = {"versions": [_v("2000-01-01", 0)]}
+    base_cal = yaml.safe_dump(doc, sort_keys=False)
+    _cp(doc)["files_go_to_period"] = {"versions": [_v("2000-01-01", 0), _v("2026-08-01", 1)]}
+    cal_path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    asset_text = asset_path.read_text().replace("\nsynthetic: true", "\nsynthetic: false")
+    assert "synthetic: false" in asset_text
+    asset_path.write_text(asset_text)
+    people = (REAL / "people.yaml").read_text()
+    at_base = {"base/calendar.yaml": base_cal, "base/data-asset.yaml": asset_text}
+
+    @functools.lru_cache
+    def content_at(rel, ref):
+        return at_base.get(rel, people if str(rel).endswith("people.yaml") else None)
+
+    monkeypatch.setattr(vs, "_repo_path", lambda path: f"base/{path.name}")
+    monkeypatch.setattr(vs, "_content_at", content_at)
+    monkeypatch.setattr(agreement_freeze, "commits_since", lambda ref, rels: [])
+    return Source(asset_path, contract)
+
+
+KEY = "collection child-protection files_go_to_period 2026-08-01"
+
+
+class TestARiseOnAFrozenVersionIsOneRefusal:
+    """REQ-PIPE-322 criterion 2, as signed: the freeze refusal for the same
+    change is combined into the rise refusal's one numbered list of steps,
+    with the correction to paste - never a second refusal beside it."""
+
+    def test_one_refusal_with_both_steps_to_paste(self, frozen_rise):
+        found = [e for e in validate(frozen_rise) if KEY in f"{e.scope} {e.problem} {e.fix}"
+                 or "2026-Q3" in f"{e.problem} {e.fix}"]
+        assert len(found) == 1, [f"{e.scope}: {e.problem}" for e in found]
+        [e] = found
+        step1, _, step2 = e.fix.partition("\n  2. ")
+        assert step1.startswith("1. ") and "not_expected:" in step1, e.fix
+        assert NOT_EXPECTED_PLACEHOLDER in step1
+        assert step2, f"no step 2: {e.fix}"
+        assert "frozen" in step2 and "corrections:" in step2, step2
+        assert f"- item: {KEY}" in step2 and "new: 1" in step2, step2
+        assert "2026-Q3" in e.problem and "froze at" in e.problem, e.problem
+
+    def test_the_freeze_gate_gives_no_refusal_of_its_own_for_it(self, frozen_rise):
+        separate = [e for e in validate(frozen_rise)
+                    if KEY in (e.scope or "").split(", ")]
+        assert separate == [], [f"{e.scope}: {e.problem}" for e in separate]
+
+    def test_the_correction_to_paste_parses_as_it_reads(self, frozen_rise):
+        """A defect found building criterion 2 (2026-11-23): a whole-number
+        value was printed '1' and then YAML's document-end '...' on a line of
+        its own, inside the block a person pastes - which ends the document
+        there. The pasted block reads back to the change it declares."""
+        [e] = [e for e in validate(frozen_rise) if KEY in e.fix]
+        block = e.fix.split("  corrections:\n", 1)[1].split("\nMay approve:", 1)[0]
+        assert "\n..." not in block, block
+        [entry] = yaml.safe_load("corrections:\n" + block)["corrections"]
+        assert entry["changes"] == [{"item": KEY, "old": None, "new": 1}]
+        assert "(nothing) -> 1)" in e.problem, e.problem
+
+    def test_an_unfrozen_rise_names_no_correction(self, contract):
+        """Where the freeze gate has nothing to say, step 1 stands alone."""
+        src, _ = contract(0, 1)
+        [e] = _offset(validate(src))
+        assert "corrections:" not in e.fix and "\n  2. " not in e.fix, e.fix
+
+
 class TestAFallIsAcceptedAndItsDoublyFedRoundOpensNoSlot:
     """Criteria 3, 8 and 10."""
 

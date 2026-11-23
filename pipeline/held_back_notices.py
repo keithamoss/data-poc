@@ -14,8 +14,8 @@ against the warehouse, and that re-check FAILED (the detail's `failed`) - a
 real failing verdict (S1 red, S6). One that could not be checked at all is
 REQ-DASH-204's notice instead.
 
-THE ROOT (criterion 2, as PROVISIONALLY re-read 2026-10-26 - functional
-critic on 7093c20, Keith Q1 = A) follows the tickets' rule, root_cause.root_of
+THE ROOT (criterion 2, as re-read 2026-10-26 - functional critic on
+7093c20, Keith Q1 = A, confirmed and reworded 2026-11-23) follows the tickets' rule, root_cause.root_of
 (REQ-PIPE-278 criterion 1, Keith's answer 3a): a supply whose re-check FAILED
 is its own root, and its notice names its immediate package-mate; a root's
 holding list is what it holds back that could not be checked, followed through
@@ -83,7 +83,7 @@ def _failed(detail) -> bool:
 
 def root_as_at(log, supply: str, when) -> str | None:
     """THE ROOT, as at `when`, by the tickets' rule (REQ-PIPE-278 criterion 1;
-    functional critic on 7093c20, Keith Q1 = A, PROVISIONAL): following
+    functional critic on 7093c20, Keith Q1 = A, confirmed 2026-11-23): following
     could-not-be-checked hold-backs to the supply whose own failure held them;
     a supply whose re-check FAILED is its own root (None here), and so is one
     whose cause has since been turned down or replaced (D2)."""
@@ -164,7 +164,7 @@ def _notice(log, supply: str, when, receipts: Receipts) -> dict | None:
                          text(" received with it has been replaced by the one "),
                          *named(by_ds, newer, receipts, style="received"),
                          text("; this supply now needs its own decision.")]}
-    # ITS OWN ROOT (Keith Q1 = A, PROVISIONAL): a failed re-check names its
+    # ITS OWN ROOT (Keith Q1 = A, confirmed 2026-11-23): a failed re-check names its
     # immediate package-mate and no chain to another root.
     joined = detail.get("came") == "joined"
     received = detail.get("by_received") or receipts.at(by)

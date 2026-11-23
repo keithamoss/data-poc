@@ -2052,11 +2052,18 @@ def _first_round(cal_name: str, begins: date, agr) -> date | None:
     return next((p.date for p in rounds if p.date >= begins), None)
 
 
-def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
+def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source, *,
+                               freeze: list[ConfigError] = (),
+                               consumed: list[ConfigError] | None = None) -> list[ConfigError]:
     """REQ-PIPE-320 criteria 3, 4, 5, 7 and 13, from committed configuration
     alone (criterion 9). A value's type and sign are the schema's (criterion
     6). Nothing here defaults a missing value: the two deployments want
-    opposite ones, so the gate names every collection that says nothing."""
+    opposite ones, so the gate names every collection that says nothing.
+
+    `freeze` is the freeze gate's refusals for this change (REQ-PIPE-111):
+    one about a version a RISE refusal is about is folded into that refusal
+    as its step 2 and added to `consumed`, so the caller gives it once
+    (REQ-PIPE-322 criterion 2)."""
     from asset_model import agreement as agreement_mod
 
     out: list[ConfigError] = []
@@ -2180,7 +2187,8 @@ def _files_go_to_period_errors(cal_raw: dict, raw: dict, src: Source) -> list[Co
                     break
                 # REQ-PIPE-320 criterion 13's own-dates refusal went with own
                 # dates (REQ-PIPE-345): no dataset states dates of its own.
-        out += _rise_errors(name, cid, scope, on_calendar, versions, agr)
+        out += _rise_errors(name, cid, scope, on_calendar, versions, agr,
+                            freeze=freeze, consumed=consumed)
     return out
 
 
@@ -2303,11 +2311,14 @@ def _day(d) -> str:
     return f"{d.day} {d.strftime('%B %Y')}"
 
 
-def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigError]:
+def _rise_errors(name, cid, scope, on_calendar, versions, agr, *,
+                 freeze: list[ConfigError] = (),
+                 consumed: list[ConfigError] | None = None) -> list[ConfigError]:
     """REQ-PIPE-322 criteria 1 and 2: a rise by D skips D periods no round
     fills, and each is declared not owed by every dataset that would have
     supplied it at the old value - ONE refusal per version, with what to
-    paste."""
+    paste, the freeze refusal for the same version (REQ-PIPE-111 criterion
+    15) combined into it as step 2 where there is one."""
     if not on_calendar:
         return []
     # EVERY CALENDAR ITS DATASETS NAME (critic finding 6): each calendar's
@@ -2317,7 +2328,8 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
         by_calendar.setdefault(entry[1], []).append(entry)
     if len(by_calendar) > 1:
         return [e for cal, group in by_calendar.items()
-                for e in _rise_errors(name, cid, scope, group, versions, agr)]
+                for e in _rise_errors(name, cid, scope, group, versions, agr,
+                                      freeze=freeze, consumed=consumed)]
     cal_name = on_calendar[0][1]
     out = []
     for old, new, i0, rounds in _change_rounds(cal_name, versions, agr):
@@ -2342,19 +2354,29 @@ def _rise_errors(name, cid, scope, on_calendar, versions, agr) -> list[ConfigErr
                 f'         - period: "{p}"\n           reason: "{NOT_EXPECTED_PLACEHOLDER}"\n'
                 for p in periods)
             for did, periods in must.items())
-        out.append(ConfigError(
-            name, scope,
-            f"rises from {_OFFSET_KEY} {old.value} to {new.value} on the version effective "
-            f"{new.effective_from.isoformat()}, from the {_day(rounds[i0].date)} round - so no "
-            f"round fills {names}. Must declare it not owed: {', '.join(must)}. Need not: "
-            + (", ".join(need_not) if need_not else "none - every dataset supplies in that round")
-            + ".",
-            f"1. Declare each skipped period not owed in {name}, stating the reason - add "
-            f"not_expected to each dataset's existing entry under datasets:\n"
-            + paste
-            + "\n  2. Where the version is already frozen, declare the change as a correction "
-              "too (REQ-PIPE-320 criterion 8): `mothman schedule preview-correction` lists every "
-              "filing it would move."))
+        # ONE NUMBERED LIST FOR ONE EDIT (REQ-PIPE-322 criterion 2, built
+        # 2026-11-23 at Keith's word): where the version is frozen, the freeze
+        # gate's refusal for it becomes step 2, with its correction to paste,
+        # and is not given again on its own.
+        key = f"collection {cid} {_OFFSET_KEY} {new.effective_from.isoformat()}"
+        frozen = next((f for f in freeze if f.scope and key in f.scope.split(", ")
+                       and not any(f is c for c in (consumed or []))), None)
+        problem = (f"rises from {_OFFSET_KEY} {old.value} to {new.value} on the version effective "
+                   f"{new.effective_from.isoformat()}, from the {_day(rounds[i0].date)} round - so "
+                   f"no round fills {names}. Must declare it not owed: {', '.join(must)}. Need "
+                   f"not: "
+                   + (", ".join(need_not) if need_not else
+                      "none - every dataset supplies in that round")
+                   + ".")
+        fix = (f"1. Declare each skipped period not owed in {name}, stating the reason - add "
+               f"not_expected to each dataset's existing entry under datasets:\n" + paste)
+        if frozen is not None:
+            if consumed is not None:
+                consumed.append(frozen)
+            problem += " And the version is frozen: " + frozen.problem
+            fix += ("\n  2. The version is frozen, so declare the change as a correction too "
+                    "(REQ-PIPE-111 criterion 15). " + frozen.fix)
+        out.append(ConfigError(name, scope, problem, fix))
     return out
 
 
@@ -2488,11 +2510,16 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _participation_errors(cal_raw, raw, src)
     errors += _defaults_errors(cal_raw, raw, src)
     errors += _turn_off_errors(cal_raw, raw, src)
-    errors += _files_go_to_period_errors(cal_raw, raw, src)
+    # THE FREEZE GATE FIRST, so a rise on a frozen version is ONE refusal
+    # (REQ-PIPE-322 criterion 2): what the rise refusal folds in is not given
+    # again on its own.
+    freeze = _freeze_errors(raw, cal_raw, src)
+    consumed: list[ConfigError] = []
+    errors += _files_go_to_period_errors(cal_raw, raw, src, freeze=freeze, consumed=consumed)
     errors += _days_before_errors(cal_raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
-    errors += _freeze_errors(raw, cal_raw, src)
+    errors += [f for f in freeze if not any(f is c for c in consumed)]
     errors += _eras_errors(raw, src)
     # NOT ASKED OF A ONE-OFF (Keith 2026-11-22): a no-period supply is never
     # promoted (REQ-PIPE-435 criterion 7), so neither setting means anything.

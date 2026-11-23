@@ -34,6 +34,25 @@ def publishing(monkeypatch):
 
 
 @pytest.fixture
+def deployment_publishes(deployment_history, monkeypatch):
+    """For a test publishing a build of the DEPLOYMENT'S history: the
+    environment stays the one that database is marked for (the sandbox here,
+    `ci` on a runner - REQ-PIPE-107 refuses any other), and that environment
+    is the publishing one for this test. `publishing` would state the sandbox
+    and be refused by CI's database before anything was built."""
+    import dataclasses
+
+    from qa_tools.common import environments
+
+    real = environments.current
+
+    def publishing_here(path=None):
+        return dataclasses.replace(real(path), publishes=True)
+    monkeypatch.setattr(environments, "current", publishing_here)
+    return environments.current()
+
+
+@pytest.fixture
 def signed_in(monkeypatch):
     """The selected asset's own hosting, its placeholder sign-in domain
     replaced by the stub's - the one value the real configuration cannot have
@@ -497,7 +516,7 @@ class TestEndToEnd:
             prints.append(snapshots.page_fingerprint(tmp_path / f"build{n}" / "qa-reporting-dashboard.html"))
         assert prints[0] == prints[1]
 
-    def test_an_unchanged_real_publish_uploads_nothing(self, deployment_history, publishing, signed_in,
+    def test_an_unchanged_real_publish_uploads_nothing(self, deployment_publishes, signed_in,
                                                         monkeypatch, tmp_path):
         from qa_tools.common import build_output
 
