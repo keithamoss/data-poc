@@ -13113,8 +13113,8 @@ twice. It deliberately did not re-find the `TypeError`.
          - D8d: the trend axis labels overprint.
          - D8e: a not-evaluated point is drawn as a 0% dip. The `plotted()`
            guard predates the critic run and does not cover this case.
-       - **DECISIONS, CARRIED**: J1 goes to the period view (running-thoughts
-         #131). J3 and J4 become amendments in the geocoding batch.
+       - **DECISIONS, CARRIED**: J1 goes to the period view
+         (REQ-DASH-356, whose criterion 9 is the J1 test). J3 and J4 become amendments in the geocoding batch.
 290. **[done, 2026-10-31]** **[Pipeline & publishing]** **[Testing & dev tooling]**
    **What the linkage push's first gate found** (gate part 1, tree 08f6985
    plus the register flip; 122 failed, 2 errors). None needed Keith: all are
