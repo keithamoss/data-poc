@@ -285,6 +285,32 @@ stream 1291s) and **3509s after** (Birth Registrations 814s, the quarterly
 stream 2507s). The linkage collection adds 55 arrival runs and 6 knock-on
 re-checks, and 14 more Child Protection and ED runs caused by a decision.
 
+**2026-11-23, TWO HAND-STARTED `test.yml` RUNS, BOTH CACHE MISSES FOR BOTH
+ASSETS** (each push changed the bootstrap inputs). Run 45156427185 on
+8d1aa280 failed on CI-only test defects, since fixed (post-build-review
+#495), so its timings stand as timings; run 45220960977 on 2f3f9773 was
+green on every job, the new -n0 `unloaded` step included. Billable minutes
+are each job's wall time rounded up; `mothman github ci-usage --days 2`
+reports 290 for the two together.
+
+| Job / step | 45156427185 (8d1aa280) | 45220960977 (2f3f9773) |
+|---|---|---|
+| `test` - tests needing no deployment | 67m27s, failed (3 failed, 8432 passed, 0 skipped) | 67m07s (8448 passed, 0 skipped) |
+| `test-deployment` | 68m55s, failed | 70m37s |
+| - bootstrap, both assets side by side | 29m39s (daily 579s, quarterly 1777s) | 29m41s (daily 581s, quarterly 1779s) |
+| - dashboard data | 1m11s | 1m11s |
+| - deployment tests, a session per asset | 37m02s (daily 115 passed; quarterly 2 failed, 487 passed) | 36m10s (daily 115, quarterly 479 passed) |
+| - `unloaded`, -n0 | not in this tree | 2m28s (10 passed) |
+| `on-demand` | 3m00s, failed (15 passed, 24 errors) | 2m56s (39 passed) |
+| `js-tests` | 3m42s | 2m31s (1317 passed) |
+| `coverage` combine | skipped | 21s (95%) |
+| **run wall clock** | **68m58s** | **71m04s** |
+| **billable minutes** | **144** | **146** |
+
+Level with 2026-10-31's cache miss (about 145). No cache-hit run since the
+asset split exists yet; the last one measured was about 80 minutes
+(2026-10-31, run 41173122058).
+
 So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
 than nineteen - 2,622 of 2,898 tests are in the fast half. The whole
 run is 15 minutes, not the ~10 an earlier estimate in #27 claimed;
