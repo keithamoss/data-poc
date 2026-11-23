@@ -37822,21 +37822,9 @@ requirements:
       total 6,513 minutes in 7 days, scaled to 27,913 a month against 2,000 - does NOT fit, about 14 times
       over. (The scoper''s estimate of ~10,900 a week was high by two thirds; it extrapolated from the 100
       newest runs, which were heavier than the week''s average.) The AFTER figure, a full working week under
-      the new cadence, is still to measure; see unmet_criteria.'
-    unmet_criteria:
-    - criterion: Criterion 7, in part - the AFTER figure from `mothman github ci-usage --days 7` covering
-        a full working week under the new cadence.
-      why: The cadence rule took effect on 2026-10-18; a working week under it has not happened yet. Measure
-        in the week beginning 2026-10-19 and record the figure here.
-      owner: the next session to run a full working week after 2026-10-18
-      blocked_by:
-        unowned: true
-    - criterion: Criterion 8 - if the measured week scales to more than 2,000 billable minutes a month,
-        record this requirement as not met and REQ-DOCS-259's flip waits on a fallback.
-      why: Decided by the measurement criterion 7 is waiting on.
-      owner: the same session as criterion 7
-      blocked_by:
-        unowned: true
+      the new cadence, is measured below.'
+    - '2026-11-24 (Perth), CRITERIA 7 AND 8, THE AFTER FIGURE: `GITHUB_REPOSITORY=keithamoss/data-poc uv run mothman github ci-usage --days 7` - Run test suite 2 runs (both started by hand), 0 pushes, 290 billable minutes; Critical tests 14 runs, 1 cancelled, 14 pushes, 110 minutes; Validate committed configuration 12 runs, 25 minutes; total 28 runs, 425 minutes, scaled to 1,821 a month against 2,000 - fits, so criterion 8''s not-met branch does not apply. The week is under REQ-TEST-375''s critical-only push CI as well as this cadence; two hand-started full runs are 290 of the 425, so the headroom is about one more such run a week.'
+    unmet_criteria: []
   - id: REQ-DOCS-259
     title: The repository is made private only once the private dashboard is live, a teammate has signed
       in, and CI fits the free allowance
@@ -48480,6 +48468,7 @@ requirements:
     - '2026-11-03 (Perth), tree 79d75153 (bfol): tests/test_pytestmark_is_never_rebound.py passed within the touched modules'' 113 passed; on the earlier tree a7b0f020 its module-wide test FAILED on a copy of tests/test_check_lifecycle.py with `pytestmark = pytest.mark.asset(''quarterly'')` appended (line 709 named), the copy then removed. Critical set on that tree: daily 106 passed; quarterly 788 passed, 1 failed - tests/test_plans_index.py, the index stale from the commit''s own plans edit, regenerated in the next commit.'
     - "2026-11-14 evidence walk-through (docs/drafts/unmet-evidence-2026-11-14.md [30]): MET on Keith's reading (2026-11-14): the chunked full suite with combined coverage plus `mothman check --no-pytest` stands in for one whole `mothman check`, which outlasts the 2-hour background-job limit here - a35066ff: 7727 tests, 0 failed, 1 skipped (post-build-review #175), coverage 94% against 92%."
     - 'CRITERION 8 ON GITHUB, 2026-11-23 (Perth): the pushes of 8d1aa280 and 2f3f9773 started only Critical tests (runs 45154279740, 45220935322) and Validate committed configuration (45154279714, 45220935310) - no test.yml run. test.yml ran only when started by hand (event workflow_dispatch): run 45156427185 (8d1aa280, failed on CI-only test defects since fixed, post-build-review #495) and run 45220960977 (2f3f9773, green on every job). The green one ran both pytest halves (fast half 8448 passed, 0 skipped; deployment half daily 115 and quarterly 479 passed, then the -n0 unloaded step 10 passed), the bootstrap with its per-asset cache steps, the on-demand job (39 passed) and the coverage combine (95 percent, step ''Combine and enforce the threshold'' green).'
+    - 'CRITERIA 4 TO 7 AND THE PERFORMANCE NFR ON GITHUB, read from the Actions log 2026-11-24 (Perth): Critical tests run 45220935322 (push of 2f3f9773) ran three jobs in parallel - critical (daily), critical (quarterly) and js-tests - with no bootstrap, browser-install or coverage step. Each critical job ran `pytest -m "critical and not needs_deployment" --only-asset <asset>` and its checker printed "109 critical tests, 0 skipped, 49s" (daily) and "930 critical tests, 0 skipped, 58s" (quarterly) against CRITICAL_BUDGET_SECONDS 300; the JS step took 3m32s. The zero-test, skip and over-budget branches stay covered locally (evidence above).'
     decisions:
     - 'Keith 2026-11-02: the push CI set is a HAND-PICKED `critical` mark. Rejected: a measured `slow` mark (selects by cost rather than by what a test guards), and selecting whole module kinds.'
     - 'Keith 2026-11-02: the delivery-scoper proposes the list against stated criteria with measured timings, and Keith signs the list off before it reaches CI.'
@@ -48506,12 +48495,7 @@ requirements:
     - 'BROWSER DETECTION, WIDENED AND ITS LIMIT ACCEPTED (post-build-review #305): conftest also reads the FUNCTION of every fixture in a test''s closure for Playwright (not the fixture''s module - conftest.py names playwright for fixtures that launch nothing). A browser reached through a PRODUCT HELPER is accepted as undetected. REJECTED: scanning the repository modules a test imports, which refused eleven approved test_publish.py tests, because cli.dashboard imports the render check while those tests stub it. Such a test cannot pass quietly on the push runner: no browser is installed, so it fails, and a skip fails the zero-skip check.'
     - 'A MODULE''S pytestmark IS NEVER REBOUND (bfol follow-on, 2026-11-02, the coordinator''s ask): during the asset split''s merge 33 modules lost their `critical` mark because a later `pytestmark = pytest.mark.asset(...)` replaced it, and nothing failed. tests/test_pytestmark_is_never_rebound.py reads every module under tests/ and fails on a module-level assignment to `pytestmark` after the first that does not read the earlier value (`+=` and `[*pytestmark, ...]` keep it); seen failing on a copy of tests/test_check_lifecycle.py with the merge''s line appended. Read from source, as an architecture rule: the loss is silent at run time by construction. REJECTED counting the critical modules against a list (the set is hand-picked and changes) and a conftest hook comparing marks at collection (it cannot see what an overwritten value held).'
     - 'Keith 2026-11-23 approved two hand-started runs; they show criterion 8 on GitHub - the pushes started no test.yml, and the hand-started one ran both halves, the on-demand job and the coverage combine - so its unmet entry is removed. Criteria 4 to 7''s push-side entry is left as it was (not judged here).'
-    unmet_criteria:
-    - criterion: 'Criteria 4 to 7 and the Performance NFR, on GitHub''s runner - the critical job and the JS job run on a push, and the pytest step is seen under 300s with zero skips in the Actions log.'
-      why: 'critical.yml cannot run from this sandbox; its checker is exercised locally against JUnit reports of each shape, and the set''s wall time measured here (evidence).'
-      owner: 'the first push after the build run'
-      blocked_by:
-        unowned: true
+    unmet_criteria: []
     open_questions: []
   - id: REQ-PIPE-380
     title: The shared reading code - asset time and its clock, the hierarchy, the schedule, slots, the check-file readers, drift arithmetic, arrival recognition and the whole of what they need - is one package, asset_model/, reading configuration and the delivery tree and never the database, which the pipeline, the generator and the bootstrap may all import and which imports none of them
