@@ -7490,27 +7490,47 @@ def _agencies_and_plans(page, url) -> dict:
         page.locator("#plans-btn").click()
         page.wait_for_selector("#plans-list .plans-entry")
         plans = page.locator("#plans-count").inner_text()
+        # ITS OWN TYPEFACE (REQ-DASH-292 criterion 9 as amended 2026-11-23):
+        # every @font-face asked to load, and what each came to - a font
+        # that cannot be found reads "error" and the page falls back to a
+        # system font.
+        faces = page.evaluate("""async () => {
+            const faces = [...document.fonts];
+            await Promise.all(faces.map(f => f.load().catch(() => null)));
+            return faces.map(f => [f.family.replace(/["']/g, ''), f.style, f.weight, f.status]);
+        }""")
+        body_font = page.evaluate("() => getComputedStyle(document.body).fontFamily")
     finally:
         page.remove_listener("request", on_request)
         page.remove_listener("console", on_console)
     return {"agencies": agencies, "collections": collections, "plans": plans,
+            "faces": faces, "body_font": body_font,
             "data_requests": [u for u in requests if u.endswith(".js") and "/vendor/" not in u],
             "errors": errors, "requests": requests}
 
 
-def _not_fonts_or_vendor(errors: list) -> list:
-    """A snapshot carries its DATA, never fonts/ or vendor/ (Keith, 2026-10-25,
-    post-build-review #268 E2: not inlined). On the site they now sit beside
-    the snapshots (#268 (c)), so the split form is held to no console error at
-    all. ALONE IN AN EMPTY DIRECTORY they cannot be there, the browser logs
-    each as a failed resource, and the page falls back to a system font - so
-    REQ-DASH-292 criterion 9's 'no console error' cannot hold for that case
-    without inlining them, which Keith declined; that is back with him
-    (#268). Until then this filter applies to the alone case only, told apart
-    by the address that failed; every other console error still fails it."""
+def _not_the_demo_player(errors: list) -> list:
+    """A snapshot carries its data and, since 2026-11-23, its fonts - inlined,
+    so it keeps its typeface opened alone (Keith, REQ-DASH-292 criterion 9 as
+    amended) - but never the demo player under vendor/, which Keith left out.
+    ALONE IN AN EMPTY DIRECTORY the player cannot be beside it, so the
+    browser logs its stylesheet and script as failed resources: those two,
+    told apart by the address that failed, are the only console errors this
+    allows. A font that failed to load is not allowed (it was, until the
+    fonts were inlined)."""
     return [(text, url) for text, url in errors
             if not (text.startswith("Failed to load resource")
-                    and re.search(r"/(fonts|vendor)/[^/]+$", url))]
+                    and re.search(r"/vendor/asciinema-player\.(css|min\.js)$", url))]
+
+
+#: The six @font-face rules the template declares, each loaded.
+_SIX_FACES_LOADED = 6
+
+
+def _in_its_own_typeface(got: dict) -> None:
+    assert len(got["faces"]) == _SIX_FACES_LOADED, got["faces"]
+    assert all(face[-1] == "loaded" for face in got["faces"]), got["faces"]
+    assert got["body_font"].startswith('"Public Sans"'), got["body_font"]
 
 
 class TestASnapshotOpensAloneAndPublishesSplit:
@@ -7526,7 +7546,8 @@ class TestASnapshotOpensAloneAndPublishesSplit:
         assert re.search(r"of [1-9][\d,]* entries", got["plans"]), got["plans"]
         assert got["data_requests"] == [], "a snapshot asked for a sibling data file"
         assert any(u.startswith("file://") for u in got["requests"]), "requests were not seen at all"
-        assert _not_fonts_or_vendor(got["errors"]) == []
+        assert _not_the_demo_player(got["errors"]) == []
+        _in_its_own_typeface(got)
 
     def test_the_split_form_renders_identically_within_the_budget(
             self, page, a_snapshot_of_the_built_page):
@@ -7543,11 +7564,14 @@ class TestASnapshotOpensAloneAndPublishesSplit:
             sorted(e["name"] for e in files), "the split form loads each of its files"
         keys = ("agencies", "collections", "plans")
         assert {k: served[k] for k in keys} == {k: alone[k] for k in keys}
-        # FONTS AND THE PLAYER ARE BESIDE THE SNAPSHOTS ON THE SITE (Keith,
-        # 2026-10-25, #268 (c)), so nothing is filtered here: no console
-        # error at all, and the fonts were actually asked for and found.
+        # THE PLAYER IS BESIDE THE SNAPSHOTS ON THE SITE (Keith, 2026-10-25,
+        # #268 (c)), so nothing is filtered here: no console error at all,
+        # and the player was actually asked for and found. The fonts travel
+        # inside the snapshot since 2026-11-23, so none is asked for.
         assert served["errors"] == []
-        assert any("/snapshots/quarterly/fonts/" in u for u in served["requests"]), served["requests"]
+        assert any("/snapshots/quarterly/vendor/" in u for u in served["requests"]), served["requests"]
+        assert not any("/fonts/" in u for u in served["requests"]), served["requests"]
+        _in_its_own_typeface(served)
 
 
 @pytest.mark.shared_page

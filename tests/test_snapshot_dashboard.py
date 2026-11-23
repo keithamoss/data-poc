@@ -589,6 +589,61 @@ def test_a_snapshot_fingerprints_the_same_as_the_page_it_archived(tmp_path):
         snapshot_dashboard.page_fingerprint(page)
 
 
+def _page_with_fonts(tmp_path):
+    """The built page's shape with two @font-face rules naming fonts/ beside
+    it, as the real template's do, and those two fonts on disk."""
+    page, files = _split_built_page(tmp_path)
+    css = ("<style>\n"
+           "@font-face{font-family:'A';src:url('fonts/a-400.woff2') format('woff2');}\n"
+           "@font-face{font-family:'B';src:url('fonts/b.woff2') format('woff2');}\n"
+           "</style>\n")
+    page.write_text(page.read_text().replace("<html>\n", "<html>\n" + css, 1))
+    fonts = tmp_path / "fonts"
+    fonts.mkdir()
+    (fonts / "a-400.woff2").write_bytes(b"\x00font-a\xff")
+    (fonts / "b.woff2").write_bytes(b"font-b")
+    return page, files, fonts
+
+
+def test_a_snapshot_carries_its_fonts_inline(tmp_path):
+    """REQ-DASH-292 criterion 9 as amended 2026-11-23 (Keith: fonts inlined,
+    the demo player left out): the archived snapshot carries every font its
+    @font-face rules name as a data: URI, so a copy opened alone keeps its
+    typeface - and the live page keeps asking for fonts/ beside it."""
+    import base64
+
+    page, _files, fonts = _page_with_fonts(tmp_path)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots",
+                                           fonts_dir=fonts)
+    html = _archived(out)
+    assert "url('fonts/" not in html
+    for name in ("a-400.woff2", "b.woff2"):
+        b64 = base64.b64encode((fonts / name).read_bytes()).decode("ascii")
+        assert f"url('data:font/woff2;base64,{b64}')" in html, name
+    assert "url('fonts/a-400.woff2')" in page.read_text(), "the live page is left as it was"
+
+
+def test_a_snapshot_with_inlined_fonts_fingerprints_as_the_page_it_archived(tmp_path):
+    """REQ-PIPE-255 criterion 24 still holds once the fonts are inlined: the
+    snapshot reads back to the page it archived."""
+    page, _files, fonts = _page_with_fonts(tmp_path)
+    vendor = tmp_path / "vendor"
+    before = snapshot_dashboard.page_fingerprint(page, fonts_dir=fonts, vendor_dir=vendor)
+    out = snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=tmp_path / "snapshots",
+                                           fonts_dir=fonts)
+    assert snapshot_dashboard.snapshot_fingerprint(out, fonts_dir=fonts, vendor_dir=vendor) == before
+
+
+def test_a_snapshot_refuses_a_missing_font_and_writes_nothing(tmp_path):
+    """Criterion 3's refusal, for a font the page names and fonts/ lacks."""
+    page, _files, fonts = _page_with_fonts(tmp_path)
+    (fonts / "b.woff2").unlink()
+    snapshots = tmp_path / "snapshots"
+    with pytest.raises(FileNotFoundError, match="b.woff2"):
+        snapshot_dashboard.take_snapshot(html_path=page, snapshots_dir=snapshots, fonts_dir=fonts)
+    assert not snapshots.exists()
+
+
 def test_a_block_over_the_budget_is_split_into_parts_within_it(tmp_path):
     """Criterion 6."""
     from dashboard import data_files

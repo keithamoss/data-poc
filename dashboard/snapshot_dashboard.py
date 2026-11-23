@@ -79,6 +79,7 @@ alone:
 """
 from __future__ import annotations
 
+import base64
 import gzip
 import json
 import os
@@ -98,6 +99,40 @@ DASHBOARD_HTML = Path(__file__).parent / "qa-reporting-dashboard.html"
 SNAPSHOTS_ROOT = Path(__file__).parent / "snapshots"
 FONTS_DIR = Path(__file__).parent / "fonts"
 VENDOR_DIR = Path(__file__).parent / "vendor"
+
+
+#: A font the page asks for beside it, as its @font-face rules name it.
+_FONT_URL = re.compile(r"url\('fonts/([A-Za-z0-9._-]+\.woff2)'\)")
+#: The same font inlined into a snapshot, its name kept in a comment after it
+#: so the snapshot reads back to the page it archived (REQ-PIPE-255 c24).
+_INLINED_FONT = re.compile(r"url\('data:font/woff2;base64,[A-Za-z0-9+/=]*'\)/\*(fonts/[A-Za-z0-9._-]+\.woff2)\*/")
+
+
+def inline_fonts(html: str, fonts_dir: Path = FONTS_DIR) -> str:
+    """The page with every font its @font-face rules ask for under fonts/
+    carried inline as a data: URI (REQ-DASH-292 criterion 9 as amended
+    2026-11-23, Keith: a snapshot keeps its typeface opened alone; the demo
+    player is left out). For the archived snapshot only - the live page keeps
+    its fonts beside it. Raises FileNotFoundError naming every font the page
+    asks for that fonts_dir lacks, before anything is written."""
+    names = sorted(set(_FONT_URL.findall(html)))
+    missing = [n for n in names if not (Path(fonts_dir) / n).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"the page asks for fonts not in {fonts_dir}: {', '.join(missing)} - "
+            "a snapshot carries its fonts inline, so it is not taken without them")
+
+    def one(m: re.Match) -> str:
+        b64 = base64.b64encode((Path(fonts_dir) / m.group(1)).read_bytes()).decode("ascii")
+        return f"url('data:font/woff2;base64,{b64}')/*fonts/{m.group(1)}*/"
+
+    return _FONT_URL.sub(one, html)
+
+
+def uninline_fonts(html: str) -> str:
+    """inline_fonts() undone: each inlined font back to the url('fonts/...')
+    the page it archived names, byte for byte."""
+    return _INLINED_FONT.sub(lambda m: f"url('{m.group(1)}')", html)
 
 
 def asset_snapshots_dir(asset: str | None = None) -> Path:
@@ -140,7 +175,7 @@ def _git_short_sha(cwd: Path) -> str:
 
 
 def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path | None = None,
-                   now: Optional[datetime] = None) -> Path:
+                   now: Optional[datetime] = None, fonts_dir: Path = FONTS_DIR) -> Path:
     """Gzips a copy of `html_path` (the fully re-embedded dashboard, real
     data already baked in by embed_dashboard_data.py) into `snapshots_dir`,
     named `<UTC timestamp>_<git short sha>.html.gz`. The timestamp format
@@ -176,8 +211,10 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path | None =
     # one that is not the one the page lists, refuses the snapshot and leaves
     # snapshots/ exactly as it was. A page with no list of files (built
     # before the split, or a test's stand-in) is archived byte for byte.
-    html_bytes = data_files.inline(html_path.read_bytes().decode("utf-8"),
-                                   html_path.parent).encode("utf-8")
+    # ITS FONTS TOO, since 2026-11-23 (criterion 9 as amended, Keith): a copy
+    # opened alone keeps its typeface. The demo player is left out.
+    html_bytes = inline_fonts(data_files.inline(html_path.read_bytes().decode("utf-8"),
+                                                html_path.parent), fonts_dir).encode("utf-8")
     now = now or datetime.now(timezone.utc)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     sha = _git_short_sha(cwd=html_path.parent)
@@ -278,7 +315,7 @@ def snapshot_fingerprint(gz_path: Path, fonts_dir: Path = FONTS_DIR,
     the same way from its decompressed page with its inlined data files read
     back out - equal to page_fingerprint() of the build it archived."""
     with gzip.open(gz_path, "rb") as f:
-        html = f.read().decode("utf-8")
+        html = uninline_fonts(f.read().decode("utf-8"))
     return data_files.fingerprint(html, gz_path.parent, [fonts_dir, vendor_dir])
 
 
