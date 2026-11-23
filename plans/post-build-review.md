@@ -17476,7 +17476,7 @@ twice. It deliberately did not re-find the `TypeError`.
        published line printing the full local path; the gate line's capitals
        and "0 calendar(s)" on a one-off's load.
 
-495. **[done, 2026-11-23]** **[Pipeline & publishing]** **[Testing & CI]** **What the first hand-started full CI run in three weeks found**
+495. **[done, 2026-11-23]** **[Pipeline & publishing]** **[Testing & dev tooling]** **What the first hand-started full CI run in three weeks found**
      test.yml run 45156427185 (on 8d1aa280, a cache miss) failed where the
      local gate of the same tree had passed 9,039 of 9,039. Each cause found,
      none a product defect except the last, and each fixed on wip/cifix:
