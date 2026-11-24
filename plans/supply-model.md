@@ -2859,7 +2859,7 @@ Reframed from daily during Keith's review: the original example (22:00
 due, 21:57 arrival) does not work at all, because the claim window opens
 BEFORE due_at, so 21:57 sits comfortably inside it and files to Tuesday
 correctly. The scenario only bites where the gap genuinely exceeds the
-window.
+window (REQ-PIPE-131 criteria 6-9, REQ-PIPE-062 criterion 5).
 
 Split into four at Keith's request - both slot states, at both cadences.
 **The symmetry is the point**: the same four outcomes at quarterly and
@@ -2891,7 +2891,8 @@ a day before its window opens.*
 **Expect** (the first bootstrapped build, 2026-10-18): filed to **2026-Q1**
 by the branch `open-slot-unfilled`, classified `late` - about 74 days -
 because February is still the open period and nothing filled it. 2026-Q2
-is left with no supply.
+is left with no supply (REQ-PIPE-131 criterion 7, REQ-PIPE-066 criterion 5,
+REQ-GEN-236 criterion 2).
 **Breaks as**: files to May and leaves February owed for ever.
 
 **TS-3c `[INJECT]` Daily, prior slot FILLED.**
@@ -2900,13 +2901,15 @@ D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday.
 Monday's slot filled. Arrival 17:00 Monday, one hour outside.*
 **Expect**: Tuesday's window has not opened, so Monday is the open
 period, and it is filled -> **resupply of Monday**, no auto-promotion,
-holds and warns.
+holds and warns (REQ-PIPE-131 criterion 8, REQ-PIPE-065 criterion 9,
+REQ-PIPE-113 criterion 5, REQ-GEN-044 criterion 8).
 
 **TS-3d `[INJECT]` Daily, prior slot UNFILLED.**
 *Same config, but Monday's slot was never filled (Monday's supply was
 due 22:00 Sunday).*
 **Expect**: Monday is still the open period -> fills **Monday, 19 hours
-late**.
+late** (REQ-PIPE-131 criterion 7, REQ-PIPE-113 criterion 5, REQ-GEN-044
+criterion 8).
 
 **What this family is FOR, and it is a different kind from the rest.**
 Most scenarios here assert the system gets the right answer. These
@@ -3002,7 +3005,7 @@ supply for an old slot, and an on-time supply for the current one.
 Present them to the assigner in both orders.
 **Expect**: **identical assignments both ways**, because replay is in
 arrival-timestamp order rather than discovery order. Identical
-timestamps resolve by a defined tiebreak.
+timestamps resolve by a defined tiebreak (REQ-PIPE-061 criteria 3 and 5).
 **Breaks as**: the answer depends on whichever file the loop happened to
 pick up first - non-determinism nothing would ever flag.
 
@@ -3047,7 +3050,9 @@ from somewhere else.
 *Config: as TS-9 - Emergency Department, one file. 2025-Q4 (1 November)
 arrives 30 October at 10:00.*
 **Expect**: assigned **2025-Q4**, classified **early by 2 days**, and
-otherwise unremarkable - it fills and promotes like an on-time supply.
+otherwise unremarkable - it fills and promotes like an on-time supply
+(REQ-PIPE-066 criterion 3, REQ-PIPE-075 criterion 1, REQ-GEN-235 criterion
+1).
 **Breaks as**: shown as anything more alarming than early.
 
 **TS-67 `[INJECT]` A quarterly supply sent too early.**
@@ -3085,49 +3090,56 @@ file reads EARLY (before its due time), not on time (Keith, 2026-10-13).
 **TS-68 `[INJECT]` A duplicate send.** The day's extract at 13:40, the same
 bytes again at 13:50 named `birth_registrations_<D>-1.csv`, which sorts
 first. **Expect**: file one D's supply, early and promoted; file two kept
-but superseded. **Breaks as**: the duplicate, sorting first, taken as file
-one - the staged ordinal and the supply ordinal disagreeing.
+but superseded (REQ-GEN-196 criterion 1, REQ-PIPE-193 criteria 3 and 28).
+**Breaks as**: the duplicate, sorting first, taken as file one - the staged
+ordinal and the supply ordinal disagreeing.
 
 **TS-69 `[INJECT]` Tomorrow's file sent early with today's.** D's extract
 at 13:30, D+1's at 13:45 named by D+1's date; D+1 has no supply of its own.
 **Expect**: file one D's supply; file two re-filed to D+1, checked there,
-and D+1's only supply. **Breaks as**: D+1 left with no supply, or the
-re-filed file checked against D.
+and D+1's only supply (REQ-GEN-196 criteria 2-3, REQ-PIPE-193 criterion
+21). **Breaks as**: D+1 left with no supply, or the re-filed file checked
+against D.
 
 **TS-70 `[INJECT]` A faulty file and its corrected re-export.** D's extract
 with a planted fault at 13:40, the corrected re-export at 16:30 - after the
 grace, before D+1's window - named `-resend`, sorting first. **Expect**:
 file one rejected; file two D's supply, its own receipt taken, so D reads
-**late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read early
-from file one's receipt.
+**late**, 4:30pm; no hold; D+1 unaffected (REQ-GEN-196 criterion 14,
+REQ-PIPE-193 criterion 10). **Breaks as**: D read early from file one's
+receipt.
 
 **TS-71 `[INJECT]` A stray test file that loads.** `_TEST.csv` with every
 registrant named TEST at 13:20, the real extract at 13:40. **Expect**: the
-test file rejected; the real one D's supply, early. **Breaks as**: the
-test rows checked as D's supply.
+test file rejected; the real one D's supply, early (REQ-GEN-196 criterion
+15, REQ-PIPE-193 criterion 3). **Breaks as**: the test rows checked as D's
+supply.
 
 **TS-72 `[INJECT]` A stray test file the load refuses.** The real extract
 at 13:30, a ragged `-test.csv` at 13:35 - first by bytes, second by the
 database's collation. **Expect**: the test file offered only "rejected",
 named as never loaded; the real file D's supply, checked by the real
-tools, early and promoted, and the refused file marked as never loaded. **Breaks as**: the real file named as the one
-that never loaded.
+tools, early and promoted, and the refused file marked as never loaded
+(REQ-GEN-196 criterion 16, REQ-PIPE-193 criterion 7). **Breaks as**: the
+real file named as the one that never loaded.
 
 **TS-73 `[INJECT]` Reject both.** A faulty extract at 13:20 and a stray
 test file at 13:40. **Expect**: each file's rejection its own entry, no QA,
 nothing promoted, D left owed and unfilled with no mark-not-supplied and no
-later supply. **Breaks as**: D read as supplied, or not-supplied by a
-person.
+later supply (REQ-GEN-196 criterion 17, REQ-PIPE-193 criterion 26).
+**Breaks as**: D read as supplied, or not-supplied by a person.
 
 **TS-74 `[INJECT]` Re-file one, reject the other.** D+1's extract at 13:30,
 a stray test file at 13:45; neither D nor D+1 has a supply of its own.
-**Expect**: one QA run, for D+1; D owed and unfilled, no
-mark-not-supplied. **Breaks as**: the early file checked against D.
+**Expect**: one QA run, for D+1; D owed and unfilled, no mark-not-supplied
+(REQ-GEN-196 criterion 18, REQ-PIPE-193 criterion 21). **Breaks as**: the
+early file checked against D.
 
 **TS-10a `[INJECT]` Evening-before daily arrival, Monday filled.**
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours -
 so Tuesday's window opens 18:00 Monday, and Monday closes then.*
-**Expect**: the 22:00 arrival fills **Tuesday, on time**.
+**Expect**: the 22:00 arrival fills **Tuesday, on time** (REQ-PIPE-131
+criteria 6-7, REQ-PIPE-113 criterion 5, REQ-PIPE-066 criterion 4).
 
 **TS-10b `[INJECT]` Evening-before daily arrival, Monday unfilled.**
 *Same config, but Monday's slot was never filled.*
@@ -3221,7 +3233,8 @@ are defined over EXPECTED tables. Not QA'd, not promoted (no slot).
 Fail-or-informational question this way, 2026-09-22: it is not a data
 quality failure, it is a supplier telling us something changed without
 saying so. Unchanged by the 2026-09-24 severity decision below, because
-we know exactly what this file is; it is merely surplus.
+we know exactly what this file is; it is merely surplus (REQ-PIPE-057
+criterion 11).
 
 **TS-15b `[unit]` An UNRECOGNISED ARTEFACT - matches nothing.**
 A file matching no dataset's pattern at all. Keith's own broadening,
@@ -3230,7 +3243,7 @@ A file matching no dataset's pattern at all. Keith's own broadening,
 promoted. **WARNING, not informational** (Keith, 2026-09-24) - because
 this is indistinguishable at runtime from a supply we FAILED TO CLAIM,
 which is the TS-38 shape below, and a near-miss that reports quietly
-produces a false-complete.
+produces a false-complete (REQ-PIPE-057 criterion 10).
 
 **Open, and it is a real tension between two of Keith's own calls.** On
 2026-09-22 he settled `test.png` as informational; on 2026-09-24 he
@@ -3248,7 +3261,7 @@ config rather than a guess about intent. Not yet decided.
 `cp_clients` lands 09:00, `cp_placements` 14:00, one of them late.
 **Expect**: each table gets its **own** early/on-time/late verdict. One
 late table does not make five punctual ones late - more honest than a
-single per-delivery verdict taking the worst.
+single per-delivery verdict taking the worst (REQ-PIPE-066 criterion 6).
 
 **TS-17 `[unit]` The transport cannot express a delivery boundary.**
 A source that drops six unrelated objects with no common prefix, folder
@@ -3256,7 +3269,7 @@ or session.
 **Expect**: an **explicit configuration failure**, never a silent guess
 at grouping. The delivery boundary is load-bearing and comes from the
 transport, so a feed that cannot express one needs a boundary arranged
-as a plumbing step.
+as a plumbing step (REQ-PIPE-057 criterion 3).
 
 ### Status and rollup - the false-pass family
 
@@ -3268,7 +3281,8 @@ clients is rejected because one of its OWN checks is a Fail.
 **Expect**: "Client reference" does **not** keep its passing verdict for
 August. It reverts to **cannot-run, Fail**, because clients never entered
 the warehouse. The passing result stays attached to the rejected SUPPLY as
-evidence of what was evaluated.
+evidence of what was evaluated (REQ-PIPE-269 criteria 1-2, REQ-PIPE-270
+criterion 1).
 **Why this one matters most**: it is the case that makes
 period-state-from-promoted-supplies-only load-bearing rather than tidy.
 Keep the verdict and a check reads Pass for a period whose data is not
@@ -3276,7 +3290,7 @@ there.
 
 **TS-19 `[unit]` Partial nodata must not roll up to Pass.**
 A collection with several passing checks and one that could not run.
-**Expect**: the collection reads **Fail**.
+**Expect**: the collection reads **Fail** (REQ-QAC-047 criterion 5).
 **Breaks as**: `worstOf()` is seeded at a pass and `STATUS_ORDER.nodata`
 is -1, so a nodata can never win a reduce - five passes plus one nodata
 returns a pass. Fail-for-unrun makes this structurally impossible; the
@@ -3288,7 +3302,8 @@ test guards the old path.
 `dashboard_status_of()` to threshold math and returns **Pass** - no
 crash, no warning, silently different from the JS.
 **Expect**: Python and JS return the same status for every input,
-including ones the Python side does not currently know.
+including ones the Python side does not currently know (REQ-QAC-047
+criteria 1-2).
 Item 74's exact failure mode, in the module whose own docstring says it
 drifted from its JS counterpart once already.
 
@@ -3297,7 +3312,8 @@ Nothing failed to run, because there was nothing to run. `worstOf()`
 over an empty list is seeded at a pass, so such a table reads Pass by
 vacuum and would auto-promote with no quality signal behind it at all.
 Every other false pass found was a real signal being swallowed; this is
-the ABSENCE of any signal reading as a good one.
+the ABSENCE of any signal reading as a good one (REQ-PIPE-075
+criterion 12).
 
 **SETTLED 2026-09-22: CI gate, hard fail, no opt-out.** Keith's call,
 and deliberately simpler than the draft it replaced (which proposed an
@@ -3383,30 +3399,36 @@ Two things that hang off it:
 ### Schedule and config
 
 **TS-23 `[unit]` Exhausted schedule.** A dataset whose authored date
-list has run out. **Expect**: the pipeline **hard-fails for that dataset
-only**; sibling datasets are unaffected; supplies pile up in staging
-(safe, because staging preserves arrival facts and the backlog drains
-correctly once dates are added); and the dashboard **still shows the
-banner**, computed from config, even though no new results were
+list has run out. **Expect**: each supply that arrives for that dataset is
+**held for a person as schedule-ended** - staged and file-checked but not
+filed, data-checked or promoted, its hold naming the dataset's last
+authored period and what to edit to add dates; sibling datasets are
+unaffected; the held supplies wait (safe, because staging preserves
+arrival facts, and each is re-filed by the rule once dates are added); and
+the dashboard **still shows the banner**, computed from config, with how
+many supplies are waiting and since when, even though no new results were
 produced. A dashboard that stopped updating otherwise looks identical to
-one where nothing changed.
+one where nothing changed (REQ-PIPE-053 criteria 4-8, REQ-PIPE-154,
+REQ-DASH-155).
 
 **TS-24 `[unit]` Low runway.** **Expect**: a warning when fewer than N
 expected supplies remain, measured in **slots** not months - three
 months of quarterly runway is one slot, which is already too late. Non-
 fatal, so it cannot fail an otherwise-fine build, which is how gates get
-disabled.
+disabled (REQ-PIPE-053 criteria 1, 2 and 10).
 
 **TS-25 `[unit]` Config typo yielding zero slots.** `delivery_months:
 [Febuary]`. **Expect**: `mothman check` **fails**. A dataset must never
 silently reach zero slots - that is the exhausted-schedule state,
-reached by accident, on a dataset nobody is watching.
+reached by accident, on a dataset nobody is watching (REQ-PIPE-050
+criteria 2 and 4).
 
 **TS-26 `[unit]` Schedule version change.** A supplier moves from
 quarterly to monthly, recorded as a new `effective_from` block.
 **Expect**: each period is evaluated against the version **in force at
 its own due date**. Periods that were met stay met; history does not
-move when a supplier changes.
+move when a supplier changes (REQ-PIPE-051 criteria 4 and 9,
+REQ-PIPE-113 criterion 3).
 
 **TS-27 `[unit]` `not_expected` versus marked not supplied.** **Expect**:
 `not_expected` yields **no slot** - nothing owed, nothing overdue,
@@ -3444,13 +3466,13 @@ promotion.
 **TS-29 `[unit]` Drift with a missing reference period.** The reference
 period was expected and is not there. **Expect**: **Fail** - identical to
 a missing table dependency, the dependency simply being temporal rather
-than lateral.
+than lateral (REQ-QAC-108 criteria 8-9).
 
 **TS-30 `[unit]` Drift on a brand-new dataset.** No prior period exists
 because none was ever owed. **Expect**: **`nodata`, not a Fail.** The
 owed-versus-not-owed boundary. Without it, every new dataset starts life
 failing on all its drift checks, which is how people learn to ignore a
-signal.
+signal (REQ-QAC-108 criterion 10, REQ-PIPE-079 criterion 5).
 
 ### Timestamps
 
@@ -3458,12 +3480,13 @@ signal.
 interpreted. `pipeline/cadence.py` treats naive values as UTC, so a
 naive AWST value is eight hours out - enough on a daily feed to flip
 on-time to late or move a supply into the wrong slot. Stored values
-carry their offset.
+carry their offset (REQ-PIPE-048 criteria 3-4).
 
 **TS-32 `[unit]` Supplier-provided timestamp.** **Expect**: **ignored**
 in favour of our own receipt time. A file's metadata reflects the
 supplier's clock, timezone and bugs; staging's whole justification is
-that it asserts only facts we can vouch for.
+that it asserts only facts we can vouch for (REQ-PIPE-060
+criterion 11, REQ-PIPE-105 criterion 3).
 
 **TS-34 `[INJECT]` One delivery, two files for each of two datasets.**
 Keith's own scenario, 2026-09-24. A Child Protection delivery carrying
@@ -3513,7 +3536,8 @@ CHANGES BUILT BEHAVIOUR twice - `qa_tools/common/arrivals.py`'s
 one such drop takes the run down for all 60 deliveries, reproduced
 before deciding), and it also returns a SINGLE `collection_id` that
 `arrivals_for()` filters on, so single-collection is structural rather
-than just a guard.
+than just a guard (REQ-PIPE-057 criteria 8 and 14, REQ-PIPE-061 criterion
+4).
 
 **Assert the run consequence too, because it is the part that will be
 got wrong**: this delivery produces **two runs**, one per collection.
@@ -3529,7 +3553,8 @@ rejected design (hold it for a human) is the one already written down in
 git history, so an implementation that reinstates it looks defensible in
 review. Assert explicitly that no hold, no anomaly and no warning is
 raised for the spanning itself - an unrecognised artefact inside such a
-delivery still warns on its own terms, which is a different thing.
+delivery still warns on its own terms, which is a different thing
+(REQ-PIPE-057 criterion 14).
 
 **TS-36c `[unit]` One file, two datasets' patterns - the runtime hold.**
 Two arrival patterns configured so that one filename matches both. The
@@ -3567,7 +3592,8 @@ shows through repetition. The reason this is the normal case rather than
 an edge - under a real transport a delivery has no receipt until our own
 BOUNDARY RULE says it is complete, and in S3 events fire per object with
 no delivery-is-finished signal, so "files present, no receipt" is the
-state of every delivery until the boundary closes.
+state of every delivery until the boundary closes (REQ-PIPE-057 criteria
+4-7).
 
 **TS-38 `[INJECT]` A resupply whose filename no longer matches.**
 **Keith's own case, 2026-09-24, and the most dangerous shape in this
@@ -3581,7 +3607,8 @@ unmatched ones are reported as unrecognised artefacts at **warning**
 level. Critically, the supply is **NOT** silently treated as complete -
 the warning is the only thing standing between this and a promoted,
 passing, HALF supply. Had the resupplies matched, this would instead be
-the duplicate-match hold of TS-34, which is louder still.
+the duplicate-match hold of TS-34, which is louder still (REQ-PIPE-057
+criteria 10 and 15, REQ-PIPE-202 criterion 2, REQ-GEN-044 criterion 1).
 **Why `[INJECT]`**: the failure is one of ATTENTION, not computation. A
 unit test asserts the warning is emitted; only a rendered dashboard
 shows whether a person scanning the activity feed would actually notice
@@ -3612,7 +3639,7 @@ during the fourth, or during the SIXTH.
 **Expect**: every table without a committed load record is treated as
 unloaded and replaced, whatever is sitting in the staging schema. The
 delivery is not considered processed until every attributed file has a
-record.
+record (REQ-PIPE-060 criteria 13-16).
 **The case that decides this one is the LAST table**, and it is why
 deriving completeness from the warehouse catalogue was rejected: a crash
 during the sixth load leaves six of six tables present with one
@@ -3643,7 +3670,8 @@ claim window opens, and nothing is open again until August's does.
 arrival carrying the other five Child Protection tables, all of them
 due this quarter.
 **Expect**: each is filed to its own open period and promoted on the
-ordinary passing-or-warning rule. The hold is on one supply only.
+ordinary passing-or-warning rule. The hold is on one supply only
+(REQ-PIPE-064 criterion 7, REQ-PIPE-131 criterion 6).
 
 **TS-33b is the important half**, and it is the half an earlier
 implementation got wrong rather than a hypothetical: a gate once
@@ -3711,7 +3739,8 @@ file's asset day.
 to 2019-Q4, late, and supersedes the pair: "Two files for one table —
 superseded by the supply received 10:00am Friday, 29 November 2019". It is
 promoted on 5 December, and the three readers are re-evaluated by the
-knock-on at the same instant.
+knock-on at the same instant (REQ-PIPE-194 criterion 9, REQ-PIPE-118
+criterion 1, REQ-GEN-203 criteria 3 and 7).
 **Breaks as**: the pair still contested after the later file, or the later
 file filed as a resupply rather than ending the contest.
 
@@ -4195,7 +4224,8 @@ no moves.
 TS-57a's placement.
 *Config: as TS-57a.*
 **Expect**: a new verdict naming the change reference, on time; the late
-verdict still readable as history.
+verdict still readable as history (REQ-PIPE-168 criteria 4 and 6,
+REQ-DASH-172 criterion 2, REQ-GEN-205).
 **Breaks as**: the late verdict overwritten, or no verdict naming the
 correction.
 
@@ -4431,7 +4461,8 @@ against a period whose holder is a SUBSTITUTED supply, a variant of #164 -
 while the pill's drill-down reads "Since replaced, as from Wednesday, 14
 June 2023" and "2023-Q2 holds 2023-Q1's supply; the results below are a newer
 supply awaiting a decision." Once #164 is decided the panel's reason line
-should say the supply was waiting for a decision. **Breaks as**: a
+should say the supply was waiting for a decision (REQ-GEN-199 criteria 11
+and 28, REQ-DASH-197 criteria 4 and 8, REQ-DASH-198). **Breaks as**: a
 different reason line in the panel means #164 was decided, not a
 regression; any other change on that date - the drill-down's sentences
 included - is a regression.
