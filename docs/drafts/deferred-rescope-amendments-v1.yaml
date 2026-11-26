@@ -1,0 +1,30 @@
+REQ-PIPE-065:
+  amended_criteria:
+    3: "WHEN a supply is recorded as a resupply of a slot already filled by a promoted supply, THE SYSTEM SHALL say, in the queue item that offers its decision, when the promoted supply was accepted. AMENDED 2026-11-21 (Keith): it asked for a separate report; the awaiting-decision queue item is that report (REQ-PIPE-131, REQ-DASH-070)."
+    4: "WHERE such a resupply was received within an hour before the next slot's claim window opened, THE SYSTEM SHALL say so in that queue item, naming the next slot. AMENDED 2026-11-21 (Keith)."
+  new_criterion_if_Q1b_yes: "WHERE a resupply replaces a promoted supply automatically under the replacement setting (REQ-PIPE-123), THE SYSTEM SHALL carry the same accepted-at and proximity wording in the supply-history entry recording the replacement."
+  retired_criteria:
+    - criterion: 7
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-GHUB-082]
+      reason: "The queue item offers its operations itself - promote, which supersedes the holder, re-file and reject (filing_queue.operations_for, REQ-GHUB-082 criterion 16) - so naming them again in prose is a second list that can drift from the first."
+    - criterion: 8
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-131, REQ-DASH-070]
+      reason: "There is no separate warning to emit. Under REQ-PIPE-131 a supply received into a filled slot is recorded as a resupply and waits in the awaiting-decision queue, which never stops processing; a second, parallel warning for the same supply would say the same thing twice."
+  decisions_add:
+    - "THE FILLED-SLOT REPORT IS THE QUEUE ITEM, NOT A SECOND WARNING (Keith, 2026-11-21, delivery-architect triage): landed_on_accepted.report() was built in September, before REQ-PIPE-131 made every such arrival a resupply waiting in the queue, and nothing ever called it. Its wording moves into the queue item's reason; the module goes. REJECTED wiring report() as a separate warning in the processing-pass report and the dashboard - the same supply would then appear twice, once as a warning and once as a decision. REJECTED retiring criteria 3 to 8 outright, which would lose the accepted-at instant and the near-the-next-window hint the queue item does not give today."
+    - "CRITERION 9 IS THE PROMOTION GATE'S (2026-11-21): promotion.should_promote's slot-filled refusal implements it and REQ-PIPE-075 criterion 4 restates it; landed_on_accepted.may_auto_promote was called only by tests and is deleted with the module."
+REQ-PIPE-352:
+  retired_criteria:
+    - criterion: 5
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-250]
+      reason: "One requirement owns one claim (REQ-PIPE-403's decisions, Keith 2026-11-14): the per-asset 12-minute budget is REQ-PIPE-250 criterion 2, as amended by this requirement on 2026-11-15, and its measurements are REQ-PIPE-403's evidence."
+    - criterion: 6
+      date: "2026-11-21"
+      by: Keith
+      reason: "It asked whether splitting one bootstrap into two added cost, against the pre-split figures on REQ-PIPE-336's commit. That comparison can no longer be made like for like - Cancer and Mental Health have been added, the speed batch has landed, and the last quiet measure (REQ-PIPE-403's decisions, 2026-11-18) includes both - and the question it answered no longer matters: no supported path runs the two bootstraps side by side (CI's deployment half bootstraps each asset in turn, and at the target scale each asset bootstraps in its own environment). Each asset's own figure stays REQ-PIPE-403's evidence for REQ-PIPE-250."

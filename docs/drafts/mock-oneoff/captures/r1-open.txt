@@ -1,0 +1,10 @@
+$ uv run mothman one-off open --kind extraction /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/repro-package
+
+Generated one-offs/extraction/repro-undeclared-only from /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/repro-package (extraction repro-undeclared-only, Repro: an undeclared file is the only problem).
+Next: commit and push it, then load it:
+  git add one-offs/extraction/repro-undeclared-only
+  git commit -m "Open extraction repro-undeclared-only"
+  git push
+  mothman one-off load --id repro-undeclared-only /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/repro-package
+
+[exit code 0, 1s]

@@ -1,0 +1,90 @@
+# v6 (2026-11-21, the post-sign-off reviews and Keith's answers to them). A PROPOSAL until Keith re-signs it.
+# Set A (REQ-PIPE-065, REQ-PIPE-352, REQ-GHUB-082, REQ-PIPE-379) is UNCHANGED from v5 and stays signed.
+# Changed in v6: REQ-PIPE-363 (criteria 1, 2, 4, 5 and 6, and a new test criterion 11) and plans_drafts.
+# Unchanged in v6: REQ-PIPE-342, REQ-PIPE-106.
+# SET A, FINAL (Keith 2026-11-21: Q1.1 (a), Q1.2 (a), Q3.1 (a)). Ready to apply.
+REQ-PIPE-065:
+  acceptance_criteria_replace:
+    3: "WHEN a supply is recorded as a resupply of a slot already filled by a promoted supply, THE SYSTEM SHALL say, in the queue item that offers its decision, when the promoted supply was accepted. AMENDED 2026-11-21 (Keith): it asked for a separate report; the awaiting-decision queue item is that report (REQ-PIPE-131, REQ-DASH-070)."
+    4: "WHERE such a resupply was received within an hour before the next slot's claim window opened, THE SYSTEM SHALL say so in that queue item, naming the next slot. AMENDED 2026-11-21 (Keith)."
+  acceptance_criteria_append:
+    10: "WHERE a resupply replaces a promoted supply automatically under the replacement setting (REQ-PIPE-123), THE SYSTEM SHALL carry the same accepted-at and proximity wording in the supply-history entry recording the replacement, and SHALL NOT give that entry more prominence than REQ-PIPE-123 criterion 6 allows. ADDED 2026-11-21 (Keith)."
+  retired_criteria:
+    - criterion: 7
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-GHUB-082]
+      reason: "The queue item offers its operations itself - promote, which supersedes the holder, re-file and reject (filing_queue.operations_for, REQ-GHUB-082 criterion 16) - so naming them again in prose is a second list that can drift from the first."
+    - criterion: 8
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-131, REQ-DASH-070]
+      reason: "There is no separate warning to emit. Under REQ-PIPE-131 a supply received into a filled slot is recorded as a resupply and waits in the awaiting-decision queue, which never stops processing; a second, parallel warning for the same supply would say the same thing twice."
+  unmet_criteria: "REMOVE the criterion-8 entry (retired); add entries for criteria 3, 4 and 10 as not yet built, owned by this requirement's rework."
+  status_note: "Criteria 3, 4 and 10 become unbuilt by this amendment, so the status moves from built to in_progress until the rework lands."
+  implemented_by_replace:
+    remove:
+      - qa_tools/common/landed_on_accepted.py::report
+      - qa_tools/common/landed_on_accepted.py::may_auto_promote
+      - qa_tools/common/landed_on_accepted.py::LandedOnAccepted
+    add:
+      - qa_tools/common/promotion.py::should_promote
+      - "qa_tools/common/filing_queue.py::waiting_over_promoted   # the rework adds the wording here"
+  linked_tests_remove:
+    - tests/test_landed_on_accepted.py
+  code_to_delete:
+    - qa_tools/common/landed_on_accepted.py
+    - tests/test_landed_on_accepted.py
+    - "the 'qa_tools/common/landed_on_accepted' entry in tests/test_sample_data.py's module list (line 283)"
+  decisions_add:
+    - "THE FILLED-SLOT REPORT IS THE QUEUE ITEM, NOT A SECOND WARNING (SETTLED by Keith 2026-11-21, Q1.1 (a)): landed_on_accepted.report() was built in September, before REQ-PIPE-131 made every such arrival a resupply waiting in the queue, and nothing ever called it. Its wording moves into the queue item's reason; the module and its test go. REJECTED (c) wiring report() as a separate warning, which shows one supply twice, and (b) retiring criteria 3 to 8 outright, which loses the accepted-at instant and the near-the-next-window hint."
+    - "THE AUTOMATIC REPLACEMENT CARRIES THE SAME WORDS (SETTLED by Keith 2026-11-21, Q1.2 (a)): with replacement set to green, a green file sent early for the next period and received just before its window opens replaces accepted data with no queue item; criterion 10 gives that history entry the same diagnosis, wording only, no added prominence."
+    - "CRITERION 9 IS THE PROMOTION GATE'S (2026-11-21): promotion.should_promote's slot-filled refusal implements it and REQ-PIPE-075 criterion 4 restates it; landed_on_accepted.may_auto_promote was called only by tests and is deleted with the module."
+    - "CRITERIA 3 TO 7 HAD BEEN CLAIMED BY TESTS OF CODE NOTHING RAN (found 2026-11-21 by the delivery-architect triage); this amendment ends that over-claim rather than carrying it."
+REQ-PIPE-352:
+  retired_criteria:
+    - criterion: 5
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-250]
+      reason: "One requirement owns one claim (REQ-PIPE-403's decisions, Keith 2026-11-14): the per-asset 12-minute budget is REQ-PIPE-250 criterion 2, as amended by this requirement on 2026-11-15, and its measurements are REQ-PIPE-403's evidence."
+    - criterion: 6
+      date: "2026-11-21"
+      by: Keith
+      replaced_by: [REQ-PIPE-403]
+      reason: "It asked whether splitting one bootstrap into two added cost, against the pre-split figures on REQ-PIPE-336's commit. That comparison can no longer be like for like - Cancer and Mental Health were added and the speed batch landed, and the last quiet measure (REQ-PIPE-403, 2026-11-18) includes both - and the question no longer matters: no supported path runs the two bootstraps side by side (CI's deployment half bootstraps each asset in turn; at the target scale each asset bootstraps in its own environment). Each asset's own figure is REQ-PIPE-403's evidence for REQ-PIPE-250."
+  unmet_criteria: "REMOVE both entries (criteria 5 and 6 are retired); the requirement is then built with nothing unmet."
+  decisions_add:
+    - "C5 AND C6 RETIRED (SETTLED by Keith 2026-11-21, Q3.1 (a)): c5 to REQ-PIPE-250, which owns the budget; c6 because nothing runs the bootstraps side by side. REJECTED (b) re-baselining c6 as one commit alone against side by side, which measures contention on the sandbox only, and (c) folding it into REQ-PIPE-250, a second claim on the budget's owner."
+REQ-GHUB-082:
+  unmet_criteria: "Criterion 1's entry: replace blocked_by {unowned: true} with blocked_by {requirements: [REQ-GHUB-433]}, owner REQ-GHUB-433 (Keith 2026-11-21, Q2.1 (a))."
+REQ-PIPE-379:
+  unmet_criteria: "Criterion 5's entry: replace blocked_by {unowned: true} with blocked_by {requirements: [REQ-TEST-437]}; retired_by REQ-TEST-437 criterion 6 when that is built."
+REQ-PIPE-342:
+  acceptance_criteria_replace:
+    5: "THE SYSTEM SHALL discover the asset folders from assets/ itself, and the one-off folders from one-offs/<kind>/ itself for every kind (REQ-PIPE-446), and SHALL NOT hold a list of assets, kinds or one-offs, or name any of them, anywhere in code. AMENDED 2026-11-21 by REQ-PIPE-446."
+  note: "UNCHANGED from v5. Criterion 1 is unchanged - it lays out an ENDURING asset's folder; a one-off's folder is its kind's (REQ-PIPE-440 for the extraction)."
+REQ-PIPE-363:
+  acceptance_criteria_replace:
+    1: "THE SYSTEM SHALL take the asset a command acts for from MOTHMAN_ASSET, naming an asset folder under assets/ by its bare name, beside MOTHMAN_ENVIRONMENT and MOTHMAN_SUPPLY_DSN (SETTLED by Keith 2026-11-01, on REQ-PIPE-091's precedent); a one-off is named by `mothman one-off`'s `--id` or chosen in its TUI (REQ-PIPE-446 criterion 3), and WHERE MOTHMAN_ASSET is set while a one-off is named, it SHALL name that same one-off. AMENDED 2026-11-21 by REQ-PIPE-446. v6: PROVISIONAL on question 2 of the v6 changes (whether MOTHMAN_ASSET may name a one-off at all)."
+    2: "WHEN mothman starts, THE SYSTEM SHALL build the command groups of the selected asset's collections only, and SHALL build none and read no asset configuration WHILE MOTHMAN_ASSET is unset, names no asset folder, or a one-off is selected (REQ-PIPE-446 criterion 8). AMENDED 2026-11-21 by REQ-PIPE-446 (v6, delivery-architect A and L)."
+    4: "IF a command that is not one of the tool commands of criterion 5 is given WHILE MOTHMAN_ASSET is unset or names no asset or one-off folder, THEN THE SYSTEM SHALL answer not 'No such command' but that MOTHMAN_ASSET is not set, or names no folder, naming the variable, listing the folder names found under assets/, saying how many one-offs of each kind there are - leaving out any kind with no folders - and how to list them, and saying there is deliberately no default, in the form environments.current() uses for MOTHMAN_ENVIRONMENT - reading nothing but those folder names. AMENDED 2026-11-21 by REQ-PIPE-446 (v6: a kind with no folders left out, Keith's yes to delivery-cli-ux D3)."
+    5: "WHILE MOTHMAN_ASSET is unset, THE SYSTEM SHALL run `mothman check`, `mothman --help`, every `mothman one-off` command (REQ-PIPE-442 criterion 1) and every command that reads no asset configuration and opens no connection, and `mothman --help` SHALL say, as one line inside its Collections panel (REQ-TEST-252 criterion 2's two-panel layout kept), 'Set MOTHMAN_ASSET to one of: <the asset folder names found> - or one of <n> <kind plural> (mothman one-off list)', one count per kind with folders and every kind with none left out, in the same words as criteria 4 and 6 (wording SETTLED by Keith 2026-11-01; the one-off half AMENDED 2026-11-21, Keith's yes to delivery-cli-ux D3)."
+    6: "IF a command that reads asset configuration or opens a connection runs WHILE MOTHMAN_ASSET is unset or names no asset or one-off folder, THEN THE SYSTEM SHALL refuse before reading any asset configuration or opening any connection, naming the variable, every asset folder found and how many one-offs of each kind there are - leaving out any kind with no folders - and SHALL NOT fall back to a default, a last-used value or the only asset present - except every `mothman one-off` command (REQ-PIPE-442 criterion 1), which selects its one-off by `--id` or in its TUI. AMENDED 2026-11-21 by REQ-PIPE-446 and REQ-PIPE-442 (v6: the exemption widened from open and list to the whole group, following Keith's CLI Q1 and Q2; a kind with no folders left out, Keith's yes to D3)."
+  acceptance_criteria_append:
+    11: "THE SYSTEM SHALL have tests, seen failing first, of `mothman --help` naming a one-off count per kind and leaving out a kind with no folders, of criterion 4's and 6's refusals doing the same, of a collection command refused while a one-off is selected with no collection group built, and of every `mothman one-off` command running with MOTHMAN_ASSET unset. ADDED 2026-11-21 by REQ-PIPE-446 (v6)."
+  wording_for_keith: "NEEDS KEITH'S EXPLICIT YES AGAIN. v5's wording for criteria 4 and 6 was APPROVED (round 6); v6 changes it in two ways: (i) a kind with no folders is left out, and criterion 5's --help line uses the same words - both Keith's yes to delivery-cli-ux D3, 2026-11-21, but the exact text of criterion 5 is new; (ii) criterion 6's exemption now covers the whole `mothman one-off` group. AND AN OPEN POINT (question 2 of the v6 changes): the approved words 'Set it to one of: daily, quarterly - or one of 37 extractions (mothman one-off list)' tell a person to SET MOTHMAN_ASSET to an extraction, while Keith's CLI Q2 answer names a one-off by --id. Kept as approved until he says which; the recommended rewording is '... Set it to one of: daily, quarterly. For one of 37 extractions, use mothman one-off.'"
+  decisions_add:
+    - "ONE-OFFS ARE NAMED BY THEIR BARE ID (REQ-PIPE-446, 2026-11-21): one namespace across assets and every kind, a clash refused; the refusal counts one-offs per kind. REJECTED a prefix, since data/, reports/ and supply_<name> are one namespace either way."
+    - "v6, A ONE-OFF IS NAMED BY --id (Keith 2026-11-21, CLI Q2): REPLACES v5's 'MOTHMAN_ASSET names a one-off folder' in criterion 1; MOTHMAN_ASSET, if set, must name the same one-off (REQ-PIPE-446 criterion 3)."
+    - "v6, EVERY `mothman one-off` COMMAND RUNS WITH NO ASSET SELECTED (REQ-PIPE-442 criterion 1): v5 exempted open, because the one-off does not exist yet, and list; Keith's CLI Q1 (bare `mothman one-off` needs no asset) and Q2 (--id) extend it to the group. REPLACES v5's 'TWO ONE-OFF COMMANDS RUN WITH NO ASSET SELECTED'."
+    - "v6, NO COLLECTION GROUPS FOR A ONE-OFF (delivery-architect A and L): cli/app.py builds groups at import, so criterion 2 says none are built while a one-off is selected."
+    - "v6, A KIND WITH NO FOLDERS IS LEFT OUT, AND --help MATCHES (Keith 2026-11-21, yes to both delivery-cli-ux D3 edge cases): '0 extractions' is noise, and --help saying less than the refusal would be two answers to one question. REJECTED the architect's L 'leave criterion 5 deliberately'."
+REQ-PIPE-106:
+  note: "UNCHANGED from v5. Amended by REQ-PIPE-438 criterion 1 when built (criteria 7, 9 and 10 to read 'not-yet-agreed' only); nothing applied now."
+plans_drafts:
+  "plans/supply-model.md sprint 12": "Owns line gains REQ-GHUB-433."
+  "plans/supply-model.md sprint 29": "Owns: REQ-PIPE-434, REQ-PIPE-435, REQ-DASH-436, REQ-TEST-437, REQ-PIPE-438, REQ-PIPE-439, REQ-PIPE-440, REQ-PIPE-446, REQ-QAC-441, REQ-PIPE-442, REQ-PIPE-443, REQ-DASH-444, REQ-DASH-447. Retitle the sprint 'One-offs, the extraction the first kind'. Replace 'the five requirements below are not drafted' with 'drafted 2026-11-21, with the no-period lifecycle beneath them'. v6 ADDS the build order (delivery-architect, post-sign-off review): 434, 438, 436, 433 (any time), 446, 439, 440, 441, 442, 435, 444, 447, 443, 437. v6 REMOVES the round 5 line that building 440 and running a real extraction wait for REQ-DOCS-259 (Keith 2026-11-21, architect Q-A2). The sprint's prose stays until its last requirement is built (CLAUDE.md rule 4, delete a thread whole)."
+  "plans/running-thoughts.md #53": "Delete once REQ-GHUB-433 is signed (its accept-badge half went with #54 and REQ-PIPE-091; its polling half is 433)."
+  "plans/running-thoughts.md #141": "Delete once 434 to 447 are signed; carried in REQ-PIPE-434's decisions."
+  "plans/post-build-review.md #473": "Repoint at REQ-PIPE-434, REQ-PIPE-435 and REQ-DASH-436."

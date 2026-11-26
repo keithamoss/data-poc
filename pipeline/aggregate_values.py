@@ -53,36 +53,41 @@ HISTOGRAM_BINS = 6
 
 
 def categorical_aggregate(conn: duckdb.DuckDBPyConnection, table: str, column: str, invalid_condition: str,
-                           classification: str | None, params: list | None = None) -> dict:
+                           classification: str | None) -> dict:
     """Distinct invalid values + counts for a closed-value-set check.
     `invalid_condition` is a raw SQL boolean expression (e.g. "sex NOT IN
     ('M','F','X') OR sex IS NULL") - the caller owns the exact valid-value
     list so it can match whatever dbt/Soda/datacontract-cli actually
     enforce, rather than this module keeping its own possibly-drifting
-    copy. `params` are extra `?` bind values `invalid_condition` refers to
-    (e.g. a `run_id = ?` scope for a combined multi-run warehouse)."""
-    params = list(params or [])
-    total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {invalid_condition}", params).fetchone()[0]
+    copy."""
+    total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {invalid_condition}").fetchone()[0]
     suppressed = classification is not None
     values: list[dict] = []
     if not suppressed and total:
         rows = conn.execute(
+            # ORDER BY n DESC, v - the `, v` is the fix for a real bug
+            # (2026-09-25). Ordering by count alone left ties to
+            # whatever order the engine produced, so the same data
+            # stored differently aggregated differently. With a LIMIT
+            # under it that does not merely reorder the list, it decides
+            # which value a reader sees at all - and this repo is seeded
+            # so that regenerating and diffing is a real correctness
+            # check, which a query answering differently for the same
+            # data quietly takes away.
             f"SELECT CAST({column} AS VARCHAR) AS v, COUNT(*) AS n FROM {table} WHERE {invalid_condition} "
-            f"GROUP BY v ORDER BY n DESC LIMIT {AGGREGATE_VALUE_CAP}",
-            params,
+            f"GROUP BY v ORDER BY n DESC, v LIMIT {AGGREGATE_VALUE_CAP}",
         ).fetchall()
         values = [{"value": v if v is not None else "(null)", "count": n} for v, n in rows]
     return {"type": "categorical", "suppressed": suppressed, "total_invalid": total, "values": values}
 
 
 def numeric_date_aggregate(conn: duckdb.DuckDBPyConnection, table: str, column: str, invalid_condition: str,
-                            classification: str | None, params: list | None = None,
+                            classification: str | None,
                             n_bins: int = HISTOGRAM_BINS) -> dict:
     """min/max + distinct failing values + a binned histogram, for a
-    numeric/date range check. Same `invalid_condition`/`params` contract
-    as categorical_aggregate."""
-    params = list(params or [])
-    total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {invalid_condition}", params).fetchone()[0]
+    numeric/date range check. Same `invalid_condition` contract as
+    categorical_aggregate."""
+    total = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {invalid_condition}").fetchone()[0]
     suppressed = classification is not None
     out = {"type": "numeric_date", "suppressed": suppressed, "total_invalid": total,
            "min": None, "max": None, "values": [], "histogram": []}
@@ -91,7 +96,6 @@ def numeric_date_aggregate(conn: duckdb.DuckDBPyConnection, table: str, column: 
 
     rows = conn.execute(
         f"SELECT {column} AS v, COUNT(*) AS n FROM {table} WHERE {invalid_condition} GROUP BY v ORDER BY v",
-        params,
     ).fetchall()
     lo, hi = rows[0][0], rows[-1][0]
     out["min"] = str(lo)

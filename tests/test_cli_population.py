@@ -7,6 +7,8 @@ via a small --population rather than any synthetic_data_generator/-
 internal mocking."""
 from __future__ import annotations
 
+import pytest
+
 from click.testing import CliRunner
 
 import cli.population as population_cli
@@ -86,3 +88,8 @@ def test_dirty_red_does_not_raise(tmp_path):
 def test_default_outdir_matches_the_real_synthetic_data_generator_output_demo_path():
     import os
     assert population_cli._DEFAULT_OUTDIR.endswith(os.path.join("synthetic_data_generator", "output", "demo"))
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

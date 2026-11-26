@@ -45,75 +45,36 @@ cadence, some quarterly. Two real problems surfaced:
    ago" beyond the opt-in, coarse "time travel" snapshots (whole-page
    freezes, not queryable data).
 
-## Thread B - committed per-run tool-output files (build first)
+## Thread B - per-run tool output (superseded)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-27) · **Category:** Pipeline & publishing
 
-**Decision:** each QA run's raw tool output - one file per tool per
-dataset per run (a real dbt run-results file, a real Soda scan result, a
-real Evidently report, etc.) - gets committed to the repo, as-is in each
-tool's own native format, not reshaped into a common schema first. This
-becomes the actual source of truth for QA history, potentially spanning
-years, independent of whatever the dashboard currently renders.
+**Replaced by REQ-PIPE-089, which is built.** Thread B's design was that
+each QA run's raw tool output gets COMMITTED to the repository, one file
+per tool per dataset per run, in each tool's own native format - the
+source of truth for QA history, potentially spanning years. That tree
+existed for a year of this project's life and is gone: 924 files, 28MB,
+removed once the same records were rows in the `qa` metadata schema.
 
-A separate "dashboard pipeline" step reads the full committed history
-and merges/reshapes it into the reporting layer - deliberate separation
-of concerns between the checks layer and the reporting layer, since
-either might get swapped independently (tools narrowed down post-PoC;
-the dashboard itself rebuilt or replaced).
+**What replaced it and why**, so nobody reads this as a design still
+waiting to be built: Keith's own standing rule of 2026-09-27 is that the
+repository holds CONFIGURATION, not STATE, and QA results are state -
+they accumulate, nobody reviews them, and a second person running the
+pipeline legitimately produces different bytes.
 
-**Confirmed explicitly with Keith:**
-- Scope is tool RESULTS only (what `reports/*.json` already holds today)
-  - NOT the underlying raw synthetic data records (`data/raw/`), which
-    stays exactly as it is: gitignored, regenerated, ephemeral.
-- This reverses CLAUDE.md's current documented rule that `reports/*.json`
-  etc. are gitignored/regenerated - needs an explicit doc update as part
-  of this work, not a silent contradiction (see "Doc updates needed"
-  below).
-- Retention: keep everything forever, same policy as the dashboard
-  snapshots (item 26) - no thinning, revisit only if storage genuinely
-  becomes a problem.
-- Format: native/raw tool output, unmodified - the dashboard pipeline
-  does all reshaping when reading history back, not at commit time.
+**Its live decisions were carried into REQ-PIPE-089's own `decisions:`
+before this prose went** - scope is tool results only and never the data
+records, retention is forever with no thinning, and nesting stays at
+dataset level rather than table level for both check definitions and
+results. That last one has the most reasoning behind it and REQ-PIPE-089
+records the whole of it, including what changed Keith's own first
+instinct.
 
-**Not yet pinned down** (implementation detail, propose a default when
-building, not a real fork worth a round of questions): exact path/
-naming layout for these files. Something like `qa_results/<agency>/
-<dataset>/<run_timestamp>/<tool>.<ext>` is the obvious shape, consistent
-with how `data/raw/`/`data/cp_raw/` already lay out by dataset - confirm
-against the real per-tool output formats when this gets built (dbt's
-`run_results.json`, Soda's scan result, Evidently's report format may
-each want slightly different handling).
-
-**Scoped and decided, 2026-09-16 (Keith): per-table nesting stays
-dataset-level everywhere, not table-level** - both for check DEFINITION
-files and for `qa_results/` output. Keith's own initial instinct was
-table-level (Child Protection has 6 tables, and he was explicitly fine
-with the real-tool run time cost of invoking each tool once per table
-instead of once per dataset), but once the ODCS/datacontract-cli
-constraint was laid out concretely - one contract document IS one data
-product, carrying document-level identity/version/team/support/as-of
-config plus 10 real cross-table FK/business-rule checks that don't have
-a single owning table to live under - Keith's final call was to keep
-every tool (dbt/Soda/ODCS/Evidently) uniformly at dataset level, not
-carve out ODCS as the one exception while the other three fragment.
-Nothing about `qa_results/`'s existing `<agency>/<dataset>/<run_id>/
-<tool>.json` layout needed to change to honor this - it was already
-dataset-level for 3 of 4 CP tools.
-
-**A real bug found while confirming that, not a design gap**: tracing
-CP's actual on-disk `qa_results/` layout to answer this turned up that
-`run_evidently_cp.py` was the one genuine outlier - it wrote under its
-own table-scoped dataset id (`cp_common.TABLE_DATASET_ID
-["cp_notifications"]`) instead of the collection id every other CP tool
-uses, landing each run's `evidently.json` in a stray sibling directory
-instead of alongside that run's other 4 files. Fixed (write path only -
-each result's own per-table `dataset_id` field is untouched, still
-needed for dashboard grouping), verified via a real full `orchestrate_
-cp.py` run diffed against the previously-committed history (only
-`run_timestamp` changed, same 2832-result pass/warn/fail distribution),
-stale directory removed. Full account, including the regression tests,
-in `plans/qa-pipeline.md` item 50 - not re-derived here.
+**What went with the prose, because each is spent:** the path/naming
+layout it left unpinned (there are no paths), its note that committing
+results reverses CLAUDE.md's gitignored-and-regenerated rule (this
+reverses it back), and a real `run_evidently_cp.py` bug it recorded and
+that was fixed in 2026-09-16 - see `plans/qa-pipeline.md` item 50.
 
 ## Thread D - check lifecycle: retirement + definition changes (build together with B)
 
@@ -376,7 +337,37 @@ CHECK_LIFECYCLE = {
 
 ## Thread A - publishing (build after B/D's data format exists)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-28) · **Category:** Pipeline & publishing
+
+> **SUPERSEDED BY `REQ-PIPE-092`, AND THE WHOLE MECHANISM BELOW IS
+> HISTORY** (REQ-DOCS-101 criterion 6). Everything in this thread rests
+> on two premises that are no longer true: that a QA run's results are
+> COMMITTED FILES, and that CI is therefore the only thing able to see
+> all of them and so the only thing that may publish. `REQ-PIPE-089`
+> moved the results into the warehouse database on 2026-09-27, and a
+> GitHub Actions runner has no route to that database - so the publisher
+> moved to the environment that does.
+>
+> **WHAT SURVIVES, because it is the part that mattered.** Keith's own
+> call - "gone entirely" - was about there being NO ad-hoc publish path,
+> and that is intact: there is exactly one publisher, `mothman dashboard
+> publish`, it gates before it deploys, and publishing is opt-in on
+> every other command so a debugging run cannot put its reproduction on
+> the public site. The gate itself survives whole: structural checks, a
+> real browser render check, and the check-lifecycle validation, still
+> one gate rather than three. What changed is WHERE it runs, never
+> whether it runs.
+>
+> **WHAT DOES NOT SURVIVE:** the path-filter design in the last two
+> paragraphs, which exists only to decide when CI should rebuild;
+> committing raw per-run files as the way results are shared; and
+> `deploy-pages.yml`, which is deleted - `validate-config.yml` gates the
+> committed CONFIGURATION and deploys nothing.
+>
+> Left in place rather than deleted because CLAUDE.md's rule is that a
+> thread goes whole once its last dependent batch is built, and because
+> the reasoning below is why the design was right for the system it was
+> designed for.
 
 **Decision: no manual "publish from local" path, in any form** - not a
 routine mechanism, and not even as a break-glass fallback for CI being
@@ -2579,7 +2570,9 @@ convention. Numbered independently from this file's own Thread/Phase
 structure above - these are discrete open questions, not part of any
 one Thread's narrative.
 
-1. **[todo, medium]** **[Pipeline & publishing]** No CI. Nothing re-runs
+1. **[todo, 2026-09-14]** **[Pipeline & publishing]** Medium priority (the
+   original tag's own word, preserved through the 2026-09-20 retrofit).
+   No CI. Nothing re-runs
    `qa_tools/bdm/orchestrate_bdm.py` against upstream tool releases, so a
    `dbt-core`/`soda-core-duckdb`/`datacontract-cli`/`evidently` update
    could silently break this and we wouldn't know. A scheduled job (even
@@ -2675,7 +2668,7 @@ one Thread's narrative.
    dates, same row counts), confirming the split is behaviour-preserving,
    not just a plausible-looking rewrite.
 
-3. **[done]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
+3. **[done, 2026-09-14]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
    `synthetic_data_generator/` got the same treatment `plans/qa-
    pipeline.md` #84 gave `real_tools/` -> `qa_tools/`: real Python
    packages (an `__init__.py` each, `-m` invocation, real absolute
@@ -2761,7 +2754,7 @@ one Thread's narrative.
    run by other people evaluating the PoC, on their own machines, not
    just the one it was built on.
 
-4. **[superseded]** **[Pipeline & publishing]** Versioning the checks
+4. **[superseded, 2026-09-16]** **[Pipeline & publishing]** Versioning the checks
    themselves, with that version flowing through to the results/data
    each check run captures - Keith's own framing, raised right after
    `plans/dashboard.md` #5's time-travel build: "a useful thing to have
@@ -2833,42 +2826,163 @@ one Thread's narrative.
    "log the specific mistake" (done, `plans/dashboard.md` #5's addendum)
    with "fix the pattern" (this item).
 
-6. **[parked]** **[Pipeline & publishing]** Revisit the per-dataset file
-   architecture across `qa_tools/`/`pipeline/` - flagged by Keith right
-   after Phase 2 landed, near-future not now: "I don't really want a
-   separate file for each individual dataset/agency, but I am open to it
-   if needs be." Explicitly a discussion/brainstorm to have later, not a
-   decision made here - this entry just records the concern and its
-   context, no proposed solution.
+7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
+   workflows are pinned to a single, hardcoded session branch name -
+   `on: push: branches: [claude/new-session-en9qen]` in
+   `.github/workflows/test.yml`, and the equivalent in
+   `deploy-pages.yml`. That branch was the working branch of the session
+   that last edited them; every session since gets a different one, so
+   **neither workflow fires at all for the current branch** and CI
+   silently does nothing.
 
-   Related to, but a reopening of, `plans/qa-pipeline.md` #84 rather
-   than the same question: `plans/qa-pipeline.md` #84 confirmed the same
-   "one file pair per tool per dataset" pattern back when there were
-   only 2 datasets (BDM, Child Protection), found it wasn't false-DRY
-   (the per-dataset half is genuinely different check-to-dashboard-field
-   logic, not copy-paste boilerplate), extracted the confirmed-shared
-   ~30-40 lines/pair into `qa_tools/common/`, and left the per-dataset
-   split itself in place - explicitly flagging even then that "every new
-   dataset currently means copy-pasting a whole file." That trade-off
-   made sense at 2 datasets. The project's own stated target is ~30, and
-   Phase 1/2 above have since added MORE per-dataset file pairs on top
-   of the original 4 tool-runners (`build_results_from_history.py`,
-   `evidently_check_lifecycle.py`, the per-dataset warehouse builders,
-   the two `build_*dashboard_data.py` scripts) - the pattern `plans/
-   qa-pipeline.md` #84 already named as a real (if partial) cost is now
-   multiplying, not just persisting.
+   Found 2026-09-19 while following `CLAUDE.md`'s own standing "a
+   passing local pytest is NOT evidence CI is green - actually check the
+   real run" rule after pushing item 74's fix: there was no run to
+   check. `list_workflow_runs` filtered to this session's own branch
+   returned `total_count: 0`, while the unfiltered list showed 335 runs,
+   every recent one on `claude/new-session-en9qen`.
 
-   Nothing about `plans/qa-pipeline.md` #84's actual finding is being
-   second-guessed - the per-dataset LOGIC (which tests exist, what they
-   mean, dataset-specific reliability workarounds) is still genuinely
-   different per dataset and shouldn't be forced into one shared
-   abstraction just to reduce file count. What's worth a real
-   conversation is the file-per-dataset-per-concern SHAPE itself at ~30x
-   today's scale - e.g. whether tool-runner logic could be data-driven
-   off each dataset's own config/check definitions inside fewer files,
-   whether a plugin/registry pattern per tool (not per dataset) reads
-   better, or whether the current shape is still fine and it's
-   specifically the Phase 1/2 additions (which are more mechanical/
-   generic than the original 4 tool-runners) that should collapse first.
-   Not scoped - the point of this entry is to not lose the concern
-   before that conversation happens.
+   Worth noting precisely what this does and doesn't break, because it's
+   easy to over- or under-read: nothing is broken on the branch the pin
+   names, and the last run there (`b0585da`) was genuinely green. The
+   failure mode is subtler and matches the exact incident that rule was
+   written for - CI appearing fine because it isn't running, rather than
+   failing loudly. `workflow_dispatch` is a real workaround (used for
+   item 74's own push, against this branch's ref, and it works), but it
+   depends on someone remembering, which is the same class of thing the
+   rule already says not to rely on.
+
+   **Fixed 2026-09-19** (Keith's call: "open to moving to PR triggers if
+   that's cleaner, but also a Claude glob if simpler"). Chose the
+   `claude/**` glob, and the deciding fact was one nobody had checked:
+   **this repo has no trunk at all.** `list_branches` returns three
+   branches, every one a `claude/*` session branch, each continuing from
+   the last - there is no `main`. So a `pull_request` trigger has
+   nothing to target, and the PR option isn't "cleaner" here, it's
+   inapplicable without first inventing a trunk. Worth recording since
+   the option sounded reasonable in the abstract.
+
+   **A third workflow had the identical pin, found only by grepping
+   after fixing the first two**: `.github/workflows/ticket-sync.yml`.
+   That one matters more than the other two, because it holds
+   `issues: write` and opens real GitHub issues on a public repo - and
+   its own trigger `paths` include itself, so the very commit fixing its
+   pin would fire it. Its own comment records that Keith had explicitly
+   enabled its push trigger at the time; the dead pin meant it had
+   nonetheless never once fired. Flagged to him with the real number
+   before touching it - 3 datasets currently read red
+   (birth-registrations, cp-carers, cp-placements), down from all 7
+   before `plans/qa-pipeline.md` item 74's fix, so the first real run
+   opens 3 tickets rather than the noise storm that item's own write-up
+   had been holding this back to avoid - and his call was to fix the pin
+   and let it fire.
+
+   `test.yml` also gained a real `concurrency` group
+   (`test-${{ github.ref }}`, `cancel-in-progress: true`): this branch
+   pushes several times a session and only the newest commit's result
+   means anything. Keyed on the ref, so two concurrent sessions can't
+   cancel each other. `deploy-pages.yml` already had its own
+   `concurrency: pages` group, so deploys serialise rather than
+   interleave.
+
+   **A real second half to this, found immediately after pushing the
+   fix and NOT solvable from code**: `deploy-pages.yml` now fires, and
+   then fails in ~2 seconds with no steps run and no logs (a 404 on the
+   log download). That is the signature of GitHub's own **environment
+   protection rules** rejecting the branch: the job declares
+   `environment: github-pages`, and that environment is configured in
+   repo Settings to allow deployments only from specific branches -
+   almost certainly still just `claude/new-session-en9qen`, the same
+   dead branch this whole item is about. So the pin exists in TWO
+   places, and fixing the workflow file only fixed one of them.
+   Diagnosis is high-confidence but not directly confirmed: this
+   session's proxy blocks the `/repos/{owner}/{repo}/environments/...`
+   API path, so the rule couldn't be read back. Supporting evidence:
+   the same workflow succeeded on the old branch (run 163), a
+   job-level `if:` evaluating false would report "skipped" not
+   "failure", and the `concurrency: pages` group would report
+   "cancelled".
+
+   **Keith's to fix, not a session's** - repo Settings -> Environments
+   -> `github-pages` -> "Deployment branches and tags" -> allow
+   `claude/**` (or whatever pattern matches the glob above). Deliberately
+   NOT reverted to a pinned branch to hide it in the meantime: a visible
+   failure is strictly better than the silent non-run this item started
+   as.
+
+   **Done by Keith, 2026-09-19 evening - and the diagnosis is now
+   CONFIRMED, not just high-confidence.** He added the `claude/**`
+   wildcard to the environment's allowed branches, and the very next
+   push flipped the workflow's behaviour completely: instead of failing
+   in ~2 seconds with zero steps and a 404 on logs, it ran properly and
+   finished `success`. That's the first time all three workflows have
+   run and passed on a session branch since the pin broke - `Run test
+   suite`, `Sync QA status to GitHub Issues`, and `Build, validate, and
+   publish the dashboard`, all green on the same commit. The earlier
+   inference (environment protection rejecting the branch, unreadable
+   from here because the proxy blocks the environments API) held up
+   exactly.
+
+   Real, user-visible consequence worth naming: the live published
+   dashboard had not been rebuilt since before the pin broke, so this
+   is also the deploy that finally carries `plans/qa-pipeline.md` item
+   74's corrected statuses to the public site - the end of the "all 7
+   datasets read red on every run" era for anyone actually looking at
+   it.
+
+   **Now verified against the real live site, not just inferred from the
+   workflow's own conclusion** - Keith allow-listed
+   `keithamoss.github.io` minutes later (see `CLAUDE.md`'s own audited
+   blocked-domain list), which made the check that this item originally
+   had to skip actually possible. Driving the real published URL in a
+   real browser and using the page's OWN
+   `buildRealDataset()`/`checkStatus()`/`historyStatus()`: **30,561
+   rendered statuses compared against each tool's own recorded verdict,
+   zero disagreements, and zero results missing a verdict** (locally it
+   had been 198 before the placeholder fix, so that shipped too). The
+   live page's embedded `GITHUB_LINKS` commit confirms it was built from
+   `24b2560`, the commit carrying all of item 74's work. This is the
+   first time this project has verified its own published output at the
+   render layer against the real source of truth, rather than trusting a
+   green workflow.
+
+   **One residual risk, named rather than silently accepted**: with a
+   glob, any `claude/*` branch can publish to the live public site. That
+   matches how this project actually works (sessions are sequential, so
+   "newest push publishes" is correct) and the pages concurrency group
+   stops two interleaving - but if two sessions genuinely overlap, an
+   older branch pushing last would publish older content. The honest fix
+   for that is a real trunk branch to publish from, which is a bigger
+   change to how this project works and is deliberately NOT bundled in
+   here.
+
+8. **[done, 2026-09-19]** **[Pipeline & publishing]** The Plans tab was
+   silently never republishing. `dashboard/embed_dashboard_data.py`
+   embeds every `plans/*.md` file's own content into `const PLANS` at
+   build time (via `dashboard/plans_md.py`'s `parse_plans()`,
+   `PLANS_DIR`), exactly like `CHANGELOG.md` feeds Release Notes and
+   `requirements.yaml` feeds the Requirements panel - but **`plans/**`
+   was never added to `.github/workflows/deploy-pages.yml`'s own trigger
+   `paths`**, so a plans-only commit didn't rebuild the site and the
+   live Plans tab quietly drifted behind the repo.
+
+   Missed when that tab was built (2026-09-18, `plans/running-
+   thoughts.md` #10). The other two embedded files each carry an inline
+   comment in that path list saying why they're there ("embeds this
+   file's own content at build time") - `plans/**` just never got added
+   alongside them.
+
+   Found 2026-09-19 evening, and only because `keithamoss.github.io`
+   had just been allow-listed (`CLAUDE.md`'s own audited domain list):
+   fetching the REAL published page and grepping it showed none of that
+   day's plans work present, with the live build's own embedded
+   `GITHUB_LINKS` commit still reading `24b2560` after five subsequent
+   plans-only commits. Not findable any other way from here - the
+   workflow wasn't failing, it simply wasn't running, the same
+   silent-non-run failure mode as item #7 above and caught by the same
+   habit of checking the real artifact rather than the green tick.
+
+   Fixed by adding `plans/**` to that `paths` list, with a comment
+   matching the convention the neighbouring two already use. The fix
+   verifies itself: the commit carrying it is a `plans/**` change, so
+   it triggers the very rebuild it enables.

@@ -1,0 +1,23 @@
+# The Cancer collection's Evidently checks (REQ-QAC-348): two drift checks on
+# the one table, each against the last promoted supply.
+checks:
+  - check_id: quarterly.department-of-health.cancer.cancer-notifications.primary_site.drift_psi_evidently
+    category: consistency
+    introduced_date: "2015-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: primary_site
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []
+  - check_id: quarterly.department-of-health.cancer.cancer-notifications.stage.drift_psi_evidently
+    category: consistency
+    introduced_date: "2015-01-01"
+    description: The spread of values must stay close to the reference supply.
+    failure_indicates: self-evident
+    column: stage
+    method: psi
+    warn_threshold: 0.10
+    fail_threshold: 0.25
+    changelog: []

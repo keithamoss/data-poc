@@ -72,3 +72,8 @@ def test_load_null_values_by_column_parses_a_real_contract_shape(tmp_path):
         "table_one": {"col_a": ["TBD", "Unknown"]},
         "table_two": {"col_c": ["N/A"]},
     }
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

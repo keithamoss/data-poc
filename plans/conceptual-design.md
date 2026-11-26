@@ -176,3 +176,74 @@ happens to end on a non-chained run) but architecturally the same
 category-error risk item 69 fixed for the supply-history table. Keith's
 own sequencing: pick this up once the chain-derivation redesign above is
 done, not before.
+
+## Thread B: what a contract's `physicalType` declaration is FOR (2026-09-27)
+
+**Status:** investigate · **Category:** QA checks & contract
+
+**The tension.** Every ODCS contract in `contract/` declares a
+`physicalType` per column - `varchar(20)`, `varchar(200)`, `date` - and
+nothing in this pipeline has ever checked one. Under DuckDB it could not:
+datacontract-cli read the supplier's CSV, and a CSV has no physical types
+at all, so the declarations were inert. Moving that tool onto the
+warehouse (REQ-QAC-088) made them checkable for the first time, and they
+immediately reported a real mismatch - the staged column is unbounded
+`character varying`, because its type comes from DuckDB's INFERENCE of
+the arriving file rather than from the contract.
+
+So there is now a genuine question this project has never had to answer:
+is a declared physical type a description of the supplier's system, a
+promise our warehouse should keep, or a thing to check and report?
+
+**The obvious fix is the wrong one, and it took an experiment to show
+it.** The reading that feels right is "the contract is the source of
+truth for schema, so build the staged table to it". That was tried:
+`csv_io.load_physical_types_by_column()` read the declarations and the
+loader built the table to them. It worked, and it broke the thing the
+pipeline exists for.
+
+Child Protection's dirty fixture deliberately injects a value longer
+than `cp_clients`' declared column. With contract-typed columns the COPY
+fails, so the load fails, so there is NO TABLE - and then no view, then
+dbt skips that table's model, then Soda and the audit-table
+re-derivation both raise on a relation that legitimately is not there.
+Four separate crashes downstream of one design choice, and three fixes
+were spent guarding against symptoms before the change itself was
+tested.
+
+What matters is not the crashes, which were fixable, but what the
+dataset would have REPORTED once they were: "no table", where it used to
+report "these values are too long". That is strictly less information
+about strictly the same data, and a QA pipeline exists to produce the
+more informative answer. The loader takes what arrived; the checks
+report the discrepancy. Reverted.
+
+**Three readings, for Keith to pick - a product decision, not a bug.**
+
+1. **It describes the SUPPLIER's system, not ours.** The declarations
+   document where the data comes from, checking them against our staging
+   table is a category error, and nothing needs doing. This is the
+   reading the code now implies, by omission rather than by choice.
+2. **It is a promise the WAREHOUSE should keep** - but enforced on
+   PROMOTION into a period schema, not on arrival into staging. A breach
+   is then reported by a check at staging and prevented from reaching the
+   promoted table: the information is kept and the guarantee is had, at
+   the cost of a second set of typed tables.
+3. **It is a check, not a constraint.** Compare the staged column's type
+   against the declaration and report it like any other check, with no
+   effect on loading. Cheapest, and it makes declarations that are
+   already written mean something for the first time.
+
+My own view, for what it is worth: (3) now, and (2) later if promoted
+tables ever need the guarantee. (1) is defensible and wastes work that is
+already done.
+
+**What was kept from the episode.** Two guards in
+`qa_tools/cp/run_dbt_cp.py` that tolerate a table having no staging model
+rather than abandoning the whole run. They were written while chasing the
+self-inflicted bug above, but the state they guard is real and reachable
+without it: under REQ-PIPE-059 a HELD supply stages two files claiming
+one dataset, ambiguity is absence, so that table has no view and dbt
+skips its tests - and `status != "error"` does not catch it, because a
+skipped test's status is `"skipped"`. Crashing the run over one
+legitimately absent table loses the other five tables' results.

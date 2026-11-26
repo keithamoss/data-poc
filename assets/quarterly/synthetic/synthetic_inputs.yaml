@@ -1,0 +1,42 @@
+# What a SYNTHETIC product is built from, where the generator needs to know
+# more about a source than the hierarchy says (REQ-QAC-294 criterion 3).
+#
+# GENERATOR-ONLY CONFIGURATION, as contract/scripted_decisions.yaml is: read
+# by the generator alone, never by a QA tool, the pipeline or the dashboard.
+# It sits at the top of contract/ among the asset-wide files because it is
+# about this asset's synthetic history, not one agency's checks, and it moves
+# with the asset split to the quarterly asset's own folder (asset-split
+# amendment A21).
+#
+# GENERIC KEYS. For each declaring dataset:
+#   place_by        the source columns a synthetic product places a record by,
+#                   FINEST FIRST, each with the value it yields
+#   placed_column   the declaring table's column the value goes in
+#   unplaced_value  the value for a record none of place_by's columns places
+# A record is placed by the first column in the list that holds a value.
+#
+# GATED: the collections gate fails where a declared column is not in the
+# source's contract, or a declared value is not among the placed column's
+# allowed values in the declaring dataset's contract, naming the dataset and
+# the column or value. The source is the one the dataset's linked_datasets
+# entry names (contract/data-asset.yaml).
+datasets:
+  # Child Protection's Client Register carries suburb and postcode, both
+  # required (Keith, 2026-10-25, Q9b). A suburb places a record more finely
+  # than a postcode, so a blank suburb drops it to postcode (Keith,
+  # 2026-11-01).
+  - dataset: geo-cp-clients
+    placed_column: match_level
+    unplaced_value: not geocoded
+    place_by:
+      - column: suburb
+        value: suburb
+      - column: postcode
+        value: postcode
+  # ED Presentations' only address column is postcode, optional.
+  - dataset: geo-ed-presentations
+    placed_column: match_level
+    unplaced_value: not geocoded
+    place_by:
+      - column: postcode
+        value: postcode

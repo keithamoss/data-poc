@@ -1,0 +1,8 @@
+# The Mental Health collection's dbt source (REQ-QAC-350) - the run's own view schema.
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
+    tables:
+      - name: mental_health_contacts

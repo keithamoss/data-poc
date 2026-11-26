@@ -1,0 +1,254 @@
+"""Which deployment is this, and what are the others.
+
+WHY IT EXISTS (Keith, 2026-09-27). Once GitHub Actions is no longer
+allowed to reach a database, the dashboard is built where the data is -
+so a build from here, a build from somebody's development environment
+and the published one are different artifacts that look identical.
+Each has to say which environment produced it: "this dashboard here is
+physically separate to a dashboard from my development or production or
+another user."
+
+THE SPLIT IS THE DESIGN DECISION, and it follows this repo's own
+configuration-not-state rule rather than being invented for this module.
+The LIST of environments is configuration: it declares how the system
+behaves, it is the same for everyone who checks the repository out, and
+it is reviewed - so it is committed, at contract/environments.yaml.
+WHICH ONE YOU ARE is a property of one deployment, like the database it
+talks to - so it comes from MOTHMAN_ENVIRONMENT, sitting beside
+MOTHMAN_SUPPLY_DSN where it belongs.
+
+Both alternatives are worse in the same way. Committing the answer
+means committing one deployment's identity for everybody. Gitignoring
+the list means the set of valid environments is no longer reviewed, and
+a typo becomes a new environment rather than an error.
+
+AN UNKNOWN NAME IS REFUSED rather than accepted as a new environment,
+which is the whole reason the list is worth having. `MOTHMAN_ENVIRONMENT
+=prod` when the list says `production` should stop, not quietly publish
+a dashboard labelled with a name nobody declared.
+"""
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from asset_model import config_yaml
+from asset_model import assets as _assets
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+ENVIRONMENTS_PATH = ROOT / "assets" / "environments.yaml"
+
+#: Where a deployment says which of the declared environments it is.
+ENVIRONMENT_ENV = "MOTHMAN_ENVIRONMENT"
+
+#: An id reaches a schema name, a file name and a URL, so it is held to
+#: the same shape as every other identifier in this project.
+_SAFE_ID = re.compile(r"^[a-z0-9_]+$")
+
+
+class EnvironmentError_(RuntimeError):
+    """Raised where continuing would mean guessing which deployment this
+    is - which is the one thing a published artifact must not do."""
+
+
+@dataclass(frozen=True)
+class Environment:
+    id: str
+    label: str
+    description: str = ""
+    publishes: bool = False
+    #: The one environment that IS production (Keith, 2026-11-21, amending
+    #: REQ-TEST-114 criterion 5): every other environment says "not
+    #: production", whatever it publishes - the sandbox publishes today and is
+    #: still not production. Declared, never inferred from an id.
+    production: bool = False
+    #: A person TYPES this environment's id before any change they make by
+    #: hand from the terminal (REQ-PIPE-093 criteria 4-8).
+    confirm_changes: bool = False
+    #: The only switch for ticketing (criterion 10).
+    ticketing: bool = False
+    #: HOW OFTEN THIS ENVIRONMENT'S SCHEDULER RUNS `mothman pipeline process`,
+    #: in whole minutes, where it declares it (REQ-GHUB-433 criterion 12): a
+    #: slot ticket says so, so nobody re-posts a command not yet read. None
+    #: where undeclared, and then the ticket says nothing about how often.
+    processing_interval_minutes: int | None = None
+    #: WHERE THIS DEPLOYMENT KEEPS ITS LOCAL dbt_utils COPY FOR ONE-OFFS
+    #: (REQ-PIPE-440 criterion 12), relative to the repository root unless
+    #: absolute - installed once by `mothman one-off setup-dbt-utils`, so a
+    #: load makes no network fetch. None where the environment works no one-offs.
+    one_off_dbt_utils: str | None = None
+
+
+#: The declared environments, keyed on the file's content (REQ-PIPE-192):
+#: read on every connection, 15,000 times in one bootstrap.
+_loaded: "dict[str, tuple[Environment, ...]]" = {}
+
+
+def _load(path: Path | str | None = None) -> list[Environment]:
+    path = Path(path or ENVIRONMENTS_PATH)
+    if not path.exists():
+        raise EnvironmentError_(f"no environments declared - {path} does not exist")
+    text = config_yaml.read(path)
+    hit = _loaded.get(text)
+    if hit is None:
+        hit = tuple(_parse_environments(path, text))
+        if len(_loaded) > 16:
+            _loaded.clear()
+        _loaded[text] = hit
+    return list(hit)
+
+
+def _parse_environments(path: Path, text: str) -> list[Environment]:
+    raw = config_yaml.parse(text) or {}
+    declared = raw.get("environments")
+    if not declared:
+        raise EnvironmentError_(f"{path} declares no environments")
+
+    out: list[Environment] = []
+    seen: set[str] = set()
+    for entry in declared:
+        env_id = (entry or {}).get("id")
+        if not env_id or not _SAFE_ID.match(str(env_id)):
+            raise EnvironmentError_(
+                f"{path}: {env_id!r} is not a usable environment id - lowercase "
+                f"letters, digits and underscore only, because it reaches a "
+                f"schema name, a file name and a URL")
+        if env_id in seen:
+            raise EnvironmentError_(f"{path}: {env_id!r} is declared more than once")
+        seen.add(env_id)
+        out.append(Environment(
+            id=env_id,
+            label=entry.get("label") or env_id,
+            description=(entry.get("description") or "").strip(),
+            publishes=bool(entry.get("publishes")),
+            production=bool(entry.get("production")),
+            confirm_changes=bool(entry.get("confirm_changes")),
+            ticketing=bool(entry.get("ticketing")),
+            processing_interval_minutes=_interval(path, env_id, entry),
+            one_off_dbt_utils=(str(entry["one_off_dbt_utils"])
+                               if entry.get("one_off_dbt_utils") else None),
+        ))
+
+    productions = [e.id for e in out if e.production]
+    if len(productions) > 1:
+        raise EnvironmentError_(
+            f"{path}: {len(productions)} environments claim to be production "
+            f"({', '.join(productions)}) - at most one is")
+    publishing = [e.id for e in out if e.publishes]
+    if len(publishing) > 1:
+        raise EnvironmentError_(
+            f"{path}: {len(publishing)} environments claim to publish "
+            f"({', '.join(publishing)}) - exactly one may, or two deployments "
+            f"race to overwrite the same published dashboard")
+    return out
+
+
+def _interval(path: Path, env_id: str, entry: dict) -> int | None:
+    value = entry.get("processing_interval_minutes")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise EnvironmentError_(
+            f"{path}: {env_id!r} declares processing_interval_minutes: {value!r} - a whole "
+            f"number of minutes, 1 or more, is how often its scheduler runs a pass")
+    return value
+
+
+def interval_words(minutes: int) -> str:
+    """'every 15 minutes', 'every hour', 'every 2 hours' - the declared
+    interval in the words a slot ticket says it in (REQ-GHUB-433 c12)."""
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return "every hour" if hours == 1 else f"every {hours} hours"
+    return "every minute" if minutes == 1 else f"every {minutes} minutes"
+
+
+def all_environments(path: Path | str | None = None) -> list[Environment]:
+    """Every declared environment, in the order the file declares them."""
+    return _load(path)
+
+
+def get(env_id: str, path: Path | str | None = None) -> Environment:
+    for env in _load(path):
+        if env.id == env_id:
+            return env
+    known = ", ".join(e.id for e in _load(path))
+    raise EnvironmentError_(
+        f"{env_id!r} is not a declared environment - known: {known}. Add it to "
+        f"{Path(path or ENVIRONMENTS_PATH)} if it is real, rather than letting a "
+        f"typo become an environment")
+
+
+def current(path: Path | str | None = None) -> Environment:
+    """This deployment's environment, from MOTHMAN_ENVIRONMENT.
+
+    Loud when unset. A build that cannot say where it came from is
+    exactly the artifact this module exists to prevent, so there is no
+    default - "local" would be the tempting one and would mean a
+    production build silently labelled as somebody's laptop.
+    """
+    name = os.environ.get(ENVIRONMENT_ENV)
+    if not name:
+        known = ", ".join(e.id for e in _load(path))
+        raise EnvironmentError_(
+            f"{ENVIRONMENT_ENV} is not set, so this deployment cannot say which "
+            f"environment it is. Set it to one of: {known}. There is deliberately "
+            f"no default - a build that guesses is a build that can be labelled "
+            f"as somewhere it is not")
+    return get(name, path)
+
+
+def current_or_none(path: Path | str | None = None) -> Environment | None:
+    """For a caller that can legitimately carry on without knowing -
+    a local report, a test. Never for anything published."""
+    try:
+        return current(path)
+    except EnvironmentError_:
+        return None
+
+
+def ticket_repository() -> str | None:
+    """`owner/repo` tickets go to, from contract/data-asset.yaml - a fact
+    about the data asset, one per deployment (REQ-PIPE-093 criterion 12).
+    Never GITHUB_REPOSITORY, which names whichever repository a workflow
+    happens to run in."""
+    from asset_model.hierarchy import data_asset_yaml
+
+    doc = config_yaml.load(Path(data_asset_yaml())) or {}
+    repo = str(doc.get("ticket_repository") or "").strip()
+    return repo or None
+
+
+def for_connection(path: Path | str | None = None) -> Environment:
+    """The stated environment, checked BEFORE any database connection opens,
+    for a read as well as a write (REQ-PIPE-093 criteria 1, 2 and 13).
+
+    Raises where nothing is stated - naming the variable and the declared
+    ids, with no default - and where the stated environment turns ticketing
+    on while the asset names no ticket repository: refused loudly, because
+    quietly running without tickets is how a production asset ends up with
+    nobody told."""
+    env = current(path)
+    if env.ticketing and "/" not in (ticket_repository() or "").strip("/"):
+        raise EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
+            f"names no ticket_repository to open tickets in. Name it (owner/repo) or turn "
+            f"ticketing off for {env.id!r} in assets/environments.yaml.")
+    # A TICKET LINKS TO THE DASHBOARD, so the address it links to must be
+    # configured too (REQ-GHUB-258 criterion 3), named by its key.
+    if env.ticketing and not _dashboard_address_configured():
+        raise EnvironmentError_(
+            f"the {env.id!r} environment turns ticketing on, but {_assets.config_dir()}/data-asset.yaml "
+            f"names no hosting.address for a ticket to link to. Name the dashboard's address "
+            f"under hosting: or turn ticketing off for {env.id!r} in assets/environments.yaml.")
+    return env
+
+
+def _dashboard_address_configured() -> bool:
+    from asset_model.hierarchy import data_asset_yaml
+
+    doc = config_yaml.load(Path(data_asset_yaml())) or {}
+    return bool(str(((doc.get("hosting") or {}).get("address")) or "").strip())
+

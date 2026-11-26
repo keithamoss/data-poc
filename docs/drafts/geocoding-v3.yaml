@@ -1,0 +1,318 @@
+# DRAFT v3 - geocoding (plans/road-testing.md #12 and #31), updated on Keith's
+# later answers of 2026-10-25 evening (scratchpad geocoding-answers.md, lines
+# 22 onward; linkage-answers.md). delivery-scoper, 2026-10-25.
+# A PROPOSAL for sign-off, not a settled requirement. Supersedes v2.
+# Ids REQ-*-294 to 300 and REQ-QAC-340. Shares the Linkage Products
+# collection, contract, adapter (REQ-PIPE-336), provider (REQ-GEN-334) and
+# Health release with the linkage draft (linkage-v2.yaml, REQ-*-330 to 339),
+# and depends on it rather than restating it. Also depends on the offset
+# draft (REQ-PIPE-320, 321, 325) and on the REQ-GEN-237 amendment being
+# drafted with linkage-v2.yaml. None of these is signed.
+requirements:
+  - id: REQ-QAC-294
+    title: "Each geocoded source dataset gets a geocoding dataset of its own in Department of Health's Linkage Products collection, keyed by the source's own identifiers plus census year, carrying area codes and a match level and no address"
+    date_written: "2026-10-25"
+    story: "As whoever maintains the pipeline, I want a geocoding dataset declared for each source dataset that carries an address, in the collection Department of Health releases each period, naming the source dataset it geocodes and the identifier columns it carries, so that each one can be checked on its own and later against the source supply it was built from."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/road-testing.md #12 (2026-09-24, unparked 2026-10-25), with his answers of 2026-10-25 (one geocoding dataset per source dataset; in Linkage Products; Child Protection's cp-clients and Emergency Department only) and that evening (the shape agreed; keys on the Linkage Keys id_1..id_n pattern; road-testing #31 answered; names kept, L5). Drafted by delivery-scoper 2026-10-25, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare, in contract/data-asset.yaml's hierarchy, inside the Linkage Products collection REQ-QAC-330 declares, one geocoding dataset per geocoded source dataset, each with its own id, name, table and an exact arrival pattern for one file in the Health release - geo-cp-clients 'Client Register Geocodes', table geo_cp_clients, file geo_cp_clients.csv; geo-ed-presentations 'ED Presentations Geocodes', table geo_ed_presentations, file geo_ed_presentations.csv (names Keith's, L5; ids, tables and files PROVISIONAL)."
+      - "THE SYSTEM SHALL declare, in the Linkage Products configuration beside each geocoding dataset, the one SOURCE DATASET it geocodes and the ordered list of that dataset's source columns that id_1, id_2 and onward hold - geo-cp-clients geocoding cp-clients with id_1 cp_client_id, geo-ed-presentations geocoding ed-presentations with id_1 presentation_id - as the one place every reader learns which source a geocoding dataset covers and how its rows are identified."
+      - "IF a geocoding dataset names a source dataset that is not in the hierarchy, that is on a different calendar from the geocoding dataset, or that another geocoding dataset already names, or names a source column the source's contract does not declare, or declares more identifier columns than its table's id_N, THEN `mothman check` SHALL fail, naming the geocoding dataset and the reason."
+      - "THE SYSTEM SHALL declare each geocoding dataset's table in the Linkage Products contract with the columns id_1 to id_N, census_year, sa2_code, lga_code and match_level, each with its type and whether it is required; id_1, census_year and match_level SHALL be required, id_2 to id_N, sa2_code and lga_code SHALL NOT be, and every id column SHALL be text whatever the source column's type (PROVISIONAL - N per open question 2)."
+      - "THE SYSTEM SHALL declare match_level's allowed values as exactly 'address', 'postcode', 'suburb' and 'not geocoded'."
+      - "THE SYSTEM SHALL declare sa2_code and lga_code as codes in the ABS ASGS formats when the row is geocoded and empty when match_level is 'not geocoded' (PROPOSED formats - a nine-digit SA2 code and a five-digit LGA code)."
+      - "THE SYSTEM SHALL declare each geocoding table's key as the identifier columns its source declares together with census_year, and SHALL NOT declare single-column uniqueness on any id column in any tool."
+      - "THE SYSTEM SHALL declare no column holding address text, coordinates, a mesh block or SA1 code, a name, a date of birth or any other attribute of the person or presentation, so that a geocoding row names its source row only by the source's identifier values."
+      - "THE SYSTEM SHALL place each geocoding dataset on the quarterly calendar under the Linkage Products collection's offset of 0 (REQ-PIPE-320), participating from the first quarter its source dataset has a generated supply filed to (REQ-GEN-295)."
+      - "THE SYSTEM SHALL say, in each geocoding table's description in the contract, that it is synthetic, stands in for a geocoding product, and holds area codes and a match level only, no real address, location or person."
+      - "WHEN `mothman check` runs, THE SYSTEM SHALL pass every configuration gate with the geocoding datasets present, with no exemption added for them."
+    non_functional_requirements:
+      - "CONFIGURATION ONLY: hierarchy, calendar, contract and presentation files; nothing here reads supply rows or the database. Checks are REQ-QAC-297's and REQ-QAC-300's, generation REQ-GEN-295's, running REQ-PIPE-296's."
+      - "PRIVACY AT REAL SCALE: a geocode of a child's or patient's address is location data about that person, and the source's identifier values plus an area code plus a census year re-attach it to the source row. The shape carries no coordinates, no address text and nothing finer than SA2 even synthetically, so it is safe to copy into a real deployment; the remaining sensitivity (area code joined to source identifier) is said in the contract description."
+      - "SYNTHETIC GEOGRAPHY: SA2 and LGA codes are drawn in the ABS code formats from a synthetic pool, never from a real ABS correspondence or a licensed address product, so nothing real is bundled or implied."
+      - "SCALE AT 30 COLLECTIONS: one geocoding dataset per address-bearing source dataset could mean dozens in Linkage Products. Nothing assumes two, and the declaration and its gate (criteria 2 and 3) keep the list honest as it grows. Both synthetic sources declare one identifier (Keith, L10); the several-identifier case is exercised on REQ-TEST-339's pattern."
+      - "NO NEW DEPENDENCY: the four installed tools only."
+    dependencies:
+      - REQ-QAC-330
+      - REQ-PIPE-320
+      - REQ-PIPE-240
+      - REQ-QAC-241
+    decisions:
+      - "ONE GEOCODING DATASET PER SOURCE DATASET (Keith, 2026-10-25). REJECTED v1's single tall table for every source, which would mix sources in one file and make every check's result about several collections at once."
+      - "IN DEPARTMENT OF HEALTH'S LINKAGE PRODUCTS COLLECTION, BESIDE THE LINKAGE PRODUCT (Keith, 2026-10-25, Q1a). REJECTED v1's new Location Services agency, a collection of its own, and a second dataset inside Emergency Department."
+      - "SYNTHETIC SOURCES ARE cp-clients AND ed-presentations ONLY (Keith, 2026-10-25, Q9b). Found from the contracts: Emergency Department has one dataset, ed-presentations, whose only address-like column is postcode, optional; cp-clients carries suburb and postcode, both required. cp-placements' placement_suburb is out by Keith's 'cp-clients only'."
+      - "BIRTH REGISTRATIONS IS OUT (Keith, 2026-10-25, option i): it is daily and stands in for a separate data asset, and a quarterly geocoding dataset read against daily periods would read across periods. Criterion 3's same-calendar rule enforces this from configuration, as REQ-QAC-330 criterion 6 does for linked datasets."
+      - "ONE ROW PER SOURCE ROW PER CENSUS YEAR, NOT PER PERSON (Keith, 2026-10-25): an ED patient with three presentations has three sets of rows."
+      - "KEYED BY THE SOURCE'S OWN IDENTIFIERS ON THE LINKAGE KEYS PATTERN (Keith, 2026-10-25 evening): id_1 to id_n hold the source's identifier values, each geocoding dataset declaring its id_n to source-column mapping in configuration; the key is the ids plus census_year. REJECTED v2's single source_row_id, which assumed every source is identified by one column, and REJECTED a line number in the file, which changes with every resupply and identifies nothing a reader can look up."
+      - "THE GEOCODING MAPPING IS ITS OWN, NOT THE LINKED-DATASET MAPPING (Keith, 'each geo dataset declares its id_n -> source column mapping'): which columns a geocoder identifies a record by is an agreement with the geocoder, as REQ-QAC-330's mapping is with the linkage unit, and the two need not agree. Both live in the Linkage Products configuration."
+      - "A SOURCE-DATASET DECLARATION NOW, THOUGH v1 READS NO SOURCE (delivery-scoper, v2, kept): the generator needs to know what to geocode, the later cross-collection checks (REQ-QAC-340) need it, and the page can name it. Consistent with REQ-QAC-330 criterion 5's linked-dataset list."
+      - "ID COLUMNS ARE TEXT (as REQ-QAC-330's): one shape for every source, whatever the source column's type."
+      - "THE SHAPE IS KEITH'S (2026-10-25 evening): one file per geocoding dataset; census_year, sa2_code, lga_code, match_level; no address, coordinates, name or date of birth; no mesh block or SA1. REJECTED v1's statistical_area_code (unnamed level), match_score, geocoded_date and geocoder_version, each a column to check that no check here needs."
+      - "NOT GEOCODED IS A ROW, NOT AN ABSENCE (Keith, road-testing #31 = a): an address that could not be geocoded still has one row per census year, sa2_code and lga_code empty and match_level 'not geocoded'. REJECTED no row at all, which would make the missing-year check (REQ-QAC-297) red for a geocoder's honest failure; missing-year stays about process."
+      - "SA2 AND LGA, NOT SA1 OR MESH BLOCK (Keith, agreeing the delivery-scoper's v2 proposal): SA2 is the coarsest ABS area commonly used for analysis, so it carries less re-identification risk; the codes differ by ASGS edition, which is why there is a row per census year."
+      - "NO COORDINATES, NO ADDRESS TEXT (v1, kept, and Keith's shape): a coordinate is the address. REJECTED synthetic jittered coordinates; the shape, not the values, is what a real deployment copies."
+      - "EVERY QUARTER, NOT ANNUALLY (Keith, 2026-10-25, Q2): quarterly in the linkage round at offset 0. REJECTED v1's annual participation."
+      - "PARTICIPATION FOLLOWS THE SOURCE'S HISTORY (delivery-scoper, from Keith's L4 'all quarters each source has'): a geocoding dataset is owed from its own source's first quarter, not from the collection's, so geo-ed-presentations is not owed before Emergency Department's history starts."
+      - "NO ROW-COUNT CHECK (Keith, 2026-10-25, Q8). v1's row-count band is DROPPED: the year checks find a missing year row by row, and an empty or short supply is the cross-collection checks' to find (REQ-QAC-340)."
+      - "THE CONTRACT IS THE COLLECTION'S (from the registry): each collection names one contract, so the geocoding tables are further schema entries in the Linkage Products contract, as Child Protection's six tables are in one; no contract of their own."
+    open_questions:
+      - "The dataset ids, table and file names (proposed geo-cp-clients, geo-ed-presentations and their tables and files); the dataset names are Keith's (L5)."
+      - "How wide each geocoding table's id columns are. Recommended: every geocoding table declares the same id_1 to id_N, N being the largest number any geocoding dataset declares, so the tables share one shape and the exact-ids check (REQ-QAC-297) has something to catch; the alternative, each table declaring only its own source's count, leaves 'no more ids than declared' to the schema check and makes the tables differ."
+
+  - id: REQ-GEN-295
+    title: "The Linkage Products provider writes each quarter's geocoding files into the Health release, for every quarter each source has, one row per source row per census year in force, a row it cannot place written as not geocoded"
+    date_written: "2026-10-25"
+    story: "As Keith planting scenarios, I want each quarter's synthetic geocoding files built from exactly the source rows the Health release could have seen, in every quarter Child Protection's and Emergency Department's histories hold, so that the ordinary history is clean by construction and every fault in it is one the generator put there on purpose."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-25 (Q3a full snapshots, Q9b sources) and that evening (L4 all quarters, overriding Q9b's twelve; Q13 one Health release built from what was received before it; road-testing #31; L9 = b the corrected quarters). Drafted by delivery-scoper 2026-10-25, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL generate the geocoding datasets' history in the Linkage Products provider REQ-GEN-334 creates, through REQ-GEN-246's shared driver, with no geocoding code outside that provider."
+      - "THE SYSTEM SHALL build each geocoding file for quarter P from every row of the same source supply REQ-GEN-334 criterion 3 names for P - the source dataset's last generated supply filed to P and received before the Health release - with its identifier values written under REQ-QAC-294 criterion 2's mapping, never by reading data/deliveries."
+      - "THE SYSTEM SHALL write, in an ordinary geocoding supply, exactly one row for each source row and each census year in the set in force for P (REQ-QAC-300), and no other row."
+      - "THE SYSTEM SHALL write a row as 'not geocoded', with sa2_code and lga_code empty, for a source row its synthetic geocoder cannot place, and otherwise SHALL write a match_level of 'address', 'postcode' or 'suburb' with both codes drawn from a synthetic pool in the ABS code formats, the same source row and census year giving the same codes and match level in every quarter, from the provider's own seed."
+      - "THE SYSTEM SHALL keep each ordinary geocoding supply's not-geocoded share at or below 5 percent of its rows, so that it is green on REQ-QAC-297's share check by construction (PROVISIONAL - see open question 1)."
+      - "THE SYSTEM SHALL generate a geocoding supply for every quarter its source dataset has a generated supply filed to, Child Protection's grown quarters included, and none for a quarter whose date is after the generator's anchor date."
+      - "WHERE a quarter is one REQ-GEN-205's corrections alter, THE SYSTEM SHALL generate geo-ed-presentations' supply there, re-judged or moved with Emergency Department's supplies by the correction under REQ-GEN-237 as amended, each named in its scenario; and SHALL write no geo_cp_clients.csv there, the geo-cp-clients slot scripted not supplied (REQ-GEN-135, REQ-PIPE-132) as Child Protection's own slot is."
+      - "THE SYSTEM SHALL write each quarter's geocoding files inside that quarter's one Health release zip beside linkage_keys.csv (REQ-GEN-334 criterion 6), never in a delivery of their own."
+      - "WHEN the generate command runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times."
+    non_functional_requirements:
+      - "BOOTSTRAP BUDGET, TO BE MEASURED (Keith, L4): every quarter of each source, about 55 for Child Protection and as many as Emergency Department's history holds, on the quarterly stream that is already the critical path. Measured with linkage in REQ-PIPE-336's before-and-after, geocoding runs counted separately, and reported against REQ-PIPE-250's budget, which is already not met."
+      - "VOLUME: rows are source rows times census years - about 2,000 ED presentations times 2 is about 4,000 rows a supply, and three census years from 2026-Q3 (REQ-QAC-300)."
+      - "BYTE-IDENTICAL NEIGHBOURS: every other collection's generated files, and the linkage_keys.csv REQ-GEN-334 writes, unchanged by this requirement alone - REQ-TEST-239's compare."
+      - "SYNTHETIC ONLY: no real address, geocode, ABS correspondence or licensed address product. Importable without pandas or numpy, as every provider is (REQ-GEN-246)."
+    dependencies:
+      - REQ-QAC-294
+      - REQ-QAC-300
+      - REQ-GEN-334
+      - REQ-GEN-246
+      - REQ-GEN-325
+      - REQ-GEN-237
+      - REQ-GEN-205
+      - REQ-GEN-135
+    decisions:
+      - "FULL SNAPSHOTS, SO EVERY ROW (Keith, 2026-10-25, Q3a): a geocoding supply geocodes everything in its period's source supply. REJECTED v1's 'records geocoded since the last supply'."
+      - "THE PERIOD, NOT THE ROUND (Keith, 2026-10-25, with REQ-PIPE-320 and REQ-GEN-325): Child Protection is at offset 1, so the Child Protection geocoding supply arriving on 2026-Q2's date (1 May) geocodes the cp_clients supply filed to 2026-Q2, which arrived on 1 February. Emergency Department is at 0, so its geocoding supply geocodes the ED supply of the same round."
+      - "FROM THE LAST SOURCE SUPPLY RECEIVED BEFORE THE RELEASE (Keith, Q13, 2026-10-25 evening): settled once in REQ-GEN-334 criterion 3 for the whole release, and this requirement uses the same source supply rather than restating the rule. A geocoder cannot geocode a file it has not received; for Emergency Department's red quarters the resupply arrives five to twenty days after the release (REQ-GEN-232), so the release geocodes the red routine supply, and REQ-QAC-340 later catches the mismatch."
+      - "ONE HEALTH RELEASE PER QUARTER, DUE IN THE AFTERNOON (Keith, Q13): the geocoding files and linkage_keys.csv in one zip, due after Emergency Department's morning arrivals (PROVISIONAL 14:00, REQ-GEN-334 criterion 6). REJECTED v2's open choice of a delivery of their own. One zip makes one package (REQ-PIPE-266); no file in it reads another, so each dataset is gated on its own verdicts."
+      - "IN THE LINKAGE PRODUCTS PROVIDER, NOT A PROVIDER OF ITS OWN (from REQ-GEN-246): one provider per collection. REJECTED v1's separate geocoding provider."
+      - "ALL QUARTERS EACH SOURCE HAS (Keith, L4, overriding his own Q9b). REJECTED v2's most recent twelve quarters. Child Protection's newest filed period, 2026-Q4, has no geocoding supply yet because its date (1 November) is after today - an ordinary not-yet-due slot, not a fault."
+      - "THE CORRECTED QUARTERS ARE GENERATED TOO (Keith, L9 = b, confirmed after the nine quarters were explained): REQ-GEN-205's five fictional Emergency Department quarter-date corrections (TS-57 to TS-61) alter nine 2013-2015 quarters in which Emergency Department is supplied and Child Protection is suppressed by REQ-GEN-237's empty-elsewhere rule. The ED geocoding supply there is generated and moves or is re-judged with ED's own; the CP geocoding slot is scripted not supplied, as CP's is. REJECTED suppressing Linkage Products in those quarters. The REQ-GEN-237 amendment that permits this is drafted with linkage-v2.yaml and needs its own sign-off wording; it is referenced here, not restated."
+      - "A NOT-GEOCODED ROW IS ORDINARY (Keith, road-testing #31 = a, with the 5 and 10 percent bands): a few in every supply is a geocoder's normal state, so the generator writes some by construction, under the amber line."
+      - "CLEAN BY CONSTRUCTION (v1, kept): ordinary rows satisfy the three year checks exactly, so any missing, duplicate or unexpected year in the history is an injection (REQ-GEN-298)."
+      - "THE SET IN FORCE FOR THE PERIOD, not today's (v1, kept): criterion 3 reads REQ-QAC-300's one resolution, so the generator and the checks cannot disagree about what a supply owed."
+      - "STABLE CODES AND MATCH LEVEL PER SOURCE ROW (PROPOSED v2, kept): the same row geocodes to the same areas at the same level every quarter, as a real geocoder would, so the match_level drift check (REQ-QAC-297) is quiet in ordinary supplies."
+    open_questions:
+      - "NEW - what an Emergency Department presentation with no postcode geocodes to. ED's own postcode check tolerates up to 2 percent missing green and 5 percent amber, and its red supplies may miss more. Recommended: written 'not geocoded', faithfully, so a red ED supply missing postcodes can make its geocoding supply amber or red too, the planned geocoding verdict read from the source rows it geocodes and confirmed with the real tools (REQ-GEN-186). The alternative keeps every ordinary geocoding supply green by placing a missing postcode at suburb level, which no real geocoder could do for ED, whose only address column is postcode."
+      - "NEW - Emergency Department's participation gap (REQ-GEN-251), one quarter ED is not owed with the quarter after inheriting. Recommended: each geocoding dataset's participation mirrors its source's, enforced by REQ-QAC-294 criterion 3's gate, so geo-ed-presentations is not owed in the gap quarter (rather than scripted not supplied), and an inheriting quarter geocodes the supply its period holds. The same question applies to Linkage Keys' coverage of ed-presentations (REQ-GEN-334)."
+
+  - id: REQ-PIPE-296
+    title: "The geocoding datasets run end to end through Linkage Products' QA adapter, in the quarterly bootstrap stream"
+    date_written: "2026-10-25"
+    story: "As whoever maintains the pipeline, I want the geocoding datasets filed, staged, checked, recorded, gated and bootstrapped through the Linkage Products adapter like every other dataset, so that nothing about geocoding is special-cased."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-25. Drafted by delivery-scoper 2026-10-25 on REQ-PIPE-233's pattern, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "WHEN a Health release arrives holding geocoding files, THE SYSTEM SHALL file, stage, check with all four tools, record and gate each geocoding supply through the shared modules and the Linkage Products adapter (REQ-PIPE-336), with no geocoding name in any file outside configuration, check files and the provider."
+      - "WHEN `mothman pipeline bootstrap` runs over an empty database, THE SYSTEM SHALL replay the geocoding datasets in the quarterly stream in receipt order with the other quarterly collections (REQ-PIPE-262), their runs counted separately in REQ-PIPE-336's before-and-after measurement."
+      - "WHEN the dashboard is built from recorded results holding the geocoding datasets, THE SYSTEM SHALL show each as a dataset of Linkage Products with the same status, as-at and supply-history behaviour as every other dataset."
+      - "WHERE a Health release omits a geocoding dataset's file for a quarter, THE SYSTEM SHALL treat that slot as any unfilled slot (REQ-PIPE-132), the other files in the zip filed and checked as usual."
+    non_functional_requirements:
+      - "A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): nothing here widens the publisher's grant."
+      - "ENUMERATE EVERY CONSUMER OF THE KEY (CLAUDE.md's shape-change rule): every reader that assumes a one-column failing-sample key is found by grep before this is called done, not discovered on a page."
+      - "CI COST: measured once, in REQ-PIPE-336's deployment-half figure, against REQ-TEST-260's monthly allowance."
+    dependencies:
+      - REQ-QAC-294
+      - REQ-GEN-295
+      - REQ-PIPE-336
+      - REQ-PIPE-262
+    decisions:
+      - "NO ADAPTER OF ITS OWN (from REQ-PIPE-240): one adapter per collection, and REQ-PIPE-336 provides Linkage Products'. REJECTED v1's criterion 1, a geocoding adapter."
+      - "MOSTLY ITEM 6's ALREADY (v1, kept): what remains is the end-to-end facts only real datasets make true, as REQ-PIPE-233 found for Emergency Department."
+      - "NO CROSS-COLLECTION READ IN v1 (Keith, 2026-10-25, Q1b): every v1 check reads its own table, so nothing here needs REQ-PIPE-331."
+      - "ONE MEASUREMENT, NOT TWO (delivery-scoper, v3): v2 had this requirement log its own bootstrap and CI times; REQ-PIPE-336 now measures the whole collection with geocoding counted separately, so the two cannot disagree."
+
+  - id: REQ-QAC-297
+    title: "Every geocoding dataset gets three census-year checks from one reusable dbt test, red on a single row, a not-geocoded share check amber above 5 percent and red above 10, and four ordinary checks"
+    date_written: "2026-10-25"
+    story: "As whoever maintains the pipeline, I want one reusable test that says, for a geocoding table, whether every source row has exactly one row for each census year in force - missing, duplicated and unexpected years each reported on its own - beside a banded share of rows not geocoded and a few structural checks, so that an incomplete geocode, a double-load, a year nobody agreed and a geocoder placing fewer addresses are different alarms."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/road-testing.md #12, and his answers of 2026-10-25 (Q6 three checks, one dbt generic test; Q7 red on any; Q8 empty supply) and that evening (#31 the not-geocoded share, amber above 5 percent and red above 10; Q14 the ordinary check set confirmed). Drafted by delivery-scoper 2026-10-25, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL provide one dbt generic test in dbt_project/macros/, taking a list of key columns, a member column and the declared set, that every geocoding dataset's three year checks use, with no geocoding dataset carrying SQL of its own for them."
+      - "WHEN a source row's identifier values present in the table lack a row for a census year in the set in force (REQ-QAC-300), THE SYSTEM SHALL fail the missing-year check, counting one violation per absent source row and year."
+      - "WHEN a source row's identifier values have more than one row for the same census year, THE SYSTEM SHALL fail the duplicate-year check, counting one violation per duplicated source row and year."
+      - "WHEN a row carries a census year outside the set in force, or no census year, THE SYSTEM SHALL fail the unexpected-year check, counting one violation per such row."
+      - "THE SYSTEM SHALL record each of the three as its own check, with its own check_id, verdict, count and bands, and SHALL band each red at a single violation, with no amber band."
+      - "THE SYSTEM SHALL record, for each failing pair, the source row's identifier values and the census year, so that a failing sample names both."
+      - "THE SYSTEM SHALL define, for each geocoding dataset, a NOT-GEOCODED SHARE check, the percentage of the supply's rows whose match_level is 'not geocoded', amber above 5 percent and red above 10 percent."
+      - "THE SYSTEM SHALL define, for each geocoding dataset, the ordinary checks Keith confirmed, each red on one violation (PROPOSED bands, following L7's own-row rule for Linkage Keys): each row carrying exactly the identifier columns its source declares, no fewer and no more, the count taken from REQ-QAC-294 criterion 2's mapping; match_level one of its four allowed values, an empty match_level counting as a violation; and sa2_code and lga_code each in its ABS format when match_level is not 'not geocoded' and empty when it is."
+      - "THE SYSTEM SHALL define, for each geocoding dataset, an Evidently drift check on match_level, computed over geocoded rows only, with the bands Emergency Department's drift checks use (PROPOSED)."
+      - "WHEN a geocoding supply holds no rows, THE SYSTEM SHALL evaluate the three year checks and the share check as it would any table and record each as passed."
+      - "IF a geocoding dataset declared under REQ-QAC-294 lacks any of the three year checks or the share check, or declares a year check without key columns, a member column or a set, THEN `mothman check` SHALL fail, naming the dataset."
+      - "THE SYSTEM SHALL give every check here a name, description, failure_indicates and technical_note written to docs/check-authoring-rules.md as it stands, with reads_columns declared, an introduced_date on or before the claim-window opening of the dataset's first generated period, and no change to those rules, in the files REQ-QAC-241 finds by convention."
+    non_functional_requirements:
+      - "PRIVACY: a failing sample records the source's identifier values and the census year only - no area code and no other column - so the recorded failures say which row and which year, and nothing about where."
+      - "NO PERMISSIVE FALLBACK: a misdeclared check is refused by the gate (criterion 11), never evaluated as a silent green - the false-green family plans/road-testing.md #6 found in Soda's validity config."
+      - "VERIFIED BY EXPERIMENT, NOT DOCS: how dbt records a failing row for a missing year, which has no row of its own, and how the share check evaluates on zero rows, are proven against the installed tools before criteria 6 and 10 are called met."
+      - "SCALE: one GROUP BY over key and year, linear in rows; at dozens of geocoding datasets every check is declared, never copied, and criterion 11's gate keeps each dataset's year and share checks present."
+      - "ONE IMPLEMENTATION OF EXACT IDS (PROPOSED): the exact-ids check is the same test REQ-QAC-333 uses for Linkage Keys' identifier-count check, here with a single declared count, so the two cannot drift."
+    dependencies:
+      - REQ-QAC-294
+      - REQ-QAC-300
+      - REQ-PIPE-296
+      - REQ-QAC-333
+    decisions:
+      - "THE GENERALISABLE RULE (plans/road-testing.md #12): for every key, exactly one row for each member of a declared set - one reusable test, not a bespoke query. The key is now the ids together (REQ-QAC-294), hence a list of key columns."
+      - "THREE CHECKS, NOT ONE WITH THREE COUNTS (Keith, 2026-10-25, Q6): missing is an incomplete geocode, duplicate a double-load or bad join (the likeliest to skew an aggregate silently), unexpected a source emitting what nobody agreed. REJECTED one combined count and one result with sub-counts."
+      - "ONE NEW GENERIC TEST, NOT TWO REUSED PLUS ONE NEW (Keith, 2026-10-25, Q6). REJECTED accepted_values for unexpected and unique_combination_of_columns for duplicates, which would put the set in two places that can drift."
+      - "dbt, NOT SODA, FOR THE YEAR CHECKS (Keith, 2026-10-25, Q6). REJECTED Soda failed-rows SQL copied per dataset."
+      - "RED ON ANY, ALL THREE YEAR CHECKS (Keith, Q7, restated with the share bands). REJECTED v1's provisional bands (missing amber above zero, red above a percentage of rows)."
+      - "NOT GEOCODED IS A BANDED SHARE, NOT A MISSING YEAR (Keith, road-testing #31 = a): amber above 5 percent, red above 10. A geocoder that cannot place an address is a quality signal that grows, not a process fault; missing-year stays about process. The share is of ROWS (PROPOSED), which equals the share of source rows while a not-geocoded source row is not geocoded in every census year."
+      - "AMBER IS NOT RESERVED FOR THE CROSS-COLLECTION CHECKS (resolved by Keith's share bands): v2's open question whether amber was kept only for REQ-QAC-340 is answered - the share check has an amber band, and the drift check keeps ordinary bands."
+      - "THE ORDINARY CHECK SET IS KEITH'S (Q14, 2026-10-25 evening): exact ids, match_level allowed values, SA2 and LGA format when geocoded and empty when not, and match_level drift, beside the three year checks and the share. REJECTED v2's 'source_row_id never empty' (replaced by exact ids), a row-count band (Q8), drift on sa2_code (a distribution of where people live, published, at no gain over match_level), and any check on address text, which the tables do not hold."
+      - "DRIFT OVER GEOCODED ROWS ONLY (PROPOSED by delivery-scoper, v3): with 'not geocoded' a match_level value, drift over all rows would fire whenever the share check does, so one fault would raise two alarms and REQ-GEN-298's one-fault scenarios could not be placed. Excluding not-geocoded rows makes drift about how addresses are matched and the share about how many are not."
+      - "AN EMPTY SUPPLY PASSES - A KNOWN GAP (Keith, 2026-10-25, Q8): no special handling and no row-count check; the year checks pass vacuously on an empty file, and the share check reads zero of zero as passed (PROPOSED, in the same spirit), so an empty geocoding supply reads green until REQ-QAC-340's every-source-row check finds it. REVERSES v1's criterion 'SHALL NOT report the three as passed' on an empty table."
+      - "KEYS COME FROM THE TABLE ITSELF, IN v1: a source row with no geocoding row at all is invisible to these checks, and the empty-supply gap is the extreme case of it. Both close with REQ-QAC-340."
+      - "A NULL CENSUS YEAR IS UNEXPECTED (PROPOSED v2, kept): it is not a member of the set, so the unexpected-year check counts it rather than a fourth not-null check."
+    open_questions: []
+
+  - id: REQ-GEN-298
+    title: "The geocoding history carries missing, duplicate and unexpected census years and an amber and a red not-geocoded share on purpose, in ordinary supplies and in one named scenario for each"
+    date_written: "2026-10-25"
+    story: "As Keith showing the checks to the participant who asked for them, I want each fault planted in ordinary supplies and once each in a named scenario I can find from the scenario map, so that each check can be seen going amber or red for its own reason on a real page."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-25 (Q10a presets and one named scenario per fault; Q11a in the TS register) and that evening (Q14 scenario hosts; 2026 sent before 2026-Q3; the share bands). Drafted by delivery-scoper 2026-10-25, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL provide five injections in the Linkage Products provider - drop one census year's rows for chosen source rows; duplicate one year's row for chosen source rows; add a row for a census year outside the set in force; and raise the not-geocoded share into the amber band, or into the red band - each seeded."
+      - "WHEN an ordinary geocoding supply is drawn amber or red, THE SYSTEM SHALL apply one or more of the five through the provider's severity presets (REQ-GEN-184), and SHALL confirm the verdict with the real tools (REQ-GEN-186)."
+      - "THE SYSTEM SHALL plant five named scenarios, one per fault, each the only fault in its supply with every other check green, each in a quarter of its own - the missing-year and unexpected-year scenarios on Client Register Geocodes, the duplicate-year scenario on ED Presentations Geocodes, and the two share scenarios one on each (PROPOSED for the share)."
+      - "THE SYSTEM SHALL record each named scenario in plans/supply-model.md's TS register under the next free TS numbers when applied, and in the scenario map with its dataset, supply, period and as-at date (REQ-GEN-045)."
+      - "WHEN a duplicate-year injection runs, THE SYSTEM SHALL make the duplicate identical in every column to the row it copies."
+      - "WHEN an unexpected-year injection runs, THE SYSTEM SHALL use 2026, in a quarter before 2026-Q3, when 2026 joins the set (REQ-QAC-300), so that only the unexpected-year check catches it."
+      - "WHEN a share injection runs, THE SYSTEM SHALL turn whole source rows to 'not geocoded' in every census year, codes emptied, so that only the share check catches it."
+      - "IF an injection would also break a check it is not aimed at, judged from the checks' declared reads_columns, or cannot be placed, or would land in a quarter REQ-GEN-205's corrections alter, THEN generation SHALL refuse before writing anything, naming the injection, and SHALL NOT shift, drop or relax it."
+    non_functional_requirements:
+      - "DETERMINISM: the same seed and configuration place the same injections in the same supplies."
+      - "SYNTHETIC ONLY, AND SAID SO: the TS register and the scenario map are the list that says which red was on purpose."
+      - "BOOTSTRAP BUDGET: the scenarios sit inside the every-quarter history, so they add no runs beyond any resupplies they cause."
+      - "BYTE-IDENTICAL NEIGHBOURS: no injection touches another collection's files or REQ-GEN-335's linkage scenarios."
+    dependencies:
+      - REQ-GEN-295
+      - REQ-QAC-297
+      - REQ-QAC-300
+      - REQ-GEN-184
+      - REQ-GEN-045
+    decisions:
+      - "PRESETS AND NAMED SCENARIOS, BOTH (Keith, 2026-10-25, Q10a)."
+      - "IN THE TS REGISTER (Keith, 2026-10-25, Q11a). RE-VERIFIED 2026-10-25 evening against plans/supply-model.md: the highest number used is TS-85, so TS-86 is next free today. REQ-GEN-335's linkage scenarios also take 'the next free TS numbers when applied', so whichever batch lands first takes TS-86 - the numbers are assigned at application, not here."
+      - "SCENARIO HOSTS ARE KEITH'S (Q14): missing and unexpected on Client Register Geocodes, duplicate on ED Presentations Geocodes."
+      - "SHARE SCENARIOS ADDED (PROPOSED by delivery-scoper, v3): Keith's Q10a gives one named scenario per fault, and the not-geocoded share is a new check with two bands, so one scenario per band follows REQ-GEN-335's one-scenario-per-verdict-route rule (its coverage amber and red)."
+      - "RED PRESETS FOR THE YEAR CHECKS, AMBER AND RED FOR THE SHARE: the year checks are red on any (Keith, Q7), so their faults have no amber preset; the ordinary history's geocoding amber comes from the share."
+      - "EACH NAMED SCENARIO CARRIES ONE FAULT ALONE (v1, kept): a supply red on all three shows the checks fire, not that they distinguish. That is why criterion 7 turns whole source rows and REQ-QAC-297's drift excludes not-geocoded rows."
+      - "2026, BEFORE 2026-Q3 (Keith, Q14, correcting v2's proposed 2026-Q1): the next census is exactly the year a source would emit before anyone had agreed it, and the same year joining the set from 2026-Q3 (REQ-QAC-300) shows the before and after on one page. REJECTED a malformed year, which a type check would catch first."
+      - "NOT IN THE CORRECTED QUARTERS (delivery-scoper): those nine quarters already carry the correction scenarios TS-57 to TS-61, so a geocoding fault there would not be the only fault its page shows."
+    open_questions: []
+
+  - id: REQ-DASH-299
+    title: "The dashboard names the year checks plainly, shows a failing sample as source row and year - 'source row 4821 · 2021: no row' - and shows the census years in force for the period"
+    date_written: "2026-10-25"
+    story: "As a data team leader glancing at a geocoding dataset, I want the three year checks to read as three different problems, a failing sample to say which source row and which census year, and the page to say which census years the period was held to, so that I can tell an incomplete geocode from a double-load without opening a tool's output."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-25 (Q12a the constructed missing-year sample, worded as such; Q5a the page shows the set in force per period). Drafted by delivery-scoper 2026-10-25, updated the same evening for the id_1..id_n key. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL label the three year checks by what they find - missing, duplicated or unexpected census years - and the share check as the share of rows not geocoded, from pipeline/dashboard_check_labels.py, never from the macro's name, in the same order on every geocoding dataset."
+      - "WHEN a missing-year failing sample is shown, THE SYSTEM SHALL show each failing pair as a constructed line, 'source row <identifier values> · <census year>: no row', so that it never reads as a row that exists in the data."
+      - "WHEN a duplicate-year or unexpected-year failing sample is shown, THE SYSTEM SHALL show each failing row as its identifier values and census year together (PROPOSED - 'source row 4821 · 2021: 2 rows' and 'source row 4821 · 2026')."
+      - "WHERE a source declares several identifier columns, THE SYSTEM SHALL show their values in declared order, separated by ' / ' (PROPOSED)."
+      - "THE SYSTEM SHALL NOT render a failing pair as the identifier values alone anywhere a sample is shown, asserted in a real browser on the built page."
+      - "WHILE a geocoding dataset's page is shown for a period, THE SYSTEM SHALL show the census years in force for that period (REQ-QAC-300), and the date the set last changed."
+      - "THE SYSTEM SHALL draw a break on each of the three year checks' trend charts at a widening of the set, as it does for any breaking definition change."
+      - "THE SYSTEM SHALL NOT show an area code, address text or any source-row attribute other than its identifier values in a geocoding dataset's samples or headings."
+    non_functional_requirements:
+      - "ASSERT AT THE LAYER A HUMAN SEES (CLAUDE.md): the composite sample is checked on the built page in a real browser, not only in the recorded data."
+      - "POLISH BAR: the three read as siblings, same wording shape (Keith's Apple-level bar)."
+      - "A BUILD READS RECORDED QA RESULTS AND CONFIGURATION ONLY: the set in force comes from configuration; nothing reads supply rows."
+      - "RENDER BUDGET: page size and tests/test_dashboard_e2e.py's duration measured before and after; growth beyond about 10 percent reported to Keith."
+    dependencies:
+      - REQ-QAC-297
+      - REQ-QAC-300
+      - REQ-PIPE-296
+    decisions:
+      - "A CONSTRUCTED PAIR, WORDED AS SUCH (Keith, 2026-10-25, Q12a): a missing year has no row, so its sample is a pair the check builds, and the wording says 'no row' rather than imitating a data row."
+      - "THE SET IN FORCE ON THE PAGE, NO ADVANCE WARNING (Keith, 2026-10-25, Q5a): a widening is a reviewed configuration change, so the page shows what applied rather than warning of what will."
+      - "NO NEW PANEL (v1, kept): the checks render as rows wherever checks render. REJECTED a bespoke completeness-by-key panel."
+      - "THE KEY'S SECOND PART IS THE DISPLAY GAP (plans/road-testing.md #12): the failing sample has only ever shown a one-part key, and with id_1..id_n the first part may itself have several values."
+      - "'source row' STAYS THE WORD (v3): Keith's example names a source row, and the identifier values are what identify it; the source column names are not shown, as they are the maintainer's detail."
+      - "CRITERIA 3 AND 4's WORDING IS THE SCOPER'S EXTENSION of Keith's missing-year example, not his own words."
+    open_questions: []
+
+  - id: REQ-QAC-300
+    title: "The census years every geocoding dataset owes are declared once for the collection, as effective-dated versions - 2016 and 2021, with 2026 joining from 2026-Q3 - and each supply is judged against the set in force for its period"
+    date_written: "2026-10-25"
+    story: "As an agency's accountable data owner, I want the expected census years to widen on a date we declare, with earlier supplies judged against the earlier set, so that the day a new census is processed does not turn every historical geocode red for a reason that is not a data-quality failure."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/road-testing.md #12 (2026-09-24, the set grows on a five-year cadence) and his answers of 2026-10-25 (Q4 2016 and 2021, widening in this batch; Q5a no advance warning) and that evening (Q14 declared once per collection; 2026 from 2026-Q3). Drafted by delivery-scoper 2026-10-25, updated the same evening. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare the census years once for the Linkage Products collection, as effective-dated versions each with its effective_from and a changelog entry, read by every geocoding dataset's checks and by the generator."
+      - "THE SYSTEM SHALL state a first version of 2016 and 2021, in force from on or before the first period any geocoding dataset owes."
+      - "THE SYSTEM SHALL state a second version adding 2026, effective from 2026-Q3's own date (2026-08-01), with geocoding supplies on both sides of it."
+      - "WHEN a supply is checked, THE SYSTEM SHALL judge it against the version in force on its period's own date, through one shared resolution function."
+      - "IF no version covers a period a geocoding dataset owes, THEN `mothman check` SHALL refuse the configuration, naming the dataset and the period, and SHALL NOT use the nearest version."
+      - "WHEN a version adds a census year, THE SYSTEM SHALL record the change as breaking in each affected check's changelog."
+      - "IF a version whose effective_from has passed is edited, THEN `mothman check` SHALL refuse it, except on an asset declared synthetic, as the agreement freeze refuses a past calendar version."
+      - "THE SYSTEM SHALL record, with each result of the three year checks, which version of the set it was judged against."
+    non_functional_requirements:
+      - "ONE RESOLUTION: which version is in force is answered by one function, shared by the checks, the generator and the page (replacement_setting.py's warning that two implementations of 'which version is in force' is how settings drift)."
+      - "AUDITABILITY: every recorded result names its version (criterion 8), so 'why was this red' is answerable after the set has moved."
+      - "SCALE: one declaration for the collection, so dozens of geocoding datasets cannot disagree about the census years."
+      - "CONFIGURATION, NOT STATE: authored, reviewed and versioned in git."
+    dependencies:
+      - REQ-QAC-294
+    decisions:
+      - "IN THIS BATCH (Keith, 2026-10-25, Q4)."
+      - "2016 AND 2021 (Keith, 2026-10-25, Q4). REJECTED v1's six years, 1996 to 2021. Still enough with every quarter generated (L4): ASGS editions, not the history's depth, decide the years."
+      - "2026 FROM 2026-Q3 (Keith, Q14, 2026-10-25 evening). REJECTED v2's proposed 2026-Q1. With today's anchor that leaves 2026-Q3 the only quarter after the widening that has a geocoding supply yet, which is enough to show both sides; 2026-Q4's joins it on 1 November."
+      - "NO ADVANCE WARNING (Keith, 2026-10-25, Q5a): a widening is a reviewed configuration change. REJECTED a runway warning like REQ-PIPE-053's."
+      - "THE SET GROWS, A CERTAINTY (Keith, 2026-09-24): ABS runs a census every five years."
+      - "DECLARED, DATED, NEITHER READING ALONE (plans/road-testing.md #12): 'every census year that exists' turns the whole table red the day a census is processed; 'every year it was geocoded against' hides a backfill that never happened. RESOLVED as a declared set whose widening is an explicit dated act. REJECTED deriving the set from the data, which hides a wholly missing year."
+      - "WHY VERSIONED AND NOT ONE EDITED LIST (v1, from the code): a bootstrap replays every historical supply against today's check files, so one edited list would re-judge the whole history the day it changed."
+      - "RESOLVED ON THE PERIOD'S OWN DATE, as REQ-PIPE-320 resolves an offset and REQ-PIPE-113 everything else about a period."
+      - "ONCE FOR THE COLLECTION, NOT PER DATASET (Keith, Q14, confirming the scoper's proposal): the census years are an ABS fact, the same for every source. REJECTED a set per geocoding dataset, which at dozens of datasets is dozens of copies to widen in step."
+      - "EXISTING MACHINERY (plans/road-testing.md #12): check_lifecycle.py, changelog breaking flags and the trend-chart break already handle a dated definition change."
+    open_questions: []
+
+  - id: REQ-QAC-340
+    title: "LATER - each geocoding dataset is checked against its source supply for the period, every source row geocoded and no geocoding row without a source row, re-scoped once the cross-collection read is built"
+    date_written: "2026-10-25"
+    story: "As a data team leader, I want each period's geocoding checked against the source supply it was built from, so that a source row left out entirely, or an empty geocoding file, is found rather than reading green."
+    moscow: could
+    status: not_started
+    source: "Keith, 2026-10-25 (Q1b cross-collection checks definitely needed for geocoding, fine to wait for REQ-PIPE-331; Q8 they close the empty-supply gap) and that evening (Q14 re-scoped once REQ-PIPE-331 is built). Drafted by delivery-scoper 2026-10-25 so the follow-up is not lost. NOT v1. A PLACEHOLDER PROPOSAL, not for sign-off until re-scoped."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL define, for each geocoding dataset, a COVERAGE check failing on each source row of the period's source supply that has no geocoding row for some census year in force, comparing identifiers under REQ-QAC-294 criterion 2's mapping and declaring reads_tables for the source dataset's table (REQ-PIPE-331)."
+      - "THE SYSTEM SHALL define, for each geocoding dataset, an ORPHAN check failing on each geocoding row whose identifier values match no row of the period's source supply."
+      - "THE SYSTEM SHALL band the coverage check with an amber band Keith signs off at re-scoping, and the orphan check red on one violation (PROVISIONAL)."
+      - "WHEN a geocoding supply holds no rows and the period's source supply holds some, THE SYSTEM SHALL fail the coverage check, closing REQ-QAC-297's empty-supply gap."
+      - "THE SYSTEM SHALL count each evaluated result toward the supplies it read as REQ-PIPE-332 settles for linkage checks (PROVISIONAL, for re-scoping)."
+    non_functional_requirements:
+      - "PRIVACY: the first join of a geocoding table to the person or presentation records it was built from; failing samples carry identifier values only."
+      - "SCALE: two checks per geocoding dataset, each one join against one source table."
+    dependencies:
+      - REQ-PIPE-331
+      - REQ-PIPE-332
+      - REQ-QAC-297
+    decisions:
+      - "SEPARATE AND LATER (Keith, 2026-10-25, Q1b): v1 checks own rows only. Drafted now so the cross-collection half and the empty-supply gap it closes are not lost."
+      - "RE-SCOPED ONCE REQ-PIPE-331 IS BUILT (Keith, Q14, confirming the scoper's recommendation): a placeholder, not for sign-off in this batch. REJECTED scoping and signing it now, before the read it depends on exists."
+      - "THE SAME PAIR AS LINKAGE's (REQ-QAC-333): referential and coverage, one table per result."
+      - "COUNTED BOTH WAYS, AS LINKAGE IS (follows Keith's L1 = b for REQ-PIPE-332): v2 counted these toward the geocoding supply only, which REQ-PIPE-332's redraft no longer supports; whether geocoding follows linkage here is for the re-scoping."
+    open_questions:
+      - "At re-scoping - the coverage bands (linkage's are amber below 95 percent and red below 90, L7), and whether a geocoding verdict counts toward the source supply it read, as linkage's does (REQ-PIPE-332)."

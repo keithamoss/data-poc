@@ -38,7 +38,7 @@ import pandas as pd
 from synthetic_data_generator.population import generate_population
 from synthetic_data_generator.child_protection import generate_child_protection_collection
 from synthetic_data_generator.agency_datasets import generate_birth_registrations, generate_school_enrollment
-from generator import dirty as dirty_mod
+from synthetic_data_generator import dirty_presets as dirty_mod
 
 PUBLIC_COLUMNS = {
     "birth_registrations": [c for c in

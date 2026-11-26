@@ -1,0 +1,33 @@
+# The Cancer collection's Soda checks (REQ-QAC-348). The prose follows
+# docs/check-authoring-rules.md. A synthetic test dataset: no real patient data.
+checks for cancer_notifications:
+  - missing_percent(postcode):
+      warn: when > 2
+      fail: when > 5
+      attributes:
+        check_id: quarterly.department-of-health.cancer.cancer-notifications.postcode.missing_percent_soda
+        name: Postcode recorded
+        category: completeness
+        introduced_date: "2015-01-01"
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          Notifications are being recorded without an address, most often
+          because a pathology laboratory's feed has stopped carrying it.
+        changelog: []
+
+  - invalid_percent(basis_of_diagnosis):
+      valid values: ["Histology", "Cytology", "Clinical", "Death certificate only"]
+      warn: when > 0
+      fail: when > 1
+      attributes:
+        check_id: quarterly.department-of-health.cancer.cancer-notifications.basis_of_diagnosis.invalid_percent_soda
+        name: Known basis of diagnosis
+        category: conformity
+        introduced_date: "2015-01-01"
+        description: >
+          A single unrecognised value warns; a sustained share fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed
+          in the contract, usually a new code introduced upstream without notice.
+        changelog: []

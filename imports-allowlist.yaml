@@ -1,0 +1,19 @@
+# REQ-TEST-384: the imports gate's exceptions - every forbidden import the tree
+# held when the gate landed (2026-11-15), each naming the requirement whose
+# build removes it. A to-do list that ONLY SHRINKS: `mothman dashboard
+# validate-imports` fails on an entry that matches no import any more (delete
+# it) and on any entry the push's base commit did not hold. One entry covers
+# every import of that module in that file. The fix for a new finding is to
+# move the code across the boundary, never a new entry here.
+#
+# Who removes what. REQ-PIPE-380 moved the shared reading code into
+# asset_model/ and rewrote its importers (criteria 1, 2 and 15), removing its
+# 58 entries on 2026-11-15. REQ-GEN-381 took the bootstrap off cli.pipeline
+# (criterion 3), and the promotion lag rule moved into scenarios/ with
+# REQ-PIPE-382 (REQ-GEN-386 criterion 4's lag half), removing 4 more the same
+# day. REQ-GEN-386 moves the register, map and scripted-decision readers into
+# scenarios/ (criteria 4 and 6) and gives the generator its own delivery
+# writer (criterion 7), and REQ-QAC-389 stops the Linkage Products provider
+# loading its collection's QA adapter (criterion 9): both built 2026-11-18,
+# removing the last 7.
+entries: []

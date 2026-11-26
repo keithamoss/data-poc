@@ -19,12 +19,14 @@ def _write(tmp_path, content):
 class TestParsePeopleConfig:
     def test_a_missing_file_returns_empty_config_rather_than_raising(self, tmp_path):
         config = people_mod.parse_people_config(tmp_path / "does-not-exist.yaml")
-        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
+                          "asset_assignments": [], "roles": []}
 
     def test_a_genuinely_empty_committed_file_also_returns_empty_config(self, tmp_path):
         path = _write(tmp_path, "people: []\nassignments: []\n")
         config = people_mod.parse_people_config(path)
-        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
+                          "asset_assignments": [], "roles": []}
 
     def test_parses_real_people_and_agency_and_dataset_assignments(self, tmp_path):
         path = _write(tmp_path, """
@@ -53,6 +55,7 @@ class TestParsePeopleConfig:
         assert config["agency_assignments"]["registry-services"][0]["github"] == "keithamoss"
         assert config["dataset_assignments"]["cp-clients"][0]["github"] == "janereviewer"
 
+    @pytest.mark.asset("daily")
     def test_an_assignment_referencing_an_unknown_person_is_skipped_not_an_error(self, tmp_path):
         path = _write(tmp_path, """
             people: []
@@ -86,6 +89,7 @@ class TestAssigneesFor:
     def test_a_scope_with_neither_returns_an_empty_list(self, config):
         assert people_mod.assignees_for("cp-carers", "child-protection-family-support", config) == []
 
+    @pytest.mark.asset("quarterly")
     def test_dataset_level_entries_are_never_merged_with_agency_level(self):
         """A dataset carrying its own explicit assignments overrides its
         agency's list outright - a real design choice (people.py's own
@@ -107,6 +111,7 @@ class TestGithubUsernamesFor:
             {"email": "aaron@example.com", "github": "aaronsomeone", "role": "manager"})
         assert people_mod.github_usernames_for("birth-registrations", "registry-services", config) == ["aaronsomeone", "keithamoss"]
 
+    @pytest.mark.asset("daily")
     def test_a_person_with_no_real_github_username_is_silently_excluded(self):
         config = {
             "people": {},
@@ -123,3 +128,8 @@ class TestGithubUsernamesFor:
         committed check-definition files."""
         config = people_mod.parse_people_config()
         assert isinstance(config["people"], dict)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

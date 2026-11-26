@@ -1,0 +1,15 @@
+# Linkage Products' dbt source (REQ-QAC-330, REQ-PIPE-296) - the run's own view
+# schema: the linkage release, each geocoding table, and the declared set in
+# force for the run's period (REQ-QAC-297 criterion 3), which
+# qa_tools/common/list_setting_members.py builds with the period's views. It is
+# no dataset's table, so it is declared here and in no check's reads_tables.
+version: 2
+
+sources:
+  - name: raw
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
+    tables:
+      - name: linkage_keys
+      - name: geo_cp_clients
+      - name: geo_ed_presentations
+      - name: list_setting_members

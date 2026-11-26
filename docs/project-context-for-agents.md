@@ -58,7 +58,8 @@ for their products... a UX where you don't even realize it's polished
 because of everything else." That's a real, standing bar for anything
 UX-related in this project, not just a nice-to-have.
 
-**A data steward** (the day-to-day dashboard user this PoC models, not
+**A data team leader** (the glancing dashboard reader this PoC models,
+not
 yet a real named person) - checks the register regularly, often quickly,
 often alongside other work, not as their sole focus. What they actually
 need in that moment: "is my dataset OK, and if not, what's wrong and
@@ -78,13 +79,13 @@ time, and do they have something defensible to point to if someone above
 them asks "why is this red."
 
 **Whoever maintains the pipeline itself** (the QA checks, the contract,
-the ingestion) - the opposite of the data steward's need: this person
+the ingestion) - the opposite of the data team leader's need: this person
 *wants* the raw tool-level detail (which specific dbt test, which Soda
 check, the actual failing values) to find and fix a real root cause, not
-a simplified summary. A UX decision that's right for the steward (hide
-the noise) can be wrong for this person (surface the detail) - both are
-real users of the same dashboard, at different depths of the same
-information.
+a simplified summary. A UX decision that's right for the data team leader
+(hide the noise) can be wrong for this person (surface the detail) -
+both are real users of the same dashboard, at different depths of the
+same information.
 
 None of these last three are real named people yet in this PoC -
 `contract/people.yaml` has Keith's own real identity plus fictional
@@ -128,7 +129,7 @@ for the full, current, authoritative breakdown)
 | `contract/` | The real ODCS contract + SodaCL checks - the actual source of truth for schema/quality rules. |
 | `generator/`, `synthetic_data_generator/` | Synthetic data generation standing in for real production data. |
 | `qa_tools/` | The real dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path. |
-| `qa_results/` | The permanent, committed history of every real QA run - never regenerated away. |
+| the `qa` schema | The permanent recorded history of every real QA run, in the warehouse database - never regenerated away. It was a committed `qa_results/` tree until REQ-PIPE-089 (2026-09-27); the repository holds configuration, not state. |
 | `dashboard/` | The single-file static reporting dashboard, built from a real hand-authored template plus real embedded data. |
 | `plans/*.md` | This project's own living design memory - real decisions, real open questions, real status per item. |
 | `requirements.yaml` | The live, structured requirements register (MoSCoW, acceptance criteria, real CI-enforced test linkage) - this is what the delivery-scoper/reviewer agents write into. |
@@ -145,9 +146,16 @@ needs this specifically to pick the right code for a new requirement's
 
 - **`mothman` is the only sanctioned way to run anything in this repo** -
   never invoke a script directly.
-- **CI never touches live or synthetic data** - any check that needs a
-  live connection runs once, at real pipeline-run time, never deferred
-  to a later read.
+- **A build may read recorded QA results, never actual data, and never
+  anything else** (Keith's own wording, 2026-09-27) - any computation
+  that needs supply rows runs once, at real pipeline-run time, and its
+  conclusion is recorded, never deferred to a later read. This used to
+  read "CI never touches live or synthetic data", which named the wrong
+  actor and the wrong store: the dashboard is not built in GitHub Actions
+  any more (REQ-PIPE-092) and supply rows are in PostgreSQL rather than
+  under `data/` (REQ-PIPE-087). The rule is unchanged and sharper - the
+  publisher reads the recorded results over a least-privilege grant and
+  cannot reach the extract at all.
 - **A real bug found gets a regression test, confirmed failing before
   the fix** - the same standard a delivery-critic agent should
   hold newly-reviewed work to.

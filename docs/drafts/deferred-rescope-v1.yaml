@@ -1,0 +1,144 @@
+- id: REQ-GHUB-433
+  title: "The processing pass reads new slot-ticket comments from GitHub and hands each to the GitHub filing route once, so a comment reaches the decision log without GitHub Actions reaching the database"
+  date_written: "2026-11-21"
+  story: "As a data engineer working a slot's ticket, I want a filing command I post there to be acted on by the next processing pass in the environment that holds the decision log, so that the GitHub route of REQ-GHUB-082 works now that no workflow can reach the database."
+  moscow: should
+  status: not_started
+  source: "Keith, delivery-architect triage of REQ-GHUB-082 criterion 1 relayed by the main session, 2026-11-21; plans/running-thoughts.md #53 (Keith, 2026-09-27); Thread H's drain-the-backlog rule (plans/supply-model.md sprint 12). Drafted by delivery-scoper 2026-11-21. PROPOSAL, not signed."
+  acceptance_criteria:
+    - "WHEN `mothman pipeline process` runs in an environment whose ticketing is on, THE SYSTEM SHALL read every comment posted on the asset's ticket repository since the last comment it handled, and SHALL pass each one on a slot ticket to filing_from_github.handle(), oldest first by GitHub's creation time."
+    - "THE SYSTEM SHALL read those comments by an outbound request from inside the environment that holds the asset's database, and SHALL NOT require any inbound connection to that environment."
+    - "THE SYSTEM SHALL read comments with one repository-level listing per pass, paged, and SHALL NOT make a request per ticket."
+    - "THE SYSTEM SHALL record which comments it has handled in the asset's own database, and SHALL NOT keep that record in the repository or on local disk."
+    - "THE SYSTEM SHALL hand any one comment to the handler at most once, so that a pass re-run after a failure does not raise the same decision twice."
+    - "IF reading or handling comments fails partway through a pass, THEN THE SYSTEM SHALL keep the record at the last comment handled, SHALL report the stage as failed in the pass's exit status, and SHALL read the rest on the next pass."
+    - "THE SYSTEM SHALL take each comment's author from GitHub's own record of who posted it, and SHALL NOT read an author from the comment's body (REQ-GHUB-082 criterion 4)."
+    - "WHERE a comment is on a ticket whose slot is not a dataset of the selected asset, THE SYSTEM SHALL neither handle it nor reply to it."
+    - "THE SYSTEM SHALL read comments before it reconciles tickets in the same pass, so that a decision raised on a ticket is reflected on that ticket by the same pass (REQ-GHUB-082 criterion 8)."
+    - "WHERE the environment's ticketing is off, THE SYSTEM SHALL read no comments and SHALL say so in one line of the pass's report."
+    - "THE SYSTEM SHALL act on a comment as it read when first handled, and SHALL NOT re-handle a comment edited afterwards."
+    - "THE SYSTEM SHALL delete the disabled .github/workflows/ticket-sync.yml in the same change, and SHALL close REQ-GHUB-082 criterion 1's unmet entry citing this requirement."
+  non_functional_requirements:
+    - "COMPATIBILITY: the environment already calls GitHub outbound for ticket reconciliation (ticket_reconciler.service_from_env), so this adds a read over the same route and the same credential; no new network path is opened."
+    - "SECURITY: the credential is read-and-write on issues of one repository only, never contents; what it lets a holder do is unchanged, because a comment's authority comes from its GitHub author being in people.yaml, never from the poller."
+    - "SECURITY: when the repository goes private (REQ-DOCS-259), commenting already needs repository access, which narrows who can raise a decision; the people.yaml allowlist stays the gate either way."
+    - "SCALABILITY: at about 30 collections per asset the cost is one paged listing per pass, independent of the number of tickets, well inside GitHub's per-token rate limit."
+    - "RELIABILITY: a GitHub outage delays decisions until the next pass and never loses one, because the record of handled comments only moves forward over comments actually handled."
+    - "OBSERVABILITY: every decision is still recorded with the person as actor and the reason they gave (REQ-GHUB-082 criteria 10 and 27); the pass report says how many comments were read and how many raised a decision."
+    - "LATENCY: a comment is acted on at the next processing pass, so the scheduler's interval is the response time; nothing here promises faster."
+    - "STATE: the record of handled comments is state, so it lives in the database (CLAUDE.md, the repository holds configuration, not state)."
+  dependencies:
+    - REQ-GHUB-082
+    - REQ-PIPE-151
+    - REQ-PIPE-083
+  decisions:
+    - "PROVISIONAL, pending Keith: POLLED BY THE PROCESSING PASS rather than a webhook or a separate Lambda. The environment already calls GitHub outbound to reconcile tickets, so polling adds no new path or credential, while a webhook needs an inbound endpoint into a strictly separated environment. A scheduled Lambda is the same thing as the scheduler that already calls `mothman pipeline process` (REQ-PIPE-151), so it is not a separate option."
+    - "REJECTED a webhook into the environment: it needs an inbound endpoint, a public address and secret verification for each of two separated environments, all to save at most one scheduler interval of latency on a decision that is not urgent."
+    - "REJECTED reviving ticket-sync.yml with database access: a runner with a route to the database breaks REQ-PIPE-089/092's line that a GitHub runner holds no route to the supply database."
+    - "DRAIN THE BACKLOG, carried from Thread H (2026-09-22): each pass reads everything since its record rather than reacting to one event, so a missed or failed pass costs nothing. Applied serially, oldest first, last wins, exactly as settled then."
+    - "ONE ASSET PER ENVIRONMENT READS ONLY ITS OWN SLOTS: both assets name the same ticket_repository today, so each pass must ignore the other asset's tickets in silence; a reply would put two environments answering one thread."
+  open_questions:
+    - "Which GitHub credential an environment holds for this and for reconciliation - a GitHub App installation per environment, or a fine-grained token on a service account. Does not change what is built here, but it is a deployment decision for whoever stands up each environment."
+- id: REQ-PIPE-434
+  title: "A supply for a dataset with no calendar is filed to no period, never held for placing, and checked when it arrives"
+  date_written: "2026-11-21"
+  story: "As whoever runs QA on a one-off project extraction, or develops checks before a schedule is agreed, I want a supply for a dataset with no calendar to be staged and checked as soon as it arrives, so that the shape REQ-PIPE-106 declares actually runs rather than stopping in filing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 and post-build-review #473 (2026-11-18: scope it separately), relayed by the main session 2026-11-21; plans/supply-model.md sprint 29 point 4 (Keith, 2026-09-27: no cadence, no slots, no lateness, no filing). Drafted by delivery-scoper 2026-11-21. PROPOSAL, not signed."
+  acceptance_criteria:
+    - "WHEN a supply arrives for a dataset that declares `no_calendar` (either value), THE SYSTEM SHALL record the arrival with no slot and no period, and SHALL NOT let NoCalendarAgreed escape filing."
+    - "THE SYSTEM SHALL NOT hold such a supply for a person to place (REQ-PIPE-064), because no period exists to place it in."
+    - "WHEN such a supply is staged, THE SYSTEM SHALL run its dataset's active checks over it in the same pass as any other arrival, against the run view REQ-PIPE-106 builds from the newest version of each no-calendar table."
+    - "THE SYSTEM SHALL NOT compute a claim window, lateness, runway, a missing slot or a schedule-ended hold for such a dataset, and SHALL NOT report any of them as failing for want of a calendar."
+    - "THE SYSTEM SHALL keep the QA record of such a supply in the supply state REQ-PIPE-106 derives from the declaration, and SHALL NOT decide that state in filing."
+    - "IF configuration declares `no_calendar` on a dataset that also names a calendar, THEN THE SYSTEM SHALL go on refusing it in the schedule gate as today (REQ-PIPE-106 criterion 2)."
+  non_functional_requirements:
+    - "SCALABILITY: no work per period, so the cost is per arrival only; 30-40 extractions a year (sprint 29 point 8) adds nothing that grows with time."
+    - "RELIABILITY: a supply that cannot be loaded or checked reads could-not-load or could-not-check as for any other arrival, and is never silently skipped."
+    - "PRIVACY: the supply rows stay in the sample schema of the database that received them; nothing here copies them anywhere else."
+    - "MAINTAINABILITY: one rule at the filing boundary, asked of the declaration (sample_data.is_sample), not a branch per caller - the same shape REQ-PIPE-106 chose for the record."
+  dependencies:
+    - REQ-PIPE-106
+    - REQ-PIPE-379
+  decisions:
+    - "BOTH no_calendar VALUES ARE FILED THE SAME WAY (delivery-scoper): neither has a period, so filing, holding and lateness cannot differ between them; where they differ is what the QA record counts for, which is REQ-PIPE-106's and, if Keith changes it, its own requirement."
+    - "REJECTED holding a no-period supply for a person, which is what happens today: there is nothing a person could choose, so the hold would be a queue item with no answer."
+    - "REJECTED inventing a pseudo-period (the receipt date, or one period per extraction) so the ordinary filing path runs: it would put a period into slot, lateness and promotion arithmetic that REQ-PIPE-106 criterion 5 requires to exclude this data by construction."
+  open_questions:
+    - "Whether a second package arriving for the same extraction is refused, or newest-wins as REQ-PIPE-106's sample read does today (relay Q4.3)."
+    - "Whether `no_calendar: not-yet-agreed` fails end to end the same way #141 found for `never`; nobody has run it (REQ-PIPE-106's own decisions record that no calendar-less dataset has ever been rendered). REQ-TEST-437 will say."
+
+- id: REQ-PIPE-435
+  title: "A supply with no period is never put to the promotion gate, and the gate says so rather than raising"
+  date_written: "2026-11-21"
+  story: "As whoever runs QA on a one-off project extraction, I want a supply that has no period to be finished with once its checks are recorded, so that nothing waits on a promotion that cannot exist."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 (2026-11-18), relayed by the main session 2026-11-21. Drafted by delivery-scoper 2026-11-21. PROVISIONAL on relay Q4.2 (report only, or a recorded release decision). PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL NOT put a supply for a dataset declaring `no_calendar` to the promotion gate, and SHALL NOT move it out of the sample schema."
+    - "IF the promotion gate is asked about such a supply, THEN THE SYSTEM SHALL refuse it as having no period to promote into, and SHALL NOT raise NoCalendarAgreed."
+    - "THE SYSTEM SHALL NOT list such a supply in the queue of supplies awaiting a decision, nor open a ticket for it (REQ-PIPE-083)."
+    - "THE SYSTEM SHALL record no decision-log entry for such a supply other than a person discarding its data (REQ-PIPE-106 criterion 17)."
+  non_functional_requirements:
+    - "OBSERVABILITY: the run that checked the supply still records run_by and run_timestamp; without a decision, that record and the published dashboard are the whole trace."
+    - "COMPLIANCE: if an extraction's QA is ever a gate on releasing data to a project, this requirement is the wrong shape and relay Q4.2's second option replaces criteria 3 and 4."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-075
+  decisions:
+    - "PROVISIONAL, pending Keith (relay Q4.2): REPORT ONLY - the published dashboard is the outcome, and nothing is promoted or decided. Sprint 29 point 7 makes the database ephemeral and point 9 makes a re-send a new extraction, so there is no later period for a promotion to serve."
+    - "REJECTED, provisionally, a period schema per extraction so the ordinary promotion path runs: it reintroduces a period by the back door (see REQ-PIPE-434's decisions)."
+  open_questions:
+    - "Relay Q4.2: is QA of an extraction a GATE on releasing it to the project - a recorded release or withhold decision with actor and reason - or a report the project reads? The answer replaces criteria 3 and 4 if it is a gate."
+
+- id: REQ-DASH-436
+  title: "The dashboard builds and reads correctly for an asset whose datasets have no calendar"
+  date_written: "2026-11-21"
+  story: "As a reader of a project extraction's dashboard, I want it to show each dataset's checks and supplies without any schedule language, so that I see what was checked rather than a page that failed to build or calls everything missing."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/running-thoughts.md #141 (2026-11-18: the dashboard build's agreement.cadence() raises), relayed by the main session 2026-11-21; plans/supply-model.md sprint 29 points 5 and 8. Drafted by delivery-scoper 2026-11-21. Rollup criterion PROVISIONAL on relay Q4.1. PROPOSAL, not signed."
+  acceptance_criteria:
+    - "WHEN the dashboard is built for an asset holding a dataset that declares `no_calendar`, THE SYSTEM SHALL build it, and SHALL NOT raise NoCalendarAgreed from agreement.cadence() or any other cadence read."
+    - "THE SYSTEM SHALL list such a dataset's supplies by receipt instant, and SHALL NOT show a period, a slot, a due date, lateness or anything marked missing for it."
+    - "THE SYSTEM SHALL show such a dataset's checks with their real verdicts and its no-schedule label in words (REQ-PIPE-106 criteria 7 and 8), on a rendered page."
+    - "WHERE every dataset of an asset declares `no_calendar`, THE SYSTEM SHALL NOT show the as-of picker's period controls or any schedule summary for that asset."
+    - "THE SYSTEM SHALL roll such datasets up as REQ-PIPE-106 criterion 9 decides, and SHALL NOT decide it a second time here."
+  non_functional_requirements:
+    - "COMPATIBILITY: the built page stays one self-contained file that opens from file:// with no network, as every dashboard does - sprint 29 point 8 publishes extraction dashboards to a shared filesystem and never retires them."
+    - "PRIVACY: whatever the page embeds outlives the ephemeral database (sprint 29 point 7), so relay Q4.5's answer on identifiers binds this page."
+    - "PERFORMANCE: an extraction is tens of tables and one supply each; no budget beyond the existing build."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-106
+  decisions:
+    - "THE ROLLUP IS NOT DECIDED HERE (delivery-scoper): REQ-PIPE-106 criterion 9 excludes every no-calendar dataset from every rollup, which on an asset made only of `never` datasets makes every group read 'Not counted'. Whether that stays is relay Q4.1, and if it changes, it changes in REQ-PIPE-106, not by an exception here."
+  open_questions:
+    - "Relay Q4.1: does a project extraction's QA count - verdicts rolling up within its own dashboard as real quality history - or stay in development as REQ-PIPE-106 has it today?"
+
+- id: REQ-TEST-437
+  title: "A fixture asset of calendar-less datasets is run end to end through `mothman pipeline run` and `mothman dashboard rebuild`, replacing REQ-PIPE-379 criterion 5"
+  date_written: "2026-11-21"
+  story: "As whoever maintains the pipeline, I want one test that runs a whole asset of calendar-less datasets from arrival to a rendered page, so that the shape cannot quietly stop working again."
+  moscow: must
+  status: not_started
+  source: "REQ-PIPE-379 criterion 5 (signed 2026-11-14), deferred by Keith 2026-11-18 to plans/running-thoughts.md #141; relayed by the main session 2026-11-21. Drafted by delivery-scoper 2026-11-21. PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL have a test that runs a fixture asset whose datasets all declare `no_calendar: never` through `mothman pipeline run` and `mothman dashboard rebuild`, and shows each supply staged, checked and recorded with no slot, no period and nothing marked missing."
+    - "THE SYSTEM SHALL have that test include a cross-table check among two of those datasets, and show its result recorded and rendered."
+    - "THE SYSTEM SHALL have a second test that runs a `no_calendar: not-yet-agreed` dataset beside a calendared one on one asset, and shows the calendared dataset's status and rollup unchanged by it in the rendered page."
+    - "THE SYSTEM SHALL assert, in each test, that the fixture holds at least one calendar-less dataset and at least one recorded result before asserting anything about them."
+    - "WHEN this requirement is built, THE SYSTEM SHALL retire REQ-PIPE-379 criterion 5, replaced_by this requirement."
+  non_functional_requirements:
+    - "COST: runs on the test database and REQ-PIPE-385's fixture-asset machinery, never a bootstrap; not marked critical, as REQ-PIPE-379's own cost NFR already judged."
+    - "PORTABILITY: no network, no gitignored artefact assumed present (CLAUDE.md's fresh-container rule)."
+  dependencies:
+    - REQ-PIPE-434
+    - REQ-PIPE-435
+    - REQ-DASH-436
+    - REQ-PIPE-379
+  decisions:
+    - "MOVED OUT OF REQ-PIPE-379 (delivery-scoper): 379 is about one calendar mechanism, which is built; the end-to-end proof belongs with the requirements that make the shape run."
+    - "THE not-yet-agreed CASE IS ADDED because REQ-PIPE-106's own decisions record that criteria 8, 13 and 14 were never exercised on a rendered page; the same defect likely affects it and nothing would show it."

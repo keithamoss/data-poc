@@ -28,6 +28,8 @@ just remembered" treatment this project already gives other
 multi-representation data (e.g. the dashboard build-output split)."""
 from __future__ import annotations
 
+import pytest
+
 import re
 from pathlib import Path
 
@@ -71,3 +73,8 @@ def test_plans_all_components_names_match_the_real_component_codes():
 
 def test_components_md_entries_match_the_real_component_codes_exactly():
     assert _components_md_entries() == _COMPONENT_CODES
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

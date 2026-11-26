@@ -1,0 +1,104 @@
+"""Each dataset's slots for the page - period, round and instants - so the
+page never stands a period's date in for a round or a due date
+(REQ-DASH-326 criterion 8, the architect's S3).
+
+THE ANSWERS TRAVEL, NOT THE RULE: every value comes from the one
+slot-instants function filing uses (asset_model.slots). The page picks
+the slot whose claim window most recently opened on the date on show
+(criterion 5) and reads its period, round and due instant off it.
+
+ONLY SLOTS WHOSE CLAIM WINDOW HAS OPENED BY NOW, so nothing in the future is
+embedded - which is also every period an open or filed-to slot fills
+(criterion 10): a supply can only be filed to an open slot.
+
+ONLY FOR AN AUTHORED CALENDAR (criterion 3). A cadence-rule calendar keeps
+its period-date headings and current cycle, so it gets nothing here, and the
+page's existing path answers for it. CONFIGURATION ONLY - no database.
+"""
+from __future__ import annotations
+
+from datetime import timedelta
+
+from asset_model import asset_time, schedule, slots
+from qa_tools.common import files_go
+
+
+def _iso(instant) -> str | None:
+    return instant.isoformat() if instant is not None else None
+
+
+class ScheduleRefusesBuild(RuntimeError):
+    """A dataset's schedule configuration is broken, so the dashboard build is
+    refused (REQ-PIPE-378 criterion 16, Dash A, SETTLED by Keith 2026-11-14):
+    never published as owing nothing - the live page stays at the last good
+    build."""
+
+
+def refuse_build(dataset_id: str, exc: Exception) -> ScheduleRefusesBuild:
+    """The one refusal both build paths raise, naming the dataset and the
+    asset's calendar file."""
+    from asset_model import assets
+
+    return ScheduleRefusesBuild(
+        f"dataset {dataset_id!r}'s schedule configuration in "
+        f"{assets.config_dir()}/calendar.yaml is broken: {exc}. No page was written - the "
+        f"live page stays at the last good build. Fix the configuration, then "
+        f"`mothman schedule validate` checks it.")
+
+
+def for_dataset(dataset_id: str, now=None) -> dict | None:
+    """{filesGo, slots: [{period, date, round, opens, due, closes}]}, oldest
+    first, or None for a cadence-rule calendar or a dataset with none."""
+    now = now or asset_time.now()
+    today = asset_time.local_date(now)
+    from asset_model import hierarchy
+
+    try:
+        cal = schedule.calendar_for_dataset(dataset_id)
+    except (schedule.NoCalendarAgreed, hierarchy.UnknownDatasetError):
+        return None             # no calendar, or a dataset outside the hierarchy
+    try:
+        if cal.version_in_force(today).is_cadence_rule:
+            return None
+        until = today + timedelta(days=400)
+        agr = schedule.agreement_to_read(None)
+        found = slots.slots_for_dataset(dataset_id, until=until)
+        sequence = slots.period_sequence(dataset_id, until, agr)
+    except schedule.NoCalendarAgreed:
+        return None
+    except schedule.ScheduleConfigError as exc:
+        raise refuse_build(dataset_id, exc) from exc
+    owed = {s.period.name: s for s in found}
+    begins = found[0].round_date if found and found[0].round_date else None
+    out = []
+    # EVERY ROUND FROM THE FIRST OWED ONE, OWED OR NOT, so the current cycle
+    # on a date can be a period the dataset owes nothing in (REQ-DASH-182
+    # criterion 10): the round's own claim opening still marks when that
+    # period is current. Each round names the period its files fill, as
+    # pipeline/owed_nothing.py does.
+    for i, rnd in enumerate(sequence):
+        if begins is not None and rnd.date < begins:
+            continue
+        j = schedule.filled_index(dataset_id, sequence, i, agr)
+        if j is None:
+            continue
+        period = sequence[j]
+        slot = owed.get(period.name)
+        if slot is not None:
+            opens, due, closes = slot.claim_opens_at, slot.due_at, slot.closes_at
+        else:
+            instants = slots.slot_instants(dataset_id, rnd.date, agr)
+            opens, due, closes = instants.claim_opens_at, instants.due_at, None
+        if opens > now:
+            continue
+        out.append({"period": period.name, "date": period.date.isoformat(),
+                    "round": rnd.date.isoformat(), "owed": slot is not None,
+                    "opens": _iso(opens), "due": _iso(due), "closes": _iso(closes)})
+    # THE FIRST OWED SLOT, open or not, for 'Not owed yet — owes from
+    # <period>, first due <instant>' (REQ-DASH-182 criterion 3 as amended).
+    first = found[0] if found else None
+    return {"filesGo": files_go.describe(dataset_id, today),
+            "filesGoValue": agr.files_go_to_period_for(dataset_id, today),
+            "first": {"period": first.period.name, "due": _iso(first.due_at),
+                      "opens": _iso(first.claim_opens_at)} if first else None,
+            "slots": out}

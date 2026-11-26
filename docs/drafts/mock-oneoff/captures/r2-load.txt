@@ -1,0 +1,51 @@
+$ uv run mothman one-off load --id repro-undeclared-only /tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/mock-oneoff/repro-package
+
+hierarchy validation OK - 2 agenc(ies), 3 collection(s), 4 dataset(s), 3 contract(s) in agreement.
+collections OK - every collection has an adapter, and 0 file(s) still wait on the requirement that rewires them.
+schedule validation OK - 0 calendar(s), 4 dataset(s), no configuration errors.
+arrival pattern validation OK - 4 dataset pattern(s), NO DATABASE REACHABLE, so duplicate attribution was not checked - the delivery log is a table since REQ-PIPE-089, and this half of the gate needs one.
+Soda check files OK - 3 file(s), every check runnable here.
+reads_columns validation OK - 41 SQL-bodied checks each name the columns they read.
+people validation OK - 2 person/people, 1 placeholder(s), zero errors.
+Created supply_repro-undeclared-only.
+Environment: Claude Code sandbox (not production) · One-off: repro-undeclared-only (extraction)
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+Filed Emergency Care as delivery handfiled-2026-11-22T144410.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+ed_presentations__20261122144410930192: ed_presentations: 240 rows -> sample.ed_presentations__20261122144410930192
+ed_presentations__20261122144410930192: staged 1 table(s)
+--- ed_presentations__20261122144410930192 ---
+ed_presentations__20261122144410930192: checked in 8s
+note: delivery 'handfiled-2026-11-22T144419' carries hospital-admissions, readmission-summary, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144419' carries hospital-admissions, readmission-summary, which nothing is currently owed from - processed as usual.
+Filed Inpatient Care as delivery handfiled-2026-11-22T144419.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144419' carries hospital-admissions, readmission-summary, which nothing is currently owed from - processed as usual.
+hospital_admissions__20261122144419520555: hospital_admissions: 96 rows -> sample.hospital_admissions__20261122144419520555
+hospital_admissions__20261122144419520555: staged 1 table(s)
+readmission_summary__20261122144419520555: readmission_summary: 16 rows -> sample.readmission_summary__20261122144419520555
+readmission_summary__20261122144419520555: staged 1 table(s)
+--- hospital_admissions__20261122144419520555 ---
+hospital_admissions__20261122144419520555: checked in 1s
+--- readmission_summary__20261122144419520555 ---
+readmission_summary__20261122144419520555: checked in 1s
+note: delivery 'handfiled-2026-11-22T144422' carries deaths, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144419' carries hospital-admissions, readmission-summary, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144422' carries deaths, which nothing is currently owed from - processed as usual.
+Filed Death Registrations as delivery handfiled-2026-11-22T144422.
+note: delivery 'handfiled-2026-11-22T144410' carries ed-presentations, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144419' carries hospital-admissions, readmission-summary, which nothing is currently owed from - processed as usual.
+note: delivery 'handfiled-2026-11-22T144422' carries deaths, which nothing is currently owed from - processed as usual.
+death_registrations__20261122144422413348: death_registrations: 11 rows -> sample.death_registrations__20261122144422413348
+death_registrations__20261122144422413348: staged 1 table(s)
+--- death_registrations__20261122144422413348 ---
+death_registrations__20261122144422413348: checked in 1s
+Loaded repro-undeclared-only into supply_repro-undeclared-only: 4 run(s), 81 tool result(s), 0 failing; not declared, not filed: linkage_keys_DRAFT.csv.
+Next: decide what to release, or publish it:
+  mothman one-off decide --id repro-undeclared-only
+  mothman one-off publish --id repro-undeclared-only
+
+[exit code 0, 20s]

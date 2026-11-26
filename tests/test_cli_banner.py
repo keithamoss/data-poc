@@ -11,6 +11,8 @@ eyes were static, not actually pulsing: a real `blink` style too (the
 real ANSI SGR blink attribute, not something faked by re-rendering)."""
 from __future__ import annotations
 
+import pytest
+
 from cli.banner import _moth_text
 
 
@@ -68,3 +70,8 @@ def test_moth_eyes_actually_blink_not_just_static_red():
 
     assert "blink" in styles_by_offset[first_eye_offset]
     assert "blink" in styles_by_offset[second_eye_offset]
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

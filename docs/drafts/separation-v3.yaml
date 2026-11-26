@@ -1,0 +1,279 @@
+# PROPOSAL - plans/running-thoughts.md #134, the CODE half. Drafted by
+# delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers to
+# Q1-Q8 applied; v3 the same day with his answers to v2's three open
+# questions (package name, every anchor() moved, scenario features hidden), against the moved tree at /home/user/bmove-wt (b03a7be6).
+# NOT SIGNED until Keith signs v3. Q1-Q8 are SETTLED (Keith, 2026-11-02) and
+# carried into the criteria and decisions below.
+#
+# Scan of the moved tree, 2026-11-02 (b03a7be6):
+#   generator -> qa_tools: 86 import statements in 13 files (48 in generator/,
+#     38 in the quarterly providers, 2 in the daily one; 0 in
+#     synthetic_data_generator/), 122 imported names across 21 modules. The
+#     domain core (asset_time 27, hierarchy 27, schedule 12, slots 9) is 75 of
+#     the 122. The rest: collections registry 5, linked_datasets 5, assets 4,
+#     amber_setting 4, scripted_decisions 4, arrivals 3, scenario_map 3,
+#     agreement 3, check_bands 3, delivery 2, correction_apply 2,
+#     correction_trial 2, assignment 2, promotion 2, correction_replay 1,
+#     arrival_classification 1, list_setting_members 1.
+#   Bootstrap and replay machinery, all in qa_tools/common/: bootstrap 783,
+#     checkpoints 335, replay_clock 136, replay_inputs 248, scripted_decisions
+#     721, scripted_corrections 189, correction_replay 165, scenarios 178,
+#     scenario_map 372, target_agreement 387 = 3,514 lines (plus cli/scenarios.py
+#     257 and qa_tools/common/synthetic_reset.py 210).
+#   replay_clock is read by 17 real pipeline modules (qa_tools/tools/stage,
+#     orchestrate; qa_tools/common/arrival_lifecycle, census, correction_apply,
+#     decision_log, delivery_log, file_checks, filing, gate, inheritance,
+#     knock_on, period_schema, qa_store, recheck, schedule_ended, supply_holds):
+#     29 now(), 7 active(), 6 anchor(), 1 advance_to(), 2 @on_replay_clock.
+#   orchestrate plays scripted decisions in _begin(), which defaults the player
+#     to scripted_decisions.Player(coll.id) (orchestrate.py line 606), and
+#     StreamPlayer combines them for run_stream; arrival_lifecycle.py line 169
+#     imports correction_replay for each arrival.
+#   Other real-pipeline -> machinery edges: knock_on.py line 475 imports
+#     bootstrap (streams); dashboard/embed_dashboard_data.py line 196 imports
+#     scenario_map. Machinery -> cli: bootstrap reaches cli.pipeline.generated_into.
+#   Domain-model closure (what the four import): assets, config_yaml, in_force,
+#     agreement - 3,735 lines for all eight; none imports a database driver.
+requirements:
+  - id: REQ-PIPE-380
+    title: "The shared domain model - asset time, the hierarchy, the schedule, slots and what they need - is one package of its own, which the pipeline, the generator and the bootstrap may all import and which imports none of them"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the model of an asset's time, hierarchy, schedule and slots in a package of its own, so that the real pipeline and the synthetic side share one definition of these things without either depending on the other."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; the code half queued behind the asset split, (a)); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold the shared domain model in one top-level package, domain/ (Q2, SETTLED by Keith 2026-11-02): asset_time, hierarchy, schedule and slots, and the modules they import today (assets, config_yaml, in_force and agreement, 3,735 lines in all at b03a7be6), moved with their behaviour unchanged."
+      - "THE SYSTEM SHALL split the collection registry (qa_tools/collections/__init__.py today) so that which collections an asset declares, with each one's short and run_prefix, is domain model; loading a collection's QA adapter by path stays in the real pipeline; and loading its provider by path moves to the generator."
+      - "IF a domain-model module imports qa_tools, pipeline, dashboard, cli, generator, synthetic_data_generator, the bootstrap package or anything under assets/, THEN `mothman check` SHALL fail, naming the file, the line and the imported module (REQ-TEST-384)."
+      - "THE SYSTEM SHALL import no database driver, pandas or numpy at module level anywhere in the domain model, so that importing it opens no connection and needs no supply rows."
+      - "THE SYSTEM SHALL move into the domain model every pure pipeline function the generator calls today - assignment.open_slot, arrival_classification.classify, check_bands.catalogue and default_rows, agreement.from_doc, promotion.effective_at_for and next_receipt among them (REQ-GEN-386 criterion 2) - so that the pipeline and the generator call one definition (Q1, SETTLED by Keith 2026-11-02)."
+      - "IF a function the generator calls cannot move into the domain model without importing the real pipeline or opening a database, THEN THE SYSTEM SHALL report it to Keith for a decision rather than allowlist it permanently or hand its value to the generator as data."
+      - "WHEN a module moves into the domain model, THE SYSTEM SHALL rewrite every importer in the same change and SHALL leave no forwarding module under its old path."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare, normalised as REQ-TEST-357 criterion 3 is amended, that the move changes nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: a move of code, proven by REQ-TEST-239's equivalence compare for each asset, never by re-capturing a pin."
+      - "PERFORMANCE: each asset's bootstrap from empty is no slower than before the change by more than 5 percent (5 percent SETTLED by Keith 2026-11-02), measured on the same sandbox, and the CLI's import time is unchanged."
+      - "PORTABILITY: no new third-party dependency; everything still runs through `uv run` from the repository root."
+      - "SCALABILITY: nothing in the domain model is per collection, so a thirtieth collection adds no module to it."
+    dependencies:
+      - "REQ-PIPE-342"
+      - "REQ-PIPE-369"
+      - "REQ-TEST-239"
+      - "REQ-TEST-357"
+      - "REQ-TEST-384"
+    decisions:
+      - "THE CODE HALF IS ITS OWN BATCH, AFTER THE SPLIT (Keith, 2026-10-31, #134 (a)): the configuration half went into the asset split (REQ-GEN-370, REQ-GEN-371). REJECTED (b), the whole separation after the split, which moves the configuration twice, and (c), the whole separation before the split."
+      - "THE CLOSURE MOVES WITH THE FOUR (delivery-scoper, from the scan): schedule and slots import agreement, asset_time imports in_force and assets, so a package holding only the four would import qa_tools and fail its own gate."
+      - "NO FORWARDING MODULES (delivery-scoper): a re-export left at the old path keeps an old import working, so the import gate would stop seeing it. REJECTED shims kept for one push."
+      - "THE REGISTRY IS SPLIT, NOT MOVED WHOLE (delivery-scoper): which collections exist is shared, but loading an adapter is the pipeline's and loading a provider is the generator's, and moving the whole registry into the domain model would make it import both sides."
+      - "THE GENERATOR'S PURE PIPELINE FUNCTIONS MOVE INTO THE DOMAIN MODEL (Q1, SETTLED by Keith 2026-11-02): REJECTED a permanent list of pipeline modules the generator may import, and REJECTED handing the generator everything as data, which would let its predictions drift from what the pipeline does."
+      - "TOP-LEVEL domain/ (Q2, SETTLED by Keith 2026-11-02): beside qa_tools/, generator/ and bootstrap/."
+    open_questions: []
+
+  - id: REQ-GEN-381
+    title: "The bootstrap and replay machinery - bootstrap, checkpoints, replay inputs, the simulated clock, scripted decisions and corrections, correction replay, scenarios, target agreement and the synthetic reset - is a package of its own outside qa_tools/, and the real pipeline never imports it"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want everything that exists only to replay a synthetic history in one package outside the pipeline, so that a deployment leaves it out and the pipeline cannot come to depend on it."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the bootstrap and replay machinery out of qa_tools'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL hold in one top-level package, bootstrap/ (Q2, SETTLED by Keith 2026-11-02), the modules that exist only to replay a synthetic history: today's qa_tools/common/bootstrap, checkpoints, replay_inputs, scripted_decisions, scripted_corrections, correction_replay, scenarios, target_agreement and synthetic_reset, and the simulated half of replay_clock (REQ-PIPE-382). None of them SHALL remain under qa_tools/."
+      - "IF `mothman pipeline bootstrap` is asked to run for an asset that does not declare `synthetic: true`, THEN THE SYSTEM SHALL refuse, naming the asset, and replay_clock.replaying's wall-clock branch for a real asset's bootstrap SHALL go; a real asset's first run is `mothman pipeline run` (Q5, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL let the bootstrap package import the domain model, the shared scenarios package (REQ-GEN-386 criterion 4), the real pipeline and the generator's one public entry point (REQ-GEN-386 criterion 3), and SHALL NOT let it import cli/; bootstrap.py's reach into cli.pipeline.generated_into goes."
+      - "IF any module under qa_tools/, pipeline/, dashboard/ or an asset's collections/ imports the bootstrap package, THEN `mothman check` SHALL fail, naming it (REQ-TEST-384)."
+      - "THE SYSTEM SHALL move how collections are grouped into streams (bootstrap.streams today) into the real pipeline, because knock_on.py (line 475 today) reads it outside any replay."
+      - "THE SYSTEM SHALL keep `mothman pipeline bootstrap`, checkpoints and resume, `mothman pipeline cache-key`, `mothman scenarios`, the target trial and `mothman env reset-synthetic` doing what they do today for each asset (REQ-PIPE-352, REQ-PIPE-365 criteria 2 and 3), with their existing tests passing and asserting what they asserted before."
+      - "THE SYSTEM SHALL key the replay cache (replay_inputs.cache_key) on the bootstrap package's own files as well as today's inputs, so that a change to the machinery restarts a resume as a change to it under qa_tools/ does today."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare, normalised as REQ-TEST-357 criterion 3 is amended, that the move changes nothing either asset's bootstrap records, generates, builds or offers."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: proven by REQ-TEST-239's equivalence compare for each asset."
+      - "PERFORMANCE: each asset's bootstrap from empty is no slower than before the change by more than 5 percent (5 percent SETTLED by Keith 2026-11-02), and it still meets REQ-PIPE-352 criterion 5's 12 minutes wherever it met it before."
+      - "RELIABILITY: a resume after the move still restarts when machinery changes (criterion 6), so a checkpoint never outlives the code that wrote it."
+      - "PRIVACY AT REAL SCALE: the package that can invent a record's time and play a scripted person is the part a real deployment leaves out."
+      - "MAINTAINABILITY: about 3,500 lines change address once; nothing gains a new dependency."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-382"
+      - "REQ-PIPE-383"
+      - "REQ-TEST-384"
+      - "REQ-GEN-386"
+      - "REQ-PIPE-352"
+      - "REQ-PIPE-365"
+      - "REQ-TEST-239"
+    decisions:
+      - "OUT OF qa_tools, NOT A SUBPACKAGE OF IT (Keith, 2026-10-31, #134: 'strict separation ... with the actual pipelines'). REJECTED (b) and (c) of #134 as in REQ-PIPE-380."
+      - "SEPARATE FROM THE GENERATOR, NOT ONE 'synthetic' PACKAGE (Keith, 2026-10-31: 'a strict separation between themselves'). REJECTED one package holding both, with the separation left to convention."
+      - "SYNTHETIC RESET GOES WITH THE BOOTSTRAP (delivery-scoper's choice): it is refused unless the asset is synthetic and exists only to start a replay from empty."
+      - "THE SCENARIO MAP IS NOT IN THIS LIST (delivery-scoper's choice): its writer goes with the generator, which places the scenarios (REQ-GEN-386 criterion 6), its vocabulary with the shared scenarios package (Q4), and the reader the dashboard uses stays with the pipeline (REQ-PIPE-385 criterion 4)."
+      - "THE BOOTSTRAP IS SYNTHETIC-ONLY (Q5, SETTLED by Keith 2026-11-02): REJECTED keeping a bootstrap for a real asset, whose first run is `mothman pipeline run`."
+      - "THE BOOTSTRAP STAYS GEN (SETTLED by Keith 2026-11-02): REJECTED PIPE, and REJECTED a new eighth component code, which would touch docs/components.md, _COMPONENT_CODES and the dashboard's taxonomy consts."
+    open_questions: []
+
+  - id: REQ-PIPE-382
+    title: "The real pipeline reads the time through one clock in the domain model, which only a replay of a synthetic asset may replace, and no real pipeline module imports replay_clock or sets the time"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the pipeline to ask one clock for the time and never know whether a replay is running, so that the simulated clock can leave with the bootstrap and a real record's time can still never be invented."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the replay clock untangled from the real pipeline'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL give the real pipeline one clock to stamp records with, in the domain model, and every real pipeline module that reads replay_clock today SHALL read the time from that clock and import nothing of replay_clock: 17 modules at b03a7be6 (stage and orchestrate in qa_tools/tools/; arrival_lifecycle, census, correction_apply, decision_log, delivery_log, file_checks, filing, gate, inheritance, knock_on, period_schema, qa_store, recheck, schedule_ended and supply_holds in qa_tools/common/)."
+      - "WHILE no replay clock is installed, THE SYSTEM SHALL stamp every record with the wall clock, as asset_time.now() does today."
+      - "THE SYSTEM SHALL let the clock be replaced only by one installation call for the span of a replay; IF the selected asset does not declare `synthetic: true`, THEN the domain model SHALL refuse the installation itself, so that the refusal holds with the bootstrap package absent (Q6, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL move every call that sets the simulated time out of the real pipeline and into the bootstrap package, driven through REQ-PIPE-383's hooks: today 6 anchor() calls and 1 advance_to() call in orchestrate, stage, arrival_lifecycle, delivery_log and decision_log - EVERY one of them, the mid-step anchor() calls in stage.py and delivery_log.py included, each moved into a clock hook (SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL remove the 7 replay_clock.active() reads and the 2 @replay_clock.on_replay_clock decorations from real pipeline modules, the bootstrap entering the replay span around its own call instead."
+      - "WHERE MOTHMAN_PINNED_NOW is set, THE SYSTEM SHALL pin the time through the same installation call and the same refusal, so that there is one way to give the pipeline a time other than the wall clock (Q7, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a real pipeline module stamping a record with an installed clock, of installation refused on a non-synthetic asset in a process where the bootstrap package cannot be imported, and of a record stamped with the wall clock when no clock is installed."
+      - "WHEN REQ-TEST-239's compare is run before and after this change, THE SYSTEM SHALL show every surface equal except recorded instants written by the steps that anchored mid-step (stage.py and delivery_log.py); IF any other recorded instant, or anything else, differs, THEN the build SHALL stop and report it."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in evidence every recorded instant that moved - which table and record, its old and new value, and by how much - and SHALL accept those moves as the new recorded instants (SETTLED by Keith 2026-11-02)."
+    non_functional_requirements:
+      - "SECURITY AND PRIVACY: a real asset's record of when something happened is evidence; the refusal to invent it lives in code a real deployment keeps (criterion 3)."
+      - "BEHAVIOUR-PRESERVING EXCEPT WHERE LISTED: every surface of REQ-TEST-239's compare is equal for each asset except the recorded instants of the steps that anchored mid-step, which may move and are listed record by record in evidence (criteria 8 and 9, SETTLED by Keith 2026-11-02)."
+      - "PERFORMANCE: reading the clock costs what asset_time.now() costs today; the bootstrap is no slower than before by more than 5 percent (5 percent SETTLED by Keith 2026-11-02)."
+      - "RELIABILITY: the clock stays process-wide, as replay_clock's own docstring explains (a run's four tools write from worker threads a context variable would not reach)."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-PIPE-383"
+      - "REQ-PIPE-081"
+      - "REQ-TEST-239"
+    decisions:
+      - "ONE SEAM, NOT A FLAG IN EVERY MODULE (Keith, 2026-10-31, #134: replay_clock 'woven into about 20 real pipeline modules'; the 2026-11-02 count is 17)."
+      - "THE PIPELINE ONLY READS THE CLOCK, THE BOOTSTRAP SETS IT (delivery-scoper): anchoring at an arrival's receipt and advancing to a decision's instant are replay acts, so they belong with the replay."
+      - "THE REFUSAL LIVES IN THE DOMAIN CLOCK (Q6, SETTLED by Keith 2026-11-02): REJECTED leaving it to the bootstrap, which a real deployment does not have."
+      - "MOTHMAN_PINNED_NOW GOES THROUGH THE SAME SEAM (Q7, SETTLED by Keith 2026-11-02): REJECTED leaving it as a second way to set the time, in asset_time."
+      - "REJECTED passing a clock argument through every call (delivery-scoper): it would widen the signature of every stamping function in 17 modules for a replay-only need."
+      - "EVERY anchor() CALL MOVES, AND THE NEW INSTANTS ARE ACCEPTED (SETTLED by Keith 2026-11-02): the mid-step calls in stage.py and delivery_log.py move into clock hooks too, and the instants they stamp may change. REJECTED reporting each call that could not move without changing an instant for a decision of its own, which would leave the clock half untangled."
+    open_questions: []
+
+  - id: REQ-PIPE-383
+    title: "Scripted decisions and scripted corrections are played by the bootstrap through hooks the replay offers, and the real pipeline neither builds a player nor imports scripted_decisions or correction_replay"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want the real pipeline to offer a place to act between arrivals rather than to play scripted decisions itself, so that a synthetic history's scripted people go with the bootstrap and the pipeline only ever processes what arrived."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31 scan: 'orchestrate plays scripted decisions'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL let a caller of a collection's replay and of a stream's replay (orchestrate.run_pipeline and run_stream today) pass a hook run before each arrival and after the last, the shape scripted_decisions.Player and orchestrate.StreamPlayer have today, and SHALL run none WHERE none is passed."
+      - "THE SYSTEM SHALL NOT build a scripted-decision player inside the real pipeline: orchestrate._begin's default of scripted_decisions.Player(coll.id) (line 606 today) SHALL go, and the bootstrap SHALL build each collection's player and each stream's combined player and pass it in, StreamPlayer moving with it."
+      - "THE SYSTEM SHALL hand an arrival's scripted correction to arrival_lifecycle through the same hook rather than have it import correction_replay (arrival_lifecycle.py line 169 today)."
+      - "WHEN the bootstrap replays a synthetic asset, THE SYSTEM SHALL play every scripted decision and correction at the instant and in the order it plays them today, through the same decision path a person uses (REQ-GEN-135), refused unless the asset declares itself synthetic."
+      - "WHEN `mothman pipeline run` or the processing pass runs, on any asset, THE SYSTEM SHALL play no scripted decision and no scripted correction; only the bootstrap plays them (Q5, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have tests, seen failing first, of a replay given no hook playing nothing, of a stream's hook called before an arrival of another collection received after a decision's instant (REQ-PIPE-262 criterion 4), and SHALL show through REQ-TEST-239's compare that every decision-log entry is unchanged."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: the decision log, filings and promotions of each asset's bootstrap are unchanged, proven by REQ-TEST-239's compare."
+      - "AUDITABILITY: scripted decisions keep their synthetic actor and recorded instants (REQ-GEN-135), so a replayed history still says who decided and when."
+      - "SECURITY: the real pipeline keeps its refusal of the synthetic actor outside a replay (filing_decisions.py, people.py), because a guard is not machinery and must stay where a real deployment runs it."
+      - "PERFORMANCE: a hook call per arrival is what the player call costs today."
+    dependencies:
+      - "REQ-GEN-381"
+      - "REQ-GEN-135"
+      - "REQ-PIPE-262"
+      - "REQ-TEST-239"
+    decisions:
+      - "HOOKS IN THE PIPELINE, SCRIPTS IN THE BOOTSTRAP (delivery-scoper): the replay already takes a player argument; only its default and the correction lookup reach the scripts, so the seam exists and needs closing rather than building."
+      - "THE SYNTHETIC-ACTOR REFUSAL STAYS IN THE PIPELINE (delivery-scoper): REJECTED moving it with the player, because a real deployment would then have no guard against the synthetic actor."
+      - "ONLY THE BOOTSTRAP PLAYS SCRIPTED DECISIONS (Q5, SETTLED by Keith 2026-11-02): REJECTED `mothman pipeline run` playing them on a synthetic asset as it does today. A behaviour change for that command, not for a bootstrap, so REQ-TEST-239's compare (which captures a bootstrap) is unaffected; any test asserting that `pipeline run` plays them changes with this requirement."
+    open_questions: []
+
+  - id: REQ-TEST-384
+    title: "An imports gate in mothman check fails any import across a forbidden edge between the domain model, the real pipeline, the generator, the bootstrap and cli/, with a shrink-only allowlist whose every entry names the requirement that removes it"
+    date_written: "2026-11-02"
+    story: "As whoever maintains the pipeline, I want a gate that fails a forbidden import in either direction, so that the separation is checked on every change rather than remembered."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31: 'a strict separation'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL offer an `imports` gate in `mothman check`, needing no asset and no database, that reads every Python file of the repository outside tests/ by its syntax tree - module-level and function-level imports, imports under `if TYPE_CHECKING:`, and importlib.import_module calls with a literal name - and assigns each file to one side: the domain model, the real pipeline (qa_tools/, pipeline/, dashboard/, each asset's collections/), the generator (generator/, synthetic_data_generator/, each asset's synthetic/collections/), the shared scenarios package (REQ-GEN-386 criterion 4), the bootstrap package, or cli/."
+      - "IF the domain model imports any other side, or the real pipeline imports the generator, the scenarios package, the bootstrap or cli/, or the scenarios package imports anything but the domain model, or the generator imports the bootstrap, cli/ or the real pipeline (Q1, SETTLED by Keith 2026-11-02), or the bootstrap imports cli/, THEN the gate SHALL fail, naming the file, the line, both sides and the imported module."
+      - "THE SYSTEM SHALL read the gate's exceptions from one committed allowlist whose every entry names a file, the module it imports and the requirement that removes it, and SHALL fail WHERE an entry names no requirement, or names an import that no longer exists."
+      - "IF a change adds an allowlist entry absent at the base commit, THEN the gate SHALL fail, so that the list only shrinks."
+      - "WHEN this gate lands, THE SYSTEM SHALL hold in the allowlist exactly the gate's own findings on that commit, so that it lands green, and each of REQ-PIPE-380, REQ-GEN-381, REQ-PIPE-382, REQ-PIPE-383, REQ-PIPE-385 and REQ-GEN-386 SHALL remove the entries it names."
+      - "THE SYSTEM SHALL run the gate in the validate-config workflow, which reads only committed configuration."
+      - "THE SYSTEM SHALL have tests, seen failing first, of each forbidden edge failing, of each allowed edge passing, of a function-level import caught, of a stale allowlist entry failing, and of an added entry failing."
+    non_functional_requirements:
+      - "PERFORMANCE: the gate reads syntax trees and imports nothing, and runs in under 5 seconds over the repository."
+      - "MAINTAINABILITY: each allowlist entry names its requirement, so the list is a to-do list that can only get shorter."
+      - "OBSERVABILITY: a failure names the file and the line, so it can be fixed without reading the gate."
+      - "COST: no database and no bootstrap, so it adds seconds to CI, not minutes."
+      - "SCALABILITY: a thirtieth collection's adapter and provider are sorted by folder, so the gate needs no change for a new collection."
+    dependencies:
+      - "REQ-PIPE-342"
+      - "REQ-PIPE-369"
+      - "REQ-GEN-370"
+    decisions:
+      - "THE GATE COMES FIRST (delivery-scoper's choice): landing it with today's findings allowlisted makes it the measure each later requirement shrinks, rather than a test written last against a tree already moved."
+      - "BOTH DIRECTIONS IN ONE GATE (the brief, 2026-11-02): the pipeline never imports the generator today, but nothing holds that true; the generator imports the pipeline in 86 statements."
+      - "SYNTAX TREE, NOT IMPORTING (delivery-scoper): importing every module to watch sys.modules would need pandas, a database and an asset; a syntax tree needs none. REJECTED a runtime import hook as the gate (it stays a possible test tool, REQ-PIPE-385)."
+      - "tests/ ARE EXEMPT (delivery-scoper): a test of the bootstrap imports the pipeline and the bootstrap together by design."
+    open_questions: []
+
+  - id: REQ-PIPE-385
+    title: "An asset with no synthetic/ folder runs, publishes and passes every gate with neither the generator nor the bootstrap importable, and the commands that need them are absent or refused by name"
+    date_written: "2026-11-02"
+    story: "As whoever would take this to a real deployment, I want to leave the generator and the bootstrap out entirely, so that what runs on real supplies is only the pipeline and its configuration."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31); extends REQ-GEN-370 criterion 8 from configuration to code. Scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "WHERE the generator, synthetic_data_generator and the bootstrap package cannot be imported and the selected asset has no synthetic/ folder, THE SYSTEM SHALL stage, check, gate, promote, re-check and record that asset's real supplies, build and publish its dashboard, and pass every `mothman check` gate."
+      - "THE SYSTEM SHALL keep one `mothman` entry point, and SHALL list a synthetic command in `mothman --help` and the terminal's menus only WHERE the components it needs can be imported AND the selected asset has a synthetic/ folder (Q3, SETTLED by Keith 2026-11-02)."
+      - "IF a synthetic command is invoked by name where criterion 2 leaves it out, THEN THE SYSTEM SHALL exit non-zero naming the missing component or the missing synthetic/ folder rather than raise an ImportError or report an unknown command - REQ-GEN-370 criterion 8's refusal by name, kept."
+      - "IF the asset has no scenario map (SCENARIOS-<asset>.md, REQ-PIPE-352 criterion 3), THEN the dashboard build SHALL embed an empty SCENARIO_MAP rather than fail, reading the map through a reader outside the generator and the bootstrap package."
+      - "WHILE the embedded scenario map is empty - as it is for an asset with no synthetic/ folder - THE SYSTEM SHALL hide the dashboard's scenario features entirely, showing no scenario control, label, link or count anywhere on the page (SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have a test, seen failing first, that runs a fixture asset with no synthetic/ folder through `mothman pipeline run`, `mothman dashboard rebuild` and `mothman check` in a subprocess where importing the generator, synthetic_data_generator or the bootstrap package raises, and shows each succeeding (Q8, SETTLED by Keith 2026-11-02)."
+      - "THE SYSTEM SHALL have a real-browser test, seen failing first, that builds the dashboard for a fixture asset with no synthetic/ folder and finds no scenario control or label in the page's text, accessible names or menus, and that the same page built with a non-empty map shows them."
+    non_functional_requirements:
+      - "PRIVACY AT REAL SCALE: a real deployment can show that no code able to invent a record's time or play a scripted person is present."
+      - "PORTABILITY: works from a plain checkout through `uv run`, with no extra install step to leave a component out."
+      - "RELIABILITY: a missing component is a named refusal, never a traceback."
+      - "COST: criterion 5's test uses a fixture asset and the test database, not a bootstrap, so it costs seconds."
+    dependencies:
+      - "REQ-GEN-370"
+      - "REQ-GEN-381"
+      - "REQ-PIPE-382"
+      - "REQ-PIPE-383"
+      - "REQ-GEN-386"
+      - "REQ-TEST-384"
+    decisions:
+      - "ONE mothman, SYNTHETIC COMMANDS PRESENT ONLY WHERE THEY CAN RUN (Q3, SETTLED by Keith 2026-11-02): REJECTED a second entry point, and REJECTED listing them always and refusing at run time."
+      - "AN IMPORT-BLOCKING TEST ONLY (Q8, SETTLED by Keith 2026-11-02): REJECTED a recorded run in a copy of the tree with the packages deleted, as v1's criterion 6 had it."
+      - "THE GATE IS NOT ENOUGH ON ITS OWN (delivery-scoper): an import gate catches what is written, but not a command that would crash at run time without a package. Criterion 5 runs it."
+      - "THE SCENARIO MAP'S READER IS SHARED (delivery-scoper's choice): the build reads the committed map today (REQ-DASH-046) and may open nothing under data/, so the reader stays with the pipeline, the writer goes with the generator and the vocabulary with the shared scenarios package (REQ-GEN-386)."
+      - "SCENARIO FEATURES HIDDEN ENTIRELY ON AN EMPTY MAP (SETTLED by Keith 2026-11-02): a real deployment's dashboard says nothing about scenarios. REJECTED leaving them as they render today with an empty map."
+    open_questions: []
+
+  - id: REQ-GEN-386
+    title: "The generator and its providers import only the shared domain model and a small shared scenarios package, reach the bootstrap through nothing, and offer the bootstrap and cli/ one public entry point"
+    date_written: "2026-11-02"
+    story: "As whoever maintains the generator, I want it to depend only on the shared model of an asset, so that it can change, or be left out, without touching the pipeline or the bootstrap."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/running-thoughts.md #134 (2026-10-31; 'the generator's imports narrowed to the shared domain model'); scoping asked 2026-11-02. Drafted by delivery-scoper 2026-11-02 (v1); v2 the same day with Keith's answers Q1-Q8 (SETTLED 2026-11-02). v3 the same day with his answers to v2's three open questions. A PROPOSAL, not signed until Keith signs v3."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL let generator/, synthetic_data_generator/ and each asset's providers import only the domain model, the shared scenarios package (criterion 4), the standard library and declared third-party dependencies (Q1, SETTLED by Keith 2026-11-02); at b03a7be6 they hold 86 import statements of qa_tools in 13 files, naming 21 modules, of which the four domain modules are 75 of 122 imported names."
+      - "THE SYSTEM SHALL remove every import of the real pipeline from the generator, each pure function it calls moving into the domain model (REQ-PIPE-380 criterion 5) - assignment.open_slot, arrival_classification.classify, check_bands.catalogue among them - and SHALL record where each of today's 17 non-domain modules' uses went in this requirement's decisions when built."
+      - "THE SYSTEM SHALL give the generator one public entry point, used by the bootstrap and cli/: generate an asset's history, and report what was generated under a root (generator/output.generated_into today, reached from the bootstrap through cli/pipeline.py). The bootstrap SHALL import nothing else of the generator."
+      - "THE SYSTEM SHALL hold in one small shared scenarios package (Q4, SETTLED by Keith 2026-11-02), named scenarios/ at the top level (SETTLED by Keith 2026-11-02) the reader of each asset's scripted_decisions.yaml (load, PERIOD, CHAIN_MARK, CHAIN_OPERATIONS and the due-instant helpers the generator calls today) and the scenario vocabulary (SUBJECTS, SUPPLY_HISTORY_ROW, AS_AT_PANEL and the rest); the generator and the bootstrap may import it, it imports only the domain model, and nothing in the real pipeline imports it."
+      - "IF the generator imports the bootstrap package, THEN `mothman check` SHALL fail (REQ-TEST-384); today's 8 such statements (scripted_decisions, correction_replay, in scenario_injection.py, correction_claims.py and linkage_products.py) SHALL go, through criterion 4's package or criterion 2's moves."
+      - "THE SYSTEM SHALL move the scenario map's writer to the generator, which places the scenarios."
+      - "THE SYSTEM SHALL move delivery writing (delivery.write_delivery, remove_deliveries) to the generator, keeping the delivery layout and file-name reading the pipeline uses in the domain model or the pipeline."
+      - "THE SYSTEM SHALL show through REQ-TEST-239's compare that no byte any collection generates changes, for each asset."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: every generated file is unchanged, proven by REQ-TEST-239's compare."
+      - "PERFORMANCE: providers stay importable without pandas or numpy (REQ-GEN-246 criterion 7), so the providers gate's time is unchanged."
+      - "MAINTAINABILITY: a generator that predicts what the pipeline will do (target trials, correction claims) through the pipeline's own code stays in step with it; one that takes data instead can drift - which is why Q1 settled on moving the functions rather than passing data."
+    dependencies:
+      - "REQ-PIPE-380"
+      - "REQ-TEST-384"
+      - "REQ-GEN-370"
+      - "REQ-GEN-246"
+      - "REQ-TEST-239"
+    decisions:
+      - "NARROWED TO THE DOMAIN MODEL (Keith, 2026-10-31, #134's code half). REJECTED (b) and (c) of #134 as in REQ-PIPE-380."
+      - "ONE ENTRY POINT, NOT A SUBPROCESS (delivery-scoper's choice): REJECTED having the bootstrap run the generator only as a `mothman` subprocess, which would lose the in-process resume comparison (REQ-TEST-160) for no gain the gate does not already give."
+      - "A SHARED SYNTHETIC-CONFIG PACKAGE (Q4, SETTLED by Keith 2026-11-02): REJECTED the generator owning the readers (the bootstrap would then import the generator beyond its entry point), and REJECTED the bootstrap owning them (the generator would import the bootstrap)."
+      - "DOMAIN MODEL ONLY (Q1, SETTLED by Keith 2026-11-02): REJECTED a permanent list of allowed pipeline modules, and REJECTED taking everything as data."
+      - "THE SHARED PACKAGE IS NAMED scenarios/, AT THE TOP LEVEL (SETTLED by Keith 2026-11-02): REJECTED synthetic_config/. It does not clash with the scenarios modules moving into bootstrap/ or with cli/scenarios.py, because imports here are absolute (bootstrap.scenarios, cli.scenarios)."
+    open_questions: []

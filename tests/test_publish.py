@@ -1,0 +1,842 @@
+"""REQ-PIPE-092 - the dashboard is built where the data is, and GitHub
+never holds a database credential.
+
+WHAT IS WORTH TESTING HERE, and it is not "does it push". The push is one
+git command and a test that mocked it would assert that a mock was called.
+What can actually go wrong is quieter:
+
+  - A SECOND publish path appearing (criterion 10). Three entry points
+    reach the site today - the command, `pipeline run --publish` and the
+    wizard's prompt - and the moment one of them pushes for itself rather
+    than calling the one function, they can drift and nobody would notice
+    until two builds differed.
+  - PUBLISHING WITHOUT THE GATE (criteria 4 and 5). The render check moved
+    out of GitHub Actions with the build, and a publish that skipped it
+    would put a broken page on a public site.
+  - PUBLISHING WHEN NOBODY ASKED (criterion 16). This is the one with an
+    audience outside the tool.
+  - A CREDENTIAL REACHING GITHUB (criterion 2), which is the thing the
+    whole requirement exists to prevent.
+"""
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+import pytest
+
+from cli import dashboard as dashboard_cli
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.critical
+class TestThereIsExactlyOnePublishPath:
+    """Criterion 10, and criterion 15 for the prompt specifically."""
+
+    @staticmethod
+    def _through_the_command(monkeypatch):
+        from click.testing import CliRunner
+
+        result = CliRunner().invoke(dashboard_cli.publish_command, [])
+        assert result.exit_code == 0, result.output
+
+    @staticmethod
+    def _through_pipeline_run(monkeypatch):
+        """`pipeline run --publish` with everything before the publish
+        stubbed out - the real run checks every supply that has arrived."""
+        import contextlib
+
+        from click.testing import CliRunner
+
+        from cli import pipeline
+        from dashboard import snapshot_dashboard
+        from qa_tools.common import processing_pass, streams
+        from qa_tools.tools import orchestrate
+
+        monkeypatch.setattr(streams, "holds_history", lambda conn: False)
+        monkeypatch.setattr(processing_pass, "pass_lock",
+                            lambda *a, **k: contextlib.nullcontext())
+        monkeypatch.setattr(orchestrate, "run_stream", lambda ids, **k: None)
+        monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
+        monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
+        monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
+        # The suite's `test` environment publishes nothing; this is about the
+        # route, so the refusal it would meet first is set aside.
+        monkeypatch.setattr(dashboard_cli, "publish_refusal", lambda **k: None)
+        result = CliRunner().invoke(pipeline.run_command, ["--publish"])
+        assert result.exit_code == 0, result.output
+
+    @staticmethod
+    def _through_the_wizards_prompt(monkeypatch):
+        """Criterion 15 in as many words: the prompt reaches the site by
+        the same path the command uses, and by no other."""
+        from cli import common
+
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+        monkeypatch.setattr(common, "confirm", lambda *a, **k: True)
+        common.offer_to_publish()
+
+    @pytest.mark.parametrize("route", ["_through_the_command", "_through_pipeline_run",
+                                       "_through_the_wizards_prompt"])
+    def test_every_route_publishes_through_the_one_function(self, route, monkeypatch, tmp_path):
+        """Each of the three entry points reaches the site by calling
+        dashboard.publish() once - so none of them can push for itself."""
+        monkeypatch.chdir(tmp_path)
+        calls = []
+        monkeypatch.setattr(dashboard_cli, "publish", lambda **kwargs: calls.append(kwargs))
+
+        getattr(self, route)(monkeypatch)
+
+        assert len(calls) == 1, f"{route} reached publish() {len(calls)} times"
+
+    def test_only_one_function_in_the_cli_pushes_anything(self):
+        """The structural version of the same claim - so a fourth entry
+        point added later cannot quietly bring its own push."""
+        pushers = []
+        for path in sorted((ROOT / "cli").glob("*.py")):
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.FunctionDef):
+                    continue
+                body = ast.get_source_segment(path.read_text(), node) or ""
+                if '"push"' in body:
+                    pushers.append(f"{path.name}::{node.name}")
+        # ONE NAMED EXCEPTION, and it publishes nothing (2026-11-02): `mothman
+        # debug snapshot-worktrees` pushes each worktree's uncommitted work to
+        # a wip/<branch>-snap ref as a safety net (plans/running-thoughts.md
+        # #135). It never builds, uploads or deploys a site; that it pushes
+        # ONLY to such refs is pinned in test_worktree_snapshot.py. Any other
+        # pusher still fails here.
+        # NO GIT PUSH PUBLISHES ANY MORE (REQ-PIPE-255 criterion 31): the
+        # upload to Cloudflare Pages replaced the push to the gh-pages branch.
+        assert pushers == ["worktree_snapshot.py::snapshot_one"], pushers
+
+    def test_only_publish_uploads(self):
+        """The same claim for the upload that replaced the push: one function
+        in the CLI calls hosting.upload()."""
+        callers = []
+        for path in sorted((ROOT / "cli").glob("*.py")):
+            source = path.read_text()
+            for node in ast.walk(ast.parse(source)):
+                if isinstance(node, ast.FunctionDef) and \
+                        "hosting.upload(" in (ast.get_source_segment(source, node) or ""):
+                    callers.append(f"{path.name}::{node.name}")
+        assert callers == ["dashboard.py::publish"], callers
+
+
+@pytest.mark.critical
+class TestTheGateCannotBeSkipped:
+    """Criteria 4 and 5: the render check runs where the build runs, and
+    only a build that passed it is published."""
+
+    @staticmethod
+    def _record_the_steps(monkeypatch, tmp_path, *, gate_fails=False):
+        """Every step of a publish recorded rather than run, the site behind
+        its sign-in and nothing archived yet - so what is asserted is the
+        order and the gate, not Cloudflare."""
+        from dashboard import access_check, hosting
+        from dashboard import snapshot_dashboard
+
+        monkeypatch.chdir(tmp_path)
+        steps = []
+
+        def step(name, fail=False, returns=None):
+            def _run(*a, **k):
+                steps.append(name)
+                if fail:
+                    raise RuntimeError("the render check failed")
+                return returns
+            return _run
+
+        # NO WRANGLER HERE, as on CI's pytest runner, which never runs `npm ci`:
+        # found only through this checkout's node_modules, this test passed
+        # locally and failed on 724752c4's critical run.
+        monkeypatch.setattr(hosting, "ROOT", tmp_path)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        # ...so the transport is stubbed with the rest: this test is about the
+        # order and the gate (tests/test_cloudflare_publish.py drives wrangler).
+        monkeypatch.setattr(hosting, "find_wrangler", lambda: "stub-wrangler")
+        monkeypatch.setattr(hosting, "wrangler", lambda: "stub-wrangler")
+        where = hosting.Hosting("p", "main", "https://p.pages.dev", "team.cloudflareaccess.com")
+        monkeypatch.setattr(dashboard_cli, "publish_refusal", lambda **k: None)
+        monkeypatch.setattr(hosting, "hosting", lambda: where)
+        for name in ("_rebuild_results", "_build_data", "_embed"):
+            monkeypatch.setattr(dashboard_cli, name, step(name))
+        monkeypatch.setattr(dashboard_cli, "_check_renders", step("_check_renders", gate_fails))
+        monkeypatch.setattr(dashboard_cli, "_refuse_oversized_page", lambda page: None)
+        monkeypatch.setattr(snapshot_dashboard, "newest_snapshot", lambda: None)
+        monkeypatch.setattr(access_check, "check", lambda url, domain: access_check.Verdict(
+            url, access_check.SIGNIN, "HTTP 302 to team.cloudflareaccess.com"))
+        monkeypatch.setattr(snapshot_dashboard, "take_snapshot", step("take_snapshot"))
+        monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site", step("prepare_deploy_site"))
+        monkeypatch.setattr(hosting, "measure", lambda site: hosting.SiteSize(1, 1, ("index.html", 1), (), ()))
+        monkeypatch.setattr(hosting, "upload", step("upload", returns=hosting.Deployment(
+            "https://abc.p.pages.dev", "https://p.pages.dev")))
+        return steps
+
+    def test_it_runs_the_check_after_the_build_and_before_it_publishes(self, monkeypatch, tmp_path):
+        """Order, not presence. A gate after the upload is not a gate."""
+        steps = self._record_the_steps(monkeypatch, tmp_path)
+        dashboard_cli.publish()
+        assert steps == ["_rebuild_results", "_build_data", "_embed", "_check_renders",
+                         "take_snapshot", "prepare_deploy_site", "upload"]
+
+    def test_a_failed_render_check_publishes_nothing(self, monkeypatch, tmp_path):
+        steps = self._record_the_steps(monkeypatch, tmp_path, gate_fails=True)
+        with pytest.raises(RuntimeError, match="render check"):
+            dashboard_cli.publish()
+        assert "_check_renders" in steps, "test precondition - the gate must have run"
+        assert "upload" not in steps and "take_snapshot" not in steps
+
+
+class TestPublishingIsAlwaysAsked:
+    def test_pipeline_run_does_not_publish_by_default(self):
+        """Criterion 16. The default matters more than the flag: a
+        debugging run, a batch and a scheduled run must not publish a
+        dashboard nobody asked for."""
+        from cli import pipeline
+
+        import click
+
+        publish_opt = next(p for p in pipeline.run_command.params if p.name == "do_publish")
+        assert publish_opt.is_flag
+        # ASKED OF CLICK, not of the stored attribute. A flag's `.default`
+        # is an UNSET sentinel that click resolves later, and that sentinel
+        # is truthy - so asserting on it directly passes for the wrong
+        # reason or fails for one. This asks what the callback actually
+        # receives.
+        with click.Context(pipeline.run_command) as ctx:
+            assert publish_opt.get_default(ctx) is False
+
+    def test_the_prompt_defaults_to_not_publishing(self, monkeypatch):
+        """Criterion 14: a prompt they answer, and the answer that changes
+        what the public sees is not the default one."""
+        from cli import common
+
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+        asked = []
+        monkeypatch.setattr(common.questionary, "confirm",
+                            lambda message, **kwargs: asked.append(kwargs) or object())
+        monkeypatch.setattr(common, "_ask", lambda question: False)
+
+        def _never(**_k):
+            raise AssertionError("published although the answer was no")
+
+        monkeypatch.setattr(dashboard_cli, "publish", _never)
+        common.offer_to_publish()
+
+        assert len(asked) == 1, "the person was not asked"
+        assert asked[0]["default"] is False
+
+    def test_the_prompt_says_nothing_with_no_terminal(self, monkeypatch, capsys):
+        """There is nobody to ask, and the safe answer to "shall I change
+        what the public sees" asked of nobody is no - silently, since a
+        scripted caller has not done anything wrong."""
+        from cli import common
+
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+        def _never():
+            raise AssertionError("published without being asked")
+
+        monkeypatch.setattr(dashboard_cli, "publish", _never)
+        common.offer_to_publish()
+        assert capsys.readouterr().out == ""
+
+
+@pytest.mark.critical
+class TestGitHubHoldsNoCredentialAndRunsNoBuild:
+    """Criterion 2, and criterion 9 for what CI keeps."""
+
+    def _workflows(self):
+        return sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+
+    def test_no_workflow_can_reach_a_database_off_the_runner(self):
+        """The rule is REACHABILITY, not a variable name - and it was a
+        variable name until 2026-09-28, which is how it broke CI.
+
+        WHAT HAPPENED, because it is the more useful half. This test used
+        to assert that no workflow anywhere named MOTHMAN_SUPPLY_DSN, on
+        the reasoning that test.yml needs only MOTHMAN_TEST_DSN. That was
+        simply untrue: `mothman pipeline bootstrap` connects to the
+        WAREHOUSE, so the step test.yml runs to give ~167 tests something
+        to drive cannot work without one. The workflow was written to obey
+        this test, so every run died on "MOTHMAN_SUPPLY_DSN is not set"
+        before a single test ran - red for three pushes while every local
+        gate was green.
+
+        So the rule now says what it always meant, and what the sibling
+        test below already spelled out: a workflow may stand up its own
+        throwaway PostgreSQL and talk to it, and may never reach a
+        database that outlives the job. A host is what decides that, so a
+        host is what this checks - and it catches a real deployment DSN
+        pasted in, which the name check never would have.
+        """
+        import re
+
+        allowed_hosts = {"localhost", "127.0.0.1"}
+        for path in self._workflows():
+            text = path.read_text()
+            for dsn in re.findall(r"postgresql://[^\s'\"]+", text):
+                host = dsn.split("@")[-1].split(":")[0].split("/")[0]
+                assert host in allowed_hosts, (
+                    f"{path.name} names a database at {host!r}. A workflow may only "
+                    f"reach a service container inside its own job - anything else "
+                    f"outlives the run and is this deployment's data.")
+
+    def test_no_workflow_reads_a_database_credential_from_a_secret(self):
+        """The other half of the same rule, and the one a name check could
+        never see. A throwaway container's password is written inline
+        BECAUSE it guards nothing; a secrets reference means somebody
+        stored a credential to something real."""
+        for path in self._workflows():
+            text = path.read_text().lower()
+            for line in text.splitlines():
+                if "secrets." not in line:
+                    continue
+                assert not any(word in line for word in ("dsn", "postgres", "database")), (
+                    f"{path.name} reads a database credential from a secret: "
+                    f"{line.strip()}")
+
+    def test_no_workflow_publishes_the_dashboard(self):
+        """The line is PUBLISHING, not building, and the distinction is
+        worth stating because it is the one somebody would later "tidy"
+        wrongly.
+
+        test.yml legitimately builds a dashboard: it stands up its own
+        throwaway PostgreSQL service container, bootstraps synthetic data
+        into it, and builds so that ~167 tests have something to drive. That
+        is a test fixture, and its DSN is a credential to nothing real.
+        What no workflow may do is reach THIS DEPLOYMENT'S database or put
+        the result in front of the public."""
+        for path in self._workflows():
+            # EXECUTABLE LINES ONLY. A comment naming the workflow that used
+            # to publish is history, and a test that failed on history would
+            # force the history to be deleted to make it pass.
+            lines = [line for line in path.read_text().splitlines()
+                      if line.strip() and not line.strip().startswith("#")]
+            body = "\n".join(lines)
+            for command in ("dashboard publish", "deploy-pages", "upload-pages-artifact",
+                             "configure-pages"):
+                assert command not in body, \
+                    f"{path.name} still runs {command!r} - publishing left GitHub with the build"
+
+    def test_the_configuration_gates_still_run_in_ci(self):
+        """Criterion 9: everything that needs no database stays runnable
+        where no data is reachable. Dropping these with the build would
+        have been the easy mistake - they were in the same workflow."""
+        text = (ROOT / ".github" / "workflows" / "validate-config.yml").read_text()
+        for gate in ("validate-hierarchy", "schedule validate", "validate-check-lifecycle",
+                      "validate-requirements", "validate-changelog", "plans-index --check"):
+            assert gate in text, f"validate-config.yml no longer runs {gate!r}"
+
+
+class TestTheArtifactSaysWhereItCameFrom:
+    """Criteria 7 and 17."""
+
+    TEMPLATE = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"
+
+    def test_the_template_carries_the_placeholder_unset(self):
+        assert "const BUILD_PROVENANCE = null;" in self.TEMPLATE.read_text(), \
+            "the raw template must claim no environment - it was never built"
+
+    @staticmethod
+    def _embedded_provenance(monkeypatch, tmp_path) -> dict:
+        """Run the real embed() into tmp and read BUILD_PROVENANCE back
+        out of the page it wrote. The two dashboard JSON inputs are stubbed:
+        they are build artefacts, and what is under test is the stamp."""
+        import json
+        import re
+
+        from dashboard import embed_dashboard_data as edd
+        from pipeline import corrections
+
+        targets = []
+        for collection_id, _real in edd.collection_targets():
+            stub = tmp_path / f"{collection_id}.json"
+            stub.write_text(json.dumps({"datasets": []}))
+            targets.append((collection_id, str(stub)))
+        monkeypatch.setattr(edd, "collection_targets", lambda: targets)
+        monkeypatch.setattr(corrections, "applied_feed", lambda: [])
+        # The sprint graph re-parses requirements.yaml several times over,
+        # which is most of embed()'s cost and nothing to do with the stamp.
+        monkeypatch.setattr(edd, "dependency_data", lambda: {"sprints": [], "stale": []})
+        monkeypatch.setattr(edd, "DASHBOARD_HTML", tmp_path / "out.html")
+
+        edd.embed()
+
+        found = re.search(r"const BUILD_PROVENANCE = (.*?);\n",
+                          (tmp_path / "out.html").read_text())
+        assert found, "BUILD_PROVENANCE was not embedded at all"
+        return json.loads(found.group(1))
+
+    def test_the_embed_fills_it_with_the_environment_and_the_commit(self, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from dashboard import embed_dashboard_data as edd
+
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        monkeypatch.setattr(edd, "current_commit_sha", lambda *a, **k: sha)
+        monkeypatch.setattr(edd.environments, "current_or_none", lambda: SimpleNamespace(
+            id="sandbox", label="A sandbox", publishes=True, production=False))
+
+        assert self._embedded_provenance(monkeypatch, tmp_path) == {
+            "environment": {"id": "sandbox", "label": "A sandbox", "publishes": True,
+                            "production": False},
+            "commit": sha,
+            # REQ-DASH-407 criterion 4: a synthetic asset's generated-up-to
+            # date - none recorded in this worker's database.
+            "synthetic": True, "generated_up_to": None}
+
+    def test_absence_of_either_is_tolerated_rather_than_invented(self, monkeypatch, tmp_path):
+        """An environment is unset on a checkout nobody configured, and a
+        commit is unavailable in a container built from a tarball. Both are
+        ordinary; claiming a value for either would not be."""
+        from dashboard import embed_dashboard_data as edd
+
+        # ONLY THE FIRST ASK FAILS, which is the provenance stamp's. The
+        # GitHub-links step asks again later and does NOT tolerate a
+        # missing commit - so a build with no repository at all still
+        # fails there, which is a separate matter from what the stamp
+        # claims. If the order ever changed, the stamp would get the sha
+        # and this would fail rather than pass quietly.
+        asked = []
+
+        def no_repository_the_first_time(*_a, **_k):
+            asked.append(1)
+            if len(asked) == 1:
+                raise FileNotFoundError("git")
+            return "f" * 40
+
+        monkeypatch.setattr(edd, "current_commit_sha", no_repository_the_first_time)
+        monkeypatch.setattr(edd.environments, "current_or_none", lambda: None)
+
+        assert self._embedded_provenance(monkeypatch, tmp_path) == {
+            "environment": None, "commit": None, "synthetic": True, "generated_up_to": None}
+
+
+@pytest.mark.critical
+class TestNothingPublishesToAGitBranch:
+    """REQ-PIPE-255 criterion 31: no code pushes the dashboard to a git branch,
+    and the publish command carries no option naming one."""
+
+    def test_the_publish_command_names_no_branch(self):
+        names = {opt for p in dashboard_cli.publish_command.params for opt in p.opts}
+        assert names == {"--dry-run"}, names
+
+
+@pytest.mark.critical
+class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:
+    """Three CI-only failures in one night, each the same shape.
+
+    `mothman pipeline bootstrap` in test.yml died three times in a row on a
+    variable the runner did not have - MOTHMAN_SUPPLY_DSN, then a git
+    identity, then MOTHMAN_ENVIRONMENT. Every one was green locally,
+    because a developer's shell and this repo's gitignored `.env` have all
+    of them; every one cost a push and a five-minute run to discover.
+
+    SO THIS ASSERTS THE CLASS RATHER THAN THE THREE INSTANCES. What it
+    checks is that every variable the pipeline refuses to run without is
+    named in the workflow that runs it - which is a question answerable
+    locally, and the reason the next one will fail here instead of on the
+    runner.
+
+    IT READS THE REFUSALS FROM THE CODE, not from a list kept beside it: a
+    hand-maintained list is the thing that goes stale, and going stale
+    here means the gate stops covering the variable somebody just added.
+    """
+
+    #: Both workflows that run tests (REQ-TEST-375): the hand-started full
+    #: one, and the push job, which a missing variable would break on every
+    #: push instead.
+    @pytest.fixture(params=["test.yml", "critical.yml"])
+    def workflow(self, request):
+        return ROOT / ".github" / "workflows" / request.param
+
+    def _required(self) -> set[str]:
+        """Every environment variable something in the pipeline refuses to
+        run without, by the constant each module names it with."""
+        from qa_tools.common import environments, supply_db
+
+        return {supply_db.SUPPLY_DSN_ENV, environments.ENVIRONMENT_ENV}
+
+    def test_the_test_workflow_names_each_one(self, workflow):
+        text = workflow.read_text()
+        missing = sorted(name for name in self._required() if name not in text)
+        assert not missing, (
+            f"{workflow.name} runs the real pipeline and does not set {', '.join(missing)}. "
+            f"Every one of these has no default on purpose - the pipeline refuses "
+            f"rather than guessing - so a runner without it fails before any test "
+            f"runs, and passes locally where a shell or .env has it.")
+
+    def test_it_also_names_the_test_dsn_it_creates_databases_with(self, workflow):
+        """Separate from the list above because it is required by the SUITE
+        rather than by the pipeline: conftest raises a UsageError without
+        it rather than skipping, on the reasoning that a suite silently
+        skipping its warehouse tests reports green having checked
+        nothing."""
+        from tests.conftest import TEST_DSN_ENV
+
+        assert TEST_DSN_ENV in workflow.read_text()
+
+    def test_the_environment_it_claims_to_be_is_one_the_asset_defines(self, workflow):
+        """A value nobody defined would fail at run time with a list of the
+        real ones - which is the right error and a slow way to find it."""
+        import re
+
+        from qa_tools.common import environments
+
+        text = workflow.read_text()
+        found = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)", text)
+        assert found, f"{workflow.name} does not set MOTHMAN_ENVIRONMENT"
+        assert found.group(1) in {e.id for e in environments.all_environments()}
+
+    def test_the_environment_it_claims_publishes_nothing(self, workflow):
+        """A runner must never be an environment whose build is the
+        published one - it has no route to a real database, and
+        REQ-PIPE-092 moved publishing out of Actions entirely."""
+        import re
+
+        from qa_tools.common import environments
+
+        claimed = re.search(r"MOTHMAN_ENVIRONMENT:\s*(\S+)",
+                             workflow.read_text()).group(1)
+        by_id = {e.id: e for e in environments.all_environments()}
+        assert by_id[claimed].publishes is False
+
+
+class TestNeitherHalfOfCIQuietlyStopsCovering:
+    """The shape CI depends on, asserted here rather than trusted
+    (plans/tooling.md #27; rewritten for REQ-TEST-375, Keith 2026-11-02).
+
+    TWO WORKFLOWS SINCE REQ-TEST-375. Every push runs critical.yml - the
+    hand-picked `critical` mark, no deployment, no browser, no coverage - and
+    the JS suite beside it. test.yml keeps the full suite in its two halves
+    (`-m "not needs_deployment"` and `-m needs_deployment`) with the coverage
+    combine, and is started only by hand.
+
+    The marker is still what decides, and the old failure still applies to
+    both: a test in the WRONG set either fails outright (fine) or SKIPS - ten
+    tests once skipped quietly in CI while passing locally. So the
+    reports-readers check below stays, the push job fails on any skip, and a
+    `critical` test needing a deployment or a browser fails collection.
+    """
+
+    WORKFLOW = ROOT / "tests"
+
+    #: The GENERATED artefacts a test can only read where something has
+    #: bootstrapped first. `reports/` was the whole list until
+    #: 2026-09-29, when CI found `data/scenario_placements.json` the
+    #: expensive way - a test rebuilding SCENARIOS.md from it had been
+    #: passing only because the single job bootstrapped before running
+    #: anything.
+    #:
+    #: A LIST OF KNOWN ARTEFACTS, not a general proof, and worth being
+    #: honest about: nothing here can tell in general whether a path is
+    #: read from the real tree or a redirected one. CI running the fast
+    #: half against an empty deployment is the real check; this is the
+    #: cheap one that catches the known shapes before a push.
+    GENERATED = (r'["\']reports["\']\s*/', r"reports/[\w-]+\.json",
+                 # The placements file itself, not the module alias
+                 # scenario_placements that reads it (REQ-GEN-386).
+                 r"scenario_placements\.json",
+                 # THROUGH THE RESOLVER (REQ-PIPE-342 criterion 6), the same
+                 # artefacts by their call-time lookups.
+                 r"\breports_(?:path|dir)\(", r"\bplacements_path\(")
+
+    def _modules_reading_reports(self) -> set[str]:
+        """Test modules that name a generated artefact."""
+        import re
+
+        found = set()
+        for path in sorted((ROOT / "tests").glob("test_*.py")):
+            text = path.read_text()
+            if any(re.search(pattern, text) for pattern in self.GENERATED):
+                found.add(path.name)
+        return found
+
+    def test_every_module_reading_reports_carries_the_marker(self):
+        # FOUR WAYS TO BE COVERED, and only one is visible as a mark.
+        # conftest marks anything requesting `deployment_history`; a
+        # module may carry the mark itself or on one class or test; and
+        # a module that REDIRECTS the artefact away from the real tree
+        # never reads the real one at all, which is a stronger form of
+        # covered than any mark.
+        #
+        # THE LAST ONE WAS ADDED AFTER THIS GUARD FALSELY ACCUSED
+        # test_generate_runs.py, which mentions the placements path
+        # precisely BECAUSE it redirects it. A guard that cries wolf is
+        # one somebody disables - and the wrong fix here would have been
+        # to add a mark it does not need, pushing a fast test into the
+        # slow half to quiet a check.
+        covered = ("pytestmark = pytest.mark.needs_deployment",
+                   "@pytest.mark.needs_deployment",
+                   "deployment_history",
+                   "generator_isolation",
+                   # generator_isolation's redirect, imported from where it lives.
+                   "from generator.output import redirect",
+                   "PLACEMENTS_PATH\",",
+                   "\"placements_path\",",
+                   # A module that builds its own reports/ under a temporary
+                   # or copied tree and reads only that one says so.
+                   "READS ONLY ITS OWN REPORTS")
+        missing = {
+            name for name in self._modules_reading_reports()
+            if not any(mark in (ROOT / "tests" / name).read_text()
+                       for mark in covered)
+        }
+        assert missing == set(), (
+            f"{sorted(missing)} read a built reports/ file but would run in "
+            f"CI's fast half, which never builds one - where they would skip "
+            f"rather than fail. Add "
+            f"`pytestmark = pytest.mark.needs_deployment`.")
+
+    FULL = ROOT / ".github" / "workflows" / "test.yml"
+    PUSH = ROOT / ".github" / "workflows" / "critical.yml"
+
+    @staticmethod
+    def _load(path) -> dict:
+        import yaml
+
+        return yaml.safe_load(path.read_text())
+
+    def _critical_step(self) -> str:
+        [run] = [s["run"] for s in self._load(self.PUSH)["jobs"]["critical"]["steps"]
+                 if "pytest" in s.get("run", "")]
+        return run
+
+    def test_the_markers_are_registered(self):
+        """An unregistered marker makes a typo in `-m` select nothing,
+        silently - a green job that ran no tests at all."""
+        text = (ROOT / "pyproject.toml").read_text()
+        assert "needs_deployment:" in text
+        assert "critical:" in text
+
+    def test_the_full_workflow_is_started_only_by_hand(self):
+        assert set(self._load(self.FULL)[True]) == {"workflow_dispatch"}  # `on:` reads as True
+
+    def test_every_push_to_a_session_branch_runs_the_critical_set(self):
+        """`claude/**` only, deliberately: `wip/` checkpoint pushes bill nothing."""
+        assert self._load(self.PUSH)[True]["push"]["branches"] == ["claude/**"]
+        assert '-m "critical and not needs_deployment"' in self._critical_step()
+
+    def test_the_push_job_runs_no_bootstrap_no_browser_and_no_coverage(self):
+        job = self._load(self.PUSH)["jobs"]["critical"]
+        runs = "\n".join(s.get("run", "") for s in job["steps"])
+        for absent in ("bootstrap", "playwright", "--cov", "coverage"):
+            assert absent not in runs, absent
+
+    def test_the_push_job_lints_the_yaml(self):
+        """yamllint --strict (duplicate keys) only ever ran in test.yml's fast
+        half; with that half started by hand, push CI must carry it."""
+        runs = [s.get("run", "") for s in self._load(self.PUSH)["jobs"]["critical"]["steps"]]
+        assert "uv run yamllint --strict ." in runs
+
+    def test_the_js_suite_runs_beside_it_not_after_it(self):
+        job = self._load(self.PUSH)["jobs"]["js-tests"]
+        assert "needs" not in job
+        assert any(s.get("run") == "npm test" for s in job["steps"])
+
+    @pytest.mark.critical
+    def test_the_push_job_carries_the_full_jobs_environment(self):
+        full = self._load(self.FULL)["jobs"]["test"]["env"]
+        push = self._load(self.PUSH)["jobs"]["critical"]["env"]
+        assert set(full) <= set(push), sorted(set(full) - set(push))
+
+    def _verdict(self, tmp_path, *, tests: int, skipped: int, took: int, budget: int = 300):
+        """Runs the push job's own checker (the heredoc in its pytest step)
+        against a JUnit report of the given shape."""
+        import re
+        import subprocess
+        import sys
+        import textwrap
+
+        [body] = re.findall(r"<<'PY'\n(.*?)\nPY\n", self._critical_step(), re.S)
+        cases = "".join(f'<testcase classname="m" name="t{i}" time="{i}.0"/>'
+                        for i in range(tests))
+        (tmp_path / "critical-junit.xml").write_text(
+            f'<testsuites><testsuite tests="{tests}" skipped="{skipped}">{cases}'
+            f'</testsuite></testsuites>')
+        return subprocess.run([sys.executable, "-c", textwrap.dedent(body), str(took),
+                               str(budget)], cwd=tmp_path, capture_output=True, text=True)
+
+    def test_a_clean_run_inside_the_budget_passes(self, tmp_path):
+        assert self._verdict(tmp_path, tests=3, skipped=0, took=100).returncode == 0
+
+    def test_zero_tests_selected_fails(self, tmp_path):
+        done = self._verdict(tmp_path, tests=0, skipped=0, took=5)
+        assert done.returncode != 0 and "ZERO tests" in done.stderr
+
+    def test_any_skip_fails(self, tmp_path):
+        done = self._verdict(tmp_path, tests=3, skipped=1, took=50)
+        assert done.returncode != 0 and "SKIPPED" in done.stderr
+
+    def test_over_the_budget_fails_naming_the_time_and_the_slowest_tests(self, tmp_path):
+        done = self._verdict(tmp_path, tests=3, skipped=0, took=301)
+        assert done.returncode != 0
+        assert "301s against 300s" in done.stderr and "m::t2" in done.stderr
+
+    def test_both_halves_are_still_named_in_the_full_workflow(self):
+        text = self.FULL.read_text()
+        assert '-m "not needs_deployment"' in text
+        assert "-m needs_deployment" in text
+
+    def test_the_coverage_gate_still_runs_over_both(self):
+        """Splitting the suite splits the measurement, so `fail_under`
+        has to be enforced on the combination - not on either half,
+        where it would be meaningless."""
+        text = self.FULL.read_text()
+        assert "coverage combine" in text
+        measured = [s["run"] for job in self._load(self.FULL)["jobs"].values()
+                    for s in job.get("steps", []) if "--cov=" in s.get("run", "")]
+        assert len(measured) == 3, "the fast half, the deployment half, and its unloaded step"
+        assert all("--cov-fail-under=0" in run for run in measured), (
+            "each half must defer the threshold to the combine")
+
+    def _pytest_runs(self, job: str) -> list[str]:
+        return [s["run"] for s in self._load(self.FULL)["jobs"][job]["steps"]
+                if "uv run pytest" in s.get("run", "")]
+
+    def test_the_unloaded_tests_run_alone_after_the_deployment_half(self):
+        """Keith, 2026-11-23: a test timed against a wall-clock budget runs
+        with no parallel load. Every parallel session deselects the
+        `unloaded` mark, so EACH ONE IS RUN BY EXACTLY ONE STEP only if the
+        parallel steps stay parallel and one -n0 step selects the mark - in
+        the deployment job, where a deployment test can run, after its
+        parallel run. And never in the fast half or the push job, where it
+        would run a second time or skip."""
+        fast, = self._pytest_runs("test")
+        parallel, alone = self._pytest_runs("test-deployment")
+        assert "-m needs_deployment" in parallel and "-n0" not in parallel
+        assert "-m unloaded -n0" in alone and "--only-asset" not in alone
+        assert "unloaded" not in fast and "-n0" not in fast
+        assert "unloaded" not in self._critical_step()
+
+    def test_an_unloaded_test_is_deselected_only_under_parallel_load(self):
+        """The other half of 'exactly one step', through conftest's own hook
+        function: kept in a -n0 session (or under a single worker), dropped
+        from every worker of a parallel one - deselected, never skipped."""
+        from types import SimpleNamespace
+
+        from tests.conftest import UNLOADED, _deselect_unloaded_under_parallel_load
+
+        class _Item:
+            def __init__(self, marked):
+                self.marked = marked
+
+            def get_closest_marker(self, name):
+                return object() if (self.marked and name == UNLOADED) else None
+
+        def run(workerinput):
+            deselected = []
+            config = SimpleNamespace(hook=SimpleNamespace(
+                pytest_deselected=lambda items: deselected.extend(items)))
+            if workerinput is not None:
+                config.workerinput = workerinput
+            items = [_Item(True), _Item(False)]
+            _deselect_unloaded_under_parallel_load(config, items)
+            return [i.marked for i in items], [i.marked for i in deselected]
+
+        assert run(None) == ([True, False], [])
+        assert run({"workercount": 1}) == ([True, False], [])
+        assert run({"workercount": 4}) == ([False], [True])
+
+    def test_the_mark_is_carried_by_the_budget_it_exists_for(self):
+        """A step selecting a mark nothing carries proves nothing (and pytest
+        exits 5 on it); a mark registered under another name selects nothing.
+        Reads source: where a mark sits is the rule here, and collecting the
+        browser module to observe it would need a deployment."""
+        assert "unloaded:" in (ROOT / "pyproject.toml").read_text()
+        source = (ROOT / "tests" / "test_dashboard_e2e.py").read_text()
+        assert "@pytest.mark.unloaded\nclass TestTheDataFilesLoadFromDisk:" in source
+
+
+@pytest.mark.critical
+class TestACriticalTestCIcannotRunFailsCollection:
+    """REQ-TEST-375 criterion 3, through conftest's own refusal."""
+
+    class _Item:
+        def __init__(self, nodeid, marks=(), fixtures=()):
+            import pytest as _pytest
+
+            self.nodeid, self.fixturenames, self.path = nodeid, list(fixtures), None
+            self._marks = {m: getattr(_pytest.mark, m) for m in marks}
+
+        def get_closest_marker(self, name):
+            return self._marks.get(name)
+
+    def _refuse(self, *items):
+        from tests.conftest import _refuse_a_critical_test_ci_cannot_run
+
+        _refuse_a_critical_test_ci_cannot_run(list(items))
+
+    def test_a_critical_test_needing_neither_is_accepted(self):
+        self._refuse(self._Item("t::ok", marks=("critical",), fixtures=("tmp_path",)))
+
+    def test_one_needing_a_deployment_is_refused_by_name(self):
+        with pytest.raises(pytest.UsageError, match=r"t::dep \(needs a deployment\)"):
+            self._refuse(self._Item("t::dep", marks=("critical", "needs_deployment")))
+
+    def test_one_driving_a_browser_is_refused_by_name(self):
+        with pytest.raises(pytest.UsageError, match=r"t::web \(drives a browser\)"):
+            self._refuse(self._Item("t::web", marks=("critical",), fixtures=("page",)))
+
+    def test_an_unmarked_test_needing_both_is_none_of_its_business(self):
+        self._refuse(self._Item("t::x", marks=("needs_deployment",), fixtures=("page",)))
+
+    def test_importing_a_helper_that_can_launch_one_is_not_driving_one(self, tmp_path):
+        """The accepted limit, pinned: cli.dashboard imports the render check,
+        and the publish guards that import it stub the check out."""
+        module = tmp_path / "test_uses_helper.py"
+        module.write_text("from cli import dashboard\n")
+        item = self._Item("t::helper", marks=("critical",))
+        item.path = module
+        self._refuse(item)
+
+    def test_a_module_launching_playwright_itself_is_refused(self, tmp_path):
+        module = tmp_path / "test_launches.py"
+        module.write_text("from playwright.sync_api import sync_" "playwright\n")
+        item = self._Item("t::own", marks=("critical",))
+        item.path = module
+        with pytest.raises(pytest.UsageError, match=r"t::own \(drives a browser\)"):
+            self._refuse(item)
+
+    def test_a_browser_reached_through_a_fixture_is_refused(self, tmp_path):
+        """The fixture lives in a module of its own, as a real one would: this
+        module must not itself name Playwright, or every critical test in it
+        would be refused by the module scan."""
+        import importlib.util
+        from types import SimpleNamespace
+
+        source = tmp_path / "launching_fixture.py"
+        source.write_text("def launches():\n    from playwright.sync_api import "
+                          "sync_" "playwright  # noqa: F401\n")
+        spec = importlib.util.spec_from_file_location("launching_fixture", source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        item = self._Item("t::fixture", marks=("critical",), fixtures=("my_page",))
+        item._fixtureinfo = SimpleNamespace(
+            name2fixturedefs={"my_page": [SimpleNamespace(func=module.launches)]})
+        with pytest.raises(pytest.UsageError, match=r"t::fixture \(drives a browser\)"):
+            self._refuse(item)
+
+    def test_a_fixture_merely_defined_beside_playwright_code_is_not(self):
+        """Fixtures are judged by their own function, not their module:
+        conftest.py names playwright for fixtures that launch nothing."""
+        from types import SimpleNamespace
+
+        def plain():
+            return 1
+
+        item = self._Item("t::plain", marks=("critical",), fixtures=("plain",))
+        item._fixtureinfo = SimpleNamespace(
+            name2fixturedefs={"plain": [SimpleNamespace(func=plain)]})
+        self._refuse(item)
+
+
+#: The data asset this module's tests act for, unless a test says otherwise
+#: (C11, Keith 2026-11-02: every test module names its asset).
+pytestmark = pytest.mark.asset("quarterly")

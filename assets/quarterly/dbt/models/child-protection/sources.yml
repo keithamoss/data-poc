@@ -1,0 +1,21 @@
+version: 2
+
+# Child Protection's raw tables (REQ-QAC-241). The source is the same `raw`
+# source dbt_project/models/civil-registration/sources.yml declares - one
+# logical source resolving through the run's own view schema - and that
+# file explains how. dbt merges a source's tables across files.
+sources:
+  - name: raw
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
+    tables:
+      # Child Protection collection (qa_tools/tools/stage.py) -
+      # one snapshot's worth of all 6 tables, staged and then viewed
+      # through the same run schema birth_registrations resolves through.
+      # See generator/collections/child_protection.py for how these snapshots are
+      # built.
+      - name: cp_clients
+      - name: cp_notifications
+      - name: cp_investigations
+      - name: cp_placements
+      - name: cp_carers
+      - name: cp_case_workers

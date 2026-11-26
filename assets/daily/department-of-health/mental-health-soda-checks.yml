@@ -1,0 +1,35 @@
+# The Mental Health collection's Soda checks (REQ-QAC-350). The prose follows
+# docs/check-authoring-rules.md. A synthetic test dataset: no real patient data.
+checks for mental_health_contacts:
+  - missing_percent(postcode):
+      warn: when > 2
+      fail: when > 5
+      attributes:
+        check_id: daily.department-of-health.mental-health.mental-health-contacts.postcode.missing_percent_soda
+        name: Postcode recorded
+        category: completeness
+        introduced_date: "2026-01-01"
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          Contacts are being recorded without an address, most often because
+          telehealth contacts are logged before the client's details are.
+        changelog: []
+
+  - invalid_count(contact_minutes):
+      valid min: 1
+      valid max: 600
+      warn: when > 0
+      fail: when > 5
+      attributes:
+        check_id: daily.department-of-health.mental-health.mental-health-contacts.contact_minutes.invalid_count_soda
+        name: Plausible contact length
+        category: conformity
+        introduced_date: "2026-01-01"
+        description: >
+          A contact must last at least a minute and no longer than a plausible
+          ceiling; a few outliers warn, more fail.
+        failure_indicates: >
+          A contact was never closed off in the source system, so its length
+          kept running, or its start and end were keyed the wrong way round.
+        changelog: []

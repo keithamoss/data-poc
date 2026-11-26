@@ -1,0 +1,215 @@
+{
+  "recipe_format_version": 1,
+  "extraction_id": "ed-readmissions-2021-2024",
+  "project": "RX-0417 Readmission after an emergency department visit, 2021-2024 (fictional study, Example University)",
+  "filter": "Every emergency department presentation between 1 January 2021 and 31 December 2024 at the five study hospitals; each presenting person's inpatient admissions in the same window; and any death registration for those people up to 30 June 2025.",
+  "tables": [
+    {
+      "file": "ed_presentations.csv",
+      "format": "csv",
+      "agency": {
+        "id": "hospital-services",
+        "name": "Hospital Services Agency (mock)"
+      },
+      "collection": {
+        "id": "emergency-care",
+        "name": "Emergency Care"
+      },
+      "dataset": {
+        "id": "ed-presentations",
+        "name": "ED presentations",
+        "table": "ed_presentations"
+      },
+      "derived": false,
+      "columns": [
+        {
+          "name": "presentation_id",
+          "type": "string",
+          "primary_identifier": true
+        },
+        {
+          "name": "person_key",
+          "type": "string",
+          "primary_identifier": false
+        },
+        {
+          "name": "presentation_date",
+          "type": "date",
+          "primary_identifier": false
+        },
+        {
+          "name": "triage_category",
+          "type": "integer",
+          "primary_identifier": false
+        },
+        {
+          "name": "hospital_code",
+          "type": "string",
+          "primary_identifier": false
+        }
+      ],
+      "cohort": [
+        {
+          "column": "presentation_date",
+          "lower": "2021-01-01",
+          "upper": "2024-12-31"
+        }
+      ],
+      "expected_rows": 240
+    },
+    {
+      "file": "hospital_admissions.csv",
+      "format": "csv",
+      "agency": {
+        "id": "hospital-services",
+        "name": "Hospital Services Agency (mock)"
+      },
+      "collection": {
+        "id": "inpatient-care",
+        "name": "Inpatient Care"
+      },
+      "dataset": {
+        "id": "hospital-admissions",
+        "name": "Hospital admissions",
+        "table": "hospital_admissions"
+      },
+      "derived": false,
+      "columns": [
+        {
+          "name": "admission_id",
+          "type": "string",
+          "primary_identifier": true
+        },
+        {
+          "name": "person_key",
+          "type": "string",
+          "primary_identifier": false
+        },
+        {
+          "name": "admission_date",
+          "type": "date",
+          "primary_identifier": false
+        },
+        {
+          "name": "length_of_stay_days",
+          "type": "integer",
+          "primary_identifier": false
+        },
+        {
+          "name": "within_30_days",
+          "type": "boolean",
+          "primary_identifier": false
+        }
+      ],
+      "cohort": [
+        {
+          "column": "admission_date",
+          "lower": "2021-01-01",
+          "upper": "2024-12-31"
+        }
+      ],
+      "expected_rows": 96
+    },
+    {
+      "file": "readmission_summary.csv",
+      "format": "csv",
+      "agency": {
+        "id": "hospital-services",
+        "name": "Hospital Services Agency (mock)"
+      },
+      "collection": {
+        "id": "inpatient-care",
+        "name": "Inpatient Care"
+      },
+      "dataset": {
+        "id": "readmission-summary",
+        "name": "Quarterly readmission summary",
+        "table": "readmission_summary"
+      },
+      "derived": true,
+      "columns": [
+        {
+          "name": "year",
+          "type": "integer",
+          "primary_identifier": true
+        },
+        {
+          "name": "quarter",
+          "type": "integer",
+          "primary_identifier": true
+        },
+        {
+          "name": "presentations",
+          "type": "integer",
+          "primary_identifier": false
+        },
+        {
+          "name": "readmissions_30d",
+          "type": "integer",
+          "primary_identifier": false
+        },
+        {
+          "name": "readmission_rate",
+          "type": "number",
+          "primary_identifier": false
+        }
+      ],
+      "cohort": [
+        {
+          "column": "year",
+          "lower": 2021,
+          "upper": 2024
+        }
+      ],
+      "expected_rows": 16
+    },
+    {
+      "file": "death_registrations.csv",
+      "format": "csv",
+      "agency": {
+        "id": "civil-registry",
+        "name": "Civil Registry Office (mock)"
+      },
+      "collection": {
+        "id": "death-registrations",
+        "name": "Death Registrations"
+      },
+      "dataset": {
+        "id": "deaths",
+        "name": "Death registrations",
+        "table": "death_registrations"
+      },
+      "derived": false,
+      "columns": [
+        {
+          "name": "death_registration_id",
+          "type": "string",
+          "primary_identifier": true
+        },
+        {
+          "name": "person_key",
+          "type": "string",
+          "primary_identifier": false
+        },
+        {
+          "name": "date_of_death",
+          "type": "date",
+          "primary_identifier": false
+        },
+        {
+          "name": "cause_group",
+          "type": "string",
+          "primary_identifier": false
+        }
+      ],
+      "cohort": [
+        {
+          "column": "date_of_death",
+          "lower": "2021-01-01",
+          "upper": "2025-06-30"
+        }
+      ],
+      "expected_rows": 11
+    }
+  ]
+}
